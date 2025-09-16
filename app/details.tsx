@@ -213,7 +213,7 @@ const MaterialsManager: React.FC = () => {
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
-            {/* Header */}
+            {/* Header - Fixed */}
             <View style={styles.header}>
                 <View style={styles.headerLeft}>
                     <Ionicons name="stats-chart-outline" size={24} color="#000" />
@@ -225,106 +225,118 @@ const MaterialsManager: React.FC = () => {
                 </TouchableOpacity>
             </View>
 
-            {/* Search Bar */}
-            <View style={styles.searchContainer}>
-                <Ionicons name="search-outline" size={20} color="#9CA3AF" style={styles.searchIcon} />
-                <TextInput
-                    style={styles.searchInput}
-                    placeholder="Search materials..."
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                />
-            </View>
+            {/* Scrollable Content */}
+            <ScrollView
+                style={styles.scrollContainer}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+            >
+                {/* Search Bar */}
+                <View style={styles.searchContainer}>
+                    <Ionicons name="search-outline" size={20} color="#9CA3AF" style={styles.searchIcon} />
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="Search materials..."
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                    />
+                </View>
 
-            {/* Period Filters */}
-            <View style={styles.periodContainer}>
-                {periods.map((period) => (
+                {/* Period Filters */}
+                <View style={styles.periodContainer}>
+                    {periods.map((period) => (
+                        <TouchableOpacity
+                            key={period}
+                            style={[
+                                styles.periodButton,
+                                selectedPeriod === period && styles.periodButtonActive
+                            ]}
+                            onPress={() => setSelectedPeriod(period)}
+                        >
+                            <Text style={[
+                                styles.periodText,
+                                selectedPeriod === period && styles.periodTextActive
+                            ]}>
+                                {period}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+
+                {/* Tab Selector */}
+                <View style={styles.tabContainer}>
                     <TouchableOpacity
-                        key={period}
-                        style={[
-                            styles.periodButton,
-                            selectedPeriod === period && styles.periodButtonActive
-                        ]}
-                        onPress={() => setSelectedPeriod(period)}
+                        style={[styles.tab, activeTab === 'imported' && styles.activeTab]}
+                        onPress={() => setActiveTab('imported')}
                     >
-                        <Text style={[
-                            styles.periodText,
-                            selectedPeriod === period && styles.periodTextActive
-                        ]}>
-                            {period}
+                        <Ionicons name="download-outline" size={16} color={activeTab === 'imported' ? '#000' : '#6B7280'} />
+                        <Text style={[styles.tabText, activeTab === 'imported' && styles.activeTabText]}>
+                            Total Material Imported
                         </Text>
                     </TouchableOpacity>
-                ))}
-            </View>
-
-            {/* Tab Selector */}
-            <View style={styles.tabContainer}>
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'imported' && styles.activeTab]}
-                    onPress={() => setActiveTab('imported')}
-                >
-                    <Ionicons name="download-outline" size={16} color={activeTab === 'imported' ? '#000' : '#6B7280'} />
-                    <Text style={[styles.tabText, activeTab === 'imported' && styles.activeTabText]}>
-                        Total Material Imported
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'used' && styles.activeTab]}
-                    onPress={() => setActiveTab('used')}
-                >
-                    <Ionicons name="trending-down-outline" size={16} color={activeTab === 'used' ? '#000' : '#6B7280'} />
-                    <Text style={[styles.tabText, activeTab === 'used' && styles.activeTabText]}>
-                        Total Material Used
-                    </Text>
-                </TouchableOpacity>
-            </View>
-
-            {/* Summary Cards */}
-            <View style={styles.summaryContainer}>
-                <View style={styles.summaryCard}>
-                    <Text style={styles.summaryLabel}>Total Materials</Text>
-                    <Text style={styles.summaryValue}>{totalMaterials}</Text>
+                    <TouchableOpacity
+                        style={[styles.tab, activeTab === 'used' && styles.activeTab]}
+                        onPress={() => setActiveTab('used')}
+                    >
+                        <Ionicons name="trending-down-outline" size={16} color={activeTab === 'used' ? '#000' : '#6B7280'} />
+                        <Text style={[styles.tabText, activeTab === 'used' && styles.activeTabText]}>
+                            Total Material Used
+                        </Text>
+                    </TouchableOpacity>
                 </View>
-                <View style={styles.summaryCard}>
-                    <Text style={styles.summaryLabel}>Total Cost</Text>
-                    <Text style={styles.summaryValue}>{formatPrice(totalCost)}</Text>
+
+                {/* Summary Cards */}
+                <View style={styles.summaryContainer}>
+                    <View style={styles.summaryCard}>
+                        <Text style={styles.summaryLabel}>Total Materials</Text>
+                        <Text style={styles.summaryValue}>{totalMaterials}</Text>
+                    </View>
+                    <View style={styles.summaryCard}>
+                        <Text style={styles.summaryLabel}>Total Cost</Text>
+                        <Text style={styles.summaryValue}>{formatPrice(totalCost)}</Text>
+                    </View>
                 </View>
-            </View>
 
-            {/* Table Header */}
-            <View style={styles.tableHeader}>
-                <Text style={[styles.tableHeaderText, { flex: 3 }]}>Material</Text>
-                <Text style={[styles.tableHeaderText, { flex: 2 }]}>Quantity</Text>
-                <Text style={[styles.tableHeaderText, { flex: 2 }]}>Price</Text>
-            </View>
-
-            {/* Materials List */}
-            <ScrollView style={styles.listContainer} showsVerticalScrollIndicator={false}>
-                {filteredMaterials.map((material, index) => (
-                    <View key={material.id} style={styles.materialRow}>
-                        <View style={[styles.materialName, { flex: 3 }]}>
-                            <View style={[styles.iconContainer, { backgroundColor: material.color + '20' }]}>
-                                <Ionicons name={material.icon} size={20} color={material.color} />
+                {/* Materials List */}
+                <View style={styles.materialsSection}>
+                    {filteredMaterials.map((material, index) => (
+                        <View key={material.id} style={styles.materialCard}>
+                            {/* Material Header */}
+                            <View style={styles.materialHeader}>
+                                <View style={styles.materialTitleSection}>
+                                    <View style={[styles.iconContainer, { backgroundColor: material.color + '20' }]}>
+                                        <Ionicons name={material.icon} size={24} color={material.color} />
+                                    </View>
+                                    <View style={styles.materialTitleInfo}>
+                                        <Text style={styles.materialNameText}>{material.name}</Text>
+                                        <View style={[styles.categoryTag, { backgroundColor: material.color }]}>
+                                            <Text style={styles.categoryText}>{material.category}</Text>
+                                        </View>
+                                    </View>
+                                </View>
+                                <Text style={styles.dateText}>{material.date}</Text>
                             </View>
-                            <View style={styles.materialInfo}>
-                                <Text style={styles.materialNameText}>{material.name}</Text>
-                                <View style={[styles.categoryTag, { backgroundColor: material.color }]}>
-                                    <Text style={styles.categoryText}>{material.category}</Text>
+
+                            {/* Material Details */}
+                            <View style={styles.materialDetails}>
+                                <View style={styles.detailItem}>
+                                    <Text style={styles.detailLabel}>Quantity</Text>
+                                    <View style={styles.detailValueContainer}>
+                                        <Text style={styles.detailValue}>{material.quantity}</Text>
+                                        <Text style={styles.detailUnit}>{material.unit}</Text>
+                                    </View>
+                                </View>
+
+                                <View style={styles.detailDivider} />
+
+                                <View style={styles.detailItem}>
+                                    <Text style={styles.detailLabel}>Total Price</Text>
+                                    <Text style={styles.priceValue}>{formatPrice(material.price)}</Text>
                                 </View>
                             </View>
                         </View>
-
-                        <View style={[styles.quantityContainer, { flex: 2 }]}>
-                            <Text style={styles.quantityNumber}>{material.quantity}</Text>
-                            <Text style={styles.quantityUnit}>{material.unit}</Text>
-                        </View>
-
-                        <View style={[styles.priceContainer, { flex: 2 }]}>
-                            <Text style={styles.priceText}>{formatPrice(material.price)}</Text>
-                            <Text style={styles.dateText}>{material.date}</Text>
-                        </View>
-                    </View>
-                ))}
+                    ))}
+                </View>
             </ScrollView>
         </SafeAreaView>
     );
@@ -343,6 +355,7 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         borderBottomWidth: 1,
         borderBottomColor: '#F3F4F6',
+        backgroundColor: '#fff',
     },
     headerLeft: {
         flexDirection: 'row',
@@ -366,6 +379,12 @@ const styles = StyleSheet.create({
         color: '#fff',
         marginLeft: 4,
         fontWeight: '500',
+    },
+    scrollContainer: {
+        flex: 1,
+    },
+    scrollContent: {
+        paddingBottom: 30,
     },
     searchContainer: {
         flexDirection: 'row',
@@ -469,104 +488,113 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#000',
     },
-    tableHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
+    materialsSection: {
         paddingHorizontal: 20,
-        paddingVertical: 16,
-        backgroundColor: '#9CA3AF',
-        marginHorizontal: 20,
-        borderRadius: 12,
-        marginBottom: 4,
+        backgroundColor: '#F8FAFC',
+        paddingTop: 16,
     },
-    tableHeaderText: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#fff',
-        textAlign: 'left',
-    },
-    listContainer: {
-        flex: 1,
-        paddingHorizontal: 20,
-    },
-    materialRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 20,
-        paddingHorizontal: 20,
+    materialCard: {
         backgroundColor: '#fff',
-        marginBottom: 2,
-        borderRadius: 0,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F3F4F6',
+        borderRadius: 16,
+        marginBottom: 16,
+        padding: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 4,
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
     },
-    materialText: {
-        fontSize: 14,
-        color: '#000',
-        textAlign: 'center',
+    materialHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 16,
     },
-    materialName: {
+    materialTitleSection: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingRight: 16,
+        flex: 1,
     },
-    iconContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 12,
-    },
-    materialInfo: {
+    materialTitleInfo: {
         flex: 1,
     },
     materialNameText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#000',
-        marginBottom: 6,
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1E293B',
+        marginBottom: 8,
+    },
+    iconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.8)',
     },
     categoryTag: {
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 16,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
         alignSelf: 'flex-start',
     },
     categoryText: {
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: '600',
         color: '#fff',
         textTransform: 'capitalize',
     },
-    quantityContainer: {
-        alignItems: 'flex-start',
-        paddingRight: 16,
-    },
-    quantityNumber: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#000',
-        marginBottom: 4,
-    },
-    quantityUnit: {
-        fontSize: 13,
-        color: '#6B7280',
-        fontWeight: '500',
-    },
-    priceContainer: {
-        alignItems: 'flex-start',
-    },
-    priceText: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#000',
-        marginBottom: 4,
-    },
     dateText: {
-        fontSize: 13,
-        color: '#6B7280',
+        fontSize: 14,
+        color: '#64748B',
         fontWeight: '500',
+        backgroundColor: '#F8FAFC',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
+    },
+    materialDetails: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    detailItem: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    detailLabel: {
+        fontSize: 14,
+        color: '#64748B',
+        fontWeight: '500',
+        marginBottom: 8,
+    },
+    detailValueContainer: {
+        alignItems: 'center',
+    },
+    detailValue: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#1E293B',
+        marginBottom: 2,
+    },
+    detailUnit: {
+        fontSize: 13,
+        color: '#64748B',
+        fontWeight: '500',
+    },
+    detailDivider: {
+        width: 1,
+        height: 40,
+        backgroundColor: '#E2E8F0',
+        marginHorizontal: 20,
+    },
+    priceValue: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#059669',
     },
     editButton: {
         alignItems: 'center',
