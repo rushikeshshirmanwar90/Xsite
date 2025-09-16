@@ -3,7 +3,6 @@ import { router } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
     Animated,
-    Dimensions,
     Modal,
     ScrollView,
     StatusBar,
@@ -11,11 +10,10 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const { width } = Dimensions.get('window');
 
 // Types
 interface Material {
@@ -203,7 +201,7 @@ const Details: React.FC = () => {
             })
         );
         Animated.stagger(50, animations).start();
-    }, []);
+    }, [cardAnimations]);
 
     React.useEffect(() => {
         if (searchModalVisible) {

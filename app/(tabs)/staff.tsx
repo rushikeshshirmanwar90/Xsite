@@ -4,7 +4,8 @@ import StaffHeader from '@/components/staff/StaffHeader';
 import StaffList from '@/components/staff/StaffList';
 import { dummyStaff } from '@/data/staff';
 import { Staff } from '@/types/staff';
-import React, { useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useEffect, useState } from 'react';
 import {
     Alert,
     StatusBar,
@@ -16,13 +17,29 @@ const StaffManagement: React.FC = () => {
     const [staffList, setStaffList] = useState<Staff[]>(dummyStaff);
     const [showAddModal, setShowAddModal] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [clientId, setClientId] = useState('');
 
-    const handleAddStaff = (newStaff: Omit<Staff, 'id'>) => {
-        const staffWithId: Staff = {
+    useEffect(() => {
+        const getClientId = async () => {
+            const userDetailsString = await AsyncStorage.getItem("user");
+            console.log(userDetailsString);
+            const userDetails = userDetailsString ? JSON.parse(userDetailsString) : null;
+            setClientId(userDetails?._id);
+        }
+
+        getClientId();
+
+    }, [clientId])
+
+    const handleAddStaff = (newStaff: Staff) => {
+
+        const payload = {
             ...newStaff,
-            id: Math.max(...staffList.map(s => s.id), 0) + 1
-        };
-        setStaffList([...staffList, staffWithId]);
+            clientId: clientId
+        }
+
+        console.log(payload)
+
         Alert.alert('Success', 'Staff member added successfully!');
     };
 

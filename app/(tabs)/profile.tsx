@@ -1,3 +1,4 @@
+import { useAuth } from '@/contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
@@ -10,6 +11,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
@@ -171,6 +173,7 @@ const ProjectExpenseItem: React.FC<ProjectExpenseItemProps> = ({ project }) => {
                     </View>
                     <Text style={styles.progressText}>{progressPercentage.toFixed(0)}%</Text>
                 </View>
+
             </View>
         </View>
     );
@@ -188,6 +191,17 @@ const CompanyProfile: React.FC = () => {
             return `₹${(amount / 100000).toFixed(1)} L`;
         }
         return `₹${(amount / 1000).toFixed(0)}K`;
+    };
+
+    const { logout } = useAuth();
+
+    const handleLogout = async () => {
+        try {
+            await logout();
+            // Navigation will be handled automatically by the AuthContext and layout
+        } catch (error) {
+            console.error('Logout error:', error);
+        }
     };
 
     return (
@@ -377,6 +391,11 @@ const CompanyProfile: React.FC = () => {
                         </View>
                     </View>
                 )}
+
+                <TouchableOpacity onPress={handleLogout} >
+                    <Text>Logout</Text>
+                </TouchableOpacity>
+
             </ScrollView>
         </SafeAreaView>
     );

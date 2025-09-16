@@ -43,7 +43,7 @@ export default function LoginScreen() {
             const res = await AsyncStorage.getItem("user")
 
             if (res) {
-                router.push({
+                router.replace({
                     pathname: "/(tabs)"
                 })
             }
@@ -131,7 +131,7 @@ export default function LoginScreen() {
                 const jsonUser = JSON.stringify(user.isUser);
                 await AsyncStorage.setItem("user", jsonUser);
                 toast.success('Password set successfully');
-                router.push({
+                router.replace({
                     pathname: "/(tabs)"
                 });
             } else {
