@@ -3,10 +3,10 @@ import Loading from '@/components/Loading';
 import AddStaffModal from '@/components/staff/AddStaffModel';
 import StaffHeader from '@/components/staff/StaffHeader';
 import StaffList from '@/components/staff/StaffList';
+import { getClientId } from '@/functions/clientId';
 import { addStaff } from '@/functions/staff';
 import { domain } from '@/lib/domain';
 import { Staff } from '@/types/staff';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import React, { useEffect, useState } from 'react';
 import {
@@ -25,18 +25,11 @@ const StaffManagement: React.FC = () => {
 
     // !! fetching clientId
     useEffect(() => {
-        const getClientId = async () => {
-            try {
-                const userDetailsString = await AsyncStorage.getItem("user");
-                console.log(userDetailsString);
-                const userDetails = userDetailsString ? JSON.parse(userDetailsString) : null;
-                setClientId(userDetails?._id || '');
-            } catch (error) {
-                console.error('Error getting client ID:', error);
-            }
-        };
-
-        getClientId();
+        const fetchClientId = async () => {
+            const id = await getClientId();
+            setClientId(id)
+        }
+        fetchClientId()
     }, []); // Empty dependency array to run only once
 
 

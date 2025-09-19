@@ -17,20 +17,15 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails }) => 
         ['#F59E0B', '#EF4444'],
         ['#8B5CF6', '#EC4899'],
         ['#14B8A6', '#3B82F6']
-    ];
+    ] as const;
 
-    const gradient = gradients[project.id % gradients.length];
-
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'active': return { bg: '#DCFCE7', text: '#166534' };
-            case 'planning': return { bg: '#FEF3C7', text: '#92400E' };
-            case 'completed': return { bg: '#DBEAFE', text: '#1E40AF' };
-            default: return { bg: '#F3F4F6', text: '#374151' };
-        }
-    };
-
-    const statusColor = getStatusColor(project.status);
+    // Robust gradient selection: support string or number _id
+    const idNumber = typeof project._id === 'number'
+        ? project._id
+        : typeof project._id === 'string'
+            ? (project._id as string).split('').reduce((acc: number, ch: string) => acc + ch.charCodeAt(0), 0)
+            : 0;
+    const gradient = gradients[idNumber % gradients.length];
 
     return (
         <View style={styles.card}>
@@ -40,14 +35,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails }) => 
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
             >
-                <View style={styles.cardHeaderContent}>
-                    <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
-                        <Text style={[styles.statusText, { color: statusColor.text }]}>
-                            {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
-                        </Text>
-                    </View>
-                    <Text style={styles.progressText}>{project.progress}% Complete</Text>
-                </View>
             </LinearGradient>
 
             <View style={styles.cardBody}>
@@ -60,46 +47,38 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails }) => 
 
                 <View style={styles.infoRow}>
                     <Ionicons name="person-outline" size={16} color="#6B7280" />
-                    <Text style={styles.infoTextBold}>{project.assignedStaff}</Text>
+                    <Text style={styles.infoTextBold}>
+                        {Array.isArray(project.assignedStaff) && project.assignedStaff.length > 0
+                            ? project.assignedStaff.length === 1
+                                ? `${project.assignedStaff.length} staff member assigned`
+                                : `${project.assignedStaff.length} staff members assigned`
+                            : 'No staff assigned'
+                        }
+                    </Text>
                 </View>
 
                 <View style={styles.infoRow}>
                     <Ionicons name="calendar-outline" size={16} color="#6B7280" />
                     <Text style={styles.infoText}>
-                        {new Date(project.startDate).toLocaleDateString('en-IN')} - {new Date(project.endDate).toLocaleDateString('en-IN')}
+
                     </Text>
                 </View>
-
-                <View style={styles.progressContainer}>
-                    <View style={styles.progressHeader}>
-                        <Text style={styles.progressLabel}>Progress</Text>
-                        <Text style={styles.progressValue}>{project.progress}%</Text>
-                    </View>
-                    <View style={styles.progressBar}>
-                        <LinearGradient
-                            colors={['#3B82F6', '#8B5CF6']}
-                            style={[styles.progressFill, { width: `${project.progress}%` }]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                        />
-                    </View>
-                </View>
-
-                <TouchableOpacity
-                    style={styles.viewButton}
-                    onPress={() => onViewDetails(project)}
-                >
-                    <LinearGradient
-                        colors={['#3B82F6', '#8B5CF6']}
-                        style={styles.viewButtonGradient}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                    >
-                        <Ionicons name="eye-outline" size={18} color="white" />
-                        <Text style={styles.viewButtonText}>View Details</Text>
-                    </LinearGradient>
-                </TouchableOpacity>
             </View>
+
+            <TouchableOpacity
+                style={styles.viewButton}
+                onPress={() => onViewDetails(project)}
+            >
+                <LinearGradient
+                    colors={['#3B82F6', '#8B5CF6']}
+                    style={styles.viewButtonGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                >
+                    <Ionicons name="eye-outline" size={18} color="white" />
+                    <Text style={styles.viewButtonText}>View Details</Text>
+                </LinearGradient>
+            </TouchableOpacity>
         </View>
     );
 };

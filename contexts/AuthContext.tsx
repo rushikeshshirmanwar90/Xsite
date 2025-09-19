@@ -5,6 +5,8 @@ import { AppState, AppStateStatus } from 'react-native';
 interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
+  user: any | null;
+  clientId: string | null;
   checkAuthStatus: () => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -26,6 +28,8 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<any | null>(null);
+  const [clientId, setClientId] = useState<string | null>(null);
 
   const checkAuthStatus = async () => {
     try {
@@ -35,19 +39,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const data = JSON.parse(userDetails);
           if (data && typeof data === 'object' && Object.keys(data).length > 0) {
             setIsAuthenticated(true);
+            setUser(data);
+            setClientId(typeof data?._id === 'string' ? data._id : null);
           } else {
             setIsAuthenticated(false);
+            setUser(null);
+            setClientId(null);
           }
         } catch (parseError) {
           console.error('Error parsing user data:', parseError);
           setIsAuthenticated(false);
+          setUser(null);
+          setClientId(null);
         }
       } else {
         setIsAuthenticated(false);
+        setUser(null);
+        setClientId(null);
       }
     } catch (error) {
       console.error('Error checking auth status:', error);
       setIsAuthenticated(false);
+      setUser(null);
+      setClientId(null);
     } finally {
       setIsLoading(false);
     }
@@ -57,11 +71,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       await AsyncStorage.removeItem('user');
       setIsAuthenticated(false);
+      setUser(null);
+      setClientId(null);
     } catch (error) {
       console.error('Logout error:', error);
       // Fallback: try to set empty string if remove fails
       await AsyncStorage.setItem('user', '');
       setIsAuthenticated(false);
+      setUser(null);
+      setClientId(null);
     }
   };
 
@@ -91,6 +109,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const value: AuthContextType = {
     isAuthenticated,
     isLoading,
+    user,
+    clientId,
     checkAuthStatus,
     logout,
   };

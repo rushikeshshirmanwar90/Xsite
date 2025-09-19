@@ -1,54 +1,69 @@
-import styles from '@/style/project';
+// App.tsx
+import { styles } from "@/style/adminHome";
 import { Project } from '@/types/project';
+import { AddProjectModalProps, StaffMembers } from '@/types/staff';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
-import { Alert, Modal, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-const staffMembers: string[] = [
-    "Rajesh Kumar",
-    "Priya Sharma",
-    "Amit Patel",
-    "Sneha Reddy",
-    "Vikram Singh",
-    "Kavya Nair",
-    "Rohit Gupta"
-];
+import {
+    Alert,
+    Modal,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
+} from 'react-native';
 
-interface AddProjectModalProps {
-    visible: boolean;
-    onClose: () => void;
-    onAdd: (project: Omit<Project, 'id'>) => void;
-}
-
-const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onAdd }) => {
+const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onAdd, staffMembers }) => {
     const [projectName, setProjectName] = useState('');
     const [projectAddress, setProjectAddress] = useState('');
-    const [assignedTo, setAssignedTo] = useState('');
+    const [projectDescription, setProjectDescription] = useState('');
+    const [assignedTo, setAssignedTo] = useState<StaffMembers[]>([]);
     const [showStaffDropdown, setShowStaffDropdown] = useState(false);
 
+    const handleStaffSelection = (staff: StaffMembers) => {
+        const isSelected = assignedTo.some(member => member._id === staff._id);
+
+        if (isSelected) {
+            // Remove staff member
+            setAssignedTo(assignedTo.filter(member => member._id !== staff._id));
+        } else {
+            // Add staff member
+            setAssignedTo([...assignedTo, staff]);
+        }
+    };
+
+    const isStaffSelected = (staff: StaffMembers) => {
+        return assignedTo.some(member => member._id === staff._id);
+    };
+
+    const getSelectedStaffText = () => {
+        if (assignedTo.length === 0) return 'Select staff members';
+        if (assignedTo.length === 1) return assignedTo[0].fullName;
+        if (assignedTo.length === 2) return `${assignedTo[0].fullName} and ${assignedTo[1].fullName}`;
+        return `${assignedTo[0].fullName} and ${assignedTo.length - 1} others`;
+    };
+
     const handleSubmit = () => {
-        if (projectName && projectAddress && assignedTo) {
-            const newProject: Omit<Project, 'id'> = {
+        if (projectName && projectAddress && assignedTo.length > 0) {
+            const newProject: Project = {
                 name: projectName,
                 address: projectAddress,
                 assignedStaff: assignedTo,
-                status: 'planning',
-                startDate: new Date().toISOString().split('T')[0],
-                endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                progress: 0,
-                totalMaterials: 0,
-                materialsReceived: 0,
-                materialsIssued: 0,
-                recentActivities: []
+                description: projectDescription
             };
+
+            console.log(newProject)
+
             onAdd(newProject);
             setProjectName('');
             setProjectAddress('');
-            setAssignedTo('');
+            setProjectDescription('');
+            setAssignedTo([]);
             onClose();
         } else {
-            Alert.alert('Error', 'Please fill all fields');
+            Alert.alert('Error', 'Please fill all fields and assign at least one staff member');
         }
     };
 
@@ -82,29 +97,48 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                             numberOfLines={2}
                         />
 
+                        <Text style={styles.label}>Project Description</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={projectDescription}
+                            onChangeText={setProjectDescription}
+                            placeholder="Enter project description"
+                            multiline
+                            numberOfLines={2}
+                        />
+
                         <Text style={styles.label}>Assign To</Text>
                         <TouchableOpacity
                             style={styles.dropdown}
                             onPress={() => setShowStaffDropdown(!showStaffDropdown)}
                         >
-                            <Text style={assignedTo ? styles.dropdownText : styles.dropdownPlaceholder}>
-                                {assignedTo || 'Select staff member'}
+                            <Text style={assignedTo.length > 0 ? styles.dropdownText : styles.dropdownPlaceholder}>
+                                {getSelectedStaffText()}
                             </Text>
                             <Ionicons name="chevron-down" size={20} color="#6B7280" />
                         </TouchableOpacity>
 
                         {showStaffDropdown && (
                             <View style={styles.dropdownList}>
-                                {staffMembers.map((staff, index) => (
+                                {staffMembers.map((staff: StaffMembers) => (
                                     <TouchableOpacity
-                                        key={index}
+                                        key={staff._id}
                                         style={styles.dropdownItem}
-                                        onPress={() => {
-                                            setAssignedTo(staff);
-                                            setShowStaffDropdown(false);
-                                        }}
+                                        onPress={() => handleStaffSelection(staff)}
                                     >
-                                        <Text style={styles.dropdownItemText}>{staff}</Text>
+                                        <View style={styles.checkboxContainer}>
+                                            <View style={[
+                                                styles.checkbox,
+                                                isStaffSelected(staff) && styles.checkboxSelected
+                                            ]}>
+                                                {isStaffSelected(staff) && (
+                                                    <Ionicons name="checkmark" size={16} color="#fff" />
+                                                )}
+                                            </View>
+                                            <Text style={styles.dropdownItemText} numberOfLines={1} ellipsizeMode="tail">
+                                                {staff.fullName}
+                                            </Text>
+                                        </View>
                                     </TouchableOpacity>
                                 ))}
                             </View>
