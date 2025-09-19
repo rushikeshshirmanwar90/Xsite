@@ -15,8 +15,8 @@ const StaffCard: React.FC<StaffCardProps> = ({ staff, onPress }) => {
         return (firstName[0] + lastName[0]).toUpperCase();
     };
 
-    const getRandomColor = (id: number): string[] => {
-        const colors = [
+    const getRandomColor = (id: string | undefined): readonly [string, string] => {
+        const colors: readonly [string, string][] = [
             ['#3B82F6', '#1D4ED8'],
             ['#10B981', '#059669'],
             ['#F59E0B', '#D97706'],
@@ -26,10 +26,12 @@ const StaffCard: React.FC<StaffCardProps> = ({ staff, onPress }) => {
             ['#84CC16', '#65A30D'],
             ['#F97316', '#EA580C']
         ];
-        return colors[id % colors.length];
+        // Convert string ID to a number for color selection
+        const idNumber = id ? id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
+        return colors[idNumber % colors.length];
     };
 
-    const avatarColors = getRandomColor(staff.id);
+    const avatarColors = getRandomColor(staff._id?.toString());
     const fullName = `${staff.firstName} ${staff.lastName}`;
 
     return (

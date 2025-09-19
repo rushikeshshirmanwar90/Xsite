@@ -1,12 +1,13 @@
 // types/Staff.ts
 export interface Staff {
-  id?: number;
+  _id?: string;
   firstName: string;
   lastName: string;
   phoneNumber: string;
   email: string;
   assignedProjects: string[];
   role: string;
+  clientId?: string;
 }
 
 export interface AddStaffModalProps {

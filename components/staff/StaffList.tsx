@@ -24,7 +24,7 @@ const StaffList: React.FC<StaffListProps> = ({
     return (
         <FlatList
             data={staffData}
-            keyExtractor={(item) => item.id.toString()}
+            keyExtractor={(item) => String(item._id || '')}
             renderItem={({ item }) => (
                 <StaffCard
                     staff={item}
