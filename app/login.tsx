@@ -132,8 +132,8 @@ export default function LoginScreen() {
             if (res) {
                 const user = await getUser(email, userType);
                 console.log(user)
-                const jsonUser = JSON.stringify(user.isUser);
-                await AsyncStorage.setItem("user", jsonUser);
+                const jsonUser = JSON.stringify(user);
+                await AsyncStorage.setItem(userType, jsonUser);
                 toast.success('Password set successfully');
                 router.replace({
                     pathname: "/(tabs)"
