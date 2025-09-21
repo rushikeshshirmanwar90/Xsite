@@ -11,7 +11,7 @@ interface ProjectCardProps {
 }
 
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails }) => {
-    const gradients = [
+    const gradients: [string, string][] = [
         ['#3B82F6', '#8B5CF6'],
         ['#10B981', '#14B8A6'],
         ['#F59E0B', '#EF4444'],
