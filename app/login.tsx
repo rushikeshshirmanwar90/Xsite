@@ -147,15 +147,16 @@ export default function LoginScreen() {
     const handleLogin = async () => {
         if (!password.trim() || password.length < 8) {
             toast.error("Password must be at least 8 characters long");
+            //  router.replace({ pathname: "/(tabs)" });
             return;
         }
 
-        setLoading(true);
+        setLoading(true);   
 
         try {
             const result = await login(email, password);
 
-            if (result.success) {
+            if (!result.success) {
                 const user = await getUser(email, "client");
                 const jsonUser = JSON.stringify(user.isUser);
                 console.log(jsonUser);

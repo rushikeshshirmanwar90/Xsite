@@ -1,17 +1,14 @@
 // App.tsx
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-    Alert,
-    Modal,
     ScrollView,
     StatusBar,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -29,6 +26,9 @@ interface Project {
     totalMaterials: number;
     materialsReceived: number;
     materialsIssued: number;
+    priority: 'high' | 'medium' | 'low';
+    budget: number;
+    spent: number;
     recentActivities: Activity[];
 }
 
@@ -39,7 +39,18 @@ interface Activity {
     date: string;
 }
 
-// Utility function to generate initials from company name
+interface ProjectStats {
+    totalProjects: number;
+    activeProjects: number;
+    completedProjects: number;
+    averageProgress: number;
+    totalBudget: number;
+    totalSpent: number;
+    highPriorityProjects: number;
+    overdueProjects: number;
+}
+
+// Utility functions
 const generateInitials = (companyName: string): string => {
     if (!companyName) return 'XX';
     
@@ -71,13 +82,55 @@ const generateInitials = (companyName: string): string => {
         .toUpperCase();
 };
 
+const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+    }).format(amount);
+};
+
+const isProjectOverdue = (endDate: string, progress: number): boolean => {
+    const today = new Date();
+    const projectEndDate = new Date(endDate);
+    const daysRemaining = Math.ceil((projectEndDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
+    
+    // Consider overdue if less than 30 days remaining and progress < 80%
+    return daysRemaining < 30 && progress < 80 && progress < 100;
+};
+
+const calculateProjectStats = (projects: Project[]): ProjectStats => {
+    const totalProjects = projects.length;
+    const activeProjects = projects.filter(p => p.status === 'active').length;
+    const completedProjects = projects.filter(p => p.status === 'completed').length;
+    const averageProgress = totalProjects > 0 
+        ? Math.round(projects.reduce((acc, p) => acc + p.progress, 0) / totalProjects) 
+        : 0;
+    const totalBudget = projects.reduce((acc, p) => acc + p.budget, 0);
+    const totalSpent = projects.reduce((acc, p) => acc + p.spent, 0);
+    const highPriorityProjects = projects.filter(p => p.priority === 'high').length;
+    const overdueProjects = projects.filter(p => isProjectOverdue(p.endDate, p.progress)).length;
+
+    return {
+        totalProjects,
+        activeProjects,
+        completedProjects,
+        averageProgress,
+        totalBudget,
+        totalSpent,
+        highPriorityProjects,
+        overdueProjects
+    };
+};
+
 // Company configuration
 const COMPANY_CONFIG = {
     name: "Sharda Constructions",
-    subtitle: "Project Management"
+    subtitle: "Project Management Dashboard"
 };
 
-// Dummy data
+// Enhanced dummy data with more realistic details
 const dummyProjects: Project[] = [
     {
         id: 1,
@@ -85,12 +138,15 @@ const dummyProjects: Project[] = [
         address: "Baner Road, Pune, Maharashtra 411045",
         assignedStaff: "Rajesh Kumar",
         status: "active",
-        startDate: "2024-10-01",
-        endDate: "2026-03-01",
-        progress: 45,
+        startDate: "2024-01-15",
+        endDate: "2025-06-30",
+        progress: 98,
         totalMaterials: 156,
         materialsReceived: 124,
         materialsIssued: 89,
+        priority: "high",
+        budget: 66300000,
+        spent: 66300000,
         recentActivities: [
             { type: "received", material: "Modular Bricks", quantity: "10,000 pcs", date: "2024-09-10" },
             { type: "issued", material: "Cement Bags", quantity: "150 bags", date: "2024-09-09" },
@@ -103,12 +159,15 @@ const dummyProjects: Project[] = [
         address: "Hinjewadi Phase 2, Pune, Maharashtra 411057",
         assignedStaff: "Priya Sharma",
         status: "active",
-        startDate: "2024-08-15",
+        startDate: "2024-03-01",
         endDate: "2025-12-15",
-        progress: 65,
+        progress: 45,
         totalMaterials: 203,
         materialsReceived: 189,
         materialsIssued: 156,
+        priority: "medium",
+        budget: 120000000,
+        spent: 54000000,
         recentActivities: [
             { type: "received", material: "Ready Mix Concrete", quantity: "50 m³", date: "2024-09-12" },
             { type: "issued", material: "Sand", quantity: "25 m³", date: "2024-09-11" },
@@ -127,6 +186,9 @@ const dummyProjects: Project[] = [
         totalMaterials: 89,
         materialsReceived: 12,
         materialsIssued: 8,
+        priority: "low",
+        budget: 95000000,
+        spent: 14250000,
         recentActivities: [
             { type: "ordered", material: "Foundation Steel", quantity: "15 tons", date: "2024-09-13" },
             { type: "received", material: "Survey Equipment", quantity: "1 set", date: "2024-09-12" }
@@ -138,28 +200,60 @@ const dummyProjects: Project[] = [
         address: "Kothrud, Pune, Maharashtra 411038",
         assignedStaff: "Sneha Reddy",
         status: "active",
-        startDate: "2024-06-01",
-        endDate: "2025-10-01",
-        progress: 78,
+        startDate: "2024-02-01",
+        endDate: "2024-11-30",
+        progress: 92,
         totalMaterials: 178,
         materialsReceived: 165,
         materialsIssued: 142,
+        priority: "high",
+        budget: 75000000,
+        spent: 69000000,
         recentActivities: [
             { type: "issued", material: "Paint", quantity: "200 liters", date: "2024-09-13" },
             { type: "received", material: "Door Frames", quantity: "45 units", date: "2024-09-12" },
             { type: "issued", material: "Electrical Wires", quantity: "500 meters", date: "2024-09-11" }
         ]
+    },
+    {
+        id: 5,
+        name: "Heritage Residency",
+        address: "Koregaon Park, Pune, Maharashtra 411001",
+        assignedStaff: "Vikram Singh",
+        status: "completed",
+        startDate: "2023-05-01",
+        endDate: "2024-08-01",
+        progress: 100,
+        totalMaterials: 245,
+        materialsReceived: 245,
+        materialsIssued: 245,
+        priority: "medium",
+        budget: 65000000,
+        spent: 63500000,
+        recentActivities: [
+            { type: "issued", material: "Final Touch-up Paint", quantity: "50 liters", date: "2024-07-30" },
+            { type: "received", material: "Cleaning Supplies", quantity: "1 set", date: "2024-07-28" }
+        ]
+    },
+    {
+        id: 6,
+        name: "Tech Park Phase 1",
+        address: "Magarpatta, Pune, Maharashtra 411013",
+        assignedStaff: "Kavya Nair",
+        status: "planning",
+        startDate: "2025-01-01",
+        endDate: "2026-12-01",
+        progress: 5,
+        totalMaterials: 320,
+        materialsReceived: 15,
+        materialsIssued: 0,
+        priority: "medium",
+        budget: 150000000,
+        spent: 7500000,
+        recentActivities: [
+            { type: "ordered", material: "Site Survey Equipment", quantity: "2 sets", date: "2024-09-15" }
+        ]
     }
-];
-
-const staffMembers: string[] = [
-    "Rajesh Kumar",
-    "Priya Sharma",
-    "Amit Patel",
-    "Sneha Reddy",
-    "Vikram Singh",
-    "Kavya Nair",
-    "Rohit Gupta"
 ];
 
 // Project Card Component
@@ -171,196 +265,147 @@ interface ProjectCardProps {
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails }) => {
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'active': return { bg: '#06B6D4', text: '#ffffff' }; // Cyan 500
-            case 'planning': return { bg: '#8B5CF6', text: '#ffffff' }; // Violet 500
-            case 'completed': return { bg: '#10B981', text: '#ffffff' }; // Emerald 500
-            default: return { bg: '#6B7280', text: '#ffffff' };
+            case 'active': return { bg: '#0EA5E9', text: '#ffffff', light: '#E0F2FE' };
+            case 'planning': return { bg: '#8B5CF6', text: '#ffffff', light: '#EDE9FE' };
+            case 'completed': return { bg: '#10B981', text: '#ffffff', light: '#D1FAE5' };
+            default: return { bg: '#64748B', text: '#ffffff', light: '#F1F5F9' };
+        }
+    };
+
+    const getPriorityColor = (priority: string) => {
+        switch (priority) {
+            case 'high': return { bg: '#FEE2E2', text: '#DC2626', icon: 'alert-circle' };
+            case 'medium': return { bg: '#FEF3C7', text: '#D97706', icon: 'time' };
+            case 'low': return { bg: '#D1FAE5', text: '#10B981', icon: 'checkmark-circle' };
+            default: return { bg: '#F1F5F9', text: '#64748B', icon: 'help-circle' };
         }
     };
 
     const statusColor = getStatusColor(project.status);
+    const priorityColor = getPriorityColor(project.priority);
+    const budgetProgress = (project.spent / project.budget) * 100;
+    const isOverdue = isProjectOverdue(project.endDate, project.progress);
+    
+    // Calculate days remaining
+    const today = new Date();
+    const endDate = new Date(project.endDate);
+    const daysRemaining = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
 
     return (
-        <View style={styles.card}>
+        <View style={[styles.card, isOverdue && styles.overdueCard]}>
             <View style={styles.cardHeader}>
                 <View style={styles.cardHeaderTop}>
-                    <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
-                        <Text style={[styles.statusText, { color: statusColor.text }]}>
-                            {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
-                        </Text>
+                    <View style={styles.badgeRow}>
+                        <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
+                            <Text style={[styles.statusText, { color: statusColor.text }]}>
+                                {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
+                            </Text>
+                        </View>
+                        <View style={[styles.priorityBadge, { backgroundColor: priorityColor.bg }]}>
+                            <Ionicons name={priorityColor.icon as any} size={10} color={priorityColor.text} />
+                            <Text style={[styles.priorityText, { color: priorityColor.text }]}>
+                                {project.priority.toUpperCase()}
+                            </Text>
+                        </View>
                     </View>
-                    <Text style={styles.progressText}>{project.progress}% Complete</Text>
+                    <View style={styles.progressBadge}>
+                        <Text style={styles.progressText}>{project.progress}%</Text>
+                    </View>
                 </View>
                 <Text style={styles.projectTitle}>{project.name}</Text>
+                {isOverdue && (
+                    <View style={styles.overdueWarning}>
+                        <Ionicons name="warning" size={14} color="#DC2626" />
+                        <Text style={styles.overdueText}>
+                            {daysRemaining < 0 ? 'Overdue' : `${daysRemaining} days remaining`}
+                        </Text>
+                    </View>
+                )}
             </View>
 
             <View style={styles.cardBody}>
                 <View style={styles.infoRow}>
-                    <View style={styles.iconContainer}>
-                        <Ionicons name="location-outline" size={18} color="#F59E0B" />
+                    <View style={[styles.iconContainer, { backgroundColor: statusColor.light }]}>
+                        <Ionicons name="location" size={16} color={statusColor.bg} />
                     </View>
                     <Text style={styles.infoText} numberOfLines={2}>{project.address}</Text>
                 </View>
 
                 <View style={styles.infoRow}>
-                    <View style={styles.iconContainer}>
-                        <Ionicons name="person-outline" size={18} color="#06B6D4" />
+                    <View style={[styles.iconContainer, { backgroundColor: '#FEF3C7' }]}>
+                        <Ionicons name="person" size={16} color="#D97706" />
                     </View>
                     <Text style={styles.infoTextBold}>{project.assignedStaff}</Text>
                 </View>
 
                 <View style={styles.infoRow}>
-                    <View style={styles.iconContainer}>
-                        <Ionicons name="calendar-outline" size={18} color="#8B5CF6" />
+                    <View style={[styles.iconContainer, { backgroundColor: '#F3E8FF' }]}>
+                        <Ionicons name="calendar" size={16} color="#7C3AED" />
                     </View>
                     <Text style={styles.infoText}>
                         {new Date(project.startDate).toLocaleDateString('en-IN')} - {new Date(project.endDate).toLocaleDateString('en-IN')}
                     </Text>
                 </View>
 
+                <View style={styles.budgetRow}>
+                    <View style={[styles.iconContainer, { backgroundColor: '#ECFDF5' }]}>
+                        <Ionicons name="card" size={16} color="#10B981" />
+                    </View>
+                    <View style={styles.budgetInfo}>
+                        <Text style={styles.budgetText}>
+                            {formatCurrency(project.spent)} / {formatCurrency(project.budget)}
+                        </Text>
+                        <View style={styles.budgetProgressBar}>
+                            <View style={[styles.budgetProgressFill, { 
+                                width: `${Math.min(budgetProgress, 100)}%`,
+                                backgroundColor: budgetProgress > 90 ? '#EF4444' : '#10B981'
+                            }]} />
+                        </View>
+                    </View>
+                </View>
+
                 <View style={styles.progressContainer}>
                     <View style={styles.progressHeader}>
-                        <Text style={styles.progressLabel}>Progress</Text>
-                        <Text style={styles.progressValue}>{project.progress}%</Text>
+                        <Text style={styles.progressLabel}>Project Progress</Text>
+                        <Text style={[styles.progressValue, { color: statusColor.bg }]}>{project.progress}%</Text>
                     </View>
                     <View style={styles.progressBar}>
-                        <View style={[styles.progressFill, { width: `${project.progress}%` }]} />
+                        <View style={[styles.progressFill, { 
+                            width: `${project.progress}%`,
+                            backgroundColor: statusColor.bg 
+                        }]} />
                     </View>
                 </View>
 
                 <TouchableOpacity
-                    style={styles.viewButton}
+                    style={[styles.viewButton, { backgroundColor: statusColor.bg }]}
                     onPress={() => onViewDetails(project)}
                     activeOpacity={0.8}
                 >
-                    <Ionicons name="arrow-forward" size={18} color="white" />
                     <Text style={styles.viewButtonText}>View Details</Text>
+                    <Ionicons name="arrow-forward" size={16} color="white" />
                 </TouchableOpacity>
             </View>
         </View>
     );
 };
 
-// Add Project Modal Component
-interface AddProjectModalProps {
-    visible: boolean;
-    onClose: () => void;
-    onAdd: (project: Omit<Project, 'id'>) => void;
-}
-
-// const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onAdd }) => {
-//     const [projectName, setProjectName] = useState('');
-//     const [projectAddress, setProjectAddress] = useState('');
-//     const [assignedTo, setAssignedTo] = useState('');
-//     const [showStaffDropdown, setShowStaffDropdown] = useState(false);
-
-//     const handleSubmit = () => {
-//         if (projectName && projectAddress && assignedTo) {
-//             const newProject: Omit<Project, 'id'> = {
-//                 name: projectName,
-//                 address: projectAddress,
-//                 assignedStaff: assignedTo,
-//                 status: 'planning',
-//                 startDate: new Date().toISOString().split('T')[0],
-//                 endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-//                 progress: 0,
-//                 totalMaterials: 0,
-//                 materialsReceived: 0,
-//                 materialsIssued: 0,
-//                 recentActivities: []
-//             };
-//             onAdd(newProject);
-//             setProjectName('');
-//             setProjectAddress('');
-//             setAssignedTo('');
-//             onClose();
-//         } else {
-//             Alert.alert('Error', 'Please fill all fields');
-//         }
-//     };
-
-//     return (
-//         <Modal visible={visible} animationType="slide" transparent>
-//             <View style={styles.modalOverlay}>
-//                 <View style={styles.modalContent}>
-//                     <View style={styles.modalHeader}>
-//                         <Text style={styles.modalTitle}>Add New Project</Text>
-//                         <TouchableOpacity onPress={onClose}>
-//                             <Ionicons name="close" size={24} color="#374151" />
-//                         </TouchableOpacity>
-//                     </View>
-
-//                     <View style={styles.form}>
-//                         <Text style={styles.label}>Project Name</Text>
-//                         <TextInput
-//                             style={styles.input}
-//                             value={projectName}
-//                             onChangeText={setProjectName}
-//                             placeholder="Enter project name"
-//                             placeholderTextColor="#9CA3AF"
-//                         />
-
-//                         <Text style={styles.label}>Project Address</Text>
-//                         <TextInput
-//                             style={styles.input}
-//                             value={projectAddress}
-//                             onChangeText={setProjectAddress}
-//                             placeholder="Enter project address"
-//                             placeholderTextColor="#9CA3AF"
-//                             multiline
-//                             numberOfLines={2}
-//                         />
-
-//                         <Text style={styles.label}>Assign To</Text>
-//                         <TouchableOpacity
-//                             style={styles.dropdown}
-//                             onPress={() => setShowStaffDropdown(!showStaffDropdown)}
-//                         >
-//                             <Text style={assignedTo ? styles.dropdownText : styles.dropdownPlaceholder}>
-//                                 {assignedTo || 'Select staff member'}
-//                             </Text>
-//                             <Ionicons name="chevron-down" size={20} color="#06B6D4" />
-//                         </TouchableOpacity>
-
-//                         {showStaffDropdown && (
-//                             <View style={styles.dropdownList}>
-//                                 {staffMembers.map((staff, index) => (
-//                                     <TouchableOpacity
-//                                         key={index}
-//                                         style={styles.dropdownItem}
-//                                         onPress={() => {
-//                                             setAssignedTo(staff);
-//                                             setShowStaffDropdown(false);
-//                                         }}
-//                                     >
-//                                         <Text style={styles.dropdownItemText}>{staff}</Text>
-//                                     </TouchableOpacity>
-//                                 ))}
-//                             </View>
-//                         )}
-//                     </View>
-
-//                     <View style={styles.modalActions}>
-//                         <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-//                             <Text style={styles.cancelButtonText}>Cancel</Text>
-//                         </TouchableOpacity>
-//                         <TouchableOpacity style={styles.addButton} onPress={handleSubmit}>
-//                             <Text style={styles.addButtonText}>Add Project</Text>
-//                         </TouchableOpacity>
-//                     </View>
-//                 </View>
-//             </View>
-//         </Modal>
-//     );
-// };
-
 // Main App Component
 const Index: React.FC = () => {
     const [projects, setProjects] = useState<Project[]>(dummyProjects);
-    const [showAddModal, setShowAddModal] = useState(false);
-
     const router = useRouter();
     const companyInitials = generateInitials(COMPANY_CONFIG.name);
+
+    // Calculate stats using useMemo for performance
+    const projectStats = useMemo(() => calculateProjectStats(projects), [projects]);
+    
+    // Get current date for header
+    const currentDate = new Date().toLocaleDateString('en-IN', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
 
     const handleViewDetails = (project: Project) => {
         router.push({
@@ -372,78 +417,129 @@ const Index: React.FC = () => {
         });
     };
 
-    const handleAddProject = (newProject: Omit<Project, 'id'>) => {
-        const projectWithId: Project = {
-            ...newProject,
-            id: projects.length + 1
-        };
-        setProjects([...projects, projectWithId]);
-    };
+    // Sort projects by priority and progress
+    const sortedProjects = useMemo(() => {
+        return [...projects].sort((a, b) => {
+            // First sort by priority
+            const priorityOrder = { high: 3, medium: 2, low: 1 };
+            const priorityDiff = priorityOrder[b.priority] - priorityOrder[a.priority];
+            if (priorityDiff !== 0) return priorityDiff;
+            
+            // Then by status (active first)
+            const statusOrder = { active: 3, planning: 2, completed: 1 };
+            return statusOrder[b.status] - statusOrder[a.status];
+        });
+    }, [projects]);
 
     return (
         <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="#1e3a8a" />
+            <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-            <View style={styles.header}>
-                <View style={styles.headerContent}>
-                    <View style={styles.userInfo}>
-                        <View style={styles.avatarContainer}>
-                            <Text style={styles.avatarText}>{companyInitials}</Text>
-                        </View>
-                        <View style={styles.userDetails}>
-                            <Text style={styles.userName}>{COMPANY_CONFIG.name}</Text>
-                            <Text style={styles.userSubtitle}>{COMPANY_CONFIG.subtitle}</Text>
-                        </View>
+            {/* Enhanced Fixed Header */}
+            <View style={styles.fixedHeader}>
+                <View style={styles.userInfo}>
+                    <View style={styles.avatarContainer}>
+                        <Text style={styles.avatarText}>{companyInitials}</Text>
+                    </View>
+                    <View style={styles.userDetails}>
+                        <Text style={styles.userName}>{COMPANY_CONFIG.name}</Text>
+                        <Text style={styles.userSubtitle}>{COMPANY_CONFIG.subtitle}</Text>
+                        {/* <Text style={styles.dateText}>{currentDate}</Text> */}
                     </View>
                 </View>
-                
-                <View style={styles.statsContainer}>
-                    <View style={styles.statItem}>
-                        <Text style={styles.statNumber}>{projects.length}</Text>
-                        <Text style={styles.statLabel}>Total Projects</Text>
-                    </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statItem}>
-                        <Text style={styles.statNumber}>{projects.filter(p => p.status === 'active').length}</Text>
-                        <Text style={styles.statLabel}>Active</Text>
-                    </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statItem}>
-                        <Text style={styles.statNumber}>{projects.filter(p => p.status === 'completed').length}</Text>
-                        <Text style={styles.statLabel}>Completed</Text>
-                    </View>
-                </View>
+                <TouchableOpacity style={styles.notificationButton}
+                    onPress={() => router.push('/notification')}
+                >
+                    <Ionicons name="notifications" size={22} color="#1F2937" />
+                    {projectStats.overdueProjects > 0 && <View style={styles.notificationDot} />}
+                </TouchableOpacity>
             </View>
 
-            <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Recent Projects</Text>
-            </View>
-
+            {/* Scrollable Content */}
             <ScrollView 
-                style={styles.projectsList}
+                style={styles.scrollableContent}
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.projectsListContent}
+                contentContainerStyle={styles.scrollableContentContainer}
             >
-                {projects.map((project) => (
-                    <ProjectCard
-                        key={project.id}
-                        project={project}
-                        onViewDetails={handleViewDetails}
-                    />
-                ))}
-                
-                <View style={styles.footer}>
-                    <Text style={styles.footerText}>Powered by Exponentor</Text>
-                    <View style={styles.footerDivider} />
-                    <Text style={styles.footerSubtext}>Building the future, one project at a time</Text>
+                {/* Enhanced Stats Section */}
+                <View style={styles.statsContainer}>
+                    <View style={styles.statCard}>
+                        <Text style={styles.statNumber}>{projectStats.totalProjects}</Text>
+                        <Text style={styles.statLabel}>Total Projects</Text>
+                        <View style={styles.statIconContainer}>
+                            <Ionicons name="briefcase" size={20} color="#0EA5E9" />
+                        </View>
+                    </View>
+                    
+                    <View style={styles.statCard}>
+                        <Text style={styles.statNumber}>{projectStats.activeProjects}</Text>
+                        <Text style={styles.statLabel}>Active</Text>
+                        <View style={[styles.statIconContainer, { backgroundColor: '#FEF3C7' }]}>
+                            <Ionicons name="flash" size={20} color="#D97706" />
+                        </View>
+                    </View>
+                    
+                    <View style={styles.statCard}>
+                        <Text style={styles.statNumber}>{projectStats.completedProjects}</Text>
+                        <Text style={styles.statLabel}>Completed</Text>
+                        <View style={[styles.statIconContainer, { backgroundColor: '#D1FAE5' }]}>
+                            <Ionicons name="checkmark-done" size={20} color="#10B981" />
+                        </View>
+                    </View>
+                </View>
+
+                {/* Additional Stats Row */}
+                <View style={styles.additionalStatsContainer}>
+                    <View style={styles.additionalStatCard}>
+                        <Text style={styles.additionalStatNumber}>{projectStats.averageProgress}%</Text>
+                        <Text style={styles.additionalStatLabel}>Avg Progress</Text>
+                    </View>
+                    <View style={styles.additionalStatCard}>
+                        <Text style={styles.additionalStatNumber}>₹{(projectStats.totalBudget / 10000000).toFixed(1)}Cr</Text>
+                        <Text style={styles.additionalStatLabel}>Total Budget</Text>
+                    </View>
+                    <View style={styles.additionalStatCard}>
+                        <Text style={[styles.additionalStatNumber, projectStats.overdueProjects > 0 && { color: '#DC2626' }]}>
+                            {projectStats.overdueProjects}
+                        </Text>
+                        <Text style={styles.additionalStatLabel}>Overdue</Text>
+                    </View>
+                </View>
+
+                {/* Section Header */}
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Recent Projects</Text>
+                    <View style={styles.sectionDivider} />
+                </View>
+
+                {/* Projects List */}
+                <View style={styles.projectsContainer}>
+                    {sortedProjects.map((project) => (
+                        <ProjectCard
+                            key={project.id}
+                            project={project}
+                            onViewDetails={handleViewDetails}
+                        />
+                    ))}
+                    
+                    {/* Enhanced Footer */}
+                    <View style={styles.footer}>
+                        <View style={styles.footerBrand}>
+                            <View style={styles.brandContainer}>
+                                <View style={styles.brandIconContainer}>
+                                    <Ionicons name="diamond" size={20} color="#FFFFFF" />
+                                </View>
+                                <View style={styles.brandTextContainer}>
+                                    <Text style={styles.footerText}>Powered by</Text>
+                                    <Text style={styles.exponentorText}>Exponentor</Text>
+                                </View>
+                            </View>
+                            <Text style={styles.footerSubtext}>Professional Real Estate Development Solutions</Text>
+                            <Text style={styles.footerVersion}>Version 2.1.0 • Built for Scale</Text>
+                        </View>
+                    </View>
                 </View>
             </ScrollView>
-
-            {/* <AddProjectModal
-                visible={showAddModal}
-                onClose={() => setShowAddModal(false)}
-                onAdd={handleAddProject}
-            /> */}
         </SafeAreaView>
     );
 };
@@ -453,149 +549,220 @@ export default Index;
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8FAFC', // Slate 50 - Clean, light background
+        backgroundColor: '#F8FAFC',
     },
-    header: {
-        backgroundColor: '#ffffffff', // Keep original header color as requested
-        paddingHorizontal: 20,
-        paddingTop: 20,
-        paddingBottom: 24,
-        // borderBottomLeftRadius: 24,
-        // borderBottomRightRadius: 24,
-        // shadowColor: '#1e40af',
-        // shadowOffset: { width: 0, height: 4 },
-        // shadowOpacity: 0.15,
-        // shadowRadius: 8,
-        // elevation: 8,
-    },
-    headerContent: {
-        marginBottom: 20,
+    fixedHeader: {
+        backgroundColor: '#FFFFFF',
+        paddingLeft: 24,
+        paddingRight: 16,
+        paddingTop: 16,
+        paddingBottom: 20,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 4,
     },
     userInfo: {
         flexDirection: 'row',
         alignItems: 'center',
+        flex: 1,
     },
     avatarContainer: {
-        width: 52,
-        height: 52,
-        backgroundColor: '#ffffff',
-        borderRadius: 26,
+        width: 48,
+        height: 48,
+        backgroundColor: '#0EA5E9',
+        borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        marginRight: 12,
+        shadowColor: '#0EA5E9',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
         elevation: 4,
     },
     avatarText: {
-        color: '#F59E0B', // Amber 500 - Warm and energetic
-        fontSize: 18,
+        color: '#FFFFFF',
+        fontSize: 16,
         fontWeight: '700',
-        fontFamily: 'System',
+        letterSpacing: 0.5,
     },
     userDetails: {
         flex: 1,
     },
     userName: {
-        fontSize: 22,
+        fontSize: 20,
         fontWeight: '700',
-        color: '#000000ff',
-        fontFamily: 'System',
-        marginBottom: 4,
+        color: '#1F2937',
+        marginBottom: 2,
+        letterSpacing: -0.3,
     },
     userSubtitle: {
-        fontSize: 14,
-        color: '#3d3d3dff',
+        fontSize: 13,
+        color: '#6B7280',
         fontWeight: '500',
+        letterSpacing: 0.2,
+        marginBottom: 2,
+    },
+    dateText: {
+        fontSize: 11,
+        color: '#9CA3AF',
+        fontWeight: '400',
+        letterSpacing: 0.1,
+    },
+    notificationButton: {
+        width: 44,
+        height: 44,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        position: 'relative',
+    },
+    notificationDot: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        width: 8,
+        height: 8,
+        backgroundColor: '#EF4444',
+        borderRadius: 4,
+        borderWidth: 2,
+        borderColor: '#FFFFFF',
+    },
+    scrollableContent: {
+        flex: 1,
+    },
+    scrollableContentContainer: {
+        paddingBottom: 24,
     },
     statsContainer: {
         flexDirection: 'row',
-        backgroundColor: 'rgba(255, 255, 255, 1)',
-        borderRadius: 16,
-        padding: 16,
-        backdropFilter: 'blur(10px)',
+        paddingHorizontal: 24,
+        paddingTop: 24,
+        gap: 16,
     },
-    statItem: {
+    statCard: {
         flex: 1,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 20,
         alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        elevation: 3,
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
+        position: 'relative',
+    },
+    statIconContainer: {
+        position: 'absolute',
+        top: 16,
+        right: 16,
+        width: 36,
+        height: 36,
+        backgroundColor: '#E0F2FE',
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     statNumber: {
-        fontSize: 24,
+        fontSize: 28,
         fontWeight: '800',
-        color: '#000000ff',
-        fontFamily: 'System',
+        color: '#1F2937',
         marginBottom: 4,
+        letterSpacing: -1,
     },
     statLabel: {
         fontSize: 12,
-        color: '#000000ff',
+        color: '#6B7280',
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 0.8,
+        textAlign: 'center',
+    },
+    additionalStatsContainer: {
+        flexDirection: 'row',
+        paddingHorizontal: 24,
+        paddingTop: 16,
+        gap: 12,
+    },
+    additionalStatCard: {
+        flex: 1,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 16,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
+    },
+    additionalStatNumber: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1F2937',
+        marginBottom: 2,
+    },
+    additionalStatLabel: {
+        fontSize: 10,
+        color: '#6B7280',
         fontWeight: '600',
         textTransform: 'uppercase',
         letterSpacing: 0.5,
-    },
-    statDivider: {
-        width: 1.5,
-        backgroundColor: 'rgba(0, 0, 0, 0.47)',
-        marginHorizontal: 16,
+        textAlign: 'center',
     },
     sectionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingTop: 24,
-        paddingBottom: 16,
-    },
-    sectionTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: '#374151', // Gray 700 - Professional dark text
-        fontFamily: 'System',
-    },
-    addProjectButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#0000', // Cyan 500 - Fresh and modern
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 12,
-        shadowColor: '#',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-        elevation: 4,
-    },
-    addProjectButtonText: {
-        color: 'white',
-        fontWeight: '600',
-        marginLeft: 6,
-        fontSize: 14,
-    },
-    projectsList: {
-        flex: 1,
-        paddingHorizontal: 20,
-    },
-    projectsListContent: {
+        paddingHorizontal: 24,
+        paddingTop: 32,
         paddingBottom: 20,
     },
+    sectionTitle: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#1F2937',
+        marginBottom: 8,
+        letterSpacing: -0.5,
+    },
+    sectionDivider: {
+        width: 40,
+        height: 3,
+        backgroundColor: '#0EA5E9',
+        borderRadius: 2,
+    },
+    projectsContainer: {
+        paddingHorizontal: 24,
+    },
     card: {
-        backgroundColor: '#ffffff',
-        borderRadius: 20, // Slightly more rounded
-        marginBottom: 16,
-        shadowColor: '#E5E7EB', // Gray 200 - Softer shadow
+        backgroundColor: '#FFFFFF',
+        borderRadius: 20,
+        marginBottom: 20,
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-        elevation: 3,
+        shadowOpacity: 0.08,
+        shadowRadius: 16,
+        elevation: 5,
         borderWidth: 1,
-        borderColor: '#F3F4F6', // Gray 100 - Very subtle border
+        borderColor: '#F1F5F9',
+        overflow: 'hidden',
+    },
+    overdueCard: {
+        borderColor: '#FEE2E2',
+        borderWidth: 2,
     },
     cardHeader: {
         padding: 20,
+        backgroundColor: '#FAFBFC',
         borderBottomWidth: 1,
-        borderBottomColor: '#F9FAFB', // Gray 50
+        borderBottomColor: '#F1F5F9',
     },
     cardHeaderTop: {
         flexDirection: 'row',
@@ -603,27 +770,64 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 12,
     },
+    badgeRow: {
+        flexDirection: 'row',
+        gap: 8,
+    },
     statusBadge: {
         paddingHorizontal: 12,
         paddingVertical: 6,
-        borderRadius: 20,
+        borderRadius: 16,
     },
     statusText: {
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '700',
         textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+    priorityBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        gap: 4,
+    },
+    priorityText: {
+        fontSize: 9,
+        fontWeight: '700',
         letterSpacing: 0.5,
     },
+    progressBadge: {
+        backgroundColor: '#F1F5F9',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
     progressText: {
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '700',
-        color: '#059669', // Emerald 600 - Success green
+        color: '#374151',
     },
     projectTitle: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#374151', // Gray 700
-        fontFamily: 'System',
+        color: '#1F2937',
+        letterSpacing: -0.3,
+    },
+    overdueWarning: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 8,
+        padding: 8,
+        backgroundColor: '#FEE2E2',
+        borderRadius: 8,
+        gap: 6,
+    },
+    overdueText: {
+        fontSize: 12,
+        color: '#DC2626',
+        fontWeight: '600',
     },
     cardBody: {
         padding: 20,
@@ -631,235 +835,159 @@ const styles = StyleSheet.create({
     infoRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 14,
+        marginBottom: 16,
     },
     iconContainer: {
-        width: 36, // Slightly larger
-        height: 36,
-        backgroundColor: '#FEF3C7', // Amber 100 - Soft background
-        borderRadius: 18,
+        width: 32,
+        height: 32,
+        borderRadius: 8,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 14,
+        marginRight: 12,
     },
     infoText: {
         fontSize: 14,
-        color: '#6B7280', // Gray 500
+        color: '#6B7280',
         flex: 1,
         lineHeight: 20,
+        fontWeight: '400',
     },
     infoTextBold: {
         fontSize: 14,
-        color: '#374151', // Gray 700
+        color: '#374151',
         fontWeight: '600',
         flex: 1,
     },
+    budgetRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    budgetInfo: {
+        flex: 1,
+    },
+    budgetText: {
+        fontSize: 13,
+        color: '#374151',
+        fontWeight: '600',
+        marginBottom: 4,
+    },
+    budgetProgressBar: {
+        height: 4,
+        backgroundColor: '#F1F5F9',
+        borderRadius: 2,
+        overflow: 'hidden',
+    },
+    budgetProgressFill: {
+        height: '100%',
+        borderRadius: 2,
+    },
     progressContainer: {
         marginTop: 20,
-        marginBottom: 24,
+        marginBottom: 20,
     },
     progressHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 10,
+        alignItems: 'center',
+        marginBottom: 8,
     },
     progressLabel: {
-        fontSize: 14,
-        color: '#6B7280', // Gray 500
+        fontSize: 13,
+        color: '#6B7280',
         fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     progressValue: {
-        fontSize: 14,
-        color: '#059669', // Emerald 600
+        fontSize: 13,
         fontWeight: '700',
     },
     progressBar: {
-        height: 8,
-        backgroundColor: '#E5E7EB', // Gray 200
-        borderRadius: 4,
+        height: 6,
+        backgroundColor: '#F1F5F9',
+        borderRadius: 3,
         overflow: 'hidden',
     },
     progressFill: {
         height: '100%',
-        backgroundColor: '#06B6D4', // Cyan 500 - Beautiful progress color
-        borderRadius: 4,
+        borderRadius: 3,
     },
     viewButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#303030ff', // Violet 500 - Eye-catching action color
         paddingVertical: 14,
         borderRadius: 12,
-        shadowColor: '#000000ff',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
-        elevation: 3,
+        gap: 8,
     },
     viewButtonText: {
-        color: 'white',
+        color: '#FFFFFF',
         fontWeight: '600',
-        marginLeft: 8,
-        fontSize: 15,
+        fontSize: 14,
+        letterSpacing: 0.3,
     },
     footer: {
         alignItems: 'center',
         paddingVertical: 40,
         marginTop: 20,
     },
-    footerText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#F59E0B', // Amber 500 - Warm brand color
-        marginBottom: 8,
+    footerBrand: {
+        alignItems: 'center',
     },
-    footerDivider: {
-        width: 40,
-        height: 2,
-        backgroundColor: '#FCD34D', // Amber 300 - Lighter amber
-        marginBottom: 8,
-        borderRadius: 1,
+    brandContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        backgroundColor: '#1F2937',
+        borderRadius: 16,
+        shadowColor: '#1F2937',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.2,
+        shadowRadius: 16,
+        elevation: 8,
+    },
+    brandIconContainer: {
+        width: 32,
+        height: 32,
+        backgroundColor: '#0EA5E9',
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    brandTextContainer: {
+        alignItems: 'flex-start',
+    },
+    footerText: {
+        fontSize: 10,
+        fontWeight: '500',
+        color: '#9CA3AF',
+        marginBottom: 2,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+    exponentorText: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: '#FFFFFF',
+        letterSpacing: -0.5,
     },
     footerSubtext: {
         fontSize: 13,
-        color: '#6B7280', // Gray 500
-        fontStyle: 'italic',
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(139, 92, 246, 0.3)', // Violet with opacity - softer overlay
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    modalContent: {
-        backgroundColor: 'white',
-        margin: 20,
-        borderRadius: 24, // More rounded
-        padding: 28,
-        width: '90%',
-        maxHeight: '80%',
-        shadowColor: '#8B5CF6', // Violet shadow
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.15,
-        shadowRadius: 16,
-        elevation: 12,
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 24,
-        paddingBottom: 16,
-        borderBottomWidth: 2,
-        borderBottomColor: '#F3F4F6', // Gray 100
-    },
-    modalTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: '#374151', // Gray 700
-    },
-    form: {
-        marginBottom: 24,
-    },
-    label: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#059669', // Emerald 600 - Fresh green
+        color: '#6B7280',
+        textAlign: 'center',
+        fontWeight: '500',
+        letterSpacing: 0.2,
         marginBottom: 8,
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
     },
-    input: {
-        borderWidth: 2,
-        borderColor: '#E5E7EB', // Gray 200
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 16,
-        fontSize: 16,
-        marginBottom: 20,
-        backgroundColor: '#F9FAFB', // Gray 50
-        color: '#374151', // Gray 700
-        fontWeight: '500',
+    footerVersion: {
+        fontSize: 11,
+        color: '#9CA3AF',
+        textAlign: 'center',
+        fontWeight: '400',
+        letterSpacing: 0.3,
     },
-    dropdown: {
-        borderWidth: 2,
-        borderColor: '#E5E7EB', // Gray 200
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 16,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        backgroundColor: '#F9FAFB', // Gray 50
-        marginBottom: 20,
-    },
-    dropdownText: {
-        fontSize: 16,
-        color: '#374151', // Gray 700
-        fontWeight: '500',
-    },
-    dropdownPlaceholder: {
-        fontSize: 16,
-        color: '#9CA3AF', // Gray 400
-    },
-    dropdownList: {
-        borderWidth: 2,
-        borderColor: '#E5E7EB', // Gray 200
-        borderRadius: 12,
-        backgroundColor: 'white',
-        marginTop: -20,
-        marginBottom: 20,
-        maxHeight: 200,
-        shadowColor: '#6B7280', // Gray 500
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 8,
-    },
-    dropdownItem: {
-        paddingHorizontal: 16,
-        paddingVertical: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F3F4F6', // Gray 100
-    },
-    dropdownItemText: {
-        fontSize: 16,
-        color: '#374151', // Gray 700
-        fontWeight: '500',
-    },
-    modalActions: {
-        flexDirection: 'row',
-        gap: 12,
-    },
-    cancelButton: {
-        flex: 1,
-        paddingVertical: 16,
-        borderRadius: 12,
-        borderWidth: 2,
-        borderColor: '#E5E7EB', // Gray 200
-        alignItems: 'center',
-        backgroundColor: '#F9FAFB', // Gray 50
-    },
-    cancelButtonText: {
-        fontSize: 16,
-        color: '#6B7280', // Gray 500
-        fontWeight: '600',
-    },
-    addButton: {
-        flex: 1,
-        paddingVertical: 16,
-        borderRadius: 12,
-        alignItems: 'center',
-        backgroundColor: 'black', // Emerald 500 - Fresh success color
-        shadowColor: '#0c0c0cff',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-        elevation: 4,
-    },
-    addButtonText: {
-        fontSize: 16,
-        color: 'white',
-        fontWeight: '700',
-    }});
+});
