@@ -2,34 +2,33 @@ import axios from "axios";
 import { domain } from "../lib/domain";
 
 export const getUser = async (email: string, userType: string) => {
-  const res = await axios.post(`${domain}/api/findUser`, {
-    email: email,
-    userType: userType,
-  });
-
-  const data = res.data;
-
-  if (res.status === 200) {
-    return data;
-  } else {
+  try {
+    const res = await axios.get(`${domain}/api/${userType}?email=${email}`);
+    if (res.status === 200) {
+      return res.data.data;
+    }
+    return null;
+  } catch (error) {
+    console.error("Failed to fetch user:", error);
     return null;
   }
 };
 
-export const confirmMail = async (email: string, userType: string) => {
+export const confirmMail = async (email: string) => {
   const res = await axios.post(`${domain}/api/findUser`, {
     email: email,
-    userType: userType,
   });
 
+  const data = res.data.isUser;
+
   if (res.status === 200) {
-    const obj = { verified: true, isUser: true };
+    const obj = { verified: true, isUser: true, userType: data.userType };
     return obj;
   } else if (res.status === 201) {
-    const obj = { verified: false, isUser: true };
+    const obj = { verified: false, isUser: true, userType: data.userType };
     return obj;
   } else {
-    const obj = { verified: false, isUser: false };
+    const obj = { verified: false, isUser: false, userType: "" };
     return obj;
   }
 };
@@ -57,6 +56,10 @@ export const addPassword = async (
     password: password,
     userType: userType,
   });
+
+  console.log(userType);
+  console.log(email);
+  console.log(password);
 
   if (res.status === 200) {
     return true;

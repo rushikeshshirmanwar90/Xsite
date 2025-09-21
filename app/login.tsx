@@ -37,6 +37,7 @@ export default function LoginScreen() {
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [isVerified, setIsVerified] = useState(false);
+    const [userType, setUserType] = useState('');
 
     useEffect(() => {
         const checkLogin = async () => {
@@ -64,10 +65,11 @@ export default function LoginScreen() {
 
         setLoading(true);
         try {
-            const check = await confirmMail(email, "client");
+            const check = await confirmMail(email);
 
             console.log(check);
-
+            console.log(check.userType)
+            setUserType(check.userType)
             if (!check.verified) {
                 if (check) {
                     const OTP = generateOTP();
@@ -124,9 +126,11 @@ export default function LoginScreen() {
         setLoading(true);
         try {
 
-            const res = await addPassword(email, password, "client");
+            console.log(userType)
+
+            const res = await addPassword(email, password, userType);
             if (res) {
-                const user = await getUser(email, "client");
+                const user = await getUser(email, userType);
                 console.log(user)
                 const jsonUser = JSON.stringify(user.isUser);
                 await AsyncStorage.setItem("user", jsonUser);
@@ -154,11 +158,13 @@ export default function LoginScreen() {
 
         try {
             const result = await login(email, password);
-
+            console.log("===========")
+            console.log(result)
+            console.log("===========")
             if (result.success) {
-                const user = await getUser(email, "client");
-                const jsonUser = JSON.stringify(user.isUser);
-                console.log(jsonUser);
+                const user = await getUser(email, userType);
+                console.log("user data : ", user)
+                const jsonUser = JSON.stringify(user);
                 await AsyncStorage.setItem("user", jsonUser);
                 toast.success("User logged in successfully");
                 router.replace({
@@ -346,7 +352,6 @@ export default function LoginScreen() {
             </ScrollView>
         </SafeAreaView>
     );
-
 }
 
 const styles = StyleSheet.create({
