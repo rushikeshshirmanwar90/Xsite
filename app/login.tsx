@@ -1,5 +1,5 @@
 import Loading from '@/components/Loading';
-import { addPassword, confirmMail, getUser, login, sendOtp } from '@/functions/password';
+import { addPassword, confirmMail, getUser, login, sendOtp } from '@/functions/login';
 import { generateOTP } from '@/lib/functions';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';

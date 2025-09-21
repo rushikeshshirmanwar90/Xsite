@@ -56,13 +56,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails }) => 
                         }
                     </Text>
                 </View>
-
-                <View style={styles.infoRow}>
-                    <Ionicons name="calendar-outline" size={16} color="#6B7280" />
-                    <Text style={styles.infoText}>
-
-                    </Text>
-                </View>
             </View>
 
             <TouchableOpacity
