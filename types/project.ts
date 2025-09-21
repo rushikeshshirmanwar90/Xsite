@@ -7,6 +7,10 @@ export interface Project {
   address: string;
   description: string;
   assignedStaff: StaffMembers[];
+  budget?: number;
+  spent?: number;
+  status?: "active" | "planning" | "completed";
+  progress?: number;
 }
 
 export interface Activity {

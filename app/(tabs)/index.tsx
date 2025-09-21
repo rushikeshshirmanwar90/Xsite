@@ -4,12 +4,12 @@ import ProjectCard from '@/components/ProjectCard';
 import { getClientId } from '@/functions/clientId';
 import { getProjectData } from '@/functions/project';
 import { domain } from '@/lib/domain';
+import { generateInitials } from '@/lib/functions';
 import { styles } from "@/style/adminHome";
 import { Project } from '@/types/project';
 import { StaffMembers } from '@/types/staff';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -113,10 +113,38 @@ const Index: React.FC = () => {
         }
     };
 
+    // Company configuration
+    const COMPANY_CONFIG = {
+        name: "Sharda Constructions",
+        subtitle: "Project Management Dashboard"
+    };
+    const companyInitials = generateInitials(COMPANY_CONFIG.name);
+
+
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
+            <View style={styles.fixedHeader}>
+                <View style={styles.userInfo}>
+                    <View style={styles.avatarContainer}>
+                        <Text style={styles.avatarText}>{companyInitials}</Text>
+                    </View>
+                    <View style={styles.userDetails}>
+                        <Text style={styles.userName}>{COMPANY_CONFIG.name}</Text>
+                        <Text style={styles.userSubtitle}>{COMPANY_CONFIG.subtitle}</Text>
+                        {/* <Text style={styles.dateText}>{currentDate}</Text> */}
+                    </View>
+                </View>
+                <TouchableOpacity style={styles.notificationButton}
+                    onPress={() => router.push('/notification')}
+                >
+                    <Ionicons name="notifications" size={22} color="#1F2937" />
+                    {/* {projectStats.overdueProjects > 0 && <View style={styles.notificationDot} />} */}
+                </TouchableOpacity>
+            </View>
+
+            {/*             
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Construction Materials</Text>
                 <Text style={styles.headerSubtitle}>Project Management</Text>
@@ -137,7 +165,7 @@ const Index: React.FC = () => {
                         </Text>
                     </LinearGradient>
                 </TouchableOpacity>
-            </View>
+            </View> */}
 
             <ScrollView style={styles.projectsList}>
                 {loading ? (
