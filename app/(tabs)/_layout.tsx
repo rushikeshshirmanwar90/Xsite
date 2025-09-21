@@ -14,7 +14,7 @@ const TabLayout = () => {
           backgroundColor: '#fff', // or your theme.bg
           borderTopWidth: 0,
           elevation: 0,
-          height: 58
+          height: 48
         },
       }}
     >
@@ -54,8 +54,8 @@ const TabLayout = () => {
     tabBarIcon: ({ focused }) => (
       <View
         style={{
-          width: 48,
-          height: 48,
+          width: 38,
+          height: 38,
           backgroundColor: focused ? "black" : "white", 
           borderRadius: 100, 
           justifyContent: "center",
