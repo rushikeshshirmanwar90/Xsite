@@ -8,7 +8,9 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
-    View
+    View,
+    Image,
+    TextInput
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,6 +32,7 @@ interface Project {
     budget: number;
     spent: number;
     recentActivities: Activity[];
+    image?: string; // Added image property
 }
 
 interface Activity {
@@ -96,7 +99,6 @@ const isProjectOverdue = (endDate: string, progress: number): boolean => {
     const projectEndDate = new Date(endDate);
     const daysRemaining = Math.ceil((projectEndDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
     
-    // Consider overdue if less than 30 days remaining and progress < 80%
     return daysRemaining < 30 && progress < 80 && progress < 100;
 };
 
@@ -127,10 +129,10 @@ const calculateProjectStats = (projects: Project[]): ProjectStats => {
 // Company configuration
 const COMPANY_CONFIG = {
     name: "Sharda Constructions",
-    subtitle: "Project Management Dashboard"
+    subtitle: "Project Management"
 };
 
-// Enhanced dummy data with more realistic details
+// Enhanced dummy data with images
 const dummyProjects: Project[] = [
     {
         id: 1,
@@ -147,6 +149,7 @@ const dummyProjects: Project[] = [
         priority: "high",
         budget: 66300000,
         spent: 66300000,
+        image: "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
         recentActivities: [
             { type: "received", material: "Modular Bricks", quantity: "10,000 pcs", date: "2024-09-10" },
             { type: "issued", material: "Cement Bags", quantity: "150 bags", date: "2024-09-09" },
@@ -168,6 +171,7 @@ const dummyProjects: Project[] = [
         priority: "medium",
         budget: 120000000,
         spent: 54000000,
+        image: "https://images.unsplash.com/photo-1582407947304-fd86f028f716?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
         recentActivities: [
             { type: "received", material: "Ready Mix Concrete", quantity: "50 m³", date: "2024-09-12" },
             { type: "issued", material: "Sand", quantity: "25 m³", date: "2024-09-11" },
@@ -189,6 +193,7 @@ const dummyProjects: Project[] = [
         priority: "low",
         budget: 95000000,
         spent: 14250000,
+        image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
         recentActivities: [
             { type: "ordered", material: "Foundation Steel", quantity: "15 tons", date: "2024-09-13" },
             { type: "received", material: "Survey Equipment", quantity: "1 set", date: "2024-09-12" }
@@ -209,6 +214,7 @@ const dummyProjects: Project[] = [
         priority: "high",
         budget: 75000000,
         spent: 69000000,
+        image: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
         recentActivities: [
             { type: "issued", material: "Paint", quantity: "200 liters", date: "2024-09-13" },
             { type: "received", material: "Door Frames", quantity: "45 units", date: "2024-09-12" },
@@ -230,6 +236,7 @@ const dummyProjects: Project[] = [
         priority: "medium",
         budget: 65000000,
         spent: 63500000,
+        image: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
         recentActivities: [
             { type: "issued", material: "Final Touch-up Paint", quantity: "50 liters", date: "2024-07-30" },
             { type: "received", material: "Cleaning Supplies", quantity: "1 set", date: "2024-07-28" }
@@ -250,6 +257,7 @@ const dummyProjects: Project[] = [
         priority: "medium",
         budget: 150000000,
         spent: 7500000,
+        image: "https://images.unsplash.com/photo-1577495508048-b635879837f1?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
         recentActivities: [
             { type: "ordered", material: "Site Survey Equipment", quantity: "2 sets", date: "2024-09-15" }
         ]
@@ -265,147 +273,95 @@ interface ProjectCardProps {
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails }) => {
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'active': return { bg: '#0EA5E9', text: '#ffffff', light: '#E0F2FE' };
-            case 'planning': return { bg: '#8B5CF6', text: '#ffffff', light: '#EDE9FE' };
-            case 'completed': return { bg: '#10B981', text: '#ffffff', light: '#D1FAE5' };
-            default: return { bg: '#64748B', text: '#ffffff', light: '#F1F5F9' };
-        }
-    };
-
-    const getPriorityColor = (priority: string) => {
-        switch (priority) {
-            case 'high': return { bg: '#FEE2E2', text: '#DC2626', icon: 'alert-circle' };
-            case 'medium': return { bg: '#FEF3C7', text: '#D97706', icon: 'time' };
-            case 'low': return { bg: '#D1FAE5', text: '#10B981', icon: 'checkmark-circle' };
-            default: return { bg: '#F1F5F9', text: '#64748B', icon: 'help-circle' };
+            case 'active': return '#10B981';
+            case 'planning': return '#F59E0B';
+            case 'completed': return '#3B82F6';
+            default: return '#6B7280';
         }
     };
 
     const statusColor = getStatusColor(project.status);
-    const priorityColor = getPriorityColor(project.priority);
-    const budgetProgress = (project.spent / project.budget) * 100;
     const isOverdue = isProjectOverdue(project.endDate, project.progress);
-    
-    // Calculate days remaining
-    const today = new Date();
-    const endDate = new Date(project.endDate);
-    const daysRemaining = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
 
     return (
-        <View style={[styles.card, isOverdue && styles.overdueCard]}>
-            <View style={styles.cardHeader}>
-                <View style={styles.cardHeaderTop}>
-                    <View style={styles.badgeRow}>
-                        <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
-                            <Text style={[styles.statusText, { color: statusColor.text }]}>
-                                {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
-                            </Text>
-                        </View>
-                        <View style={[styles.priorityBadge, { backgroundColor: priorityColor.bg }]}>
-                            <Ionicons name={priorityColor.icon as any} size={10} color={priorityColor.text} />
-                            <Text style={[styles.priorityText, { color: priorityColor.text }]}>
-                                {project.priority.toUpperCase()}
-                            </Text>
-                        </View>
-                    </View>
-                    <View style={styles.progressBadge}>
-                        <Text style={styles.progressText}>{project.progress}%</Text>
-                    </View>
-                </View>
-                <Text style={styles.projectTitle}>{project.name}</Text>
-                {isOverdue && (
-                    <View style={styles.overdueWarning}>
-                        <Ionicons name="warning" size={14} color="#DC2626" />
-                        <Text style={styles.overdueText}>
-                            {daysRemaining < 0 ? 'Overdue' : `${daysRemaining} days remaining`}
-                        </Text>
+        <TouchableOpacity 
+            style={styles.projectCard}
+            onPress={() => onViewDetails(project)}
+            activeOpacity={0.9}
+        >
+            <View style={styles.cardImageContainer}>
+                {project.image ? (
+                    <Image 
+                        source={{ uri: project.image }} 
+                        style={styles.cardImage}
+                        resizeMode="cover"
+                    />
+                ) : (
+                    <View style={styles.placeholderImage}>
+                        <Ionicons name="business" size={40} color="#9CA3AF" />
                     </View>
                 )}
-            </View>
-
-            <View style={styles.cardBody}>
-                <View style={styles.infoRow}>
-                    <View style={[styles.iconContainer, { backgroundColor: statusColor.light }]}>
-                        <Ionicons name="location" size={16} color={statusColor.bg} />
-                    </View>
-                    <Text style={styles.infoText} numberOfLines={2}>{project.address}</Text>
-                </View>
-
-                <View style={styles.infoRow}>
-                    <View style={[styles.iconContainer, { backgroundColor: '#FEF3C7' }]}>
-                        <Ionicons name="person" size={16} color="#D97706" />
-                    </View>
-                    <Text style={styles.infoTextBold}>{project.assignedStaff}</Text>
-                </View>
-
-                <View style={styles.infoRow}>
-                    <View style={[styles.iconContainer, { backgroundColor: '#F3E8FF' }]}>
-                        <Ionicons name="calendar" size={16} color="#7C3AED" />
-                    </View>
-                    <Text style={styles.infoText}>
-                        {new Date(project.startDate).toLocaleDateString('en-IN')} - {new Date(project.endDate).toLocaleDateString('en-IN')}
+                <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
+                    <Text style={styles.statusText}>
+                        {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
                     </Text>
                 </View>
+                <TouchableOpacity style={styles.favoriteButton}>
+                    <Ionicons name="heart-outline" size={20} color="white" />
+                </TouchableOpacity>
+            </View>
 
-                <View style={styles.budgetRow}>
-                    <View style={[styles.iconContainer, { backgroundColor: '#ECFDF5' }]}>
-                        <Ionicons name="card" size={16} color="#10B981" />
-                    </View>
-                    <View style={styles.budgetInfo}>
-                        <Text style={styles.budgetText}>
-                            {formatCurrency(project.spent)} / {formatCurrency(project.budget)}
-                        </Text>
-                        <View style={styles.budgetProgressBar}>
-                            <View style={[styles.budgetProgressFill, { 
-                                width: `${Math.min(budgetProgress, 100)}%`,
-                                backgroundColor: budgetProgress > 90 ? '#EF4444' : '#10B981'
-                            }]} />
-                        </View>
-                    </View>
+            <View style={styles.cardContent}>
+                <Text style={styles.projectName} numberOfLines={1}>
+                    {project.name}
+                </Text>
+                
+                <Text style={styles.projectBudget}>
+                    {formatCurrency(project.budget)}
+                </Text>
+
+                <View style={styles.addressRow}>
+                    <Ionicons name="location-outline" size={14} color="#6B7280" />
+                    <Text style={styles.projectAddress} numberOfLines={1}>
+                        {project.address}
+                    </Text>
                 </View>
 
                 <View style={styles.progressContainer}>
                     <View style={styles.progressHeader}>
-                        <Text style={styles.progressLabel}>Project Progress</Text>
-                        <Text style={[styles.progressValue, { color: statusColor.bg }]}>{project.progress}%</Text>
+                        <Text style={styles.progressLabel}>Progress</Text>
+                        <Text style={styles.progressValue}>{project.progress}%</Text>
                     </View>
                     <View style={styles.progressBar}>
                         <View style={[styles.progressFill, { 
                             width: `${project.progress}%`,
-                            backgroundColor: statusColor.bg 
+                            backgroundColor: statusColor 
                         }]} />
                     </View>
                 </View>
 
                 <TouchableOpacity
-                    style={[styles.viewButton, { backgroundColor: statusColor.bg }]}
+                    style={styles.viewDetailsButton}
                     onPress={() => onViewDetails(project)}
                     activeOpacity={0.8}
                 >
-                    <Text style={styles.viewButtonText}>View Details</Text>
-                    <Ionicons name="arrow-forward" size={16} color="white" />
+                    <Text style={styles.viewDetailsText}>View Details</Text>
+                    <Ionicons name="arrow-forward" size={16} color="#0EA5E9" />
                 </TouchableOpacity>
             </View>
-        </View>
+        </TouchableOpacity>
     );
 };
 
 // Main App Component
 const Index: React.FC = () => {
     const [projects, setProjects] = useState<Project[]>(dummyProjects);
+    const [searchQuery, setSearchQuery] = useState<string>('');
     const router = useRouter();
     const companyInitials = generateInitials(COMPANY_CONFIG.name);
 
     // Calculate stats using useMemo for performance
     const projectStats = useMemo(() => calculateProjectStats(projects), [projects]);
-    
-    // Get current date for header
-    const currentDate = new Date().toLocaleDateString('en-IN', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
 
     const handleViewDetails = (project: Project) => {
         router.push({
@@ -417,103 +373,97 @@ const Index: React.FC = () => {
         });
     };
 
+    // Filter projects based on search query
+    const filteredProjects = useMemo(() => {
+        if (!searchQuery.trim()) {
+            return projects;
+        }
+        return projects.filter(project =>
+            project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            project.address.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }, [projects, searchQuery]);
+
     // Sort projects by priority and progress
     const sortedProjects = useMemo(() => {
-        return [...projects].sort((a, b) => {
-            // First sort by priority
+        return [...filteredProjects].sort((a, b) => {
             const priorityOrder = { high: 3, medium: 2, low: 1 };
             const priorityDiff = priorityOrder[b.priority] - priorityOrder[a.priority];
             if (priorityDiff !== 0) return priorityDiff;
             
-            // Then by status (active first)
             const statusOrder = { active: 3, planning: 2, completed: 1 };
             return statusOrder[b.status] - statusOrder[a.status];
         });
-    }, [projects]);
+    }, [filteredProjects]);
 
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-            {/* Enhanced Fixed Header */}
-            <View style={styles.fixedHeader}>
-                <View style={styles.userInfo}>
+            {/* Header */}
+            <View style={styles.header}>
+                <View style={styles.headerLeft}>
                     <View style={styles.avatarContainer}>
                         <Text style={styles.avatarText}>{companyInitials}</Text>
                     </View>
-                    <View style={styles.userDetails}>
-                        <Text style={styles.userName}>{COMPANY_CONFIG.name}</Text>
-                        <Text style={styles.userSubtitle}>{COMPANY_CONFIG.subtitle}</Text>
-                        {/* <Text style={styles.dateText}>{currentDate}</Text> */}
+                    <View style={styles.headerTextContainer}>
+                        <Text style={styles.companyName}>{COMPANY_CONFIG.name}</Text>
+                        <Text style={styles.companySubtitle}>{COMPANY_CONFIG.subtitle}</Text>
                     </View>
                 </View>
                 <TouchableOpacity style={styles.notificationButton}
                     onPress={() => router.push('/notification')}
                 >
-                    <Ionicons name="notifications" size={22} color="#1F2937" />
+                    <Ionicons name="notifications-outline" size={24} color="#1F2937" />
                     {projectStats.overdueProjects > 0 && <View style={styles.notificationDot} />}
                 </TouchableOpacity>
             </View>
 
-            {/* Scrollable Content */}
+            {/* Search Bar */}
+            <View style={styles.searchContainer}>
+                <View style={styles.searchBar}>
+                    <Ionicons name="search" size={20} color="#9CA3AF" />
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="Search projects..."
+                        placeholderTextColor="#9CA3AF"
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                    />
+                    <TouchableOpacity style={styles.filterButton}>
+                        <Ionicons name="options" size={20} color="#6B7280" />
+                    </TouchableOpacity>
+                </View>
+            </View>
+
+            {/* Content */}
             <ScrollView 
                 style={styles.scrollableContent}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollableContentContainer}
             >
-                {/* Enhanced Stats Section */}
-                <View style={styles.statsContainer}>
-                    <View style={styles.statCard}>
+                {/* Stats Overview */}
+                <View style={styles.statsOverview}>
+                    <View style={styles.statItem}>
                         <Text style={styles.statNumber}>{projectStats.totalProjects}</Text>
-                        <Text style={styles.statLabel}>Total Projects</Text>
-                        <View style={styles.statIconContainer}>
-                            <Ionicons name="briefcase" size={20} color="#0EA5E9" />
-                        </View>
+                        <Text style={styles.statLabel}>Total</Text>
                     </View>
-                    
-                    <View style={styles.statCard}>
+                    <View style={styles.statItem}>
                         <Text style={styles.statNumber}>{projectStats.activeProjects}</Text>
                         <Text style={styles.statLabel}>Active</Text>
-                        <View style={[styles.statIconContainer, { backgroundColor: '#FEF3C7' }]}>
-                            <Ionicons name="flash" size={20} color="#D97706" />
-                        </View>
                     </View>
-                    
-                    <View style={styles.statCard}>
+                    <View style={styles.statItem}>
                         <Text style={styles.statNumber}>{projectStats.completedProjects}</Text>
                         <Text style={styles.statLabel}>Completed</Text>
-                        <View style={[styles.statIconContainer, { backgroundColor: '#D1FAE5' }]}>
-                            <Ionicons name="checkmark-done" size={20} color="#10B981" />
-                        </View>
+                    </View>
+                    <View style={styles.statItem}>
+                        <Text style={styles.statNumber}>{projectStats.averageProgress}%</Text>
+                        <Text style={styles.statLabel}>Avg Progress</Text>
                     </View>
                 </View>
 
-                {/* Additional Stats Row */}
-                <View style={styles.additionalStatsContainer}>
-                    <View style={styles.additionalStatCard}>
-                        <Text style={styles.additionalStatNumber}>{projectStats.averageProgress}%</Text>
-                        <Text style={styles.additionalStatLabel}>Avg Progress</Text>
-                    </View>
-                    <View style={styles.additionalStatCard}>
-                        <Text style={styles.additionalStatNumber}>₹{(projectStats.totalBudget / 10000000).toFixed(1)}Cr</Text>
-                        <Text style={styles.additionalStatLabel}>Total Budget</Text>
-                    </View>
-                    <View style={styles.additionalStatCard}>
-                        <Text style={[styles.additionalStatNumber, projectStats.overdueProjects > 0 && { color: '#DC2626' }]}>
-                            {projectStats.overdueProjects}
-                        </Text>
-                        <Text style={styles.additionalStatLabel}>Overdue</Text>
-                    </View>
-                </View>
-
-                {/* Section Header */}
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Recent Projects</Text>
-                    <View style={styles.sectionDivider} />
-                </View>
-
-                {/* Projects List */}
-                <View style={styles.projectsContainer}>
+                {/* Projects Grid */}
+                <View style={styles.projectsGrid}>
                     {sortedProjects.map((project) => (
                         <ProjectCard
                             key={project.id}
@@ -521,22 +471,18 @@ const Index: React.FC = () => {
                             onViewDetails={handleViewDetails}
                         />
                     ))}
-                    
-                    {/* Enhanced Footer */}
-                    <View style={styles.footer}>
-                        <View style={styles.footerBrand}>
-                            <View style={styles.brandContainer}>
-                                <View style={styles.brandIconContainer}>
-                                    <Ionicons name="diamond" size={20} color="#FFFFFF" />
-                                </View>
-                                <View style={styles.brandTextContainer}>
-                                    <Text style={styles.footerText}>Powered by</Text>
-                                    <Text style={styles.exponentorText}>Exponentor</Text>
-                                </View>
+                </View>
+
+                {/* Footer */}
+                <View style={styles.footer}>
+                    <View style={styles.footerContent}>
+                        <View style={styles.brandContainer}>
+                            <View style={styles.brandIcon}>
+                                <Ionicons name="diamond" size={16} color="white" />
                             </View>
-                            <Text style={styles.footerSubtext}>Professional Real Estate Development Solutions</Text>
-                            <Text style={styles.footerVersion}>Version 2.1.0 • Built for Scale</Text>
+                            <Text style={styles.brandText}>Powered by <Text style={styles.exponentorText}>Exponentor</Text></Text>
                         </View>
+                        <Text style={styles.footerSubtext}>Professional Construction Management Solutions</Text>
                     </View>
                 </View>
             </ScrollView>
@@ -551,70 +497,47 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#F8FAFC',
     },
-    fixedHeader: {
-        backgroundColor: '#FFFFFF',
-        paddingLeft: 24,
-        paddingRight: 16,
-        paddingTop: 16,
-        paddingBottom: 20,
+    header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        backgroundColor: '#FFFFFF',
         borderBottomWidth: 1,
         borderBottomColor: '#F1F5F9',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 4,
     },
-    userInfo: {
+    headerLeft: {
         flexDirection: 'row',
         alignItems: 'center',
         flex: 1,
     },
     avatarContainer: {
-        width: 48,
-        height: 48,
+        width: 44,
+        height: 44,
         backgroundColor: '#0EA5E9',
         borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 12,
-        shadowColor: '#0EA5E9',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 4,
     },
     avatarText: {
         color: '#FFFFFF',
         fontSize: 16,
         fontWeight: '700',
-        letterSpacing: 0.5,
     },
-    userDetails: {
+    headerTextContainer: {
         flex: 1,
     },
-    userName: {
-        fontSize: 20,
+    companyName: {
+        fontSize: 18,
         fontWeight: '700',
         color: '#1F2937',
-        marginBottom: 2,
-        letterSpacing: -0.3,
     },
-    userSubtitle: {
+    companySubtitle: {
         fontSize: 13,
         color: '#6B7280',
         fontWeight: '500',
-        letterSpacing: 0.2,
-        marginBottom: 2,
-    },
-    dateText: {
-        fontSize: 11,
-        color: '#9CA3AF',
-        fontWeight: '400',
-        letterSpacing: 0.1,
     },
     notificationButton: {
         width: 44,
@@ -623,8 +546,6 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
         position: 'relative',
     },
     notificationDot: {
@@ -638,356 +559,222 @@ const styles = StyleSheet.create({
         borderWidth: 2,
         borderColor: '#FFFFFF',
     },
+    searchContainer: {
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        backgroundColor: '#FFFFFF',
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    searchBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 16,
+        color: '#1F2937',
+        marginLeft: 12,
+    },
+    filterButton: {
+        padding: 4,
+    },
     scrollableContent: {
         flex: 1,
     },
     scrollableContentContainer: {
         paddingBottom: 24,
     },
-    statsContainer: {
+    statsOverview: {
         flexDirection: 'row',
-        paddingHorizontal: 24,
-        paddingTop: 24,
-        gap: 16,
-    },
-    statCard: {
-        flex: 1,
+        paddingHorizontal: 20,
+        paddingVertical: 20,
         backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        padding: 20,
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 3,
-        borderWidth: 1,
-        borderColor: '#F1F5F9',
-        position: 'relative',
+        marginBottom: 8,
     },
-    statIconContainer: {
-        position: 'absolute',
-        top: 16,
-        right: 16,
-        width: 36,
-        height: 36,
-        backgroundColor: '#E0F2FE',
-        borderRadius: 18,
+    statItem: {
+        flex: 1,
         alignItems: 'center',
-        justifyContent: 'center',
     },
     statNumber: {
-        fontSize: 28,
-        fontWeight: '800',
+        fontSize: 20,
+        fontWeight: '700',
         color: '#1F2937',
         marginBottom: 4,
-        letterSpacing: -1,
     },
     statLabel: {
         fontSize: 12,
         color: '#6B7280',
-        fontWeight: '600',
-        textTransform: 'uppercase',
-        letterSpacing: 0.8,
-        textAlign: 'center',
+        fontWeight: '500',
     },
-    additionalStatsContainer: {
-        flexDirection: 'row',
-        paddingHorizontal: 24,
+    projectsGrid: {
+        paddingHorizontal: 16,
         paddingTop: 16,
-        gap: 12,
     },
-    additionalStatCard: {
-        flex: 1,
+    projectCard: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 12,
-        padding: 16,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#F1F5F9',
-    },
-    additionalStatNumber: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1F2937',
-        marginBottom: 2,
-    },
-    additionalStatLabel: {
-        fontSize: 10,
-        color: '#6B7280',
-        fontWeight: '600',
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-        textAlign: 'center',
-    },
-    sectionHeader: {
-        paddingHorizontal: 24,
-        paddingTop: 32,
-        paddingBottom: 20,
-    },
-    sectionTitle: {
-        fontSize: 24,
-        fontWeight: '700',
-        color: '#1F2937',
-        marginBottom: 8,
-        letterSpacing: -0.5,
-    },
-    sectionDivider: {
-        width: 40,
-        height: 3,
-        backgroundColor: '#0EA5E9',
-        borderRadius: 2,
-    },
-    projectsContainer: {
-        paddingHorizontal: 24,
-    },
-    card: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 20,
-        marginBottom: 20,
+        borderRadius: 16,
+        marginHorizontal: 4,
+        marginBottom: 16,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 16,
-        elevation: 5,
-        borderWidth: 1,
-        borderColor: '#F1F5F9',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
         overflow: 'hidden',
     },
-    overdueCard: {
-        borderColor: '#FEE2E2',
-        borderWidth: 2,
+    cardImageContainer: {
+        height: 180,
+        position: 'relative',
     },
-    cardHeader: {
-        padding: 20,
-        backgroundColor: '#FAFBFC',
-        borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
+    cardImage: {
+        width: '100%',
+        height: '100%',
     },
-    cardHeaderTop: {
+    placeholderImage: {
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#F3F4F6',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    statusBadge: {
+        position: 'absolute',
+        top: 12,
+        left: 12,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    statusText: {
+        color: 'white',
+        fontSize: 10,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+    },
+    favoriteButton: {
+        position: 'absolute',
+        top: 12,
+        right: 12,
+        width: 32,
+        height: 32,
+        backgroundColor: 'rgba(0,0,0,0.3)',
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    cardContent: {
+        padding: 16,
+    },
+    projectName: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#1F2937',
+        marginBottom: 4,
+    },
+    projectBudget: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#0EA5E9',
+        marginBottom: 8,
+    },
+    addressRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 12,
     },
-    badgeRow: {
-        flexDirection: 'row',
-        gap: 8,
-    },
-    statusBadge: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 16,
-    },
-    statusText: {
-        fontSize: 10,
-        fontWeight: '700',
-        textTransform: 'uppercase',
-        letterSpacing: 1,
-    },
-    priorityBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-        gap: 4,
-    },
-    priorityText: {
-        fontSize: 9,
-        fontWeight: '700',
-        letterSpacing: 0.5,
-    },
-    progressBadge: {
-        backgroundColor: '#F1F5F9',
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 12,
-    },
-    progressText: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#374151',
-    },
-    projectTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1F2937',
-        letterSpacing: -0.3,
-    },
-    overdueWarning: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 8,
-        padding: 8,
-        backgroundColor: '#FEE2E2',
-        borderRadius: 8,
-        gap: 6,
-    },
-    overdueText: {
-        fontSize: 12,
-        color: '#DC2626',
-        fontWeight: '600',
-    },
-    cardBody: {
-        padding: 20,
-    },
-    infoRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    iconContainer: {
-        width: 32,
-        height: 32,
-        borderRadius: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 12,
-    },
-    infoText: {
-        fontSize: 14,
-        color: '#6B7280',
-        flex: 1,
-        lineHeight: 20,
-        fontWeight: '400',
-    },
-    infoTextBold: {
-        fontSize: 14,
-        color: '#374151',
-        fontWeight: '600',
-        flex: 1,
-    },
-    budgetRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    budgetInfo: {
-        flex: 1,
-    },
-    budgetText: {
+    projectAddress: {
         fontSize: 13,
-        color: '#374151',
-        fontWeight: '600',
-        marginBottom: 4,
-    },
-    budgetProgressBar: {
-        height: 4,
-        backgroundColor: '#F1F5F9',
-        borderRadius: 2,
-        overflow: 'hidden',
-    },
-    budgetProgressFill: {
-        height: '100%',
-        borderRadius: 2,
+        color: '#6B7280',
+        marginLeft: 4,
+        flex: 1,
     },
     progressContainer: {
-        marginTop: 20,
-        marginBottom: 20,
+        marginBottom: 16,
     },
     progressHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 8,
+        marginBottom: 6,
     },
     progressLabel: {
-        fontSize: 13,
+        fontSize: 12,
         color: '#6B7280',
-        fontWeight: '600',
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
+        fontWeight: '500',
     },
     progressValue: {
-        fontSize: 13,
-        fontWeight: '700',
+        fontSize: 12,
+        color: '#1F2937',
+        fontWeight: '600',
     },
     progressBar: {
-        height: 6,
+        height: 4,
         backgroundColor: '#F1F5F9',
-        borderRadius: 3,
+        borderRadius: 2,
         overflow: 'hidden',
     },
     progressFill: {
         height: '100%',
-        borderRadius: 3,
+        borderRadius: 2,
     },
-    viewButton: {
+    viewDetailsButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 14,
-        borderRadius: 12,
-        gap: 8,
+        paddingVertical: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        backgroundColor: '#F8FAFC',
     },
-    viewButtonText: {
-        color: '#FFFFFF',
-        fontWeight: '600',
+    viewDetailsText: {
         fontSize: 14,
-        letterSpacing: 0.3,
+        fontWeight: '600',
+        color: '#0EA5E9',
+        marginRight: 6,
     },
     footer: {
+        marginTop: 32,
+        paddingHorizontal: 20,
+        paddingVertical: 24,
         alignItems: 'center',
-        paddingVertical: 40,
-        marginTop: 20,
     },
-    footerBrand: {
+    footerContent: {
         alignItems: 'center',
     },
     brandContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 16,
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        backgroundColor: '#1F2937',
-        borderRadius: 16,
-        shadowColor: '#1F2937',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.2,
-        shadowRadius: 16,
-        elevation: 8,
-    },
-    brandIconContainer: {
-        width: 32,
-        height: 32,
-        backgroundColor: '#0EA5E9',
-        borderRadius: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 12,
-    },
-    brandTextContainer: {
-        alignItems: 'flex-start',
-    },
-    footerText: {
-        fontSize: 10,
-        fontWeight: '500',
-        color: '#9CA3AF',
-        marginBottom: 2,
-        textTransform: 'uppercase',
-        letterSpacing: 1,
-    },
-    exponentorText: {
-        fontSize: 18,
-        fontWeight: '800',
-        color: '#FFFFFF',
-        letterSpacing: -0.5,
-    },
-    footerSubtext: {
-        fontSize: 13,
-        color: '#6B7280',
-        textAlign: 'center',
-        fontWeight: '500',
-        letterSpacing: 0.2,
         marginBottom: 8,
     },
-    footerVersion: {
-        fontSize: 11,
+    brandIcon: {
+        width: 24,
+        height: 24,
+        backgroundColor: '#0EA5E9',
+        borderRadius: 6,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 8,
+    },
+    brandText: {
+        fontSize: 14,
+        color: '#6B7280',
+        fontWeight: '500',
+    },
+    exponentorText: {
+        fontWeight: '700',
+        color: '#1F2937',
+    },
+    footerSubtext: {
+        fontSize: 12,
         color: '#9CA3AF',
         textAlign: 'center',
-        fontWeight: '400',
-        letterSpacing: 0.3,
     },
 });
