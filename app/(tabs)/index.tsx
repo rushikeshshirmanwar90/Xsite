@@ -125,6 +125,7 @@ const Index: React.FC = () => {
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
+
             <View style={styles.fixedHeader}>
                 <View style={styles.userInfo}>
                     <View style={styles.avatarContainer}>
@@ -166,6 +167,15 @@ const Index: React.FC = () => {
                     </LinearGradient>
                 </TouchableOpacity>
             </View> */}
+
+
+
+            {/* Section Header */}
+            <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>My Projects</Text>
+                <View style={styles.sectionDivider} />
+            </View>
+
 
             <ScrollView style={styles.projectsList}>
                 {loading ? (

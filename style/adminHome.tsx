@@ -332,12 +332,6 @@ export const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 2,
     },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#111827',
-        marginBottom: 16,
-    },
     infoTable: {
         borderTopWidth: 1,
         borderTopColor: '#E5E7EB',
@@ -538,6 +532,25 @@ export const styles = StyleSheet.create({
         borderRadius: 4,
         borderWidth: 2,
         borderColor: '#FFFFFF',
+    },
+
+    sectionHeader: {
+        paddingHorizontal: 24,
+        paddingTop: 32,
+        paddingBottom: 20,
+    },
+    sectionTitle: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#1F2937',
+        marginBottom: 8,
+        letterSpacing: -0.5,
+    },
+    sectionDivider: {
+        width: 40,
+        height: 3,
+        backgroundColor: '#0EA5E9',
+        borderRadius: 2,
     },
 
 })
