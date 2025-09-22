@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
   Animated,
+  Alert,
 } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,7 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // Types
 interface Notification {
     id: number;
-    type: 'work_update' | 'work_remaining' | 'site_engineer' | 'material_alert' | 'safety_alert' | 'delay_warning';
+    type: 'work_update' | 'work_remaining' | 'site_engineer' | 'material_alert' | 'safety_alert' | 'delay_warning' | 'permission_request';
     title: string;
     message: string;
     projectName: string;
@@ -26,21 +27,28 @@ interface Notification {
     timestamp: string;
     priority: 'high' | 'medium' | 'low';
     isRead: boolean;
+    requiresApproval?: boolean;
+    approvalStatus?: 'pending' | 'approved' | 'rejected';
+    permissionType?: 'material_purchase' | 'equipment_rental' | 'overtime_work' | 'budget_revision' | 'design_change';
+    requestAmount?: number;
+    requestDetails?: string;
 }
 
 interface DeletedNotification extends Notification {
     deletedAt: number;
+    originalIndex: number; // Add original index to restore position
 }
 
 // Toast Component
 interface ToastProps {
     visible: boolean;
     message: string;
-    onUndo: () => void;
+    onUndo?: () => void;
     onHide: () => void;
+    type?: 'success' | 'error' | 'info';
 }
 
-const Toast: React.FC<ToastProps> = ({ visible, message, onUndo, onHide }) => {
+const Toast: React.FC<ToastProps> = ({ visible, message, onUndo, onHide, type = 'info' }) => {
     const translateY = useRef(new Animated.Value(100)).current;
 
     useEffect(() => {
@@ -51,7 +59,7 @@ const Toast: React.FC<ToastProps> = ({ visible, message, onUndo, onHide }) => {
                 useNativeDriver: true,
             }).start();
 
-            // Auto hide after 10 seconds
+            // Auto hide after 3 seconds
             const timer = setTimeout(() => {
                 hideToast();
             }, 3000);
@@ -74,18 +82,63 @@ const Toast: React.FC<ToastProps> = ({ visible, message, onUndo, onHide }) => {
 
     if (!visible) return null;
 
+    const getToastColor = () => {
+        switch (type) {
+            case 'success': return '#10B981';
+            case 'error': return '#EF4444';
+            default: return '#1F2937';
+        }
+    };
+
     return (
         <Animated.View 
             style={[
                 styles.toastContainer,
-                { transform: [{ translateY }] }
+                { 
+                    transform: [{ translateY }],
+                    backgroundColor: getToastColor()
+                }
             ]}
         >
             <Text style={styles.toastMessage}>{message}</Text>
-            <TouchableOpacity onPress={onUndo} style={styles.undoButton}>
-                <Text style={styles.undoText}>UNDO</Text>
-            </TouchableOpacity>
+            {onUndo && (
+                <TouchableOpacity onPress={onUndo} style={styles.undoButton}>
+                    <Text style={styles.undoText}>UNDO</Text>
+                </TouchableOpacity>
+            )}
         </Animated.View>
+    );
+};
+
+// Approval Buttons Component
+interface ApprovalButtonsProps {
+    notification: Notification;
+    onApprove: (id: number) => void;
+    onReject: (id: number) => void;
+}
+
+const ApprovalButtons: React.FC<ApprovalButtonsProps> = ({ notification, onApprove, onReject }) => {
+    if (!notification.requiresApproval || notification.approvalStatus !== 'pending') {
+        return null;
+    }
+
+    return (
+        <View style={styles.approvalContainer}>
+            <TouchableOpacity 
+                style={[styles.approvalButton, styles.rejectButton]}
+                onPress={() => onReject(notification.id)}
+            >
+                <Ionicons name="close" size={14} color="#FFFFFF" />
+                <Text style={styles.approvalButtonText}>Reject</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+                style={[styles.approvalButton, styles.approveButton]}
+                onPress={() => onApprove(notification.id)}
+            >
+                <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                <Text style={styles.approvalButtonText}>Approve</Text>
+            </TouchableOpacity>
+        </View>
     );
 };
 
@@ -104,59 +157,51 @@ const getTimeAgo = (timestamp: string): string => {
     return notificationTime.toLocaleDateString('en-IN');
 };
 
+const formatCurrency = (amount: number): string => {
+    return `₹${amount.toLocaleString('en-IN')}`;
+};
+
 // Company configuration
 const COMPANY_CONFIG = {
     name: "Sharda Constructions",
     subtitle: "Notifications"
 };
 
-// Generate initials function
-const generateInitials = (companyName: string): string => {
-    if (!companyName) return 'XX';
-    
-    const words = companyName
-        .split(/[\s\-_&]+/)
-        .filter(word => word.length > 0);
-    
-    if (words.length === 0) return 'XX';
-    
-    if (words.length === 1) {
-        const word = words[0];
-        return word.length >= 2 ? word.substring(0, 2).toUpperCase() : word.toUpperCase();
-    }
-    
-    return words
-        .slice(0, 2)
-        .map(word => word[0])
-        .join('')
-        .toUpperCase();
-};
-
-// Dummy notifications data
+// Dummy notifications data with approval requests
 const dummyNotifications: Notification[] = [
     {
         id: 1,
-        type: 'work_update',
-        title: 'Foundation Work Completed',
-        message: 'Foundation work for Block A has been completed successfully. Ready for next phase construction.',
+        type: 'permission_request',
+        title: 'Material Purchase Approval Required',
+        message: 'Requesting approval for additional cement and steel purchase for Block A foundation work. Estimated cost: ₹2,50,000',
         projectName: 'Manthan Tower A',
         projectId: 1,
-        senderName: 'Rajesh Kumar',
+        senderName: 'Rajesh Kumar (Site Engineer)',
         timestamp: '2024-09-21T08:30:00Z',
         priority: 'high',
         isRead: false,
+        requiresApproval: true,
+        approvalStatus: 'pending',
+        permissionType: 'material_purchase',
+        requestAmount: 250000,
+        requestDetails: 'Additional 50 bags of cement and 2 tons of steel bars required due to foundation depth revision.'
     },
     {
         id: 2,
-        type: 'site_engineer',
-        title: 'Material Quality Issue',
-        message: 'Some cement bags received today have moisture damage. Please arrange for replacement immediately.',
+        type: 'permission_request',
+        title: 'Equipment Rental Approval',
+        message: 'Need approval to rent JCB for excavation work. Daily rental: ₹8,000 for 3 days. Total: ₹24,000',
         projectName: 'Skyline Apartments B',
         projectId: 2,
-        senderName: 'Priya Sharma',
+        senderName: 'Priya Sharma (Site Engineer)',
         timestamp: '2024-09-21T07:15:00Z',
-        priority: 'high',
+        priority: 'medium',
         isRead: false,
+        requiresApproval: true,
+        approvalStatus: 'pending',
+        permissionType: 'equipment_rental',
+        requestAmount: 24000,
+        requestDetails: 'JCB required for basement excavation work. Expected completion in 3 days.'
     },
     {
         id: 3,
@@ -172,15 +217,20 @@ const dummyNotifications: Notification[] = [
     },
     {
         id: 4,
-        type: 'delay_warning',
-        title: 'Project Delay Risk',
-        message: 'Metro Plaza Complex is at risk of delay due to permit approval pending. Immediate action required.',
+        type: 'permission_request',
+        title: 'Overtime Work Authorization',
+        message: 'Requesting approval for overtime work to meet project deadline. Additional labor cost: ₹15,000',
         projectName: 'Metro Plaza Complex',
         projectId: 3,
-        senderName: 'Amit Patel',
+        senderName: 'Amit Patel (Site Engineer)',
         timestamp: '2024-09-20T16:20:00Z',
         priority: 'high',
         isRead: false,
+        requiresApproval: true,
+        approvalStatus: 'approved',
+        permissionType: 'overtime_work',
+        requestAmount: 15000,
+        requestDetails: 'Need to work extra hours to complete concrete pouring before monsoon.'
     },
     {
         id: 5,
@@ -206,6 +256,55 @@ const dummyNotifications: Notification[] = [
         priority: 'low',
         isRead: false,
     },
+    // Add more notifications to test scrolling
+    {
+        id: 7,
+        type: 'work_update',
+        title: 'Foundation Work Completed',
+        message: 'Foundation work for Block B has been completed successfully. Ready for next phase.',
+        projectName: 'Manthan Tower A',
+        projectId: 1,
+        senderName: 'Rajesh Kumar',
+        timestamp: '2024-09-19T16:00:00Z',
+        priority: 'medium',
+        isRead: true,
+    },
+    {
+        id: 8,
+        type: 'delay_warning',
+        title: 'Weather Delay Alert',
+        message: 'Heavy rainfall expected for next 3 days. Outdoor activities may be delayed.',
+        projectName: 'Green Valley Villas',
+        projectId: 4,
+        senderName: 'Weather Service',
+        timestamp: '2024-09-19T12:00:00Z',
+        priority: 'high',
+        isRead: true,
+    },
+    {
+        id: 9,
+        type: 'material_alert',
+        title: 'Cement Delivery Scheduled',
+        message: 'Cement delivery scheduled for tomorrow morning at 8 AM. Please ensure site access.',
+        projectName: 'Skyline Apartments B',
+        projectId: 2,
+        senderName: 'Supply Manager',
+        timestamp: '2024-09-19T10:30:00Z',
+        priority: 'medium',
+        isRead: true,
+    },
+    {
+        id: 10,
+        type: 'safety_alert',
+        title: 'Safety Training Reminder',
+        message: 'Monthly safety training scheduled for all workers this Friday at 2 PM.',
+        projectName: 'Tech Park Phase 1',
+        projectId: 6,
+        senderName: 'Safety Officer',
+        timestamp: '2024-09-18T15:45:00Z',
+        priority: 'medium',
+        isRead: true,
+    },
 ];
 
 // Swipeable Notification Item Component
@@ -213,18 +312,30 @@ interface NotificationItemProps {
     notification: Notification;
     onPress: (notification: Notification) => void;
     onDelete: (notification: Notification) => void;
+    onApprove: (id: number) => void;
+    onReject: (id: number) => void;
 }
 
 const SwipeableNotificationItem: React.FC<NotificationItemProps> = ({ 
     notification, 
     onPress, 
-    onDelete 
+    onDelete,
+    onApprove,
+    onReject
 }) => {
     const translateX = useRef(new Animated.Value(0)).current;
     const opacity = useRef(new Animated.Value(1)).current;
     const scale = useRef(new Animated.Value(1)).current;
 
-    const getNotificationIcon = (type: string) => {
+    const getNotificationIcon = (type: string, approvalStatus?: string) => {
+        if (type === 'permission_request') {
+            switch (approvalStatus) {
+                case 'approved': return { icon: 'checkmark-circle', color: '#10B981' };
+                case 'rejected': return { icon: 'close-circle', color: '#EF4444' };
+                default: return { icon: 'time-outline', color: '#F59E0B' };
+            }
+        }
+        
         switch (type) {
             case 'work_update': return { icon: 'checkmark-circle', color: '#10B981' };
             case 'work_remaining': return { icon: 'time', color: '#F59E0B' };
@@ -278,7 +389,7 @@ const SwipeableNotificationItem: React.FC<NotificationItemProps> = ({
         }
     };
 
-    const iconConfig = getNotificationIcon(notification.type);
+    const iconConfig = getNotificationIcon(notification.type, notification.approvalStatus);
 
     return (
         <View style={styles.swipeContainer}>
@@ -296,6 +407,7 @@ const SwipeableNotificationItem: React.FC<NotificationItemProps> = ({
                     style={[
                         styles.notificationItem,
                         !notification.isRead && styles.unreadItem,
+                        notification.requiresApproval && notification.approvalStatus === 'pending' && styles.approvalPendingItem,
                         {
                             transform: [{ translateX }, { scale }],
                             opacity,
@@ -327,10 +439,44 @@ const SwipeableNotificationItem: React.FC<NotificationItemProps> = ({
                             <Text style={styles.message} numberOfLines={2}>
                                 {notification.message}
                             </Text>
+
+                            {/* Request Amount Display */}
+                            {notification.requestAmount && (
+                                <Text style={styles.amountText}>
+                                    Amount: {formatCurrency(notification.requestAmount)}
+                                </Text>
+                            )}
+
+                            {/* Approval Status Badge */}
+                            {notification.requiresApproval && notification.approvalStatus && (
+                                <View style={styles.statusContainer}>
+                                    <View style={[
+                                        styles.statusBadge,
+                                        notification.approvalStatus === 'approved' && styles.approvedBadge,
+                                        notification.approvalStatus === 'rejected' && styles.rejectedBadge,
+                                        notification.approvalStatus === 'pending' && styles.pendingBadge,
+                                    ]}>
+                                        <Text style={[
+                                            styles.statusText,
+                                            notification.approvalStatus === 'pending' && styles.pendingStatusText
+                                        ]}>
+                                            {notification.approvalStatus.toUpperCase()}
+                                        </Text>
+                                    </View>
+                                </View>
+                            )}
                             
                             <Text style={styles.projectText}>
                                 {notification.projectName}
+                                {notification.senderName && ` • ${notification.senderName}`}
                             </Text>
+
+                            {/* Approval Buttons */}
+                            <ApprovalButtons 
+                                notification={notification}
+                                onApprove={onApprove}
+                                onReject={onReject}
+                            />
                         </View>
                         
                         {!notification.isRead && <View style={styles.unreadDot} />}
@@ -346,6 +492,8 @@ const NotificationScreen: React.FC = () => {
     const [notifications, setNotifications] = useState<Notification[]>(dummyNotifications);
     const [deletedNotifications, setDeletedNotifications] = useState<DeletedNotification[]>([]);
     const [toastVisible, setToastVisible] = useState(false);
+    const [toastMessage, setToastMessage] = useState('');
+    const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
     const [lastDeleted, setLastDeleted] = useState<DeletedNotification | null>(null);
     const router = useRouter();
     
@@ -353,8 +501,18 @@ const NotificationScreen: React.FC = () => {
         return notifications.filter(n => !n.isRead).length;
     }, [notifications]);
 
+    const pendingApprovals = useMemo(() => {
+        return notifications.filter(n => n.requiresApproval && n.approvalStatus === 'pending').length;
+    }, [notifications]);
+
+    const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+        setToastMessage(message);
+        setToastType(type);
+        setToastVisible(true);
+    };
+
     const handleNotificationPress = (notification: Notification) => {
-        // Just mark as read, don't remove from list
+        // Mark as read
         setNotifications(prev => 
             prev.map(n => 
                 n.id === notification.id ? { ...n, isRead: true } : n
@@ -363,20 +521,78 @@ const NotificationScreen: React.FC = () => {
     };
 
     const handleDeleteNotification = (notification: Notification) => {
+        // Find the original index of the notification
+        const originalIndex = notifications.findIndex(n => n.id === notification.id);
+        
         const deletedNotification: DeletedNotification = {
             ...notification,
             deletedAt: Date.now(),
+            originalIndex: originalIndex,
         };
 
         setLastDeleted(deletedNotification);
         setDeletedNotifications(prev => [...prev, deletedNotification]);
         setNotifications(prev => prev.filter(n => n.id !== notification.id));
-        setToastVisible(true);
+        showToast('Notification deleted', 'info');
+    };
+
+    const handleApprove = (id: number) => {
+        Alert.alert(
+            'Approve Request',
+            'Are you sure you want to approve this request?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Approve',
+                    style: 'default',
+                    onPress: () => {
+                        setNotifications(prev =>
+                            prev.map(n =>
+                                n.id === id ? { ...n, approvalStatus: 'approved' as const, isRead: true } : n
+                            )
+                        );
+                        showToast('Request approved successfully', 'success');
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleReject = (id: number) => {
+        Alert.alert(
+            'Reject Request',
+            'Are you sure you want to reject this request?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Reject',
+                    style: 'destructive',
+                    onPress: () => {
+                        setNotifications(prev =>
+                            prev.map(n =>
+                                n.id === id ? { ...n, approvalStatus: 'rejected' as const, isRead: true } : n
+                            )
+                        );
+                        showToast('Request rejected', 'error');
+                    }
+                }
+            ]
+        );
     };
 
     const handleUndo = () => {
         if (lastDeleted) {
-            setNotifications(prev => [...prev, lastDeleted]);
+            // Restore notification at its original position
+            const { originalIndex, deletedAt, ...notification } = lastDeleted;
+            
+            setNotifications(prev => {
+                const newNotifications = [...prev];
+                // Insert at the original index, but ensure it doesn't exceed array bounds
+                const insertIndex = Math.min(originalIndex, newNotifications.length);
+                newNotifications.splice(insertIndex, 0, notification);
+                return newNotifications;
+            });
+            
             setDeletedNotifications(prev => 
                 prev.filter(n => n.id !== lastDeleted.id)
             );
@@ -391,10 +607,10 @@ const NotificationScreen: React.FC = () => {
     };
 
     const handleMarkAllAsRead = () => {
-        // Just mark all as read, don't remove from list
         setNotifications(prev => 
             prev.map(notification => ({ ...notification, isRead: true }))
         );
+        showToast('All notifications marked as read', 'success');
     };
 
     // Auto-cleanup deleted notifications after 30 seconds
@@ -413,7 +629,7 @@ const NotificationScreen: React.FC = () => {
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-            {/* Simple Header */}
+            {/* Enhanced Header */}
             <View style={styles.header}>
                 <View style={styles.headerLeft}>
                     <TouchableOpacity
@@ -426,6 +642,7 @@ const NotificationScreen: React.FC = () => {
                         <Text style={styles.headerTitle}>Notifications</Text>
                         <Text style={styles.headerSubtitle}>
                             {unreadCount} unread
+                            {pendingApprovals > 0 && ` • ${pendingApprovals} pending approval`}
                         </Text>
                     </View>
                 </View>
@@ -445,7 +662,17 @@ const NotificationScreen: React.FC = () => {
                 <View style={styles.instructionBanner}>
                     <Ionicons name="information-circle-outline" size={16} color="#6B7280" />
                     <Text style={styles.instructionText}>
-                        Tap to read • Swipe to delete
+                        Tap to read • Swipe to delete • Use action buttons for approvals
+                    </Text>
+                </View>
+            )}
+
+            {/* Pending Approvals Alert */}
+            {pendingApprovals > 0 && (
+                <View style={styles.approvalAlert}>
+                    <Ionicons name="alert-circle" size={20} color="#F59E0B" />
+                    <Text style={styles.approvalAlertText}>
+                        {pendingApprovals} request{pendingApprovals > 1 ? 's' : ''} pending your approval
                     </Text>
                 </View>
             )}
@@ -453,7 +680,10 @@ const NotificationScreen: React.FC = () => {
             {/* Notifications List */}
             <ScrollView 
                 style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
+                bounces={true}
+                nestedScrollEnabled={true}
             >
                 {notifications.length > 0 ? (
                     notifications.map((notification) => (
@@ -462,6 +692,8 @@ const NotificationScreen: React.FC = () => {
                             notification={notification}
                             onPress={handleNotificationPress}
                             onDelete={handleDeleteNotification}
+                            onApprove={handleApprove}
+                            onReject={handleReject}
                         />
                     ))
                 ) : (
@@ -475,11 +707,12 @@ const NotificationScreen: React.FC = () => {
                 )}
             </ScrollView>
 
-            {/* Toast for Undo */}
+            {/* Toast for feedback */}
             <Toast
                 visible={toastVisible}
-                message="Notification deleted"
-                onUndo={handleUndo}
+                message={toastMessage}
+                type={toastType}
+                onUndo={lastDeleted ? handleUndo : undefined}
                 onHide={handleToastHide}
             />
         </SafeAreaView>
@@ -545,8 +778,27 @@ const styles = StyleSheet.create({
         color: '#6B7280',
         marginLeft: 6,
     },
+    approvalAlert: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: '#FEF3C7',
+        borderBottomWidth: 1,
+        borderBottomColor: '#FDE68A',
+    },
+    approvalAlertText: {
+        fontSize: 14,
+        color: '#92400E',
+        marginLeft: 8,
+        fontWeight: '500',
+    },
     scrollView: {
         flex: 1,
+    },
+    scrollContent: {
+        flexGrow: 1, // Changed from paddingBottom to flexGrow
+        paddingBottom: 120, // Keep some bottom padding for toast
     },
     swipeContainer: {
         position: 'relative',
@@ -579,9 +831,15 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 16,
         position: 'relative',
+        minHeight: 80, // Add minimum height to ensure proper scrolling
     },
     unreadItem: {
         backgroundColor: '#FEFEFE',
+    },
+    approvalPendingItem: {
+        backgroundColor: '#FFFBEB',
+        borderLeftWidth: 4,
+        borderLeftColor: '#F59E0B',
     },
     iconContainer: {
         width: 32,
@@ -623,10 +881,69 @@ const styles = StyleSheet.create({
         lineHeight: 18,
         marginBottom: 6,
     },
+    amountText: {
+        fontSize: 13,
+        color: '#059669',
+        fontWeight: '600',
+        marginBottom: 6,
+    },
+    statusContainer: {
+        marginBottom: 6,
+    },
+    statusBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 12,
+        alignSelf: 'flex-start',
+    },
+    approvedBadge: {
+        backgroundColor: '#D1FAE5',
+    },
+    rejectedBadge: {
+        backgroundColor: '#FEE2E2',
+    },
+    pendingBadge: {
+        backgroundColor: '#FEF3C7',
+    },
+    statusText: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: '#059669',
+    },
+    pendingStatusText: {
+        color: '#92400E',
+    },
     projectText: {
         fontSize: 12,
         color: '#3B82F6',
         fontWeight: '500',
+        marginBottom: 8,
+    },
+    approvalContainer: {
+        flexDirection: 'row',
+        marginTop: 8,
+        gap: 8,
+    },
+    approvalButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 6,
+        minWidth: 80,
+        justifyContent: 'center',
+    },
+    approveButton: {
+        backgroundColor: '#10B981',
+    },
+    rejectButton: {
+        backgroundColor: '#EF4444',
+    },
+    approvalButtonText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '600',
+        marginLeft: 4,
     },
     unreadDot: {
         position: 'absolute',
@@ -642,6 +959,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingVertical: 80,
         paddingHorizontal: 32,
+        flex: 1,
     },
     emptyTitle: {
         fontSize: 18,
@@ -662,7 +980,6 @@ const styles = StyleSheet.create({
         bottom: 24,
         left: 16,
         right: 16,
-        backgroundColor: '#1F2937',
         borderRadius: 12,
         paddingHorizontal: 16,
         paddingVertical: 14,
@@ -677,6 +994,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 8,
         elevation: 8,
+        zIndex: 1000,
     },
     toastMessage: {
         color: '#FFFFFF',
@@ -687,7 +1005,7 @@ const styles = StyleSheet.create({
         marginLeft: 16,
     },
     undoText: {
-        color: '#3B82F6',
+        color: '#FFFFFF',
         fontSize: 14,
         fontWeight: '600',
     },
