@@ -6,231 +6,503 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { Colors } from '../../constants/theme';
-import { Project, Activity } from '../../types/project';
+import { Project, ProjectSection, MaterialUsage, BudgetAnalysis } from '../../types/project';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
+
+const { width } = Dimensions.get('window');
 
 const AnalysisPage = () => {
   const { id } = useLocalSearchParams();
   const [loading, setLoading] = useState(false);
+  const [selectedSection, setSelectedSection] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'quarter'>('month');
 
-  // Mock data for demonstration
-  const mockProjects: Project[] = [
-    {
-      _id: '1',
-      name: 'Skyline Tower',
-      address: 'Mumbai, Maharashtra',
-      status: 'active',
-      progress: 75,
-      budget: 50000000,
-      spent: 37500000,
-      startDate: '2024-01-15',
-      endDate: '2024-12-31',
-      description: 'A 45-story residential tower with modern amenities',
-      assignedStaff: [],
-    },
-    {
-      _id: '2',
-      name: 'Green Valley Residency',
-      address: 'Pune, Maharashtra',
-      status: 'active',
-      progress: 45,
-      budget: 35000000,
-      spent: 15750000,
-      startDate: '2024-03-01',
-      endDate: '2025-02-28',
-      description: 'Eco-friendly residential complex with 200 units',
-      assignedStaff: [],
-    },
-    {
-      _id: '3',
-      name: 'Tech Park Phase 2',
-      address: 'Bangalore, Karnataka',
-      status: 'active',
-      progress: 90,
-      budget: 80000000,
-      spent: 72000000,
-      startDate: '2023-06-01',
-      endDate: '2024-09-30',
-      description: 'Commercial office space expansion project',
-      assignedStaff: [],
-    },
-  ];
-
-  const mockMaterialStats = {
-    materialsUsed: 1247,
-    materialsWasted: 89,
-    totalMaterials: 1336,
-    wasteCost: 245000,
+  // Enhanced mock data with sections
+  const mockProject: Project = {
+    _id: '1',
+    name: 'Skyline Tower',
+    address: 'Mumbai, Maharashtra',
+    status: 'active',
+    progress: 75,
+    budget: 50000000,
+    spent: 37500000,
+    startDate: '2024-01-15',
+    endDate: '2024-12-31',
+    description: 'A 45-story residential tower with modern amenities',
+    assignedStaff: [],
+    sections: [
+      {
+        id: 'foundation',
+        name: 'Foundation',
+        description: 'Building foundation and basement work',
+        budget: 8000000,
+        spent: 7500000,
+        progress: 95,
+        startDate: '2024-01-15',
+        endDate: '2024-04-30',
+        status: 'completed',
+        materials: [
+          {
+            materialId: 'cement',
+            name: 'Cement',
+            plannedQuantity: 2000,
+            usedQuantity: 1900,
+            wastedQuantity: 100,
+            unit: 'bags',
+            costPerUnit: 350,
+          },
+          {
+            materialId: 'steel',
+            name: 'Steel Bars',
+            plannedQuantity: 500,
+            usedQuantity: 480,
+            wastedQuantity: 20,
+            unit: 'tons',
+            costPerUnit: 65000,
+          },
+        ],
+      },
+      {
+        id: 'structure',
+        name: 'Super Structure',
+        description: 'Main building structure and framework',
+        budget: 15000000,
+        spent: 12000000,
+        progress: 80,
+        startDate: '2024-03-01',
+        endDate: '2024-08-31',
+        status: 'in_progress',
+        materials: [
+          {
+            materialId: 'concrete',
+            name: 'Ready Mix Concrete',
+            plannedQuantity: 3000,
+            usedQuantity: 2400,
+            wastedQuantity: 100,
+            unit: 'cubic meters',
+            costPerUnit: 4500,
+          },
+          {
+            materialId: 'steel',
+            name: 'Steel Beams',
+            plannedQuantity: 800,
+            usedQuantity: 640,
+            wastedQuantity: 40,
+            unit: 'tons',
+            costPerUnit: 70000,
+          },
+        ],
+      },
+      {
+        id: 'finishing',
+        name: 'Finishing',
+        description: 'Interior and exterior finishing work',
+        budget: 12000000,
+        spent: 6000000,
+        progress: 50,
+        startDate: '2024-07-01',
+        endDate: '2024-11-30',
+        status: 'in_progress',
+        materials: [
+          {
+            materialId: 'tiles',
+            name: 'Ceramic Tiles',
+            plannedQuantity: 10000,
+            usedQuantity: 5000,
+            wastedQuantity: 200,
+            unit: 'sq ft',
+            costPerUnit: 85,
+          },
+          {
+            materialId: 'paint',
+            name: 'Premium Paint',
+            plannedQuantity: 2000,
+            usedQuantity: 1000,
+            wastedQuantity: 50,
+            unit: 'liters',
+            costPerUnit: 450,
+          },
+        ],
+      },
+    ],
+    materialUsage: [
+      {
+        id: 'cement',
+        name: 'Cement',
+        totalUsed: 1900,
+        totalWasted: 100,
+        totalOrdered: 2000,
+        unit: 'bags',
+        costPerUnit: 350,
+        category: 'construction',
+      },
+      {
+        id: 'steel',
+        name: 'Steel',
+        totalUsed: 1120,
+        totalWasted: 60,
+        totalOrdered: 1300,
+        unit: 'tons',
+        costPerUnit: 67500,
+        category: 'construction',
+      },
+      {
+        id: 'concrete',
+        name: 'Concrete',
+        totalUsed: 2400,
+        totalWasted: 100,
+        totalOrdered: 2500,
+        unit: 'cubic meters',
+        costPerUnit: 4500,
+        category: 'construction',
+      },
+      {
+        id: 'tiles',
+        name: 'Tiles',
+        totalUsed: 5000,
+        totalWasted: 200,
+        totalOrdered: 5200,
+        unit: 'sq ft',
+        costPerUnit: 85,
+        category: 'finishing',
+      },
+    ],
   };
 
-  const mockMaterials = [
-    {
-      id: 1,
-      name: 'Cement',
-      used: 450,
-      wasted: 25,
-      unit: 'bags',
-    },
-    {
-      id: 2,
-      name: 'Steel',
-      used: 120,
-      wasted: 8,
-      unit: 'tons',
-    },
-    {
-      id: 3,
-      name: 'Bricks',
-      used: 15000,
-      wasted: 1200,
-      unit: 'pieces',
-    },
-    {
-      id: 4,
-      name: 'Sand',
-      used: 85,
-      wasted: 12,
-      unit: 'cubic meters',
-    },
-  ];
+  // Mock budget analysis data
+  const budgetAnalysis: BudgetAnalysis = {
+    totalBudget: 50000000,
+    totalSpent: 37500000,
+    remainingBudget: 12500000,
+    budgetUtilization: 75,
+    projectedOverspend: 2500000,
+    sectionBreakdown: [
+      {
+        sectionId: 'foundation',
+        sectionName: 'Foundation',
+        allocatedBudget: 8000000,
+        spentBudget: 7500000,
+        remainingBudget: 500000,
+        utilizationPercentage: 94,
+      },
+      {
+        sectionId: 'structure',
+        sectionName: 'Super Structure',
+        allocatedBudget: 15000000,
+        spentBudget: 12000000,
+        remainingBudget: 3000000,
+        utilizationPercentage: 80,
+      },
+      {
+        sectionId: 'finishing',
+        sectionName: 'Finishing',
+        allocatedBudget: 12000000,
+        spentBudget: 6000000,
+        remainingBudget: 6000000,
+        utilizationPercentage: 50,
+      },
+    ],
+  };
 
-  const mockActivities: Activity[] = [
-    {
-      id: 1,
-      type: 'received',
-      material: 'Cement',
-      quantity: '50 bags',
-      date: '2024-03-15',
-    },
-    {
-      id: 2,
-      type: 'issued',
-      material: 'Steel',
-      quantity: '5 tons',
-      date: '2024-03-14',
-    },
-    {
-      id: 3,
-      type: 'ordered',
-      material: 'Bricks',
-      quantity: '2000 pieces',
-      date: '2024-03-13',
-    },
-    {
-      id: 4,
-      type: 'received',
-      material: 'Sand',
-      quantity: '10 cubic meters',
-      date: '2024-03-12',
-    },
-  ];
+  // Helper functions
+  const formatCurrency = (amount: number) => {
+    return `₹${(amount / 100000).toFixed(1)}L`;
+  };
 
-  const mockWasteAnalysis = [
-    {
-      category: 'Transportation',
-      percentage: 35,
-      cost: 85750,
-    },
-    {
-      category: 'Storage',
-      percentage: 25,
-      cost: 61250,
-    },
-    {
-      category: 'Handling',
-      percentage: 20,
-      cost: 49000,
-    },
-    {
-      category: 'Over-ordering',
-      percentage: 15,
-      cost: 36750,
-    },
-    {
-      category: 'Other',
-      percentage: 5,
-      cost: 12250,
-    },
-  ];
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return '#10B981';
+      case 'in_progress':
+        return '#0EA5E9';
+      case 'delayed':
+        return '#EF4444';
+      default:
+        return '#64748B';
+    }
+  };
 
-  // Find the selected project
-  const project = mockProjects.find(p => p._id === id) || mockProjects[0];
+  const getMaterialCategoryColor = (category: string) => {
+    switch (category) {
+      case 'construction':
+        return '#0EA5E9';
+      case 'finishing':
+        return '#8B5CF6';
+      case 'electrical':
+        return '#F59E0B';
+      case 'plumbing':
+        return '#10B981';
+      default:
+        return '#64748B';
+    }
+  };
 
-  const StatCard = ({ title, value, subtitle, color, icon, trend }: any) => (
-    <View style={[styles.statCard, { backgroundColor: '#ffffff' }]}>
-      <View style={styles.statCardHeader}>
-        <View style={[styles.statIconContainer, { backgroundColor: color + '20' }]}>
-          <Ionicons name={icon} size={20} color={color} />
-        </View>
-        {trend && (
-          <View style={[styles.trendBadge, { backgroundColor: trend > 0 ? '#10B981' : '#EF4444' }]}>
-            <Text style={styles.trendText}>{trend > 0 ? '+' : ''}{trend}%</Text>
+  // Header Component
+  const ProjectHeader = () => (
+    <View style={styles.projectHeader}>
+      <View style={styles.headerContent}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="arrow-back" size={20} color="#1F2937" />
+          </TouchableOpacity>
+          <View>
+            <Text style={styles.projectTitle}>{mockProject.name}</Text>
+            <Text style={styles.projectLocation}>{mockProject.address}</Text>
           </View>
-        )}
+        </View>
       </View>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statSubtitle}>{subtitle}</Text>
+      <View style={styles.projectMeta}>
+        <View 
+          style={[styles.statusBadge, { backgroundColor: getStatusColor(mockProject.status || '') }]}
+        >
+          <Text style={styles.statusText}>
+            {mockProject.status?.replace('_', ' ').toUpperCase()}
+          </Text>
+        </View>
+        <Text style={styles.projectDate}>
+          {new Date(mockProject.startDate || '').toLocaleDateString()} - {new Date(mockProject.endDate || '').toLocaleDateString()}
+        </Text>
+      </View>
     </View>
   );
 
-  const MaterialItem = ({ item }: any) => {
-    const wastePercentage = (item.wasted / (item.used + item.wasted)) * 100;
-    return (
-      <View style={styles.materialItem}>
-        <View style={styles.materialHeader}>
-          <Text style={styles.materialName}>{item.name}</Text>
-          <Text style={styles.materialWaste}>{wastePercentage.toFixed(1)}% waste</Text>
+  // Overview Stats Component
+  const OverviewStats = () => (
+    <View style={styles.overviewContainer}>
+      <Text style={styles.sectionTitle}>Project Overview</Text>
+      <View style={styles.statsGrid}>
+        <View style={styles.statCard}>
+          <View style={[styles.statIconContainer, { backgroundColor: '#F0F9FF' }]}>
+            <Ionicons name="wallet" size={20} color="#0EA5E9" />
+          </View>
+          <Text style={styles.statValue}>{formatCurrency(mockProject.budget || 0)}</Text>
+          <Text style={styles.statLabel}>Total Budget</Text>
         </View>
-        <View style={styles.materialDetails}>
-          <Text style={styles.materialUsed}>Used: {item.used} {item.unit}</Text>
-          <Text style={styles.materialTotal}>Wasted: {item.wasted} {item.unit}</Text>
+        <View style={styles.statCard}>
+          <View style={[styles.statIconContainer, { backgroundColor: '#FEF3C7' }]}>
+            <Ionicons name="cash" size={20} color="#F59E0B" />
+          </View>
+          <Text style={styles.statValue}>{formatCurrency(mockProject.spent || 0)}</Text>
+          <Text style={styles.statLabel}>Amount Spent</Text>
         </View>
-        <View style={styles.materialProgressBar}>
-          <View
+        <View style={styles.statCard}>
+          <View style={[styles.statIconContainer, { backgroundColor: '#D1FAE5' }]}>
+            <Ionicons name="trending-up" size={20} color="#10B981" />
+          </View>
+          <Text style={styles.statValue}>{mockProject.progress}%</Text>
+          <Text style={styles.statLabel}>Progress</Text>
+        </View>
+      </View>
+    </View>
+  );
+
+  // Budget Progress Chart Component
+  const BudgetProgressChart = () => (
+    <View style={styles.chartContainer}>
+      <Text style={styles.sectionTitle}>Budget vs Actual</Text>
+      <View style={styles.budgetChart}>
+        <View style={styles.budgetBars}>
+          {budgetAnalysis.sectionBreakdown.map((section) => (
+            <View key={section.sectionId} style={styles.budgetBarContainer}>
+              <Text style={styles.budgetBarLabel}>{section.sectionName}</Text>
+              <View style={styles.budgetBarBackground}>
+                <View 
+                  style={[
+                    styles.budgetBarFill, 
+                    { 
+                      width: `${section.utilizationPercentage}%`,
+                      backgroundColor: section.utilizationPercentage > 90 ? '#EF4444' : 
+                                     section.utilizationPercentage > 75 ? '#F59E0B' : '#10B981'
+                    }
+                  ]}
+                />
+              </View>
+              <Text style={styles.budgetBarValue}>
+                {section.utilizationPercentage}% • {formatCurrency(section.spentBudget)}/{formatCurrency(section.allocatedBudget)}
+              </Text>
+            </View>
+          ))}
+        </View>
+        <View style={styles.budgetSummary}>
+          <View style={styles.budgetSummaryItem}>
+            <Text style={styles.budgetSummaryLabel}>Total Budget</Text>
+            <Text style={styles.budgetSummaryValue}>{formatCurrency(budgetAnalysis.totalBudget)}</Text>
+          </View>
+          <View style={styles.budgetSummaryItem}>
+            <Text style={styles.budgetSummaryLabel}>Total Spent</Text>
+            <Text style={styles.budgetSummaryValue}>{formatCurrency(budgetAnalysis.totalSpent)}</Text>
+          </View>
+          <View style={styles.budgetSummaryItem}>
+            <Text style={styles.budgetSummaryLabel}>Remaining</Text>
+            <Text style={styles.budgetSummaryValue}>{formatCurrency(budgetAnalysis.remainingBudget)}</Text>
+          </View>
+          <View style={styles.budgetSummaryItem}>
+            <Text style={styles.budgetSummaryLabel}>Utilization</Text>
+            <Text style={styles.budgetSummaryValue}>{budgetAnalysis.budgetUtilization}%</Text>
+          </View>
+          {budgetAnalysis.projectedOverspend && (
+            <View style={styles.budgetSummaryItem}>
+              <Text style={styles.budgetSummaryLabel}>Projected Overspend</Text>
+              <Text style={[styles.budgetSummaryValue, { color: '#EF4444' }]}>
+                {formatCurrency(budgetAnalysis.projectedOverspend)}
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+
+  // Material Usage Overview Component
+  const MaterialUsageOverview = () => (
+    <View style={styles.chartContainer}>
+      <Text style={styles.sectionTitle}>Material Usage Overview</Text>
+      <View style={styles.materialGrid}>
+        {mockProject.materialUsage?.map((material) => {
+          const usagePercentage = (material.totalUsed / material.totalOrdered) * 100;
+          const wastePercentage = (material.totalWasted / material.totalOrdered) * 100;
+          
+          return (
+            <View key={material.id} style={styles.materialCard}>
+              <View style={styles.materialHeader}>
+                <Text style={styles.materialName}>{material.name}</Text>
+                <View 
+                  style={[styles.materialCategoryBadge, { backgroundColor: getMaterialCategoryColor(material.category) + '20' }]}
+                >
+                  <Text style={[styles.materialCategoryText, { color: getMaterialCategoryColor(material.category) }]}>
+                    {material.category}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.materialStats}>
+                <View style={styles.materialStat}>
+                  <Text style={styles.materialStatValue}>{material.totalUsed}</Text>
+                  <Text style={styles.materialStatLabel}>Used</Text>
+                </View>
+                <View style={styles.materialStat}>
+                  <Text style={styles.materialStatValue}>{material.totalWasted}</Text>
+                  <Text style={styles.materialStatLabel}>Wasted</Text>
+                </View>
+                <View style={styles.materialStat}>
+                  <Text style={styles.materialStatValue}>{material.totalOrdered}</Text>
+                  <Text style={styles.materialStatLabel}>Ordered</Text>
+                </View>
+              </View>
+              <View style={styles.materialProgressBar}>
+                <View style={styles.materialProgressBackground}>
+                  <View 
+                    style={[styles.materialProgressFill, { width: `${usagePercentage}%` }]}
+                  />
+                </View>
+                <View style={styles.materialWasteBar}>
+                  <View 
+                    style={[styles.materialWasteFill, { width: `${wastePercentage}%` }]}
+                  />
+                </View>
+              </View>
+              <Text style={styles.materialProgressText}>
+                {usagePercentage.toFixed(1)}% used • {wastePercentage.toFixed(1)}% wasted
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+
+  // Project Sections Breakdown Component
+  const ProjectSectionsBreakdown = () => (
+    <View style={styles.sectionsContainer}>
+      <Text style={styles.sectionTitle}>Project Sections</Text>
+      <View style={styles.sectionsList}>
+        {mockProject.sections?.map((section) => (
+          <TouchableOpacity
+            key={section.id}
             style={[
-              styles.materialProgressFill,
-              { width: `${(item.used / (item.used + item.wasted)) * 100}%` as any },
+              styles.sectionCard,
+              selectedSection === section.id && styles.sectionCardSelected
             ]}
-          />
-        </View>
+            onPress={() => setSelectedSection(selectedSection === section.id ? null : section.id)}
+          >
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionInfo}>
+                <Text style={styles.sectionName}>{section.name}</Text>
+                <Text style={styles.sectionDescription}>{section.description}</Text>
+              </View>
+              <View 
+                style={[styles.sectionStatusBadge, { backgroundColor: getStatusColor(section.status) }]}
+              >
+                <Text style={styles.sectionStatusText}>
+                  {section.status.replace('_', ' ').toUpperCase()}
+                </Text>
+              </View>
+            </View>
+            
+            <View style={styles.sectionProgress}>
+              <View style={styles.sectionProgressHeader}>
+                <Text style={styles.sectionProgressLabel}>Progress</Text>
+                <Text style={styles.sectionProgressValue}>{section.progress}%</Text>
+              </View>
+              <View style={styles.sectionProgressBar}>
+                <View 
+                  style={[styles.sectionProgressFill, { width: `${section.progress}%` }]}
+                />
+              </View>
+            </View>
+            
+            <View style={styles.sectionBudget}>
+              <View style={styles.sectionBudgetHeader}>
+                <Text style={styles.sectionBudgetLabel}>Budget</Text>
+                <Text style={styles.sectionBudgetValue}>
+                  {formatCurrency(section.spent)} / {formatCurrency(section.budget)}
+                </Text>
+              </View>
+            </View>
+            
+            {selectedSection === section.id && (
+              <View style={styles.sectionDetails}>
+                <Text style={styles.sectionDetailsTitle}>Material Details</Text>
+                <View style={styles.sectionMaterials}>
+                  {section.materials.map((material) => {
+                    const utilizationPercentage = (material.usedQuantity / material.plannedQuantity) * 100;
+                    const wastePercentage = (material.wastedQuantity / material.plannedQuantity) * 100;
+                    const totalCost = material.usedQuantity * material.costPerUnit;
+                    const wasteCost = material.wastedQuantity * material.costPerUnit;
+                    
+                    return (
+                      <View key={material.materialId} style={styles.sectionMaterialItem}>
+                        <View style={styles.sectionMaterialInfo}>
+                          <Text style={styles.sectionMaterialName}>{material.name}</Text>
+                          <Text style={styles.sectionMaterialQuantity}>
+                            {material.usedQuantity} / {material.plannedQuantity} {material.unit}
+                          </Text>
+                        </View>
+                        <View style={styles.sectionMaterialStats}>
+                          <Text style={styles.sectionMaterialCost}>
+                            ₹{(totalCost / 100000).toFixed(1)}L
+                          </Text>
+                          <Text style={[styles.sectionMaterialWaste, { color: '#EF4444' }]}>
+                            Waste: ₹{(wasteCost / 100000).toFixed(1)}L
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+          </TouchableOpacity>
+        ))}
       </View>
-    );
-  };
-
-  const ActivityItem = ({ activity }: any) => {
-    const getActivityColor = (type: string) => {
-      switch (type) {
-        case 'received': return '#10B981';
-        case 'issued': return '#0EA5E9';
-        case 'ordered': return '#F59E0B';
-        default: return '#64748B';
-      }
-    };
-
-    return (
-      <View style={styles.activityItem}>
-        <View style={[styles.activityIcon, { backgroundColor: getActivityColor(activity.type) + '20' }]}>
-          <Ionicons 
-            name={activity.type === 'received' ? 'download' : activity.type === 'issued' ? 'send' : 'cart'} 
-            size={20} 
-            color={getActivityColor(activity.type)} 
-          />
-        </View>
-        <View style={styles.activityContent}>
-          <Text style={styles.activityText}>
-            <Text style={{ fontWeight: 'bold' }}>{activity.material}</Text> {activity.quantity}
-          </Text>
-          <Text style={styles.activityDate}>{activity.date}</Text>
-        </View>
-      </View>
-    );
-  };
-
-  const budgetPercentage = Math.round(((project.spent || 0) / (project.budget || 1)) * 100);
+    </View>
+  );
 
   if (loading) {
     return (
@@ -242,145 +514,13 @@ const AnalysisPage = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.fixedHeader}>
-        <View style={styles.headerContent}>
-          <View style={styles.headerBackContainer}>
-            <TouchableOpacity 
-              style={styles.backButton}
-              onPress={() => router.back()}
-            >
-              <Ionicons name="arrow-back" size={20} color="#64748B" />
-            </TouchableOpacity>
-            <View>
-              <Text style={styles.headerTitle}>{project.name}</Text>
-              <Text style={styles.headerSubtitle}>Detailed Analysis</Text>
-            </View>
-          </View>
-          <View style={styles.headerIconContainer}>
-            <Ionicons name="analytics" size={24} color="#0EA5E9" />
-          </View>
-        </View>
-      </View>
-
-      <ScrollView style={styles.scrollableContent} contentContainerStyle={styles.scrollableContentContainer}>
-        {/* Time Range Selector */}
-        <View style={styles.timeRangeContainer}>
-          <TouchableOpacity 
-            style={[styles.timeRangeButton, timeRange === 'week' && styles.timeRangeButtonActive]}
-            onPress={() => setTimeRange('week')}
-          >
-            <Text style={[styles.timeRangeText, timeRange === 'week' && styles.timeRangeTextActive]}>Week</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.timeRangeButton, timeRange === 'month' && styles.timeRangeButtonActive]}
-            onPress={() => setTimeRange('month')}
-          >
-            <Text style={[styles.timeRangeText, timeRange === 'month' && styles.timeRangeTextActive]}>Month</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.timeRangeButton, timeRange === 'quarter' && styles.timeRangeButtonActive]}
-            onPress={() => setTimeRange('quarter')}
-          >
-            <Text style={[styles.timeRangeText, timeRange === 'quarter' && styles.timeRangeTextActive]}>Quarter</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Stats Overview */}
-        <View style={styles.statsContainer}>
-          <StatCard
-            title="Materials Used"
-            value={mockMaterialStats.materialsUsed}
-            subtitle="Total materials"
-            color="#0EA5E9"
-            icon="cube"
-            trend={15}
-          />
-          <StatCard
-            title="Waste Cost"
-            value={`₹${(mockMaterialStats.wasteCost / 1000).toFixed(0)}K`}
-            subtitle="This month"
-            color="#EF4444"
-            icon="alert-circle"
-            trend={-8}
-          />
-        </View>
-
-        {/* Project Overview */}
-        <View style={styles.projectOverviewCard}>
-          <View style={styles.overviewHeader}>
-            <Text style={styles.overviewTitle}>Project Overview</Text>
-            <Text style={styles.overviewProgress}>{project.progress}%</Text>
-          </View>
-          <View style={styles.progressContainer}>
-            <View style={styles.progressRow}>
-              <Text style={styles.progressLabel}>Overall Progress</Text>
-              <Text style={styles.progressValue}>{project.progress}%</Text>
-            </View>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${project.progress}%` as any }]} />
-            </View>
-          </View>
-          <View style={styles.budgetOverview}>
-            <View style={styles.budgetCard}>
-              <Text style={styles.budgetCardTitle}>Spent</Text>
-              <Text style={styles.budgetCardValue}>₹{((project.spent || 0) / 1000000).toFixed(1)}M</Text>
-            </View>
-            <View style={styles.budgetCard}>
-              <Text style={styles.budgetCardTitle}>Budget</Text>
-              <Text style={styles.budgetCardValue}>₹{((project.budget || 0) / 1000000).toFixed(1)}M</Text>
-            </View>
-            <View style={styles.budgetCard}>
-              <Text style={styles.budgetCardTitle}>Used</Text>
-              <Text style={styles.budgetCardValue}>{budgetPercentage}%</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Materials Breakdown */}
-        <View style={styles.materialsCard}>
-          <View style={styles.materialsHeader}>
-            <Text style={styles.materialsTitle}>Material Breakdown</Text>
-            <Text style={styles.materialsSubtitle}>Usage and waste analysis</Text>
-          </View>
-          <View style={styles.materialsList}>
-            {mockMaterials.map((item) => (
-              <MaterialItem key={item.id} item={item} />
-            ))}
-          </View>
-        </View>
-
-        {/* Recent Activities */}
-        <View style={styles.activitiesCard}>
-          <View style={styles.activitiesHeader}>
-            <Text style={styles.activitiesTitle}>Recent Activities</Text>
-          </View>
-          <View style={styles.activitiesList}>
-            {mockActivities.map((activity) => (
-              <ActivityItem key={activity.id} activity={activity} />
-            ))}
-          </View>
-        </View>
-
-        {/* Waste Analysis */}
-        <View style={styles.wasteAnalysisCard}>
-          <View style={styles.wasteAnalysisHeader}>
-            <Text style={styles.wasteAnalysisTitle}>Waste Analysis</Text>
-          </View>
-          <View style={styles.wasteAnalysisList}>
-            {mockWasteAnalysis.map((item, index) => (
-              <View key={index} style={styles.wasteAnalysisItem}>
-                <Text style={styles.wasteAnalysisCategory}>{item.category}</Text>
-                <Text style={styles.wasteAnalysisPercentage}>{item.percentage}%</Text>
-                <View style={styles.wasteAnalysisProgressBar}>
-                  <View 
-                    style={[styles.wasteAnalysisProgressFill, { width: `${item.percentage}%` as any }]} 
-                  />
-                </View>
-                <Text style={styles.wasteAnalysisCost}>₹{item.cost.toLocaleString()}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
+      <ProjectHeader />
+      
+      <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <OverviewStats />
+        <BudgetProgressChart />
+        <MaterialUsageOverview />
+        <ProjectSectionsBreakdown />
       </ScrollView>
     </View>
   );
@@ -391,28 +531,53 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  fixedHeader: {
+  projectHeader: {
     backgroundColor: '#ffffff',
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 3,
   },
   headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
-  headerBackContainer: {
+  projectTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  projectLocation: {
+    fontSize: 14,
+    color: '#64748B',
+    marginTop: 4,
+  },
+  projectMeta: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    flex: 1,
+    marginTop: 12,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  projectDate: {
+    fontSize: 12,
+    color: '#64748B',
   },
   backButton: {
     marginRight: 12,
@@ -420,32 +585,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
     borderRadius: 12,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#64748B',
-    marginTop: 4,
-  },
-  headerIconContainer: {
-    backgroundColor: '#F0F9FF',
-    padding: 12,
-    borderRadius: 16,
-  },
-  scrollableContent: {
+  scrollContent: {
     flex: 1,
-  },
-  scrollableContentContainer: {
     padding: 20,
   },
-  timeRangeContainer: {
-    flexDirection: 'row',
+  overviewContainer: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 4,
+    borderRadius: 16,
+    padding: 16,
     marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -453,44 +600,22 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  timeRangeButton: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    alignItems: 'center',
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 16,
   },
-  timeRangeButtonActive: {
-    backgroundColor: '#0EA5E9',
-  },
-  timeRangeText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#64748B',
-  },
-  timeRangeTextActive: {
-    color: '#ffffff',
-  },
-  statsContainer: {
+  statsGrid: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 20,
+    justifyContent: 'space-between',
   },
   statCard: {
     flex: 1,
-    borderRadius: 16,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
     padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  statCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    marginHorizontal: 4,
   },
   statIconContainer: {
     width: 40,
@@ -498,16 +623,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  trendBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  trendText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#ffffff',
+    marginBottom: 12,
   },
   statValue: {
     fontSize: 20,
@@ -515,11 +631,11 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     marginBottom: 4,
   },
-  statSubtitle: {
+  statLabel: {
     fontSize: 13,
     color: '#64748B',
   },
-  projectOverviewCard: {
+  chartContainer: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
     padding: 16,
@@ -530,255 +646,286 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  overviewHeader: {
+  budgetChart: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+  },
+  budgetBars: {
+    flex: 1,
+    marginRight: 16,
+  },
+  budgetBarContainer: {
     marginBottom: 16,
   },
-  overviewTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
+  budgetBarLabel: {
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 4,
   },
-  overviewProgress: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#10B981',
-  },
-  progressContainer: {
-    marginBottom: 16,
-  },
-  progressRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  progressLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  progressValue: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#1F2937',
-  },
-  progressBar: {
+  budgetBarBackground: {
     height: 6,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#E5E7EB',
     borderRadius: 3,
     overflow: 'hidden',
   },
-  progressFill: {
+  budgetBarFill: {
     height: '100%',
-    backgroundColor: '#10B981',
     borderRadius: 3,
   },
-  budgetOverview: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  budgetCard: {
-    flex: 1,
-    alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    marginHorizontal: 4,
-  },
-  budgetCardTitle: {
+  budgetBarValue: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#64748B',
-    marginBottom: 4,
-  },
-  budgetCardValue: {
-    fontSize: 14,
-    fontWeight: '700',
     color: '#1F2937',
+    marginTop: 4,
   },
-  materialsCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
+  budgetSummary: {
+    flex: 1,
   },
-  materialsHeader: {
+  budgetSummaryItem: {
     marginBottom: 16,
   },
-  materialsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
+  budgetSummaryLabel: {
+    fontSize: 12,
+    color: '#64748B',
     marginBottom: 4,
   },
-  materialsSubtitle: {
-    fontSize: 13,
-    color: '#64748B',
+  budgetSummaryValue: {
+    fontSize: 12,
+    color: '#1F2937',
   },
-  materialsList: {
-    gap: 12,
+  materialGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
-  materialItem: {
+  materialCard: {
+    flexBasis: width / 2 - 16,
     backgroundColor: '#F8FAFC',
     borderRadius: 12,
     padding: 12,
+    marginBottom: 16,
   },
   materialHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   materialName: {
     fontSize: 14,
     fontWeight: '600',
     color: '#1F2937',
   },
-  materialWaste: {
-    fontSize: 12,
-    color: '#EF4444',
-    fontWeight: '600',
+  materialCategoryBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
-  materialDetails: {
+  materialCategoryText: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  materialStats: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  materialUsed: {
+  materialStat: {
+    alignItems: 'center',
+  },
+  materialStatValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  materialStatLabel: {
     fontSize: 12,
     color: '#64748B',
   },
-  materialTotal: {
-    fontSize: 12,
-    color: '#EF4444',
-  },
   materialProgressBar: {
     height: 4,
-    backgroundColor: '#E5E7EB',
+    flexDirection: 'row',
     borderRadius: 2,
     overflow: 'hidden',
+    marginBottom: 8,
+  },
+  materialProgressBackground: {
+    flex: 1,
   },
   materialProgressFill: {
     height: '100%',
     backgroundColor: '#10B981',
     borderRadius: 2,
   },
-  activitiesCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  activitiesHeader: {
-    marginBottom: 16,
-  },
-  activitiesTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  activitiesList: {
-    gap: 12,
-  },
-  activityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 12,
-  },
-  activityIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  activityContent: {
+  materialWasteBar: {
     flex: 1,
+    marginLeft: 8,
   },
-  activityText: {
-    fontSize: 14,
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  activityDate: {
-    fontSize: 12,
-    color: '#64748B',
-  },
-  wasteAnalysisCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  wasteAnalysisHeader: {
-    marginBottom: 16,
-  },
-  wasteAnalysisTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  wasteAnalysisList: {
-    gap: 12,
-  },
-  wasteAnalysisItem: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 12,
-  },
-  wasteAnalysisCategory: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  wasteAnalysisPercentage: {
-    fontSize: 12,
-    color: '#64748B',
-    marginBottom: 8,
-  },
-  wasteAnalysisProgressBar: {
-    height: 4,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 2,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  wasteAnalysisProgressFill: {
+  materialWasteFill: {
     height: '100%',
     backgroundColor: '#EF4444',
     borderRadius: 2,
   },
-  wasteAnalysisCost: {
-    fontSize: 12,
-    color: '#EF4444',
+  materialProgressText: {
+    fontSize: 11,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  sectionsContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  sectionsList: {
+    gap: 16,
+  },
+  sectionCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  sectionCardSelected: {
+    borderColor: '#0EA5E9',
+    backgroundColor: '#F0F9FF',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  sectionInfo: {
+    flex: 1,
+  },
+  sectionName: {
+    fontSize: 16,
     fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  sectionDescription: {
+    fontSize: 13,
+    color: '#64748B',
+  },
+  sectionStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  sectionStatusText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  sectionProgress: {
+    marginBottom: 12,
+  },
+  sectionProgressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  sectionProgressLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  sectionProgressValue: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#1F2937',
+  },
+  sectionProgressBar: {
+    height: 6,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  sectionProgressFill: {
+    height: '100%',
+    backgroundColor: '#10B981',
+    borderRadius: 3,
+  },
+  sectionBudget: {
+    marginBottom: 12,
+  },
+  sectionBudgetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  sectionBudgetLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  sectionBudgetValue: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#1F2937',
+  },
+  sectionDetails: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  sectionDetailsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 12,
+  },
+  sectionMaterials: {
+    gap: 12,
+  },
+  sectionMaterialItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  sectionMaterialInfo: {
+    flex: 1,
+  },
+  sectionMaterialName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 2,
+  },
+  sectionMaterialQuantity: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  sectionMaterialStats: {
+    alignItems: 'flex-end',
+  },
+  sectionMaterialCost: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 2,
+  },
+  sectionMaterialWaste: {
+    fontSize: 11,
+    fontWeight: '500',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
   },
 });
 

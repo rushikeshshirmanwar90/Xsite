@@ -3,7 +3,6 @@ import { router } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
     Animated,
-    Modal,
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -226,13 +225,48 @@ const Details: React.FC = () => {
         return `₹${price.toLocaleString('en-IN')}`;
     };
 
-    const openSearchModal = () => {
-        setSearchModalVisible(true);
+    // Helper function to get imported quantity for a material
+    const getImportedQuantity = (material: Material) => {
+        const importedMaterial = importedMaterials.find(m => m.id === material.id);
+        return importedMaterial ? importedMaterial.quantity : 0;
     };
 
-    const closeSearchModal = () => {
-        setSearchModalVisible(false);
-        setSearchQuery('');
+    // Helper function to get available quantity for a material
+    const getAvailableQuantity = (material: Material) => {
+        const importedMaterial = importedMaterials.find(m => m.id === material.id);
+        const usedMaterial = usedMaterials.find(m => m.id === material.id);
+
+        if (!importedMaterial) return 0;
+        if (!usedMaterial) return importedMaterial.quantity;
+
+        return importedMaterial.quantity - usedMaterial.quantity;
+    };
+
+    // Helper function to get availability percentage
+    const getAvailabilityPercentage = (material: Material) => {
+        const importedMaterial = importedMaterials.find(m => m.id === material.id);
+        const usedMaterial = usedMaterials.find(m => m.id === material.id);
+
+        if (!importedMaterial) return 0;
+        if (!usedMaterial) return 100;
+
+        const available = importedMaterial.quantity - usedMaterial.quantity;
+        return Math.round((available / importedMaterial.quantity) * 100);
+    };
+
+    // Handler for viewing material details
+    const handleViewDetails = (material: Material) => {
+        // Navigate to material details page with material ID and current tab context
+        router.push({
+            pathname: '/material-details/[id]' as const,
+            params: {
+                id: material.id.toString(),
+                tab: activeTab, // Pass current tab context
+                name: material.name,
+                category: material.category,
+                unit: material.unit
+            }
+        });
     };
 
     return (
@@ -250,13 +284,6 @@ const Details: React.FC = () => {
                         <Text style={styles.totalCostText}>{formatPrice(totalCost)}</Text>
                     </View>
                 </View>
-                <TouchableOpacity
-                    style={styles.searchButton}
-                    activeOpacity={0.7}
-                    onPress={openSearchModal}
-                >
-                    <Ionicons name="search-outline" size={22} color="#000" />
-                </TouchableOpacity>
             </View>
 
             {/* Scrollable Content */}
@@ -304,7 +331,7 @@ const Details: React.FC = () => {
                     >
                         <Ionicons name="download-outline" size={16} color={activeTab === 'imported' ? '#000' : '#6B7280'} />
                         <Text style={[styles.tabText, activeTab === 'imported' && styles.activeTabText]}>
-                            Material Imported
+                            Material Availability
                         </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -362,22 +389,45 @@ const Details: React.FC = () => {
                                     </View>
                                 </View>
 
-                                {/* Material Details */}
-                                <View style={styles.materialDetails}>
-                                    <View style={styles.detailItem}>
-                                        <Text style={styles.detailLabel}>Quantity</Text>
-                                        <View style={styles.detailValueContainer}>
-                                            <Text style={styles.detailValue}>{material.quantity}</Text>
-                                            <Text style={styles.detailUnit}>{material.unit}</Text>
+                                {/* Simple Progress Bar */}
+                                <View style={styles.simpleProgressContainer}>
+                                    <View style={styles.progressBarWithLabels}>
+                                        <View style={styles.progressStartLabel}>
+                                            <Text style={styles.progressStartLabel}>
+                                                Available:
+                                            </Text>
+                                            <Text style={styles.progressStartLabel}>
+                                                {getAvailableQuantity(material)} {material.unit}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.progressBarBackground}>
+                                            <View
+                                                style={[
+                                                    styles.progressBarFillGreen,
+                                                    { width: `${getAvailabilityPercentage(material)}%` }
+                                                ]}
+                                            />
+                                        </View>
+
+                                        <View style={styles.progressEndLabel}>
+                                            <Text style={styles.progressEndLabel}>
+                                                Total:
+                                            </Text>
+                                            <Text style={styles.progressEndLabel}>
+                                                {getImportedQuantity(material)} {material.unit}
+                                            </Text>
                                         </View>
                                     </View>
-
-                                    <View style={styles.detailDivider} />
-
-                                    <View style={styles.detailItem}>
-                                        <Text style={styles.detailLabel}>Total Price</Text>
-                                        <Text style={styles.priceValue}>{formatPrice(material.price)}</Text>
-                                    </View>
+                                    <TouchableOpacity
+                                        style={styles.viewDetailsButton}
+                                        activeOpacity={0.7}
+                                        onPress={() => handleViewDetails(material)}
+                                    >
+                                        <Text style={styles.viewDetailsButtonText}>
+                                            {activeTab === 'imported' ? 'View Import History' : 'View Usage Details'}
+                                        </Text>
+                                        <Ionicons name="chevron-forward" size={16} color="#0EA5E9" />
+                                    </TouchableOpacity>
                                 </View>
                             </TouchableOpacity>
                         </Animated.View>
@@ -385,57 +435,11 @@ const Details: React.FC = () => {
                 </View>
             </ScrollView>
 
-            {/* Search Modal */}
-            <Modal
-                visible={searchModalVisible}
-                animationType="fade"
-                transparent={true}
-                onRequestClose={closeSearchModal}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.searchModal}>
-                        <View style={styles.searchModalHeader}>
-                            <Text style={styles.searchModalTitle}>Search Materials</Text>
-                            <TouchableOpacity
-                                onPress={closeSearchModal}
-                                style={styles.closeButton}
-                                activeOpacity={0.7}
-                            >
-                                <Ionicons name="close" size={24} color="#64748B" />
-                            </TouchableOpacity>
-                        </View>
-                        <View style={styles.searchInputContainer}>
-                            <Ionicons name="search-outline" size={18} color="#9CA3AF" style={styles.searchIcon} />
-                            <TextInput
-                                ref={searchInputRef}
-                                style={styles.searchInput}
-                                placeholder="Search materials..."
-                                value={searchQuery}
-                                onChangeText={setSearchQuery}
-                                placeholderTextColor="#9CA3AF"
-                                autoFocus={true}
-                            />
-                            {searchQuery.length > 0 && (
-                                <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7}>
-                                    <Ionicons name="close-circle" size={18} color="#9CA3AF" />
-                                </TouchableOpacity>
-                            )}
-                        </View>
-                        {searchQuery.length > 0 && (
-                            <View style={styles.searchResults}>
-                                <Text style={styles.searchResultsTitle}>
-                                    Found {filteredMaterials.length} materials
-                                </Text>
-                            </View>
-                        )}
-                    </View>
-                </View>
-            </Modal>
         </SafeAreaView>
     );
 };
 
-export default Details
+export default Details;
 
 const styles = StyleSheet.create({
     container: {
@@ -754,5 +758,123 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontWeight: '800',
         color: '#059669',
+    },
+    // Progress Section Styles
+    materialProgressSection: {
+        marginTop: 16,
+        paddingTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+    },
+    progressInfoContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    progressLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#64748B',
+        marginBottom: 4,
+    },
+    progressValues: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#1F2937',
+    },
+    progressPercentageContainer: {
+        backgroundColor: '#F0F9FF',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E0F2FE',
+    },
+    progressPercentage: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#0EA5E9',
+    },
+    progressBarContainer: {
+        marginBottom: 16,
+    },
+    progressBarBackground: {
+        flex: 1,
+        height: 8,
+        backgroundColor: '#F1F5F9',
+        borderRadius: 4,
+        overflow: 'hidden',
+    },
+    progressBarFill: {
+        height: '100%',
+        backgroundColor: '#0EA5E9',
+        borderRadius: 4,
+    },
+    viewDetailsButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F0F9FF',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#E0F2FE',
+    },
+    viewDetailsButtonText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#0EA5E9',
+        marginRight: 8,
+    },
+    // Progress Bar with Labels Styles
+    progressBarWithLabels: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    progressStartLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#10B981',
+        marginBottom: 4,
+        alignItems: 'flex-start',
+        marginRight: 12,
+        minWidth: 80,
+    },
+    progressEndLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#64748B',
+        marginBottom: 4,
+        textAlign: 'right',
+        alignItems: 'flex-end',
+        marginLeft: 12,
+        minWidth: 80,
+    },
+    progressLabelText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#64748B',
+        marginBottom: 2,
+        textTransform: 'uppercase',
+    },
+    progressLabelValue: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#1F2937',
+    },
+    // Simple Progress Bar Styles
+    simpleProgressContainer: {
+        marginTop: 16,
+        paddingTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+    },
+    progressBarFillGreen: {
+        height: '100%',
+        backgroundColor: '#10B981',
+        borderRadius: 4,
     },
 });

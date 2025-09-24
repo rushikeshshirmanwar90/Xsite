@@ -31,14 +31,14 @@ const TabLayout = () => {
         }}
       />
 
-      {/* 4️⃣ Staff */}
+      {/* 2️⃣ Dashboard */}
       <Tabs.Screen
-        name="staff"
+        name="dashboard"
         options={{
           tabBarIcon: ({ focused }) => (
             <Ionicons
-              name={focused ? "people" : "people-outline"}
-              size={30}
+              name={focused ? "pulse-outline" : "pulse-outline"}
+              size={27}
               color={focused ? "black" : "gray"}
             />
           ),
@@ -73,15 +73,14 @@ const TabLayout = () => {
         }}
       />
 
-
-      {/* 2️⃣ Dashboard */}
+      {/* 4️⃣ Staff */}
       <Tabs.Screen
-        name="dashboard"
+        name="staff"
         options={{
           tabBarIcon: ({ focused }) => (
             <Ionicons
-              name={focused ? "pulse-outline" : "pulse-outline"}
-              size={27}
+              name={focused ? "people" : "people-outline"}
+              size={30}
               color={focused ? "black" : "gray"}
             />
           ),
