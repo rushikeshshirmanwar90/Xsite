@@ -1,16 +1,15 @@
-import React, { useState } from 'react';
-import {
-    View,
-    Text,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    Alert,
-    Dimensions,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import {
+    Dimensions,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Types for material details
 interface MaterialImportRecord {
@@ -46,7 +45,7 @@ const MaterialDetails: React.FC = () => {
     const router = useRouter();
     const params = useLocalSearchParams();
     const { id, tab, name, category, unit } = params;
-    
+
     // Ensure parameters are strings
     const materialId = Array.isArray(id) ? id[0] : id;
     const materialTab = Array.isArray(tab) ? tab[0] : tab;
@@ -161,7 +160,7 @@ const MaterialDetails: React.FC = () => {
                 <Text style={[styles.tableHeaderText, styles.tableCellUnitCost]}>Unit Cost</Text>
                 <Text style={[styles.tableHeaderText, styles.tableCellSupplier]}>Supplier</Text>
             </View>
-            
+
             <ScrollView style={styles.tableBody}>
                 {importRecords.map((record) => (
                     <View key={record.id} style={styles.tableRow}>
@@ -193,7 +192,7 @@ const MaterialDetails: React.FC = () => {
                 <Text style={[styles.tableHeaderText, styles.tableCellWorkArea]}>Work Area</Text>
                 <Text style={[styles.tableHeaderText, styles.tableCellContractor]}>Contractor</Text>
             </View>
-            
+
             <ScrollView style={styles.tableBody}>
                 {usageRecords.map((record) => (
                     <View key={record.id} style={styles.tableRow}>
@@ -217,7 +216,8 @@ const MaterialDetails: React.FC = () => {
     );
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView
+            style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>

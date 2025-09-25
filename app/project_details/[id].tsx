@@ -1,10 +1,8 @@
-import { projectData } from '@/data/analytics';
+import { projectData, sectionData } from '@/data/analytics';
 import { PieSliceData } from '@/types/analytics';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Dimensions,
   Easing,
@@ -30,10 +28,7 @@ import Svg, {
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedSvgText = Animated.createAnimatedComponent(SvgText);
 
-const AnalyticsDashboard: React.FC = () => {
-
-  const router = useRouter();
-
+const ProjectDetails: React.FC = () => {
   const [selectedSlice, setSelectedSlice] = useState<string | null>(null);
   const [hoveredSlice, setHoveredSlice] = useState<string | null>(null);
   const animatedValues = useRef<{ [key: string]: Animated.Value }>({}).current;
@@ -62,8 +57,7 @@ const AnalyticsDashboard: React.FC = () => {
 
   const colors = colorSchemes.professional;
 
-
-
+  // Utility functions
   const formatCurrency = (amount: number): string => {
     if (amount >= 10000000) {
       return `₹${(amount / 10000000).toFixed(1)}Cr`;
@@ -75,24 +69,17 @@ const AnalyticsDashboard: React.FC = () => {
     return `₹${amount}`;
   };
 
-  // Validate and prepare project data with numeric budgets
-  const validatedProjectData = projectData.map(project => ({
-    ...project,
-    budgetNumeric: project.budgetUsed // Since budgetUsed is now a number
-  }));
-
-  // Calculate total budget using validated numeric values
-  const totalBudget = validatedProjectData.reduce(
-    (sum, project) => sum + project.budgetNumeric,
+  // Calculate total budget from section data (not project data)
+  const totalBudget = sectionData.reduce(
+    (sum, section) => sum + section.budget,
     0
   );
 
-  // Debug log for budget validation
-  console.log('Budget Validation:', {
-    projects: validatedProjectData.map(p => ({
-      name: p.name,
-      originalBudget: p.budgetUsed,
-      numericBudget: p.budgetNumeric
+  // Debug log for section budget validation
+  console.log('Section Budget Validation:', {
+    sections: sectionData.map(s => ({
+      name: s.name,
+      budget: s.budget
     })),
     totalBudget
   });
@@ -115,15 +102,15 @@ const AnalyticsDashboard: React.FC = () => {
     ]).start();
   }, []);
 
-  // Prepare enhanced data for pie chart with explicit numeric values
-  const pieData: PieSliceData[] = validatedProjectData.map((project, index) => {
-    const value = project.budgetNumeric; // Use pre-validated numeric value
-    const percentage = totalBudget > 0 ? ((value / totalBudget) * 100).toFixed(1) : '0.0';
+  // Prepare enhanced data for pie chart
+  const pieData: PieSliceData[] = sectionData.map((section, index) => {
+    const value = section.budget;
+    const percentage = ((value / totalBudget) * 100).toFixed(1);
 
-    if (!animatedValues[project._id]) {
-      animatedValues[project._id] = new Animated.Value(0);
+    if (!animatedValues[section._id]) {
+      animatedValues[section._id] = new Animated.Value(0);
       // Staggered animation for each slice
-      Animated.timing(animatedValues[project._id], {
+      Animated.timing(animatedValues[section._id], {
         toValue: 1,
         duration: 800,
         delay: index * 150,
@@ -132,18 +119,18 @@ const AnalyticsDashboard: React.FC = () => {
       }).start();
     }
 
-    if (!scaleAnimations[project._id]) {
-      scaleAnimations[project._id] = new Animated.Value(1);
+    if (!scaleAnimations[section._id]) {
+      scaleAnimations[section._id] = new Animated.Value(1);
     }
 
     return {
-      key: project._id,
-      value: value, // Explicit numeric value
+      key: section._id,
+      value: value,
       svg: {
         fill: colors[index % colors.length].primary,
-        gradientId: `gradient_${project._id}`,
+        gradientId: `gradient_${section._id}`,
       },
-      name: project.name,
+      name: section.name,
       formattedBudget: formatCurrency(value),
       percentage: percentage,
     };
@@ -243,52 +230,45 @@ const AnalyticsDashboard: React.FC = () => {
 
     setSelectedSlice(projectId);
 
+    const project = projectData.find(p => p._id === projectId);
 
-    router.push({ pathname: '/project_details/[id]', params: { 'id': projectId } })
-
-
+    Alert.alert(
+      project?.name || 'Project Details',
+      `Budget: ${pieData.find(p => p.key === projectId)?.formattedBudget}\n` +
+      `Status: ${project?.status || 'N/A'}\n` +
+      `${project?.description || ''}`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'View Details',
+          onPress: () => {
+            console.log(`Navigating to project: ${projectId}`);
+          },
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
+  const getStatusColor = (status?: string) => {
+    switch (status) {
+      case 'active': return '#27AE60';
+      case 'completed': return '#3498DB';
+      case 'pending': return '#F39C12';
+      default: return '#95A5A6';
+    }
+  };
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <SafeAreaView>
 
-
-        {/* Main Header - Fixed */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <TouchableOpacity onPress={() => { router.back() }} style={styles.backButton} activeOpacity={0.7}>
-              <Ionicons name="arrow-back" size={24} color="#000" />
-            </TouchableOpacity>
-            <View style={styles.projectInfo}>
-              <Text style={styles.projectName}>Analysis Dashboard</Text>
-            </View>
-          </View>
-        </View>
-
-
-
-        {/* Enhanced Stats Section */}
-        <View style={styles.statsSection}>
-          <View style={[styles.statBox, styles.statBoxPrimary]}>
-            <Text style={styles.statValue}>{projectData.length}</Text>
-            <Text style={styles.statLabel}>Ongoing Projects</Text>
-          </View>
-          <View style={[styles.statBox, styles.statBoxSecondary]}>
-            <Text style={styles.statValue}>2</Text>
-            <Text style={styles.statLabel}>Completed Project</Text>
-          </View>
-          <View style={[styles.statBox, styles.statBoxTertiary]}>
-            <Text style={styles.statValue}>5
-            </Text>
-            <Text style={styles.statLabel}>Total Project</Text>
-          </View>
-        </View>
-
         <Animated.View style={[styles.card, { opacity: fadeAnim }]}>
           <View style={styles.header}>
-            <Text style={styles.title}>PROJECT BUDGETS</Text>
+            <Text style={styles.title}>PROJECT-NAME</Text>
             <Text style={styles.subtitle}>Financial Overview</Text>
           </View>
 
@@ -358,7 +338,7 @@ const AnalyticsDashboard: React.FC = () => {
 
             {/* Enhanced center content */}
             <View style={styles.centerContent}>
-              <Text style={styles.centerLabel}>OVERALL BUDGET</Text>
+              <Text style={styles.centerLabel}>TOTAL BUDGET</Text>
               <Text style={styles.centerValue}>{formatCurrency(totalBudget)}</Text>
               <Text style={styles.centerProjects}>{projectData.length} Projects</Text>
             </View>
@@ -417,7 +397,7 @@ const AnalyticsDashboard: React.FC = () => {
   );
 };
 
-export default AnalyticsDashboard;
+export default ProjectDetails;
 
 const styles = StyleSheet.create({
   container: {
@@ -436,39 +416,9 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-    zIndex: 1000,
+    marginBottom: 30,
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  backButton: {
-    padding: 8,
-    marginRight: 12,
-  },
-
-  projectInfo: {
-    flex: 1,
-  },
-  projectName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#000',
-    marginBottom: 2,
-  },
-
   title: {
     fontSize: 26,
     fontWeight: '300',
@@ -577,7 +527,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#95A5A6',
     fontStyle: 'italic',
-    fontWeight: "semibold"
   },
   legendRight: {
     marginLeft: 10,

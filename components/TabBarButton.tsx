@@ -6,7 +6,7 @@ import Animated, {
     useSharedValue,
     withSpring
 } from 'react-native-reanimated';
-import { icons } from '../constants/icons';
+import { icons } from './constants/icons';
 
 interface TabBarButtonProps {
     onPress: () => void;
