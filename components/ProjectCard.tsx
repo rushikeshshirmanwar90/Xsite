@@ -21,7 +21,12 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails }) => 
         }).format(amount);
     };
 
-    const budgetProgress = ((project?.spent ?? 0) / (project?.budget ?? 1)) * 100;
+    // Use static data when backend data is not available
+    const staticProgress = 65; // Static project progress percentage
+    const staticBudget = 500000; // Static total budget
+    const staticSpent = 325000; // Static spent amount
+    
+    const budgetProgress = ((project?.spent ?? staticSpent) / (project?.budget ?? staticBudget)) * 100;
 
 
 
@@ -66,7 +71,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails }) => 
                     </View>
                     <View style={styles.budgetInfo}>
                         <Text style={styles.budgetText}>
-                            {formatCurrency(project.spent ?? 0)} / {formatCurrency(project.budget ?? 0)}
+                            {formatCurrency(project.spent ?? staticSpent)} / {formatCurrency(project.budget ?? staticBudget)}
                         </Text>
                         <View style={styles.budgetProgressBar}>
                             <View style={[styles.budgetProgressFill, {
@@ -80,14 +85,14 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails }) => 
                 <View style={styles.progressContainer}>
                     <View style={styles.progressHeader}>
                         <Text style={styles.progressLabel}>Project Progress</Text>
-                        <Text style={[styles.progressValue, { color: '#0EA5E9' }]}>{project.progress}%</Text>
+                        <Text style={[styles.progressValue, { color: '#0EA5E9' }]}>{project.progress ?? staticProgress}%</Text>
                     </View>
-                    {/* <View style={styles.progressBar}>
+                    <View style={styles.progressBar}>
                         <View style={[styles.progressFill, {
-                            width: `${project.progress}%`,
-                            backgroundColor: statusColor.bg
+                            width: `${project.progress ?? staticProgress}%`,
+                            backgroundColor: '#0EA5E9'
                         }]} />
-                    </View> */}
+                    </View>
                 </View>
 
                 <TouchableOpacity

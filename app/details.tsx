@@ -254,6 +254,16 @@ const Details: React.FC = () => {
         return Math.round((available / importedMaterial.quantity) * 100);
     };
 
+    // Helper function to get quantity wasted
+    const getQuantityWasted = (material: Material) => {
+        const usedMaterial = usedMaterials.find(m => m.id === material.id);
+        
+        if (!usedMaterial) return 0;
+        
+        // Calculate wastage as 10% of used quantity (you can adjust this logic as needed)
+        return Math.round(usedMaterial.quantity * 0.1);
+    };
+
     // Handler for viewing material details
     const handleViewDetails = (material: Material) => {
         // Navigate to material details page with material ID and current tab context
@@ -394,27 +404,33 @@ const Details: React.FC = () => {
                                     <View style={styles.progressBarWithLabels}>
                                         <View style={styles.progressStartLabel}>
                                             <Text style={styles.progressStartLabel}>
-                                                Available:
+                                                {activeTab === 'imported' ? 'Available:' : 'Quantity Used:'}
                                             </Text>
                                             <Text style={styles.progressStartLabel}>
-                                                {getAvailableQuantity(material)} {material.unit}
+                                                {activeTab === 'imported' 
+                                                    ? `${getAvailableQuantity(material)} ${material.unit}` 
+                                                    : `${material.quantity} ${material.unit}`}
                                             </Text>
                                         </View>
                                         <View style={styles.progressBarBackground}>
                                             <View
                                                 style={[
-                                                    styles.progressBarFillGreen,
-                                                    { width: `${getAvailabilityPercentage(material)}%` }
+                                                    activeTab === 'imported' ? styles.progressBarFillGreen : styles.progressBarFillRed,
+                                                    { width: activeTab === 'imported' 
+                                                        ? `${getAvailabilityPercentage(material)}%` 
+                                                        : '100%'}
                                                 ]}
                                             />
                                         </View>
 
                                         <View style={styles.progressEndLabel}>
                                             <Text style={styles.progressEndLabel}>
-                                                Total:
+                                                {activeTab === 'imported' ? 'Total:' : 'Quantity Wasted:'}
                                             </Text>
                                             <Text style={styles.progressEndLabel}>
-                                                {getImportedQuantity(material)} {material.unit}
+                                                {activeTab === 'imported' 
+                                                    ? `${getImportedQuantity(material)} ${material.unit}` 
+                                                    : `${getQuantityWasted(material)} ${material.unit}`}
                                             </Text>
                                         </View>
                                     </View>
@@ -867,14 +883,20 @@ const styles = StyleSheet.create({
     },
     // Simple Progress Bar Styles
     simpleProgressContainer: {
-        marginTop: 16,
-        paddingTop: 16,
-        borderTopWidth: 1,
-        borderTopColor: '#F1F5F9',
+        padding: 16,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
     },
     progressBarFillGreen: {
         height: '100%',
         backgroundColor: '#10B981',
+        borderRadius: 4,
+    },
+    progressBarFillRed: {
+        height: '100%',
+        backgroundColor: '#EF4444',
         borderRadius: 4,
     },
 });

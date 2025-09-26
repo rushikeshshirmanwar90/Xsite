@@ -22,8 +22,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-
-
 // Main App Component
 const Index: React.FC = () => {
     const [projects, setProjects] = useState<Project[]>([]);

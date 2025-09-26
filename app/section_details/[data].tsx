@@ -57,6 +57,21 @@ const ProjectDetails: React.FC = () => {
         0
     );
 
+    // Calculate wasted material (10% of quantity)
+    const getQuantityWasted = (materialId: string): number => {
+        const material = materials.find(m => m.id === materialId);
+        if (!material) return 0;
+        return material.quantity * 0.1; // 10% wastage
+    };
+
+    // Calculate wasted material cost
+    const getWastedCost = (materialId: string): number => {
+        const material = materials.find(m => m.id === materialId);
+        if (!material) return 0;
+        const wastedQuantity = getQuantityWasted(materialId);
+        return wastedQuantity * material.unitPrice;
+    };
+
     // Debug log for material cost validation
     console.log('Material Cost Validation:', {
         materials: materials.map(m => ({
@@ -348,6 +363,15 @@ const ProjectDetails: React.FC = () => {
                                             {material?.description && (
                                                 <Text style={styles.legendDescription}>{material.description}</Text>
                                             )}
+                                            {/* Wasted Material Information */}
+                                            <View style={styles.wastedInfoContainer}>
+                                                <Text style={styles.wastedLabel}>
+                                                    Wasted: <Text style={styles.wastedValue}>{getQuantityWasted(item.key).toFixed(1)} {material?.unit}</Text>
+                                                </Text>
+                                                <Text style={styles.wastedCostLabel}>
+                                                    Cost: <Text style={styles.wastedCostValue}>{formatCurrency(getWastedCost(item.key))}</Text>
+                                                </Text>
+                                            </View>
                                         </View>
                                     </View>
                                     <View style={styles.legendRight}>
@@ -603,7 +627,6 @@ const styles = StyleSheet.create({
         padding: 8,
         marginRight: 12,
     },
-
     projectInfo: {
         flex: 1,
     },
@@ -613,6 +636,30 @@ const styles = StyleSheet.create({
         color: '#000',
         marginBottom: 2,
     },
-
-
+    // Wasted material styles
+    wastedInfoContainer: {
+        marginTop: 8,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#E8ECEF',
+    },
+    wastedLabel: {
+        fontSize: 12,
+        color: '#7F8C8D',
+        marginBottom: 2,
+    },
+    wastedValue: {
+        fontSize: 12,
+        color: '#E74C3C',
+        fontWeight: '600',
+    },
+    wastedCostLabel: {
+        fontSize: 12,
+        color: '#7F8C8D',
+    },
+    wastedCostValue: {
+        fontSize: 12,
+        color: '#E74C3C',
+        fontWeight: '600',
+    },
 });
