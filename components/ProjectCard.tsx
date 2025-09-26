@@ -10,14 +10,19 @@ interface ProjectCardProps {
 
 
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails }) => {
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'active': return { bg: '#0EA5E9', text: '#ffffff', light: '#E0F2FE' };
-            case 'planning': return { bg: '#8B5CF6', text: '#ffffff', light: '#EDE9FE' };
-            case 'completed': return { bg: '#10B981', text: '#ffffff', light: '#D1FAE5' };
-            default: return { bg: '#64748B', text: '#ffffff', light: '#F1F5F9' };
-        }
+
+
+    const formatCurrency = (amount: number): string => {
+        return new Intl.NumberFormat('en-IN', {
+            style: 'currency',
+            currency: 'INR',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+        }).format(amount);
     };
+
+    const budgetProgress = ((project?.spent ?? 0) / (project?.budget ?? 1)) * 100;
+
 
 
     // const statusColor = getStatusColor(project.status);
@@ -27,14 +32,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails }) => 
             <View style={styles.cardHeader}>
                 <View style={styles.cardHeaderTop}>
                     <View style={styles.badgeRow}>
-                        <View style={[styles.statusBadge, { backgroundColor: '#0EA5E9' }]}>
-                            {/* <Text style={[styles.statusText, { color: statusColor.text }]}>
-                                {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
-                            </Text> */}
-                        </View>
-                    </View>
-                    <View style={styles.progressBadge}>
-                        <Text style={styles.progressText}>{project.progress}%</Text>
                     </View>
                 </View>
                 <Text style={styles.projectTitle}>{project.name}</Text>
@@ -63,27 +60,20 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails }) => 
                     </Text>
                 </View>
 
-                <View style={styles.infoRow}>
-                    <View style={[styles.iconContainer, { backgroundColor: '#F3E8FF' }]}>
-                        <Ionicons name="calendar" size={16} color="#7C3AED" />
-                    </View>
-
-                </View>
-
                 <View style={styles.budgetRow}>
                     <View style={[styles.iconContainer, { backgroundColor: '#ECFDF5' }]}>
                         <Ionicons name="card" size={16} color="#10B981" />
                     </View>
                     <View style={styles.budgetInfo}>
-                        {/* <Text style={styles.budgetText}>
-                            {formatCurrency(project.spent)} / {formatCurrency(project.budget)}
-                        </Text> */}
-                        {/* <View style={styles.budgetProgressBar}>
+                        <Text style={styles.budgetText}>
+                            {formatCurrency(project.spent ?? 0)} / {formatCurrency(project.budget ?? 0)}
+                        </Text>
+                        <View style={styles.budgetProgressBar}>
                             <View style={[styles.budgetProgressFill, {
                                 width: `${Math.min(budgetProgress, 100)}%`,
                                 backgroundColor: budgetProgress > 90 ? '#EF4444' : '#10B981'
                             }]} />
-                        </View> */}
+                        </View>
                     </View>
                 </View>
 
@@ -101,7 +91,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails }) => 
                 </View>
 
                 <TouchableOpacity
-                    style={[styles.viewButton, { backgroundColor: '#E0F2FE' }]}
+                    style={[styles.viewButton, { backgroundColor: '#0EA5E9' }]}
                     onPress={() => onViewDetails(project)}
                     activeOpacity={0.8}
                 >

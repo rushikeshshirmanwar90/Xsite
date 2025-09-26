@@ -29,5 +29,19 @@ interface sectionDataProps {
   budget: number;
 }
 
-export { PieSliceData, ProjectData, sectionDataProps };
+interface MaterialUsage {
+  id: string;
+  name: string;
+  category: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  totalPrice: number;
+  supplier: string;
+  status: 'ordered' | 'delivered' | 'used' | 'pending';
+  description?: string;
+}
+
+
+export { MaterialUsage, PieSliceData, ProjectData, sectionDataProps };
 

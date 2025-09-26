@@ -1,8 +1,10 @@
+import { PieChartColors20 } from '@/components/PieChart';
 import { projectData, sectionData } from '@/data/analytics';
 import { PieSliceData } from '@/types/analytics';
+import { Ionicons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Alert,
   Animated,
   Dimensions,
   Easing,
@@ -36,26 +38,7 @@ const ProjectDetails: React.FC = () => {
   const rotationAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  // Enhanced data with more details
-
-
-  const colorSchemes = {
-    vibrant: [
-      { primary: '#667eea', secondary: '#764ba2' }, // Purple gradient
-      { primary: '#f093fb', secondary: '#f5576c' }, // Pink gradient
-      { primary: '#4facfe', secondary: '#00f2fe' }, // Blue gradient
-      { primary: '#43e97b', secondary: '#38f9d7' }, // Green gradient
-      { primary: '#fa709a', secondary: '#fee140' }, // Yellow-pink gradient
-      { primary: '#30cfd0', secondary: '#330867' }, // Dark blue gradient
-    ],
-    professional: [
-      { primary: '#5DADE2', secondary: '#3498DB' },
-      { primary: '#EC7063', secondary: '#E74C3C' },
-      { primary: '#F39C12', secondary: '#F1C40F' },
-    ],
-  };
-
-  const colors = colorSchemes.professional;
+  const colors = PieChartColors20;
 
   // Utility functions
   const formatCurrency = (amount: number): string => {
@@ -102,6 +85,12 @@ const ProjectDetails: React.FC = () => {
     ]).start();
   }, []);
 
+  const { width, height } = Dimensions.get('window');
+  const size = Math.min(width - 60, height * 0.4);
+  const center = size / 2;
+  const outerRadius = size / 2 - 30;
+  const innerRadius = outerRadius * 0.55; // Slightly smaller donut hole
+
   // Prepare enhanced data for pie chart
   const pieData: PieSliceData[] = sectionData.map((section, index) => {
     const value = section.budget;
@@ -136,12 +125,8 @@ const ProjectDetails: React.FC = () => {
     };
   });
 
-  // Screen dimensions with responsive sizing
-  const { width, height } = Dimensions.get('window');
-  const size = Math.min(width - 60, height * 0.4);
-  const center = size / 2;
-  const outerRadius = size / 2 - 30;
-  const innerRadius = outerRadius * 0.55; // Slightly smaller donut hole
+  // Responsive font size for pie chart labels (smaller, less aggressive scaling)
+  const pieLabelFontSize = Math.max(10, Math.round(size * 0.045));
 
   // Enhanced slice calculation with perfect alignment
   const calculatePieSlices = () => {
@@ -211,16 +196,16 @@ const ProjectDetails: React.FC = () => {
 
   const slices = calculatePieSlices();
 
-  const handleSlicePress = (projectId: string, projectName: string) => {
+  const handleSlicePress = (sectionId: string, sectionName: string) => {
     // Enhanced animation with spring effect
     Animated.sequence([
-      Animated.spring(scaleAnimations[projectId], {
+      Animated.spring(scaleAnimations[sectionId], {
         toValue: 1.1,
         friction: 3,
         tension: 40,
         useNativeDriver: true,
       }),
-      Animated.spring(scaleAnimations[projectId], {
+      Animated.spring(scaleAnimations[sectionId], {
         toValue: 1,
         friction: 3,
         tension: 40,
@@ -228,47 +213,43 @@ const ProjectDetails: React.FC = () => {
       }),
     ]).start();
 
-    setSelectedSlice(projectId);
+    setSelectedSlice(sectionId);
 
-    const project = projectData.find(p => p._id === projectId);
+    const project = projectData.find(p => p._id === sectionId);
 
-    Alert.alert(
-      project?.name || 'Project Details',
-      `Budget: ${pieData.find(p => p.key === projectId)?.formattedBudget}\n` +
-      `Status: ${project?.status || 'N/A'}\n` +
-      `${project?.description || ''}`,
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'View Details',
-          onPress: () => {
-            console.log(`Navigating to project: ${projectId}`);
-          },
-        },
-      ],
-      { cancelable: true }
-    );
-  };
-
-  const getStatusColor = (status?: string) => {
-    switch (status) {
-      case 'active': return '#27AE60';
-      case 'completed': return '#3498DB';
-      case 'pending': return '#F39C12';
-      default: return '#95A5A6';
+    const payload = {
+      sectionId,
+      sectionName
     }
+
+    router.push({
+      pathname: '/section_details/[data]',
+      params: { data: JSON.stringify(payload) },
+    });
+
   };
+
+  const { data } = useLocalSearchParams();
+  const info = JSON.parse(Array.isArray(data) ? data[0] ?? '' : data ?? '');
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <SafeAreaView>
 
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity onPress={() => { router.back() }} style={styles.backButton} activeOpacity={0.7}>
+              <Ionicons name="arrow-back" size={24} color="#000" />
+            </TouchableOpacity>
+            <View style={styles.projectInfo}>
+              <Text style={styles.projectName}>{info.projectName}</Text>
+            </View>
+          </View>
+        </View>
+
         <Animated.View style={[styles.card, { opacity: fadeAnim }]}>
-          <View style={styles.header}>
-            <Text style={styles.title}>PROJECT-NAME</Text>
+          <View style={styles.heading}>
+            <Text style={styles.title}>{info.projectName}</Text>
             <Text style={styles.subtitle}>Financial Overview</Text>
           </View>
 
@@ -314,22 +295,21 @@ const ProjectDetails: React.FC = () => {
                     />
                   </G>
                 ))}
-                {/* Render percentage labels on top layer for better visibility */}
+                {/* Render amount labels on top layer for better visibility */}
                 {slices.map((slice) => (
                   <G key={`label-${slice.key}`}>
                     <AnimatedSvgText
                       x={slice.labelX}
                       y={slice.labelY}
                       fill="white"
-                      fontSize="15"
+                      fontSize={pieLabelFontSize}
                       fontWeight="bold"
                       textAnchor="middle"
                       alignmentBaseline="middle"
                       opacity={animatedValues[slice.key]}
                       onPress={() => handleSlicePress(slice.key, slice.name)}
-                      style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.3)' }}
                     >
-                      {slice.percentage}%
+                      {slice.formattedBudget}
                     </AnimatedSvgText>
                   </G>
                 ))}
@@ -340,7 +320,6 @@ const ProjectDetails: React.FC = () => {
             <View style={styles.centerContent}>
               <Text style={styles.centerLabel}>TOTAL BUDGET</Text>
               <Text style={styles.centerValue}>{formatCurrency(totalBudget)}</Text>
-              <Text style={styles.centerProjects}>{projectData.length} Projects</Text>
             </View>
           </View>
 
@@ -390,8 +369,6 @@ const ProjectDetails: React.FC = () => {
             })}
           </View>
         </Animated.View>
-
-
       </SafeAreaView>
     </ScrollView>
   );
@@ -415,13 +392,12 @@ const styles = StyleSheet.create({
     shadowRadius: 25,
     elevation: 12,
   },
-  header: {
+  heading: {
     alignItems: 'center',
-    marginBottom: 30,
   },
   title: {
     fontSize: 26,
-    fontWeight: '300',
+    fontWeight: 'bold',
     color: '#2C3E50',
     letterSpacing: 3,
     marginBottom: 8,
@@ -433,7 +409,6 @@ const styles = StyleSheet.create({
   },
   chartContainer: {
     alignItems: 'center',
-    marginVertical: 20,
     position: 'relative',
   },
   centerContent: {
@@ -621,4 +596,31 @@ const styles = StyleSheet.create({
     color: '#2C3E50',
     fontWeight: '600',
   },
+
+  header: {
+    alignItems: 'center',
+    backgroundColor: "#fff",
+    height: 60
+  },
+
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  backButton: {
+    padding: 8,
+    marginRight: 12,
+  },
+  projectInfo: {
+    flex: 1,
+  },
+  projectName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#000',
+    marginBottom: 2,
+  },
+
+
 });
