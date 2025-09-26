@@ -178,22 +178,55 @@ const usedMaterials: Material[] = [
 const MaterialsManager: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'imported' | 'used'>('imported');
     const [selectedPeriod, setSelectedPeriod] = useState('Today');
+    const [searchQuery, setSearchQuery] = useState('');
 
     const periods = ['Today', '1 Week', '15 Days', '1 Month', 'Custom'];
 
-    const getCurrentData = () => {
+    // Get current materials based on active tab
+    const currentMaterials = activeTab === 'imported' ? importedMaterials : usedMaterials;
+    
+    // Filter materials based on search query
+    const filteredMaterials = currentMaterials.filter(material => 
+        material.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        material.category.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    
+    // Calculate totals
+    const totalMaterials = filteredMaterials.length;
+    const totalCost = filteredMaterials.reduce((sum, material) => sum + material.price, 0);
+    
     // Helper function to get availability percentage
     const getAvailabilityPercentage = (material: Material) => {
         const importedMaterial = importedMaterials.find(m => m.id === material.id);
-        const usedMaterial = used Materials.find(m => m.id === material.id);
+        const usedMaterial = usedMaterials.find(m => m.id === material.id);
 
         if (!importedMaterial) return 0;
         if (!usedMaterial) return 100;
 
         const available = importedMaterial.quantity - usedMaterial.quantity;
         return Math.round((available / importedMaterial.quantity) * 100);
-            roofing: '#7C2D12',
+    };
+    
+    // Helper function to get quantity wasted
+    const getQuantityWasted = (material: Material) => {
+        const importedMaterial = importedMaterials.find(m => m.id === material.id);
+        const usedMaterial = usedMaterials.find(m => m.id === material.id);
+        
+        if (!importedMaterial || !usedMaterial) return 0;
+        
+        // Calculate wastage as 10% of used quantity (you can adjust this logic as needed)
+        return Math.round(usedMaterial.quantity * 0.1);
+    };
+    
+    // Helper function to get category color
+    const getCategoryColor = (category: string) => {
+        const colors = {
+            foundation: '#8B5CF6',
+            walls: '#DC2626',
+            electrical: '#F59E0B',
+            plumbing: '#3B82F6',
             structure: '#92400E',
+            roofing: '#7C2D12',
         };
         return colors[category as keyof typeof colors] || '#6B7280';
     };
@@ -313,7 +346,9 @@ const MaterialsManager: React.FC = () => {
                             {/* Material Details */}
                             <View style={styles.materialDetails}>
                                 <View style={styles.detailItem}>
-                                    <Text style={styles.detailLabel}>Quantity</Text>
+                                    <Text style={styles.detailLabel}>
+                                        {activeTab === 'imported' ? 'Quantity' : 'Quantity Used'}
+                                    </Text>
                                     <View style={styles.detailValueContainer}>
                                         <Text style={styles.detailValue}>{material.quantity}</Text>
                                         <Text style={styles.detailUnit}>{material.unit}</Text>
@@ -323,8 +358,14 @@ const MaterialsManager: React.FC = () => {
                                 <View style={styles.detailDivider} />
 
                                 <View style={styles.detailItem}>
-                                    <Text style={styles.detailLabel}>Total Price</Text>
-                                    <Text style={styles.priceValue}>{formatPrice(material.price)}</Text>
+                                    <Text style={styles.detailLabel}>
+                                        {activeTab === 'imported' ? 'Total Price' : 'Quantity Wasted'}
+                                    </Text>
+                                    <Text style={activeTab === 'imported' ? styles.priceValue : styles.wastedValue}>
+                                        {activeTab === 'imported' 
+                                            ? formatPrice(material.price) 
+                                            : `${getQuantityWasted(material)} ${material.unit}`}
+                                    </Text>
                                 </View>
                             </View>
                         </View>
@@ -588,6 +629,11 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontWeight: '700',
         color: '#059669',
+    },
+    wastedValue: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#DC2626',
     },
     editButton: {
         alignItems: 'center',
