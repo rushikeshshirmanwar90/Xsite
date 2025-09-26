@@ -177,28 +177,21 @@ const usedMaterials: Material[] = [
 
 const MaterialsManager: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'imported' | 'used'>('imported');
-    const [searchQuery, setSearchQuery] = useState('');
     const [selectedPeriod, setSelectedPeriod] = useState('Today');
 
     const periods = ['Today', '1 Week', '15 Days', '1 Month', 'Custom'];
 
     const getCurrentData = () => {
-        return activeTab === 'imported' ? importedMaterials : usedMaterials;
-    };
+    // Helper function to get availability percentage
+    const getAvailabilityPercentage = (material: Material) => {
+        const importedMaterial = importedMaterials.find(m => m.id === material.id);
+        const usedMaterial = used Materials.find(m => m.id === material.id);
 
-    const filteredMaterials = getCurrentData().filter(material =>
-        material.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+        if (!importedMaterial) return 0;
+        if (!usedMaterial) return 100;
 
-    const totalMaterials = filteredMaterials.length;
-    const totalCost = filteredMaterials.reduce((sum, material) => sum + material.price, 0);
-
-    const getCategoryColor = (category: string) => {
-        const colors = {
-            foundation: '#8B5CF6',
-            walls: '#EF4444',
-            electrical: '#F59E0B',
-            plumbing: '#3B82F6',
+        const available = importedMaterial.quantity - usedMaterial.quantity;
+        return Math.round((available / importedMaterial.quantity) * 100);
             roofing: '#7C2D12',
             structure: '#92400E',
         };
