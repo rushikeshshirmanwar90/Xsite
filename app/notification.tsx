@@ -1,16 +1,16 @@
 // notification.tsx
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState, useRef, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  Animated,
-  Alert,
+    Alert,
+    Animated,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -91,10 +91,10 @@ const Toast: React.FC<ToastProps> = ({ visible, message, onUndo, onHide, type = 
     };
 
     return (
-        <Animated.View 
+        <Animated.View
             style={[
                 styles.toastContainer,
-                { 
+                {
                     transform: [{ translateY }],
                     backgroundColor: getToastColor()
                 }
@@ -124,14 +124,14 @@ const ApprovalButtons: React.FC<ApprovalButtonsProps> = ({ notification, onAppro
 
     return (
         <View style={styles.approvalContainer}>
-            <TouchableOpacity 
+            <TouchableOpacity
                 style={[styles.approvalButton, styles.rejectButton]}
                 onPress={() => onReject(notification.id)}
             >
                 <Ionicons name="close" size={14} color="#FFFFFF" />
                 <Text style={styles.approvalButtonText}>Reject</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
                 style={[styles.approvalButton, styles.approveButton]}
                 onPress={() => onApprove(notification.id)}
             >
@@ -147,13 +147,13 @@ const getTimeAgo = (timestamp: string): string => {
     const now = new Date();
     const notificationTime = new Date(timestamp);
     const diffInHours = Math.floor((now.getTime() - notificationTime.getTime()) / (1000 * 3600));
-    
+
     if (diffInHours < 1) return 'Just now';
     if (diffInHours < 24) return `${diffInHours}h ago`;
-    
+
     const diffInDays = Math.floor(diffInHours / 24);
     if (diffInDays < 7) return `${diffInDays}d ago`;
-    
+
     return notificationTime.toLocaleDateString('en-IN');
 };
 
@@ -316,9 +316,9 @@ interface NotificationItemProps {
     onReject: (id: number) => void;
 }
 
-const SwipeableNotificationItem: React.FC<NotificationItemProps> = ({ 
-    notification, 
-    onPress, 
+const SwipeableNotificationItem: React.FC<NotificationItemProps> = ({
+    notification,
+    onPress,
     onDelete,
     onApprove,
     onReject
@@ -335,7 +335,7 @@ const SwipeableNotificationItem: React.FC<NotificationItemProps> = ({
                 default: return { icon: 'time-outline', color: '#F59E0B' };
             }
         }
-        
+
         switch (type) {
             case 'work_update': return { icon: 'checkmark-circle', color: '#10B981' };
             case 'work_remaining': return { icon: 'time', color: '#F59E0B' };
@@ -355,7 +355,7 @@ const SwipeableNotificationItem: React.FC<NotificationItemProps> = ({
     const onHandlerStateChange = (event: any) => {
         if (event.nativeEvent.state === State.END) {
             const { translationX } = event.nativeEvent;
-            
+
             if (Math.abs(translationX) > 120) {
                 // Swipe threshold reached - delete
                 Animated.parallel([
@@ -422,7 +422,7 @@ const SwipeableNotificationItem: React.FC<NotificationItemProps> = ({
                         <View style={[styles.iconContainer, { backgroundColor: iconConfig.color }]}>
                             <Ionicons name={iconConfig.icon as any} size={16} color="white" />
                         </View>
-                        
+
                         <View style={styles.contentContainer}>
                             <View style={styles.headerRow}>
                                 <Text style={[
@@ -435,7 +435,7 @@ const SwipeableNotificationItem: React.FC<NotificationItemProps> = ({
                                     {getTimeAgo(notification.timestamp)}
                                 </Text>
                             </View>
-                            
+
                             <Text style={styles.message} numberOfLines={2}>
                                 {notification.message}
                             </Text>
@@ -465,20 +465,20 @@ const SwipeableNotificationItem: React.FC<NotificationItemProps> = ({
                                     </View>
                                 </View>
                             )}
-                            
+
                             <Text style={styles.projectText}>
                                 {notification.projectName}
                                 {notification.senderName && ` • ${notification.senderName}`}
                             </Text>
 
                             {/* Approval Buttons */}
-                            <ApprovalButtons 
+                            <ApprovalButtons
                                 notification={notification}
                                 onApprove={onApprove}
                                 onReject={onReject}
                             />
                         </View>
-                        
+
                         {!notification.isRead && <View style={styles.unreadDot} />}
                     </TouchableOpacity>
                 </Animated.View>
@@ -496,7 +496,7 @@ const NotificationScreen: React.FC = () => {
     const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
     const [lastDeleted, setLastDeleted] = useState<DeletedNotification | null>(null);
     const router = useRouter();
-    
+
     const unreadCount = useMemo(() => {
         return notifications.filter(n => !n.isRead).length;
     }, [notifications]);
@@ -513,8 +513,8 @@ const NotificationScreen: React.FC = () => {
 
     const handleNotificationPress = (notification: Notification) => {
         // Mark as read
-        setNotifications(prev => 
-            prev.map(n => 
+        setNotifications(prev =>
+            prev.map(n =>
                 n.id === notification.id ? { ...n, isRead: true } : n
             )
         );
@@ -523,7 +523,7 @@ const NotificationScreen: React.FC = () => {
     const handleDeleteNotification = (notification: Notification) => {
         // Find the original index of the notification
         const originalIndex = notifications.findIndex(n => n.id === notification.id);
-        
+
         const deletedNotification: DeletedNotification = {
             ...notification,
             deletedAt: Date.now(),
@@ -584,7 +584,7 @@ const NotificationScreen: React.FC = () => {
         if (lastDeleted) {
             // Restore notification at its original position
             const { originalIndex, deletedAt, ...notification } = lastDeleted;
-            
+
             setNotifications(prev => {
                 const newNotifications = [...prev];
                 // Insert at the original index, but ensure it doesn't exceed array bounds
@@ -592,8 +592,8 @@ const NotificationScreen: React.FC = () => {
                 newNotifications.splice(insertIndex, 0, notification);
                 return newNotifications;
             });
-            
-            setDeletedNotifications(prev => 
+
+            setDeletedNotifications(prev =>
                 prev.filter(n => n.id !== lastDeleted.id)
             );
             setLastDeleted(null);
@@ -607,7 +607,7 @@ const NotificationScreen: React.FC = () => {
     };
 
     const handleMarkAllAsRead = () => {
-        setNotifications(prev => 
+        setNotifications(prev =>
             prev.map(notification => ({ ...notification, isRead: true }))
         );
         showToast('All notifications marked as read', 'success');
@@ -617,7 +617,7 @@ const NotificationScreen: React.FC = () => {
     useEffect(() => {
         const interval = setInterval(() => {
             const now = Date.now();
-            setDeletedNotifications(prev => 
+            setDeletedNotifications(prev =>
                 prev.filter(n => now - n.deletedAt < 30000)
             );
         }, 1000);
@@ -646,10 +646,10 @@ const NotificationScreen: React.FC = () => {
                         </Text>
                     </View>
                 </View>
-                
+
                 {unreadCount > 0 && (
-                    <TouchableOpacity 
-                        style={styles.markAllButton} 
+                    <TouchableOpacity
+                        style={styles.markAllButton}
                         onPress={handleMarkAllAsRead}
                     >
                         <Text style={styles.markAllText}>Mark all read</Text>
@@ -678,7 +678,7 @@ const NotificationScreen: React.FC = () => {
             )}
 
             {/* Notifications List */}
-            <ScrollView 
+            <ScrollView
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
@@ -701,7 +701,7 @@ const NotificationScreen: React.FC = () => {
                         <Ionicons name="notifications-outline" size={48} color="#9CA3AF" />
                         <Text style={styles.emptyTitle}>No notifications</Text>
                         <Text style={styles.emptyMessage}>
-                            You're all caught up! Check back later for updates.
+                            You&apos;re all caught up! Check back later for updates.
                         </Text>
                     </View>
                 )}
