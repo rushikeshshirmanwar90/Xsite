@@ -405,6 +405,67 @@ export const styles = StyleSheet.create({
         borderColor: '#3B82F6',
     },
 
+    // Staff assignment styles
+    staffContainer: {
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        borderRadius: 12,
+        backgroundColor: '#F9FAFB',
+        maxHeight: 200,
+    },
+    staffItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E5E7EB',
+    },
+    staffItemContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    staffInfo: {
+        flex: 1,
+        marginLeft: 12,
+    },
+    staffName: {
+        fontSize: 16,
+        fontWeight: '500',
+        color: '#1F2937',
+    },
+    staffStatus: {
+        fontSize: 14,
+        color: '#6B7280',
+        marginTop: 2,
+    },
+    selectionIndicator: {
+        marginLeft: 8,
+    },
+    selectionIndicatorSelected: {
+        // Additional styling if needed for selected state
+    },
+    noStaffContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 40,
+        paddingHorizontal: 20,
+    },
+    noStaffText: {
+        fontSize: 16,
+        color: '#6B7280',
+        textAlign: 'center',
+        marginTop: 12,
+    },
+    noStaffSubText: {
+        textAlign: 'center',
+        color: '#9CA3AF',
+        fontSize: 14,
+        marginTop: 8,
+        fontStyle: 'italic',
+    },
+
     // Centered container and state texts for loading/empty/error states
     centerContainer: {
         alignItems: 'center',
@@ -552,5 +613,4 @@ export const styles = StyleSheet.create({
         backgroundColor: '#0EA5E9',
         borderRadius: 2,
     },
-
 })

@@ -113,7 +113,7 @@ const Index: React.FC = () => {
 
     // Company configuration
     const COMPANY_CONFIG = {
-        name: "Sharda Constructions",
+        name: "Company Name",
         subtitle: "Project Management Dashboard"
     };
     const companyInitials = generateInitials(COMPANY_CONFIG.name);
@@ -142,30 +142,6 @@ const Index: React.FC = () => {
                     {/* {projectStats.overdueProjects > 0 && <View style={styles.notificationDot} />} */}
                 </TouchableOpacity>
             </View>
-
-            {/*             
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Construction Materials</Text>
-                <Text style={styles.headerSubtitle}>Project Management</Text>
-                <TouchableOpacity
-                    style={styles.addButton}
-                    onPress={() => setShowAddModal(true)}
-                    disabled={addingProject}
-                >
-                    <LinearGradient
-                        colors={['#3B82F6', '#8B5CF6']}
-                        style={styles.addButtonGradient}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                    >
-                        <Ionicons name="add" size={20} color="white" />
-                        <Text style={styles.addButtonText}>
-                            {addingProject ? 'Adding...' : 'Add Project'}
-                        </Text>
-                    </LinearGradient>
-                </TouchableOpacity>
-            </View> */}
-
 
 
             {/* Section Header */}
@@ -205,18 +181,24 @@ const Index: React.FC = () => {
                             <Text style={styles.retryButtonText}>Retry</Text>
                         </TouchableOpacity>
                     </View>
-                ) : projects && projects.length > 0 ? (
-                    projects.map((project) => (
-                        <ProjectCard
-                            key={project._id}
-                            project={project}
-                            onViewDetails={handleViewDetails}
-                        />
-                    ))
                 ) : (
-                    <View style={styles.centerContainer}>
-                        <Text style={styles.emptyText}>No projects found</Text>
-                        <Text style={styles.emptySubText}>Tap &quot;Add Project&quot; to create your first project</Text>
+                    <View style={{ marginBottom: 24 }} >
+                        {projects && projects.length > 0 ? (
+                            projects.map((project, index) => (
+                                <View key={index} style={{ marginBottom: 10 }}  >
+                                    <ProjectCard
+                                        key={project._id}
+                                        project={project}
+                                        onViewDetails={handleViewDetails}
+                                    />
+                                </View>
+                            ))
+                        ) : (
+                            <View style={styles.centerContainer}>
+                                <Text style={styles.emptyText}>No projects found</Text>
+                                <Text style={styles.emptySubText}>Tap &quot;Add Project&quot; to create your first project</Text>
+                            </View>
+                        )}
                     </View>
                 )}
             </ScrollView>

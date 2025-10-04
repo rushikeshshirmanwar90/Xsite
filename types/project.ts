@@ -2,55 +2,25 @@ import { StaffMembers } from "./staff";
 
 // Types
 export interface Project {
-  _id?: number | string;
+  _id?: string | string;
   name: string;
   address: string;
-  location?: string; // For backward compatibility
   description: string;
   assignedStaff: StaffMembers[];
   budget?: number;
   spent?: number;
-  status?: "active" | "planning" | "completed";
   progress?: number;
-  startDate?: string;
-  endDate?: string;
-  sections?: ProjectSection[];
-  materialUsage?: MaterialUsage[];
+  section?: ProjectSection[];
 }
 
 export interface ProjectSection {
-  id: string;
+  _id: string;
+  sectionId: string;
   name: string;
-  description: string;
-  budget: number;
-  spent: number;
-  progress: number;
-  startDate?: string;
-  endDate?: string;
-  status: "not_started" | "in_progress" | "completed" | "delayed";
-  materials: SectionMaterial[];
-  dependencies?: string[]; // IDs of sections that must be completed first
-}
+  type: string;
 
-export interface SectionMaterial {
-  materialId: string;
-  name: string;
-  plannedQuantity: number;
-  usedQuantity: number;
-  wastedQuantity: number;
-  unit: string;
-  costPerUnit: number;
-}
-
-export interface MaterialUsage {
-  id: string;
-  name: string;
-  totalUsed: number;
-  totalWasted: number;
-  totalOrdered: number;
-  unit: string;
-  costPerUnit: number;
-  category: "construction" | "finishing" | "electrical" | "plumbing" | "other";
+  // progress: number;
+  // status: "not_started" | "in_progress" | "completed" | "delayed";
 }
 
 export interface Activity {

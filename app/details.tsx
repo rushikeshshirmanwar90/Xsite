@@ -257,9 +257,9 @@ const Details: React.FC = () => {
     // Helper function to get quantity wasted
     const getQuantityWasted = (material: Material) => {
         const usedMaterial = usedMaterials.find(m => m.id === material.id);
-        
+
         if (!usedMaterial) return 0;
-        
+
         // Calculate wastage as 10% of used quantity (you can adjust this logic as needed)
         return Math.round(usedMaterial.quantity * 0.1);
     };
@@ -407,8 +407,8 @@ const Details: React.FC = () => {
                                                 {activeTab === 'imported' ? 'Available:' : 'Quantity Used:'}
                                             </Text>
                                             <Text style={styles.progressStartLabel}>
-                                                {activeTab === 'imported' 
-                                                    ? `${getAvailableQuantity(material)} ${material.unit}` 
+                                                {activeTab === 'imported'
+                                                    ? `${getAvailableQuantity(material)} ${material.unit}`
                                                     : `${material.quantity} ${material.unit}`}
                                             </Text>
                                         </View>
@@ -416,9 +416,11 @@ const Details: React.FC = () => {
                                             <View
                                                 style={[
                                                     activeTab === 'imported' ? styles.progressBarFillGreen : styles.progressBarFillRed,
-                                                    { width: activeTab === 'imported' 
-                                                        ? `${getAvailabilityPercentage(material)}%` 
-                                                        : '100%'}
+                                                    {
+                                                        width: activeTab === 'imported'
+                                                            ? `${getAvailabilityPercentage(material)}%`
+                                                            : '100%'
+                                                    }
                                                 ]}
                                             />
                                         </View>
@@ -428,13 +430,13 @@ const Details: React.FC = () => {
                                                 {activeTab === 'imported' ? 'Total:' : 'Quantity Wasted:'}
                                             </Text>
                                             <Text style={styles.progressEndLabel}>
-                                                {activeTab === 'imported' 
-                                                    ? `${getImportedQuantity(material)} ${material.unit}` 
+                                                {activeTab === 'imported'
+                                                    ? `${getImportedQuantity(material)} ${material.unit}`
                                                     : `${getQuantityWasted(material)} ${material.unit}`}
                                             </Text>
                                         </View>
                                     </View>
-                                    <TouchableOpacity
+                                    {/* <TouchableOpacity
                                         style={styles.viewDetailsButton}
                                         activeOpacity={0.7}
                                         onPress={() => handleViewDetails(material)}
@@ -443,7 +445,7 @@ const Details: React.FC = () => {
                                             {activeTab === 'imported' ? 'View Import History' : 'View Usage Details'}
                                         </Text>
                                         <Ionicons name="chevron-forward" size={16} color="#0EA5E9" />
-                                    </TouchableOpacity>
+                                    </TouchableOpacity> */}
                                 </View>
                             </TouchableOpacity>
                         </Animated.View>

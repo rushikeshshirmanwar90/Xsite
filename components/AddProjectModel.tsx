@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import {
     Alert,
     Modal,
+    ScrollView,
     Text,
     TextInput,
     TouchableOpacity,
@@ -19,8 +20,8 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
     const [projectName, setProjectName] = useState('');
     const [projectAddress, setProjectAddress] = useState('');
     const [projectDescription, setProjectDescription] = useState('');
+    const [estimatedBudget, setEstimatedBudget] = useState('');
     const [assignedTo, setAssignedTo] = useState<StaffMembers[]>([]);
-    const [showStaffDropdown, setShowStaffDropdown] = useState(false);
 
     const handleStaffSelection = (staff: StaffMembers) => {
         const isSelected = assignedTo.some(member => member._id === staff._id);
@@ -38,32 +39,35 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
         return assignedTo.some(member => member._id === staff._id);
     };
 
-    const getSelectedStaffText = () => {
-        if (assignedTo.length === 0) return 'Select staff members';
-        if (assignedTo.length === 1) return assignedTo[0].fullName;
-        if (assignedTo.length === 2) return `${assignedTo[0].fullName} and ${assignedTo[1].fullName}`;
-        return `${assignedTo[0].fullName} and ${assignedTo.length - 1} others`;
-    };
-
     const handleSubmit = () => {
-        if (projectName && projectAddress && assignedTo.length > 0) {
+        if (projectName && projectAddress && assignedTo.length > 0 && estimatedBudget) {
+            // Validate budget is a valid number
+            const budgetNumber = parseFloat(estimatedBudget);
+            if (isNaN(budgetNumber) || budgetNumber <= 0) {
+                Alert.alert('Error', 'Please enter a valid budget amount');
+                return;
+            }
+
             const newProject: Project = {
                 name: projectName,
                 address: projectAddress,
                 assignedStaff: assignedTo,
-                description: projectDescription
+                description: projectDescription,
+                budget: budgetNumber
             };
 
-            console.log(newProject)
+            console.log(newProject);
 
             onAdd(newProject);
+            // Reset all fields
             setProjectName('');
             setProjectAddress('');
             setProjectDescription('');
+            setEstimatedBudget('');
             setAssignedTo([]);
             onClose();
         } else {
-            Alert.alert('Error', 'Please fill all fields and assign at least one staff member');
+            Alert.alert('Error', 'Please fill all required fields and assign at least one staff member');
         }
     };
 
@@ -78,8 +82,8 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                         </TouchableOpacity>
                     </View>
 
-                    <View style={styles.form}>
-                        <Text style={styles.label}>Project Name</Text>
+                    <ScrollView style={styles.form} showsVerticalScrollIndicator={false}>
+                        <Text style={styles.label}>Project Name *</Text>
                         <TextInput
                             style={styles.input}
                             value={projectName}
@@ -87,7 +91,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                             placeholder="Enter project name"
                         />
 
-                        <Text style={styles.label}>Project Address</Text>
+                        <Text style={styles.label}>Project Address *</Text>
                         <TextInput
                             style={styles.input}
                             value={projectAddress}
@@ -107,43 +111,63 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                             numberOfLines={2}
                         />
 
-                        <Text style={styles.label}>Assign To</Text>
-                        <TouchableOpacity
-                            style={styles.dropdown}
-                            onPress={() => setShowStaffDropdown(!showStaffDropdown)}
-                        >
-                            <Text style={assignedTo.length > 0 ? styles.dropdownText : styles.dropdownPlaceholder}>
-                                {getSelectedStaffText()}
-                            </Text>
-                            <Ionicons name="chevron-down" size={20} color="#6B7280" />
-                        </TouchableOpacity>
+                        <Text style={styles.label}>Estimated Budget *</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={estimatedBudget}
+                            onChangeText={setEstimatedBudget}
+                            placeholder="Enter estimated budget"
+                            keyboardType="numeric"
+                        />
 
-                        {showStaffDropdown && (
-                            <View style={styles.dropdownList}>
-                                {staffMembers.map((staff: StaffMembers) => (
-                                    <TouchableOpacity
-                                        key={staff._id}
-                                        style={styles.dropdownItem}
-                                        onPress={() => handleStaffSelection(staff)}
-                                    >
-                                        <View style={styles.checkboxContainer}>
-                                            <View style={[
-                                                styles.checkbox,
-                                                isStaffSelected(staff) && styles.checkboxSelected
-                                            ]}>
-                                                {isStaffSelected(staff) && (
-                                                    <Ionicons name="checkmark" size={16} color="#fff" />
-                                                )}
-                                            </View>
-                                            <Text style={styles.dropdownItemText} numberOfLines={1} ellipsizeMode="tail">
+                        <Text style={styles.label}>Assign Staff *</Text>
+                        <View style={styles.staffContainer}>
+                            {staffMembers.map((staff: StaffMembers) => (
+                                <TouchableOpacity
+                                    key={staff._id}
+                                    style={styles.staffItem}
+                                    onPress={() => handleStaffSelection(staff)}
+                                    activeOpacity={0.7}
+                                >
+                                    <View style={styles.staffItemContent}>
+                                        <View style={[
+                                            styles.checkbox,
+                                            isStaffSelected(staff) && styles.checkboxSelected
+                                        ]}>
+                                            {isStaffSelected(staff) && (
+                                                <Ionicons name="checkmark" size={18} color="#fff" />
+                                            )}
+                                        </View>
+                                        <View style={styles.staffInfo}>
+                                            <Text style={styles.staffName}>
                                                 {staff.fullName}
                                             </Text>
+                                            <Text style={styles.staffStatus}>
+                                                {isStaffSelected(staff) ? 'Assigned' : 'Available'}
+                                            </Text>
                                         </View>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        )}
-                    </View>
+                                        <View style={[
+                                            styles.selectionIndicator,
+                                            isStaffSelected(staff) && styles.selectionIndicatorSelected
+                                        ]}>
+                                            <Ionicons
+                                                name={isStaffSelected(staff) ? "checkmark-circle" : "ellipse-outline"}
+                                                size={24}
+                                                color={isStaffSelected(staff) ? "#10B981" : "#D1D5DB"}
+                                            />
+                                        </View>
+                                    </View>
+                                </TouchableOpacity>
+                            ))}
+                            {staffMembers.length === 0 && (
+                                <View style={styles.noStaffContainer}>
+                                    <Ionicons name="people-outline" size={32} color="#9CA3AF" />
+                                    <Text style={styles.noStaffText}>No staff members available</Text>
+                                    <Text style={styles.noStaffSubText}>Please add staff members first</Text>
+                                </View>
+                            )}
+                        </View>
+                    </ScrollView>
 
                     <View style={styles.modalActions}>
                         <TouchableOpacity style={styles.cancelButton} onPress={onClose}>

@@ -18,18 +18,26 @@ export const formatCurrency = (amount: number): string => {
  * Calculate percentage from value and total
  */
 export const calculatePercentage = (value: number, total: number): string => {
-  return total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+  return total > 0 ? ((value / total) * 100).toFixed(1) : "0.0";
 };
 
 /**
  * Transform project data to pie slice data
  */
 export const transformProjectDataToPieSlices = (
-  projectData: Array<{ _id: string; name: string; budgetUsed: number; description?: string }>,
-  colors: Array<{ primary: string; secondary: string }>
+  projectData: {
+    _id: string;
+    name: string;
+    budgetUsed: number;
+    description?: string;
+  }[],
+  colors: { primary: string; secondary: string }[]
 ) => {
-  const totalBudget = projectData.reduce((sum, project) => sum + project.budgetUsed, 0);
-  
+  const totalBudget = projectData.reduce(
+    (sum, project) => sum + project.budgetUsed,
+    0
+  );
+
   return projectData.map((project, index) => ({
     key: project._id,
     value: project.budgetUsed,
@@ -48,11 +56,14 @@ export const transformProjectDataToPieSlices = (
  * Transform section data to pie slice data
  */
 export const transformSectionDataToPieSlices = (
-  sectionData: Array<{ _id: string; name: string; budget: number }>,
-  colors: Array<{ primary: string; secondary: string }>
+  sectionData: { _id: string; name: string; budget: number }[],
+  colors: { primary: string; secondary: string }[]
 ) => {
-  const totalBudget = sectionData.reduce((sum, section) => sum + section.budget, 0);
-  
+  const totalBudget = sectionData.reduce(
+    (sum, section) => sum + section.budget,
+    0
+  );
+
   return sectionData.map((section, index) => ({
     key: section._id,
     value: section.budget,
@@ -69,6 +80,11 @@ export const transformSectionDataToPieSlices = (
 /**
  * Calculate total budget from data array
  */
-export const calculateTotalBudget = (data: Array<{ budgetUsed?: number; budget?: number }>): number => {
-  return data.reduce((sum, item) => sum + (item.budgetUsed || item.budget || 0), 0);
+export const calculateTotalBudget = (
+  data: { budgetUsed?: number; budget?: number }[]
+): number => {
+  return data.reduce(
+    (sum, item) => sum + (item.budgetUsed || item.budget || 0),
+    0
+  );
 };

@@ -25,7 +25,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails }) => 
     const staticProgress = 65; // Static project progress percentage
     const staticBudget = 500000; // Static total budget
     const staticSpent = 325000; // Static spent amount
-    
+
     const budgetProgress = ((project?.spent ?? staticSpent) / (project?.budget ?? staticBudget)) * 100;
 
 
@@ -410,10 +410,10 @@ const styles = StyleSheet.create({
     },
     infoText: {
         fontSize: 14,
-        color: '#6B7280',
+        color: '#111',
         flex: 1,
         lineHeight: 20,
-        fontWeight: '400',
+        fontWeight: '600',
     },
     infoTextBold: {
         fontSize: 14,
