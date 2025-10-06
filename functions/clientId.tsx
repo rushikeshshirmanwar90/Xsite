@@ -5,7 +5,7 @@ export const getClientId = async () => {
         const userDetailsString = await AsyncStorage.getItem("user");
         console.log(userDetailsString);
         const userDetails = userDetailsString ? JSON.parse(userDetailsString) : null;
-        return userDetails?._id || ''
+        return userDetails?.clientId || ''
     } catch (error) {
         console.error('Error getting client ID:', error);
     }

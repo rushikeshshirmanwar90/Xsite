@@ -37,7 +37,9 @@ const Index: React.FC = () => {
         const fetchProjectData = async () => {
             const clientId = await getClientId();
             setClientId(clientId)
-
+            console.log("********************************************")
+            console.log(clientId)
+            console.log("********************************************")
             const res = await axios.get(`${domain}/api/project?clientId=${clientId}`);
             setProjects(res.data)
             setLoading(false)
@@ -122,8 +124,6 @@ const Index: React.FC = () => {
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-
-
             <View style={styles.fixedHeader}>
                 <View style={styles.userInfo}>
                     <View style={styles.avatarContainer}>
@@ -132,7 +132,6 @@ const Index: React.FC = () => {
                     <View style={styles.userDetails}>
                         <Text style={styles.userName}>{COMPANY_CONFIG.name}</Text>
                         <Text style={styles.userSubtitle}>{COMPANY_CONFIG.subtitle}</Text>
-                        {/* <Text style={styles.dateText}>{currentDate}</Text> */}
                     </View>
                 </View>
                 <TouchableOpacity style={styles.notificationButton}
