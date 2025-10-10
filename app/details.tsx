@@ -1,904 +1,504 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     Animated,
     ScrollView,
     StatusBar,
-    StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
-    View
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+// Import refactored components
+import MaterialCharacteristicsView from './components/MaterialCharacteristicsView';
+import AddMaterialCharacteristicsModal from './components/AddMaterialCharacteristicsModal';
+import SearchModal from './components/SearchModal';
 
-// Types
-interface Material {
-    id: number;
-    name: string;
-    category: string;
-    quantity: number;
-    unit: string;
-    price: number;
-    date: string;
-    icon: keyof typeof Ionicons.glyphMap;
-    color: string;
+// Import types and data
+import { Material, Period, MaterialCharacteristics } from './types/materialTypes';
+
+// Extended Material interface for UI purposes
+interface ExtendedMaterial extends Material {
+  color?: string;
+  icon?: string;
 }
+import { importedMaterials, usedMaterials, periods } from './data/materialData';
 
-// Sample data for imported materials
-const importedMaterials: Material[] = [
-    {
-        id: 1,
-        name: 'Concrete',
-        category: 'foundation',
-        quantity: 10,
-        unit: 'cubic meters',
-        price: 25000,
-        date: '15/1/2024',
-        icon: 'cube-outline',
-        color: '#8B5CF6',
-    },
-    {
-        id: 2,
-        name: 'Steel Rebar',
-        category: 'foundation',
-        quantity: 500,
-        unit: 'kg',
-        price: 45000,
-        date: '15/1/2024',
-        icon: 'barbell-outline',
-        color: '#64748B',
-    },
-    {
-        id: 3,
-        name: 'Cement',
-        category: 'foundation',
-        quantity: 50,
-        unit: 'bags',
-        price: 15000,
-        date: '14/1/2024',
-        icon: 'bag-outline',
-        color: '#6B7280',
-    },
-    {
-        id: 4,
-        name: 'Bricks',
-        category: 'walls',
-        quantity: 5000,
-        unit: 'pieces',
-        price: 12000,
-        date: '14/1/2024',
-        icon: 'grid-outline',
-        color: '#DC2626',
-    },
-    {
-        id: 5,
-        name: 'Electrical Wiring',
-        category: 'electrical',
-        quantity: 500,
-        unit: 'meters',
-        price: 15000,
-        date: '13/1/2024',
-        icon: 'flash-outline',
-        color: '#F59E0B',
-    },
-    {
-        id: 6,
-        name: 'PVC Pipes',
-        category: 'plumbing',
-        quantity: 200,
-        unit: 'meters',
-        price: 8000,
-        date: '13/1/2024',
-        icon: 'water-outline',
-        color: '#3B82F6',
-    },
-    {
-        id: 7,
-        name: 'Paint',
-        category: 'walls',
-        quantity: 20,
-        unit: 'liters',
-        price: 6500,
-        date: '12/1/2024',
-        icon: 'color-palette-outline',
-        color: '#EF4444',
-    },
-    {
-        id: 8,
-        name: 'Wood Timber',
-        category: 'structure',
-        quantity: 50,
-        unit: 'pieces',
-        price: 35000,
-        date: '12/1/2024',
-        icon: 'leaf-outline',
-        color: '#92400E',
-    },
-    {
-        id: 9,
-        name: 'Roofing Tiles',
-        category: 'roofing',
-        quantity: 500,
-        unit: 'pieces',
-        price: 25000,
-        date: '11/1/2024',
-        icon: 'home-outline',
-        color: '#7C2D12',
-    },
-    {
-        id: 10,
-        name: 'Insulation',
-        category: 'walls',
-        quantity: 100,
-        unit: 'sq meters',
-        price: 18000,
-        date: '11/1/2024',
-        icon: 'shield-outline',
-        color: '#059669',
-    },
-];
+// Import styles
+import { detailsStyles as styles } from './styles/detailsStyles';
 
-// Sample data for used materials (subset of imported)
-const usedMaterials: Material[] = [
-    {
-        id: 1,
-        name: 'Concrete',
-        category: 'foundation',
-        quantity: 8,
-        unit: 'cubic meters',
-        price: 20000,
-        date: '16/1/2024',
-        icon: 'cube-outline',
-        color: '#8B5CF6',
-    },
-    {
-        id: 4,
-        name: 'Bricks',
-        category: 'walls',
-        quantity: 3000,
-        unit: 'pieces',
-        price: 7200,
-        date: '15/1/2024',
-        icon: 'grid-outline',
-        color: '#DC2626',
-    },
-    {
-        id: 5,
-        name: 'Electrical Wiring',
-        category: 'electrical',
-        quantity: 300,
-        unit: 'meters',
-        price: 9000,
-        date: '14/1/2024',
-        icon: 'flash-outline',
-        color: '#F59E0B',
-    },
-];
-
-const Details: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'imported' | 'used'>('imported');
+/**
+ * Details Component
+ * 
+ * This component displays material details with the following features:
+ * - Material listing with filtering by period and type (imported/used)
+ * - Material characteristics viewing and editing
+ * - Search functionality for materials
+ * - Cost calculation and availability tracking
+ */
+const Details = () => {
+    // State variables
+    const [activeTab, setActiveTab] = useState('imported');
+    const [activePeriod, setActivePeriod] = useState('all');
+    const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
+    const [showCharacteristicsModal, setShowCharacteristicsModal] = useState(false);
+    const [showSearchModal, setShowSearchModal] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedPeriod, setSelectedPeriod] = useState('Today');
-    const [searchModalVisible, setSearchModalVisible] = useState(false);
+    const [searchResults, setSearchResults] = useState<Material[]>([]);
 
-    const cardAnimations = useRef(importedMaterials.map(() => new Animated.Value(0))).current;
-    const searchInputRef = useRef<TextInput>(null);
+    // Animation references
+    const cardAnimations = useRef<{ [key: string]: Animated.Value }>({});
 
-    const periods = ['Today', '1 Week', '15 Days', '1 Month', '3 Months', '6 Months', 'Custom'];
+    // Initialize card animations
+    useEffect(() => {
+        const currentData = getCurrentData();
+        currentData.forEach((material) => {
+            if (!cardAnimations.current[material.id]) {
+                cardAnimations.current[material.id] = new Animated.Value(0);
+                Animated.timing(cardAnimations.current[material.id], {
+                    toValue: 1,
+                    duration: 300,
+                    useNativeDriver: true,
+                }).start();
+            }
+        });
+    }, [activeTab, activePeriod]);
 
-    React.useEffect(() => {
-        // Animate cards on load
-        const animations = cardAnimations.map((anim, index) =>
-            Animated.timing(anim, {
-                toValue: 1,
-                duration: 300,
-                delay: index * 100,
-                useNativeDriver: true,
-            })
-        );
-        Animated.stagger(50, animations).start();
-    }, [cardAnimations]);
-
-    React.useEffect(() => {
-        if (searchModalVisible) {
-            // Focus the search input when modal opens
-            setTimeout(() => {
-                searchInputRef.current?.focus();
-            }, 100);
-        }
-    }, [searchModalVisible]);
-
+    /**
+     * Helper function to get current data based on active tab
+     * @returns Array of materials based on the active tab (imported/used)
+     */
     const getCurrentData = () => {
         return activeTab === 'imported' ? importedMaterials : usedMaterials;
     };
 
-    const filteredMaterials = getCurrentData().filter(material =>
-        material.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    /**
+     * Filter materials based on active period
+     * @returns Filtered array of materials
+     */
+    const filteredMaterials = () => {
+        const currentData = getCurrentData();
+        if (activePeriod === 'all') {
+            return currentData;
+        }
+        return currentData.filter((material) => material.period === activePeriod);
+    };
 
-    const totalCost = filteredMaterials.reduce((sum, material) => sum + material.price, 0);
+    /**
+     * Calculate total cost of filtered materials
+     * @returns Total cost as a number
+     */
+    const totalCost = () => {
+        return filteredMaterials().reduce((sum, material) => sum + material.price * material.quantity, 0);
+    };
 
+    /**
+     * Format price with Indian Rupee symbol and thousands separator
+     * @param price - The price to format
+     * @returns Formatted price string
+     */
     const formatPrice = (price: number) => {
         return `₹${price.toLocaleString('en-IN')}`;
     };
 
-    // Helper function to get imported quantity for a material
-    const getImportedQuantity = (material: Material) => {
-        const importedMaterial = importedMaterials.find(m => m.id === material.id);
-        return importedMaterial ? importedMaterial.quantity : 0;
+    /**
+     * Get imported quantity for a specific material
+     * @param materialId - ID of the material
+     * @returns Quantity of imported material
+     */
+    const getImportedQuantity = (materialId: string) => {
+        const material = importedMaterials.find((m) => m.id === materialId);
+        return material ? material.quantity : 0;
     };
 
-    // Helper function to get available quantity for a material
-    const getAvailableQuantity = (material: Material) => {
-        const importedMaterial = importedMaterials.find(m => m.id === material.id);
-        const usedMaterial = usedMaterials.find(m => m.id === material.id);
-
-        if (!importedMaterial) return 0;
-        if (!usedMaterial) return importedMaterial.quantity;
-
-        return importedMaterial.quantity - usedMaterial.quantity;
+    /**
+     * Calculate available quantity for a specific material
+     * @param materialId - ID of the material
+     * @returns Available quantity after usage
+     */
+    const getAvailableQuantity = (materialId: string) => {
+        const importedMaterial = importedMaterials.find((m) => m.id === materialId);
+        const usedMaterial = usedMaterials.find((m) => m.id === materialId);
+        
+        const importedQty = importedMaterial ? importedMaterial.quantity : 0;
+        const usedQty = usedMaterial ? usedMaterial.quantity : 0;
+        
+        return importedQty - usedQty;
     };
 
-    // Helper function to get availability percentage
-    const getAvailabilityPercentage = (material: Material) => {
-        const importedMaterial = importedMaterials.find(m => m.id === material.id);
-        const usedMaterial = usedMaterials.find(m => m.id === material.id);
-
-        if (!importedMaterial) return 0;
-        if (!usedMaterial) return 100;
-
-        const available = importedMaterial.quantity - usedMaterial.quantity;
-        return Math.round((available / importedMaterial.quantity) * 100);
+    /**
+     * Calculate availability percentage for a specific material
+     * @param materialId - ID of the material
+     * @returns Percentage of material still available
+     */
+    const getAvailabilityPercentage = (materialId: string) => {
+        const importedQty = getImportedQuantity(materialId);
+        const availableQty = getAvailableQuantity(materialId);
+        
+        if (importedQty === 0) return 0;
+        return Math.round((availableQty / importedQty) * 100);
     };
 
-    // Helper function to get quantity wasted
-    const getQuantityWasted = (material: Material) => {
-        const usedMaterial = usedMaterials.find(m => m.id === material.id);
-
-        if (!usedMaterial) return 0;
-
-        // Calculate wastage as 10% of used quantity (you can adjust this logic as needed)
-        return Math.round(usedMaterial.quantity * 0.1);
-    };
-
-    // Handler for viewing material details
+    /**
+     * Handle view details action for a material
+     * @param material - The material to view details for
+     */
     const handleViewDetails = (material: Material) => {
-        // Navigate to material details page with material ID and current tab context
-        router.push({
-            pathname: '/material-details/[id]' as const,
-            params: {
-                id: material.id.toString(),
-                tab: activeTab, // Pass current tab context
-                name: material.name,
-                category: material.category,
-                unit: material.unit
-            }
-        });
+        setSelectedMaterial(material);
+        // In a real app, this might navigate to a detailed view
+        console.log('Viewing details for:', material.name);
+    };
+
+    /**
+     * Handle search functionality
+     * @param query - Search query string
+     */
+    const handleSearch = (query: string) => {
+        setSearchQuery(query);
+        if (query.trim() === '') {
+            setSearchResults([]);
+            return;
+        }
+        
+        const allMaterials = [...importedMaterials, ...usedMaterials];
+        const uniqueMaterials = allMaterials.filter(
+            (material, index, self) => index === self.findIndex((m) => m.id === material.id)
+        );
+        
+        const results = uniqueMaterials.filter((material) =>
+            material.name.toLowerCase().includes(query.toLowerCase()) ||
+            material.category.toLowerCase().includes(query.toLowerCase())
+        );
+        
+        setSearchResults(results);
+    };
+
+    /**
+     * Handle saving material characteristics
+     * @param material - The material being updated
+     * @param characteristics - The new characteristics to save
+     */
+    const handleSaveCharacteristics = (material: Material, characteristics: MaterialCharacteristics) => {
+        // In a real app, this would update the data in a database or state management system
+        console.log('Saving characteristics for material:', material.id, characteristics);
+        setShowCharacteristicsModal(false);
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-
-            {/* Main Header - Fixed */}
-            <View style={styles.header}>
-                <View style={styles.headerLeft}>
-                    <TouchableOpacity onPress={() => { router.back() }} style={styles.backButton} activeOpacity={0.7}>
-                        <Ionicons name="arrow-back" size={24} color="#000" />
-                    </TouchableOpacity>
-                    <View style={styles.projectInfo}>
-                        <Text style={styles.projectName}>Villa Project</Text>
-                        <Text style={styles.totalCostText}>{formatPrice(totalCost)}</Text>
+        <SafeAreaView style={{ flex: 1 }}>
+            <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+            <View style={styles.container}>
+                {/* Header */}
+                <View style={styles.header}>
+                    <View style={styles.headerLeft}>
+                        <TouchableOpacity 
+                            style={styles.backButton}
+                            onPress={() => router.back()}
+                        >
+                            <Ionicons name="chevron-back" size={24} color="#000" />
+                        </TouchableOpacity>
+                        <View style={styles.projectInfo}>
+                            <Text style={styles.projectName}>Materials</Text>
+                            <Text style={styles.totalCostText}>{formatPrice(totalCost())}</Text>
+                        </View>
                     </View>
-                </View>
-            </View>
-
-            {/* Scrollable Content */}
-            <ScrollView
-                style={styles.scrollContainer}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.scrollContent}
-            >
-                {/* Period Filters - Horizontal Scroll */}
-                <View style={styles.periodSection}>
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.periodContainer}
+                    <TouchableOpacity 
+                        style={styles.searchButton} 
+                        onPress={() => setShowSearchModal(true)}
                     >
-                        {periods.map((period, index) => (
+                        <Ionicons name="search" size={20} color="#6B7280" />
+                    </TouchableOpacity>
+                </View>
+
+                <ScrollView 
+                    style={styles.scrollContainer} 
+                    contentContainerStyle={styles.scrollContent}
+                >
+                    {/* Period Selection */}
+                    <View style={styles.periodSection}>
+                        <ScrollView 
+                            horizontal 
+                            showsHorizontalScrollIndicator={false} 
+                            contentContainerStyle={styles.periodContainer}
+                        >
                             <TouchableOpacity
-                                key={period}
                                 style={[
                                     styles.periodButton,
-                                    selectedPeriod === period && styles.periodButtonActive,
-                                    index === 0 && styles.firstPeriodButton,
-                                    index === periods.length - 1 && styles.lastPeriodButton
+                                    styles.firstPeriodButton,
+                                    activePeriod === 'all' && styles.periodButtonActive,
                                 ]}
-                                onPress={() => setSelectedPeriod(period)}
-                                activeOpacity={0.8}
+                                onPress={() => setActivePeriod('all')}
                             >
-                                <Text style={[
-                                    styles.periodText,
-                                    selectedPeriod === period && styles.periodTextActive
-                                ]}>
-                                    {period}
+                                <Text
+                                    style={[
+                                        styles.periodText,
+                                        activePeriod === 'all' && styles.periodTextActive,
+                                    ]}
+                                >
+                                    All Periods
                                 </Text>
                             </TouchableOpacity>
-                        ))}
-                    </ScrollView>
-                </View>
 
-                {/* Tab Selector */}
-                <View style={styles.tabContainer}>
-                    <TouchableOpacity
-                        style={[styles.tab, activeTab === 'imported' && styles.activeTab]}
-                        onPress={() => setActiveTab('imported')}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="download-outline" size={16} color={activeTab === 'imported' ? '#000' : '#6B7280'} />
-                        <Text style={[styles.tabText, activeTab === 'imported' && styles.activeTabText]}>
-                            Material Availability
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.tab, activeTab === 'used' && styles.activeTab]}
-                        onPress={() => setActiveTab('used')}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="trending-down-outline" size={16} color={activeTab === 'used' ? '#000' : '#6B7280'} />
-                        <Text style={[styles.tabText, activeTab === 'used' && styles.activeTabText]}>
-                            Material Used
-                        </Text>
-                    </TouchableOpacity>
-                </View>
+                            {periods.map((period, index) => (
+                                <TouchableOpacity
+                                    key={period.id}
+                                    style={[
+                                        styles.periodButton,
+                                        index === periods.length - 1 && styles.lastPeriodButton,
+                                        activePeriod === period.id && styles.periodButtonActive,
+                                    ]}
+                                    onPress={() => setActivePeriod(period.id)}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.periodText,
+                                            activePeriod === period.id && styles.periodTextActive,
+                                        ]}
+                                    >
+                                        {period.name}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
 
-                {/* Materials List */}
-                <View style={styles.materialsSection}>
-                    <Text style={styles.sectionTitle}>
-                        {activeTab === 'imported' ? 'Imported Materials' : 'Used Materials'}
-                    </Text>
-                    {filteredMaterials.map((material, index) => (
-                        <Animated.View
-                            key={material.id}
-                            style={[
-                                styles.materialCard,
-                                {
-                                    opacity: cardAnimations[index] || 1,
-                                    transform: [{
-                                        translateY: (cardAnimations[index] || new Animated.Value(1)).interpolate({
+                    {/* Tabs */}
+                    <View style={styles.tabContainer}>
+                        <TouchableOpacity
+                            style={[styles.tab, activeTab === 'imported' && styles.activeTab]}
+                            onPress={() => setActiveTab('imported')}
+                        >
+                            <Ionicons
+                                name="cube-outline"
+                                size={18}
+                                color={activeTab === 'imported' ? '#000' : '#6B7280'}
+                            />
+                            <Text
+                                style={[
+                                    styles.tabText,
+                                    activeTab === 'imported' && styles.activeTabText,
+                                ]}
+                            >
+                                Imported
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.tab, activeTab === 'used' && styles.activeTab]}
+                            onPress={() => setActiveTab('used')}
+                        >
+                            <Ionicons
+                                name="hammer-outline"
+                                size={18}
+                                color={activeTab === 'used' ? '#000' : '#6B7280'}
+                            />
+                            <Text
+                                style={[
+                                    styles.tabText,
+                                    activeTab === 'used' && styles.activeTabText,
+                                ]}
+                            >
+                                Used
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Materials List */}
+                    <View style={styles.materialsSection}>
+                        {filteredMaterials().map((material) => {
+                            const animatedStyle = {
+                                opacity: cardAnimations.current[material.id] || new Animated.Value(1),
+                                transform: [
+                                    {
+                                        translateY: (cardAnimations.current[material.id] || new Animated.Value(1)).interpolate({
                                             inputRange: [0, 1],
                                             outputRange: [50, 0],
-                                        })
-                                    }]
-                                }
-                            ]}
-                        >
-                            <TouchableOpacity activeOpacity={0.95}>
-                                {/* Material Header */}
-                                <View style={styles.materialHeader}>
-                                    <View style={styles.materialTitleSection}>
-                                        <View style={[styles.iconContainer, { backgroundColor: material.color + '20' }]}>
-                                            <Ionicons name={material.icon} size={24} color={material.color} />
+                                        }),
+                                    },
+                                ],
+                            };
+
+                            return (
+                                <Animated.View key={material.id} style={[styles.materialCard, animatedStyle]}>
+                                    <View style={styles.materialHeader}>
+                                        <View style={styles.materialTitleSection}>
+                                            <View
+                                    style={[styles.iconContainer, { backgroundColor: `${(material as ExtendedMaterial).color || '#CCCCCC'}20` }]}
+                                >
+                                    <Ionicons name={(material as ExtendedMaterial).icon as any || 'cube'} size={24} color={(material as ExtendedMaterial).color || '#CCCCCC'} />
+                                </View>
+                                            <View style={styles.materialTitleInfo}>
+                                                <Text style={styles.materialNameText}>{material.name}</Text>
+                                                <View
+                                    style={[styles.categoryTag, { backgroundColor: (material as ExtendedMaterial).color || '#CCCCCC' }]}
+                                >
+                                                    <Text style={styles.categoryText}>{material.category}</Text>
+                                                </View>
+                                            </View>
                                         </View>
-                                        <View style={styles.materialTitleInfo}>
-                                            <Text style={styles.materialNameText}>{material.name}</Text>
-                                            <View style={[styles.categoryTag, { backgroundColor: material.color }]}>
-                                                <Text style={styles.categoryText}>{material.category}</Text>
+                                        <View style={styles.dateContainer}>
+                                            <Text style={styles.dateText}>{material.date}</Text>
+                                            <TouchableOpacity style={styles.moreButton}>
+                                                <Ionicons name="ellipsis-vertical" size={20} color="#64748B" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.materialDetails}>
+                                        <View style={styles.detailItem}>
+                                            <Text style={styles.detailLabel}>Quantity</Text>
+                                            <View style={styles.detailValueContainer}>
+                                                <Text style={styles.detailValue}>{material.quantity}</Text>
+                                                <Text style={styles.detailUnit}>{material.unit}</Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.detailDivider} />
+
+                                        <View style={styles.detailItem}>
+                                            <Text style={styles.detailLabel}>Unit Price</Text>
+                                            <View style={styles.detailValueContainer}>
+                                                <Text style={styles.detailValue}>
+                                                    {formatPrice(material.price)}
+                                                </Text>
+                                                <Text style={styles.detailUnit}>per {material.unit}</Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.detailDivider} />
+
+                                        <View style={styles.detailItem}>
+                                            <Text style={styles.detailLabel}>Total</Text>
+                                            <View style={styles.detailValueContainer}>
+                                                <Text style={styles.priceValue}>
+                                                    {formatPrice(material.price * material.quantity)}
+                                                </Text>
+                                                <Text style={styles.detailUnit}>total cost</Text>
                                             </View>
                                         </View>
                                     </View>
-                                    <View style={styles.dateContainer}>
-                                        <Text style={styles.dateText}>{material.date}</Text>
-                                        <TouchableOpacity style={styles.moreButton} activeOpacity={0.7}>
-                                            <Ionicons name="ellipsis-vertical" size={16} color="#64748B" />
+
+                                    {activeTab === 'used' && (
+                                        <View style={styles.materialProgressSection}>
+                                            <View style={styles.progressInfoContainer}>
+                                                <View>
+                                                    <Text style={styles.progressLabel}>Availability</Text>
+                                                    <Text style={styles.progressValues}>
+                                                        {getAvailableQuantity(material.id)} / {getImportedQuantity(material.id)} {material.unit}
+                                                    </Text>
+                                                </View>
+                                                <View style={styles.progressPercentageContainer}>
+                                                    <Text style={styles.progressPercentage}>
+                                                        {getAvailabilityPercentage(material.id)}%
+                                                    </Text>
+                                                </View>
+                                            </View>
+
+                                            <View style={styles.progressBarContainer}>
+                                                <View style={styles.progressBarBackground}>
+                                                    <View
+                                                        style={[
+                                                            styles.progressBarFill,
+                                                            { width: `${getAvailabilityPercentage(material.id)}%` },
+                                                        ]}
+                                                    />
+                                                </View>
+                                            </View>
+
+                                            {material.wastedQuantity && material.wastedQuantity > 0 && (
+                                                <View style={styles.progressBarWithLabels}>
+                                                    <View style={styles.progressStartLabel}>
+                                                        <Text style={styles.progressLabelText}>Used</Text>
+                                                        <Text style={styles.progressLabelValue}>
+                                                            {material.quantity - (material.wastedQuantity || 0)} {material.unit}
+                                                        </Text>
+                                                    </View>
+
+                                                    <View style={styles.progressBarBackground}>
+                                                        <View
+                                                            style={[
+                                                                styles.progressBarFillGreen,
+                                                                {
+                                                                    width: `${((material.quantity - (material.wastedQuantity || 0)) / material.quantity) * 100}%`,
+                                                                },
+                                                            ]}
+                                                        />
+                                                    </View>
+
+                                                    <View style={styles.progressEndLabel}>
+                                                        <Text style={styles.progressLabelText}>Wasted</Text>
+                                                        <Text style={styles.progressLabelValue}>
+                                                            {material.wastedQuantity} {material.unit}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                            )}
+                                        </View>
+                                    )}
+
+                                    {/* Use the MaterialCharacteristicsView component */}
+                                    {material.characteristics && (
+                                        <MaterialCharacteristicsView characteristics={material.characteristics} />
+                                    )}
+
+                                    {!material.characteristics && (
+                                        <TouchableOpacity
+                                            style={styles.addCharacteristicsButton}
+                                            onPress={() => {
+                                                setSelectedMaterial(material);
+                                                setShowCharacteristicsModal(true);
+                                            }}
+                                        >
+                                            <Text style={styles.addCharacteristicsButtonText}>
+                                                Add Material Characteristics
+                                            </Text>
+                                            <Ionicons name="add-circle" size={16} color="#0EA5E9" />
                                         </TouchableOpacity>
-                                    </View>
-                                </View>
+                                    )}
 
-                                {/* Simple Progress Bar */}
-                                <View style={styles.simpleProgressContainer}>
-                                    <View style={styles.progressBarWithLabels}>
-                                        <View style={styles.progressStartLabel}>
-                                            <Text style={styles.progressStartLabel}>
-                                                {activeTab === 'imported' ? 'Available:' : 'Quantity Used:'}
-                                            </Text>
-                                            <Text style={styles.progressStartLabel}>
-                                                {activeTab === 'imported'
-                                                    ? `${getAvailableQuantity(material)} ${material.unit}`
-                                                    : `${material.quantity} ${material.unit}`}
-                                            </Text>
-                                        </View>
-                                        <View style={styles.progressBarBackground}>
-                                            <View
-                                                style={[
-                                                    activeTab === 'imported' ? styles.progressBarFillGreen : styles.progressBarFillRed,
-                                                    {
-                                                        width: activeTab === 'imported'
-                                                            ? `${getAvailabilityPercentage(material)}%`
-                                                            : '100%'
-                                                    }
-                                                ]}
-                                            />
-                                        </View>
-
-                                        <View style={styles.progressEndLabel}>
-                                            <Text style={styles.progressEndLabel}>
-                                                {activeTab === 'imported' ? 'Total:' : 'Quantity Wasted:'}
-                                            </Text>
-                                            <Text style={styles.progressEndLabel}>
-                                                {activeTab === 'imported'
-                                                    ? `${getImportedQuantity(material)} ${material.unit}`
-                                                    : `${getQuantityWasted(material)} ${material.unit}`}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    {/* <TouchableOpacity
+                                    <TouchableOpacity
                                         style={styles.viewDetailsButton}
-                                        activeOpacity={0.7}
                                         onPress={() => handleViewDetails(material)}
                                     >
-                                        <Text style={styles.viewDetailsButtonText}>
-                                            {activeTab === 'imported' ? 'View Import History' : 'View Usage Details'}
-                                        </Text>
-                                        <Ionicons name="chevron-forward" size={16} color="#0EA5E9" />
-                                    </TouchableOpacity> */}
-                                </View>
-                            </TouchableOpacity>
-                        </Animated.View>
-                    ))}
-                </View>
-            </ScrollView>
+                                        <Text style={styles.viewDetailsButtonText}>View Details</Text>
+                                        <Ionicons name="chevron-forward" size={14} color="#0EA5E9" />
+                                    </TouchableOpacity>
+                                </Animated.View>
+                            );
+                        })}
+                    </View>
+                </ScrollView>
 
+                {/* Modals */}
+                {selectedMaterial && (
+                    <AddMaterialCharacteristicsModal
+                        visible={showCharacteristicsModal}
+                        material={selectedMaterial}
+                        onClose={() => setShowCharacteristicsModal(false)}
+                        onSave={handleSaveCharacteristics}
+                    />
+                )}
+
+                <SearchModal
+                    visible={showSearchModal}
+                    searchQuery={searchQuery}
+                    searchResults={searchResults}
+                    onSearch={handleSearch}
+                    onClose={() => {
+                        setShowSearchModal(false);
+                        setSearchQuery('');
+                        setSearchResults([]);
+                    }}
+                    onSelectMaterial={(material: Material) => {
+                        setShowSearchModal(false);
+                        handleViewDetails(material);
+                    }}
+                />
+            </View>
         </SafeAreaView>
     );
 };
 
 export default Details;
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F8FAFC',
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingVertical: 16,
-        backgroundColor: '#fff',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 3,
-        zIndex: 1000,
-    },
-    headerLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flex: 1,
-    },
-    backButton: {
-        padding: 8,
-        marginRight: 12,
-    },
-    projectInfo: {
-        flex: 1,
-    },
-    projectName: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#000',
-        marginBottom: 2,
-    },
-    totalCostText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#059669',
-    },
-    searchButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        backgroundColor: '#F8FAFC',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'flex-start',
-        paddingTop: 100,
-    },
-    searchModal: {
-        backgroundColor: '#fff',
-        margin: 20,
-        borderRadius: 16,
-        padding: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.25,
-        shadowRadius: 20,
-        elevation: 10,
-    },
-    searchModalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    searchModalTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1E293B',
-    },
-    closeButton: {
-        padding: 4,
-    },
-    searchInputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        backgroundColor: '#F8FAFC',
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-    },
-    searchIcon: {
-        marginRight: 12,
-    },
-    searchInput: {
-        flex: 1,
-        fontSize: 15,
-        color: '#000',
-        fontWeight: '500',
-    },
-    searchResults: {
-        marginTop: 16,
-    },
-    searchResultsTitle: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#64748B',
-    },
-    scrollContainer: {
-        flex: 1,
-    },
-    scrollContent: {
-        paddingBottom: 30,
-    },
-    periodSection: {
-        marginTop: 16,
-    },
-    periodContainer: {
-        paddingHorizontal: 15,
-        paddingVertical: 8,
-    },
-    periodButton: {
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        borderRadius: 20,
-        backgroundColor: '#fff',
-        marginHorizontal: 5,
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 1,
-    },
-    firstPeriodButton: {
-        marginLeft: 0,
-    },
-    lastPeriodButton: {
-        marginRight: 0,
-    },
-    periodButtonActive: {
-        backgroundColor: '#000',
-        borderColor: '#000',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    periodText: {
-        color: '#6B7280',
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    periodTextActive: {
-        color: '#fff',
-    },
-    tabContainer: {
-        flexDirection: 'row',
-        marginHorizontal: 20,
-        marginTop: 20,
-        marginBottom: 20,
-        backgroundColor: '#F1F5F9',
-        borderRadius: 16,
-        padding: 6,
-    },
-    tab: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        borderRadius: 12,
-    },
-    activeTab: {
-        backgroundColor: '#fff',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    tabText: {
-        marginLeft: 8,
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#6B7280',
-    },
-    activeTabText: {
-        color: '#000',
-    },
-    materialsSection: {
-        paddingHorizontal: 20,
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1E293B',
-        marginBottom: 16,
-        paddingLeft: 4,
-    },
-    materialCard: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        marginBottom: 16,
-        padding: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
-        elevation: 6,
-        borderWidth: 1,
-        borderColor: '#F1F5F9',
-    },
-    materialHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: 16,
-    },
-    materialTitleSection: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flex: 1,
-    },
-    materialTitleInfo: {
-        flex: 1,
-    },
-    materialNameText: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1E293B',
-        marginBottom: 8,
-    },
-    iconContainer: {
-        width: 48,
-        height: 48,
-        borderRadius: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 16,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.8)',
-    },
-    categoryTag: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 20,
-        alignSelf: 'flex-start',
-    },
-    categoryText: {
-        fontSize: 11,
-        fontWeight: '700',
-        color: '#fff',
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-    },
-    dateContainer: {
-        alignItems: 'flex-end',
-    },
-    dateText: {
-        fontSize: 13,
-        color: '#64748B',
-        fontWeight: '600',
-        backgroundColor: '#F8FAFC',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 12,
-        marginBottom: 8,
-    },
-    moreButton: {
-        padding: 4,
-    },
-    materialDetails: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    detailItem: {
-        flex: 1,
-        alignItems: 'center',
-    },
-    detailLabel: {
-        fontSize: 13,
-        color: '#64748B',
-        fontWeight: '600',
-        marginBottom: 8,
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-    },
-    detailValueContainer: {
-        alignItems: 'center',
-    },
-    detailValue: {
-        fontSize: 20,
-        fontWeight: '800',
-        color: '#1E293B',
-        marginBottom: 2,
-    },
-    detailUnit: {
-        fontSize: 12,
-        color: '#64748B',
-        fontWeight: '600',
-    },
-    detailDivider: {
-        width: 1,
-        height: 40,
-        backgroundColor: '#E2E8F0',
-        marginHorizontal: 20,
-    },
-    priceValue: {
-        fontSize: 20,
-        fontWeight: '800',
-        color: '#059669',
-    },
-    // Progress Section Styles
-    materialProgressSection: {
-        marginTop: 16,
-        paddingTop: 16,
-        borderTopWidth: 1,
-        borderTopColor: '#F1F5F9',
-    },
-    progressInfoContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    progressLabel: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#64748B',
-        marginBottom: 4,
-    },
-    progressValues: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#1F2937',
-    },
-    progressPercentageContainer: {
-        backgroundColor: '#F0F9FF',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#E0F2FE',
-    },
-    progressPercentage: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#0EA5E9',
-    },
-    progressBarContainer: {
-        marginBottom: 16,
-    },
-    progressBarBackground: {
-        flex: 1,
-        height: 8,
-        backgroundColor: '#F1F5F9',
-        borderRadius: 4,
-        overflow: 'hidden',
-    },
-    progressBarFill: {
-        height: '100%',
-        backgroundColor: '#0EA5E9',
-        borderRadius: 4,
-    },
-    viewDetailsButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#F0F9FF',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#E0F2FE',
-    },
-    viewDetailsButtonText: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#0EA5E9',
-        marginRight: 8,
-    },
-    // Progress Bar with Labels Styles
-    progressBarWithLabels: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    progressStartLabel: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#10B981',
-        marginBottom: 4,
-        alignItems: 'flex-start',
-        marginRight: 12,
-        minWidth: 80,
-    },
-    progressEndLabel: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#64748B',
-        marginBottom: 4,
-        textAlign: 'right',
-        alignItems: 'flex-end',
-        marginLeft: 12,
-        minWidth: 80,
-    },
-    progressLabelText: {
-        fontSize: 11,
-        fontWeight: '600',
-        color: '#64748B',
-        marginBottom: 2,
-        textTransform: 'uppercase',
-    },
-    progressLabelValue: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#1F2937',
-    },
-    // Simple Progress Bar Styles
-    simpleProgressContainer: {
-        padding: 16,
-        backgroundColor: '#F8FAFC',
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-    },
-    progressBarFillGreen: {
-        height: '100%',
-        backgroundColor: '#10B981',
-        borderRadius: 4,
-    },
-    progressBarFillRed: {
-        height: '100%',
-        backgroundColor: '#EF4444',
-        borderRadius: 4,
-    },
-});
