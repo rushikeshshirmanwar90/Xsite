@@ -37,9 +37,6 @@ const Index: React.FC = () => {
         const fetchProjectData = async () => {
             const clientId = await getClientId();
             setClientId(clientId)
-            console.log("********************************************")
-            console.log(clientId)
-            console.log("********************************************")
             const res = await axios.get(`${domain}/api/project?clientId=${clientId}`);
             setProjects(res.data)
             setLoading(false)
