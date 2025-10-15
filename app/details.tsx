@@ -439,12 +439,12 @@ const Details: React.FC = () => {
 
     const getCurrentData = () => {
         const materials = activeTab === 'imported' ? importedMaterials : usedMaterials;
-        
+
         // Filter materials by selected section if one is selected
         if (selectedSection) {
             return materials.filter(material => material.sectionId === selectedSection);
         }
-        
+
         return materials;
     };
 
@@ -487,7 +487,7 @@ const Details: React.FC = () => {
         if (!usedMaterial) return 0;
         return Math.round(usedMaterial.quantity * 0.1);
     };
-    
+
     const getSectionName = (sectionId: string | undefined) => {
         if (!sectionId) return 'Unassigned';
         const section = predefinedSections.find(s => s.id === sectionId);
@@ -517,7 +517,7 @@ const Details: React.FC = () => {
                     </View>
                 </View>
                 <View style={styles.headerRight}>
-                    <SectionManager 
+                    <SectionManager
                         onSectionSelect={(sectionId) => setSelectedSection(sectionId)}
                         selectedSection={selectedSection}
                         sections={predefinedSections}
@@ -526,7 +526,7 @@ const Details: React.FC = () => {
                     />
                 </View>
             </View>
-            
+
             {/* Floating Action Button for Adding Material */}
             <TouchableOpacity
                 style={styles.floatingActionButton}
