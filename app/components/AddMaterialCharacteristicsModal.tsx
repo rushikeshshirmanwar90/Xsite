@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, Switch, ScrollView } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
+import { Picker } from '@react-native-picker/picker';
+import React, { useState } from 'react';
+import { Modal, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Material, MaterialCharacteristics } from '../types/materialTypes';
 
 export interface AddMaterialCharacteristicsModalProps {
@@ -24,73 +24,73 @@ const AddMaterialCharacteristicsModal: React.FC<AddMaterialCharacteristicsModalP
 
   // Steel rod characteristics
   const [steelSizes, setSteelSizes] = useState<string[]>(
-    (material.characteristics?.type === 'steel_rod' ? 
+    (material.characteristics?.type === 'steel_rod' ?
       (material.characteristics.details as any).sizes : ['8mm'])
   );
   const [rodLength, setRodLength] = useState<string>(
-    (material.characteristics?.type === 'steel_rod' ? 
+    (material.characteristics?.type === 'steel_rod' ?
       (material.characteristics.details as any).rodLength.toString() : '12')
   );
 
   // Brick characteristics
   const [brickQuantity, setBrickQuantity] = useState<string>(
-    (material.characteristics?.type === 'brick' ? 
+    (material.characteristics?.type === 'brick' ?
       (material.characteristics.details as any).brickQuantity.toString() : '1000')
   );
 
   // Electrical characteristics
   const [wireSqmm, setWireSqmm] = useState<string>(
-    (material.characteristics?.type === 'electrical' ? 
+    (material.characteristics?.type === 'electrical' ?
       (material.characteristics.details as any).wireSqmm.toString() : '2.5')
   );
   const [wireMeters, setWireMeters] = useState<string>(
-    (material.characteristics?.type === 'electrical' ? 
+    (material.characteristics?.type === 'electrical' ?
       (material.characteristics.details as any).wireMeters.toString() : '100')
   );
   const [hasPipes, setHasPipes] = useState<boolean>(
-    (material.characteristics?.type === 'electrical' ? 
+    (material.characteristics?.type === 'electrical' ?
       (material.characteristics.details as any).hasPipes : false)
   );
 
   // Plumbing characteristics
   const [pipeType, setPipeType] = useState<string>(
-    (material.characteristics?.type === 'plumbing' ? 
+    (material.characteristics?.type === 'plumbing' ?
       (material.characteristics.details as any).pipeType : 'PVC')
   );
   const [pipeDiameter, setPipeDiameter] = useState<string>(
-    (material.characteristics?.type === 'plumbing' ? 
+    (material.characteristics?.type === 'plumbing' ?
       (material.characteristics.details as any).pipeDiameter.toString() : '25')
   );
   const [pipeLength, setPipeLength] = useState<string>(
-    (material.characteristics?.type === 'plumbing' ? 
+    (material.characteristics?.type === 'plumbing' ?
       (material.characteristics.details as any).pipeLength.toString() : '100')
   );
 
   // Granite characteristics
   const [graniteColor, setGraniteColor] = useState<string>(
-    (material.characteristics?.type === 'granite' ? 
+    (material.characteristics?.type === 'granite' ?
       (material.characteristics.details as any).color : 'Black')
   );
   const [graniteThickness, setGraniteThickness] = useState<string>(
-    (material.characteristics?.type === 'granite' ? 
+    (material.characteristics?.type === 'granite' ?
       (material.characteristics.details as any).thickness.toString() : '20')
   );
   const [graniteArea, setGraniteArea] = useState<string>(
-    (material.characteristics?.type === 'granite' ? 
+    (material.characteristics?.type === 'granite' ?
       (material.characteristics.details as any).area.toString() : '50')
   );
 
   // Wall putty characteristics
   const [puttyBrand, setPuttyBrand] = useState<string>(
-    (material.characteristics?.type === 'wall_putty' ? 
+    (material.characteristics?.type === 'wall_putty' ?
       (material.characteristics.details as any).brand : 'Birla')
   );
   const [puttyCoverage, setPuttyCoverage] = useState<string>(
-    (material.characteristics?.type === 'wall_putty' ? 
+    (material.characteristics?.type === 'wall_putty' ?
       (material.characteristics.details as any).coverage.toString() : '200')
   );
   const [puttyCoats, setPuttyCoats] = useState<string>(
-    (material.characteristics?.type === 'wall_putty' ? 
+    (material.characteristics?.type === 'wall_putty' ?
       (material.characteristics.details as any).coats.toString() : '2')
   );
 
