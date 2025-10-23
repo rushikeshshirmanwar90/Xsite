@@ -4,6 +4,7 @@ import { PieSliceData } from '@/types/analytics';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
+// useProjectHierarchy hook removed – not used in this component
 import {
     Animated,
     Dimensions,
@@ -30,12 +31,28 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedSvgText = Animated.createAnimatedComponent(SvgText);
 
 const ProjectDetails: React.FC = () => {
+    const params = useLocalSearchParams();
+    const rawData = Array.isArray(params.data) ? params.data[0] : params.data;
+    const sectionData = JSON.parse(Array.isArray(rawData) ? rawData[0] : rawData);
+
     const [selectedSlice, setSelectedSlice] = useState<string | null>(null);
     const [hoveredSlice, setHoveredSlice] = useState<string | null>(null);
     const animatedValues = useRef<{ [key: string]: Animated.Value }>({}).current;
     const scaleAnimations = useRef<{ [key: string]: Animated.Value }>({}).current;
     const rotationAnim = useRef(new Animated.Value(0)).current;
     const fadeAnim = useRef(new Animated.Value(0)).current;
+
+    const handleViewMaterials = () => {
+        router.push({
+            pathname: '../details',
+            params: {
+                projectId: sectionData.projectId || sectionData._id,
+                projectName: sectionData.projectName || "",
+                sectionId: sectionData.sectionId || sectionData._id,
+                sectionName: sectionData.name
+            }
+        });
+    };
 
     const colors = PieChartColors20;
 
@@ -327,6 +344,15 @@ const ProjectDetails: React.FC = () => {
                         </View>
                     </View>
 
+                    {/* View Materials Button */}
+                    <TouchableOpacity
+                        style={styles.viewMaterialsButton}
+                        onPress={handleViewMaterials}
+                    >
+                        <Text style={styles.viewMaterialsButtonText}>View Materials</Text>
+                        <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
+                    </TouchableOpacity>
+
                     {/* Enhanced Legend */}
                     <View style={styles.legendContainer}>
                         {pieData.map((item, index) => {
@@ -586,6 +612,28 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.06,
         shadowRadius: 15,
         elevation: 6,
+    },
+    viewMaterialsButton: {
+        backgroundColor: '#3498DB',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        borderRadius: 12,
+        marginHorizontal: 20,
+        marginVertical: 15,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 5,
+    },
+    viewMaterialsButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600',
+        marginRight: 8,
     },
     insightsTitle: {
         fontSize: 18,

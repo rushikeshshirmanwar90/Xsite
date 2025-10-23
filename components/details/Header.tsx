@@ -1,8 +1,9 @@
+import { getSection } from '@/functions/details';
 import { styles } from '@/style/details';
 import { Section } from '@/types/details';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import SectionManager from './SectionManager';
 
@@ -12,6 +13,10 @@ interface HeaderProps {
     totalCost: number;
     formatPrice: (price: number) => string;
     getSectionName: (sectionId: string | undefined) => string;
+    projectName?: string;
+    sectionName?: string;
+    projectId?: string;
+    sectionId?: string;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -20,7 +25,14 @@ const Header: React.FC<HeaderProps> = ({
     totalCost,
     formatPrice,
     getSectionName,
+    projectName = "Villa Project",
+    sectionName,
+    projectId,
+    sectionId,
 }) => {
+    // Get the building/main section name from selectedSection
+    const buildingName = selectedSection ? getSectionName(selectedSection) : 'All Sections';
+
     const sections: Section[] = [
         {
             id: 'foundation',
@@ -54,32 +66,59 @@ const Header: React.FC<HeaderProps> = ({
         },
     ];
 
+
+    useEffect(() => {
+        if (selectedSection) {
+            const res: any = getSection(selectedSection);
+            const data = res.data
+            console.log(data);
+
+        }
+    }, [selectedSection]);
+
     return (
-        <View style={styles.header}>
-            <View style={styles.headerLeft}>
+        <View style={styles.headerWrapper}>
+            <View style={styles.header}>
                 <TouchableOpacity
                     onPress={() => router.back()}
                     style={styles.backButton}
                     activeOpacity={0.7}
                 >
-                    <Ionicons name="arrow-back" size={24} color="#000" />
+                    <Ionicons name="arrow-back" size={24} color="#1F2937" />
                 </TouchableOpacity>
-                <View style={styles.projectInfo}>
-                    <Text style={styles.projectNameSmall}>Villa Project</Text>
-                    <Text style={styles.sectionNameMedium}>
-                        {selectedSection ? getSectionName(selectedSection) : 'All Sections'}
-                    </Text>
-                    <Text style={styles.totalCostText}>{formatPrice(totalCost)}</Text>
+
+                <View style={styles.headerContent}>
+                    {/* Breadcrumb Navigation */}
+                    <View style={styles.breadcrumbContainer}>
+                        <Text style={styles.breadcrumbText}>{projectName}</Text>
+                        {sectionName && (
+                            <>
+                                <Ionicons name="chevron-forward" size={14} color="#9CA3AF" style={styles.breadcrumbSeparator} />
+                                <Text style={styles.breadcrumbTextActive}>{sectionName}</Text>
+                            </>
+                        )}
+                        <Ionicons name="chevron-forward" size={14} color="#9CA3AF" style={styles.breadcrumbSeparator} />
+                        <Text style={styles.breadcrumbText}>{buildingName}</Text>
+                    </View>
+
+                    {/* Section Dropdown - Replaces the building name title */}
+                    <View style={styles.sectionDropdownContainer}>
+                        <SectionManager
+                            onSectionSelect={onSectionSelect}
+                            selectedSection={selectedSection}
+                            sections={sections}
+                            compact={true}
+                            projectDetails={{
+                                projectName: projectName || "Villa Project",
+                                projectId: projectId || "unknown"
+                            }}
+                            mainSectionDetails={{
+                                sectionName: sectionName || "Main Section",
+                                sectionId: sectionId || "unknown"
+                            }}
+                        />
+                    </View>
                 </View>
-            </View>
-            <View style={styles.headerRight}>
-                <SectionManager
-                    onSectionSelect={onSectionSelect}
-                    selectedSection={selectedSection}
-                    sections={sections}
-                    compact={true}
-                    style={styles.headerSectionManager}
-                />
             </View>
         </View>
     );

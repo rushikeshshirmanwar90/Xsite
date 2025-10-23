@@ -67,12 +67,13 @@ const Index: React.FC = () => {
     }, [clientId]);
 
     const handleViewDetails = (project: Project) => {
-        // Navigate to the details page outside the (tabs) group
+        // Navigate to the new project sections page
         router.push({
-            pathname: '../details',
-            params: {
-                projectId: project._id,
-                projectData: JSON.stringify(project) // Pass entire project as string
+            pathname: '/project-sections',
+            params: { 
+                id: project._id ?? '',
+                name: project.name, 
+                sectionData: JSON.stringify(project.section) 
             }
         });
     };

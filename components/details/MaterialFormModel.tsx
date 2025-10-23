@@ -1,9 +1,10 @@
 import { MATERIAL_TEMPLATES, SPEC_FIELD_CONFIG } from '@/data/details';
 import { styles } from '@/style/details';
-import { MaterialEntry, MaterialTemplate } from '@/types/details';
+import { MaterialEntry } from '@/types/details';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
+    Alert,
     KeyboardAvoidingView,
     Modal,
     Platform,
@@ -12,7 +13,6 @@ import {
     TextInput,
     TouchableOpacity,
     View,
-    Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -35,21 +35,9 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({ visible, onClose,
     });
     const [customSpecKey, setCustomSpecKey] = useState('');
     const [customSpecValue, setCustomSpecValue] = useState('');
-    const [customSpecs, setCustomSpecs] = useState<{key: string, value: string}[]>([]);
+    const [customSpecs, setCustomSpecs] = useState<{ key: string, value: string }[]>([]);
     const [showAddSpecModal, setShowAddSpecModal] = useState(false);
-
-    // List of possible icons for shortcut creation
-    const possibleIcons: (keyof typeof Ionicons.glyphMap)[] = [
-        'cube-outline',
-        'barbell-outline',
-        'grid-outline',
-        'flash-outline',
-        'water-outline',
-        'apps-outline',
-        'color-palette-outline',
-        'construct-outline',
-        'hammer-outline',
-    ];
+    const [editingMaterialIndex, setEditingMaterialIndex] = useState<number | null>(null);
 
     const handleTemplateSelect = (templateKey: string) => {
         const template = MATERIAL_TEMPLATES[templateKey as keyof typeof MATERIAL_TEMPLATES];
@@ -85,15 +73,15 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({ visible, onClose,
             key: customSpecKey.trim(),
             value: customSpecValue.trim()
         };
-        
+
         setCustomSpecs([...customSpecs, newSpec]);
-        
+
         // Also add to formData.specs
         setFormData(prev => ({
             ...prev,
             specs: { ...prev.specs, [customSpecKey.trim()]: customSpecValue.trim() }
         }));
-        
+
         setCustomSpecKey('');
         setCustomSpecValue('');
         setShowAddSpecModal(false);
@@ -104,11 +92,11 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({ visible, onClose,
         const updatedSpecs = [...customSpecs];
         updatedSpecs.splice(index, 1);
         setCustomSpecs(updatedSpecs);
-        
+
         // Also remove from formData.specs
         const updatedFormDataSpecs = { ...formData.specs };
         delete updatedFormDataSpecs[specToRemove.key];
-        
+
         setFormData(prev => ({
             ...prev,
             specs: updatedFormDataSpecs
@@ -121,51 +109,76 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({ visible, onClose,
             return;
         }
 
-        const newEntry: MaterialEntry = {
-            id: Date.now().toString(),
-            name: formData.name,
-            category: 'custom',
-            unit: formData.unit,
-            quantity: parseFloat(formData.quantity),
-            location: '',
-            status: 'received',
-            specs: formData.specs,
-            notes: formData.notes,
-            date: new Date().toLocaleDateString('en-IN'),
-        };
-
-        setAddedMaterials([...addedMaterials, newEntry]);
+        if (editingMaterialIndex !== null) {
+            // Update existing material
+            const updatedMaterials = [...addedMaterials];
+            updatedMaterials[editingMaterialIndex] = {
+                ...updatedMaterials[editingMaterialIndex],
+                name: formData.name,
+                unit: formData.unit,
+                quantity: parseFloat(formData.quantity),
+                specs: formData.specs,
+                notes: formData.notes,
+            };
+            setAddedMaterials(updatedMaterials);
+            setEditingMaterialIndex(null);
+        } else {
+            // Add new material
+            const newEntry: MaterialEntry = {
+                id: Date.now().toString(),
+                name: formData.name,
+                unit: formData.unit,
+                quantity: parseFloat(formData.quantity),
+                specs: formData.specs,
+                notes: formData.notes,
+                date: new Date().toLocaleDateString('en-IN'),
+            };
+            setAddedMaterials([...addedMaterials, newEntry]);
+        }
         resetForm();
     };
 
+    const handleEditMaterial = (index: number) => {
+        const materialToEdit = addedMaterials[index];
+
+        // Convert specs object to array for customSpecs state
+        const specsArray = Object.entries(materialToEdit.specs || {}).map(([key, value]) => ({
+            key,
+            value: String(value)
+        }));
+
+        setFormData({
+            name: materialToEdit.name,
+            unit: materialToEdit.unit,
+            quantity: String(materialToEdit.quantity),
+            specs: materialToEdit.specs || {},
+            notes: materialToEdit.notes || '',
+        });
+
+        setCustomSpecs(specsArray);
+        setEditingMaterialIndex(index);
+
+        // Find and set template if it matches
+        const templateEntry = Object.entries(MATERIAL_TEMPLATES).find(
+            ([_, template]) => template.name === materialToEdit.name
+        );
+        if (templateEntry) {
+            setSelectedTemplateKey(templateEntry[0]);
+        } else {
+            setSelectedTemplateKey(null);
+        }
+    };
+
+    // !! send request function
+
     const handleSendRequest = () => {
-        console.log('Request sent successfully');
+        addedMaterials.forEach((m, i) => console.log(`Material ${i + 1}:`, m));
         onSubmit(addedMaterials);
         setAddedMaterials([]);
         resetForm();
         onClose();
     };
 
-    const handleCreateShortcut = () => {
-        if (!formData.name || !formData.unit) {
-            alert('Please enter at least a name and unit to create a shortcut');
-            return;
-        }
-
-        const randomIcon = possibleIcons[Math.floor(Math.random() * possibleIcons.length)];
-        const newTemplateKey = formData.name.toLowerCase().replace(/\s+/g, '_');
-        const newTemplate: MaterialTemplate = {
-            name: formData.name,
-            category: 'custom',
-            unit: formData.unit,
-            specFields: Object.keys(formData.specs),
-            icon: randomIcon,
-            color: '#64748B',
-        };
-
-        (MATERIAL_TEMPLATES as any)[newTemplateKey] = newTemplate;
-        alert(`Shortcut created for ${formData.name}!`);
-    };
 
     const resetForm = () => {
         setFormData({
@@ -178,6 +191,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({ visible, onClose,
         setSelectedTemplateKey(null);
         setShowSpecDropdown(null);
         setCustomSpecs([]);
+        setEditingMaterialIndex(null);
     };
 
     const getSpecFields = () => {
@@ -204,7 +218,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({ visible, onClose,
                             <Ionicons name="close-circle-outline" size={24} color="#64748B" />
                         </TouchableOpacity>
                     </View>
-                    
+
                     <View style={styles.customSpecFormGroup}>
                         <Text style={styles.label}>Specification Name</Text>
                         <TextInput
@@ -215,7 +229,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({ visible, onClose,
                             placeholderTextColor="#94A3B8"
                         />
                     </View>
-                    
+
                     <View style={styles.customSpecFormGroup}>
                         <Text style={styles.label}>Specification Value</Text>
                         <TextInput
@@ -226,7 +240,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({ visible, onClose,
                             placeholderTextColor="#94A3B8"
                         />
                     </View>
-                    
+
                     <TouchableOpacity
                         style={styles.addSpecButton}
                         onPress={handleAddCustomSpec}
@@ -257,10 +271,20 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({ visible, onClose,
                         {/* Added Materials List */}
                         {addedMaterials.length > 0 && (
                             <View style={styles.addedMaterialsSection}>
-                                <Text style={styles.sectionLabel}>Added Materials</Text>
+                                <Text style={styles.sectionLabel}>
+                                    Added Materials {editingMaterialIndex !== null && '(Editing)'}
+                                </Text>
                                 {addedMaterials.map((material, index) => (
-                                    <View key={material.id} style={styles.addedMaterialItem}>
-                                        <Ionicons name="checkmark-circle" size={24} color="#10B981" style={styles.addedMaterialIcon} />
+                                    <View key={material.id} style={[
+                                        styles.addedMaterialItem,
+                                        editingMaterialIndex === index && styles.editingMaterialItem
+                                    ]}>
+                                        <Ionicons
+                                            name={editingMaterialIndex === index ? "create" : "checkmark-circle"}
+                                            size={24}
+                                            color={editingMaterialIndex === index ? "#3B82F6" : "#10B981"}
+                                            style={styles.addedMaterialIcon}
+                                        />
                                         <View style={styles.addedMaterialInfo}>
                                             <Text style={styles.addedMaterialName}>{material.name}</Text>
                                             <Text style={styles.addedMaterialDetails}>
@@ -277,15 +301,24 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({ visible, onClose,
                                                 </View>
                                             )}
                                         </View>
-                                        <TouchableOpacity
-                                            style={styles.removeMaterialButton}
-                                            onPress={() => {
-                                                setAddedMaterials(addedMaterials.filter((_, i) => i !== index));
-                                            }}
-                                            activeOpacity={0.7}
-                                        >
-                                            <Ionicons name="trash-outline" size={20} color="#EF4444" />
-                                        </TouchableOpacity>
+                                        <View style={styles.materialActionButtons}>
+                                            <TouchableOpacity
+                                                style={styles.editMaterialButton}
+                                                onPress={() => handleEditMaterial(index)}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Ionicons name="create-outline" size={20} color="#3B82F6" />
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={styles.removeMaterialButton}
+                                                onPress={() => {
+                                                    setAddedMaterials(addedMaterials.filter((_, i) => i !== index));
+                                                }}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                                            </TouchableOpacity>
+                                        </View>
                                     </View>
                                 ))}
                             </View>
@@ -311,7 +344,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({ visible, onClose,
                                         <Ionicons
                                             name={template.icon as any}
                                             size={20}
-                                            color={selectedTemplateKey === key ? '#fff' : template.color}
+                                            color={selectedTemplateKey === key ? '#fff' : '#3B82F6'}
                                         />
                                         <Text
                                             style={[
@@ -384,7 +417,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({ visible, onClose,
                         <View style={styles.formSection}>
                             <View style={styles.specSectionHeader}>
                                 <Text style={styles.sectionLabel}>Material Specifications</Text>
-                                <TouchableOpacity 
+                                <TouchableOpacity
                                     style={styles.addSpecButtonSmall}
                                     onPress={() => setShowAddSpecModal(true)}
                                     activeOpacity={0.7}
@@ -393,7 +426,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({ visible, onClose,
                                     <Text style={styles.addSpecButtonText}>Add Spec</Text>
                                 </TouchableOpacity>
                             </View>
-                            
+
                             {/* Template Specs */}
                             {specFields.length > 0 && specFields.map((field) => {
                                 const config = SPEC_FIELD_CONFIG[field as keyof typeof SPEC_FIELD_CONFIG];
@@ -443,7 +476,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({ visible, onClose,
                                     </View>
                                 );
                             })}
-                            
+
                             {/* Custom Specs */}
                             {customSpecs.length > 0 && (
                                 <View style={styles.customSpecsContainer}>
@@ -464,7 +497,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({ visible, onClose,
                                     ))}
                                 </View>
                             )}
-                            
+
                             {/* Empty state when no specs */}
                             {specFields.length === 0 && customSpecs.length === 0 && (
                                 <View style={styles.emptySpecsContainer}>
@@ -507,13 +540,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({ visible, onClose,
                             >
                                 <Text style={styles.sendRequestButtonText}>Send Request</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.shortcutButton}
-                                onPress={handleCreateShortcut}
-                                activeOpacity={0.8}
-                            >
-                                <Text style={styles.shortcutButtonText}>Create Shortcut</Text>
-                            </TouchableOpacity>
+
                         </View>
                     </ScrollView>
                 </KeyboardAvoidingView>

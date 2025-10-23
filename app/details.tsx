@@ -7,6 +7,7 @@ import TabSelector from '@/components/details/TabSelector';
 import { importedMaterials, predefinedSections, usedMaterials } from '@/data/details';
 import { styles } from '@/style/details';
 import { Material, MaterialEntry } from '@/types/details';
+import { useLocalSearchParams } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import { Animated, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,15 +16,22 @@ interface DetailsProps {
 }
 
 const Details: React.FC<DetailsProps> = () => {
+    const params = useLocalSearchParams();
+    const projectId = params.projectId as string;
+    const projectName = params.projectName as string;
+    const sectionId = params.sectionId as string;
+    const sectionName = params.sectionName as string;
+
     const [activeTab, setActiveTab] = useState<'imported' | 'used'>('imported');
     const [selectedPeriod, setSelectedPeriod] = useState('Today');
     const [showMaterialForm, setShowMaterialForm] = useState(false);
-    const [selectedSection, setSelectedSection] = useState<string | null>(null);
+    const [selectedSection, setSelectedSection] = useState<string | null>(sectionId || null);
     const [materialEntries, setMaterialEntries] = useState<MaterialEntry[]>([]);
     const cardAnimations = useRef(importedMaterials.map(() => new Animated.Value(0))).current;
 
     const getCurrentData = () => {
         const materials = activeTab === 'imported' ? importedMaterials : usedMaterials;
+        console.log(selectedSection)
         if (selectedSection) {
             return materials.filter(material => material.sectionId === selectedSection);
         }
@@ -77,13 +85,21 @@ const Details: React.FC<DetailsProps> = () => {
                 totalCost={totalCost}
                 formatPrice={formatPrice}
                 getSectionName={getSectionName}
+                projectName={projectName}
+                sectionName={sectionName}
+                projectId={projectId}
+                sectionId={sectionId}
             />
             <FloatingActionButton onPress={() => setShowMaterialForm(true)} />
             <MaterialFormModal
                 visible={showMaterialForm}
                 onClose={() => setShowMaterialForm(false)}
                 onSubmit={(newEntry) => {
-                    setMaterialEntries([...materialEntries, newEntry]);
+                    if (Array.isArray(newEntry)) {
+                        setMaterialEntries(prev => [...prev, ...newEntry]);
+                    } else {
+                        setMaterialEntries(prev => [...prev, newEntry]);
+                    }
                     setShowMaterialForm(false);
                 }}
             />

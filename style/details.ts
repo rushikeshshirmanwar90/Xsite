@@ -124,19 +124,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F3F4F6",
   },
-  sectionManagerContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 12,
-  },
-  sectionManager: {
-    marginTop: 8,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+  headerWrapper: {
     backgroundColor: "#FFFFFF",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -144,6 +132,20 @@ export const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
     zIndex: 1000,
+    marginBottom: 8,
+  },
+  sectionManagerContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  sectionManager: {
+    marginTop: 8,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 16,
   },
   headerLeft: {
     flexDirection: "row",
@@ -161,6 +163,52 @@ export const styles = StyleSheet.create({
     padding: 8,
     marginRight: 12,
   },
+  headerContent: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  breadcrumbContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+    flexWrap: "wrap",
+  },
+  breadcrumbText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#9CA3AF",
+  },
+  breadcrumbTextActive: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#6B7280",
+  },
+  breadcrumbSeparator: {
+    marginHorizontal: 4,
+  },
+  sectionDropdownContainer: {
+    marginTop: 10,
+    marginBottom: 8,
+  },
+  inlineSectionManager: {
+    marginVertical: 8,
+    marginBottom: 12,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#1F2937",
+    marginBottom: 6,
+  },
+  costContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  costLabel: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#6B7280",
+  },
   projectInfo: {
     flex: 1,
   },
@@ -177,8 +225,8 @@ export const styles = StyleSheet.create({
     marginBottom: 4,
   },
   totalCostText: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 14,
+    fontWeight: "700",
     color: "#059669",
   },
   floatingActionButton: {
@@ -234,31 +282,54 @@ export const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
   },
   addedMaterialItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
     borderBottomWidth: 1,
     borderBottomColor: "#F1F5F9",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  editingMaterialItem: {
+    backgroundColor: "#EFF6FF",
+    borderColor: "#3B82F6",
+    borderWidth: 1,
   },
   addedMaterialIcon: {
     marginRight: 12,
   },
   addedMaterialInfo: {
     flex: 1,
+    paddingVertical: 4,
   },
   addedMaterialName: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 17,
+    fontWeight: "700",
     color: "#1F2937",
+    marginBottom: 4,
   },
   addedMaterialDetails: {
     fontSize: 14,
     color: "#6B7280",
     marginTop: 4,
+  },
+  materialActionButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  editMaterialButton: {
+    padding: 8,
+    marginRight: 4,
   },
   removeMaterialButton: {
     padding: 8,

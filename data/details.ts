@@ -8,7 +8,6 @@ import {
 export const MATERIAL_TEMPLATES: Record<string, MaterialTemplate> = {
   steel_road: {
     name: "Steel Rod",
-    category: "structural",
     unit: "meter",
     specFields: ["diameter", "length"], // Removed 'weight'
     icon: "barbell-outline",
@@ -16,7 +15,6 @@ export const MATERIAL_TEMPLATES: Record<string, MaterialTemplate> = {
   },
   brick: {
     name: "Brick",
-    category: "walls",
     unit: "pieces",
     specFields: ["type", "quality"],
     icon: "grid-outline",
@@ -24,7 +22,6 @@ export const MATERIAL_TEMPLATES: Record<string, MaterialTemplate> = {
   },
   electric_pipe: {
     name: "Electric Pipe",
-    category: "electrical",
     unit: "meter",
     specFields: ["diameter", "material"],
     icon: "flash-outline",
@@ -32,7 +29,6 @@ export const MATERIAL_TEMPLATES: Record<string, MaterialTemplate> = {
   },
   electric_wire: {
     name: "Electric Wire",
-    category: "electrical",
     unit: "meter",
     specFields: ["sqmm", "meter", "material", "color"],
     icon: "flash-outline",
@@ -40,7 +36,6 @@ export const MATERIAL_TEMPLATES: Record<string, MaterialTemplate> = {
   },
   plumbing_pipe: {
     name: "Plumbing Pipe",
-    category: "plumbing",
     unit: "meter",
     specFields: ["itemType", "diameter", "material"],
     icon: "water-outline",
@@ -48,7 +43,6 @@ export const MATERIAL_TEMPLATES: Record<string, MaterialTemplate> = {
   },
   granite_sheet: {
     name: "Granite Sheet",
-    category: "finishing",
     unit: "sheets",
     specFields: ["size", "thickness", "color"],
     icon: "cube-outline",
@@ -56,7 +50,6 @@ export const MATERIAL_TEMPLATES: Record<string, MaterialTemplate> = {
   },
   wall_putty: {
     name: "Wall Putty",
-    category: "finishing",
     unit: "bags",
     specFields: ["brand", "coverage"],
     icon: "color-palette-outline",
@@ -137,7 +130,6 @@ export const importedMaterials: Material[] = [
   {
     id: 1,
     name: "Concrete",
-    category: "foundation",
     quantity: 10,
     unit: "cubic meters",
     price: 25000,
@@ -149,7 +141,6 @@ export const importedMaterials: Material[] = [
   {
     id: 2,
     name: "Steel Rods",
-    category: "structural",
     quantity: 500,
     unit: "kg",
     price: 35000,
@@ -161,7 +152,6 @@ export const importedMaterials: Material[] = [
   {
     id: 3,
     name: "Bricks",
-    category: "walls",
     quantity: 2000,
     unit: "pieces",
     price: 18000,
@@ -173,7 +163,6 @@ export const importedMaterials: Material[] = [
   {
     id: 4,
     name: "Cement",
-    category: "structural",
     quantity: 50,
     unit: "bags",
     price: 15000,
@@ -185,7 +174,6 @@ export const importedMaterials: Material[] = [
   {
     id: 5,
     name: "Electrical Wiring",
-    category: "electrical",
     quantity: 300,
     unit: "meters",
     price: 12000,
@@ -197,7 +185,6 @@ export const importedMaterials: Material[] = [
   {
     id: 6,
     name: "Plumbing Pipes",
-    category: "plumbing",
     quantity: 150,
     unit: "meters",
     price: 8000,
@@ -209,7 +196,6 @@ export const importedMaterials: Material[] = [
   {
     id: 7,
     name: "Granite Tiles",
-    category: "finishing",
     quantity: 100,
     unit: "sq meters",
     price: 45000,
@@ -221,7 +207,6 @@ export const importedMaterials: Material[] = [
   {
     id: 8,
     name: "Waterproofing Material",
-    category: "finishing",
     quantity: 20,
     unit: "buckets",
     price: 10000,
@@ -236,7 +221,6 @@ export const usedMaterials: Material[] = [
   {
     id: 1,
     name: "Concrete",
-    category: "foundation",
     quantity: 8,
     unit: "cubic meters",
     price: 20000,
@@ -248,7 +232,6 @@ export const usedMaterials: Material[] = [
   {
     id: 2,
     name: "Steel Rods",
-    category: "structural",
     quantity: 400,
     unit: "kg",
     price: 28000,
@@ -260,7 +243,6 @@ export const usedMaterials: Material[] = [
   {
     id: 3,
     name: "Bricks",
-    category: "walls",
     quantity: 1500,
     unit: "pieces",
     price: 13500,
@@ -272,7 +254,6 @@ export const usedMaterials: Material[] = [
   {
     id: 4,
     name: "Cement",
-    category: "structural",
     quantity: 40,
     unit: "bags",
     price: 12000,
@@ -284,7 +265,6 @@ export const usedMaterials: Material[] = [
   {
     id: 5,
     name: "Electrical Wiring",
-    category: "electrical",
     quantity: 200,
     unit: "meters",
     price: 8000,

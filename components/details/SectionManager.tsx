@@ -17,6 +17,14 @@ type SectionManagerProps = {
   sections?: Section[];
   style?: any;
   compact?: boolean;
+  projectDetails?: {
+    projectName: string;
+    projectId: string;
+  };
+  mainSectionDetails?: {
+    sectionName: string;
+    sectionId: string;
+  };
 };
 
 const SectionManager: React.FC<SectionManagerProps> = ({
@@ -24,7 +32,9 @@ const SectionManager: React.FC<SectionManagerProps> = ({
   selectedSection,
   sections: propSections,
   style,
-  compact = false
+  compact = false,
+  projectDetails,
+  mainSectionDetails
 }) => {
   const [sections, setSections] = useState<Section[]>(propSections || []);
   const [showAddSectionModal, setShowAddSectionModal] = useState(false);
@@ -50,12 +60,33 @@ const SectionManager: React.FC<SectionManagerProps> = ({
   const handleAddSection = () => {
     if (!newSectionName.trim()) return;
 
+
+
     const newSection: Section = {
       id: `section-${Date.now()}`,
       name: newSectionName.trim(),
       description: newSectionDesc.trim(),
       createdAt: new Date().toISOString(),
     };
+
+    // Log data in the required format
+    const sectionData = {
+      name: newSectionName.trim(),
+      projectDetails: projectDetails || {
+        projectName: "projectname",
+        projectId: "1245"
+      },
+      mainSectionDetails: mainSectionDetails || {
+        sectionName: "tower A",
+        sectionId: "sec124"
+      }
+    };
+
+
+
+
+    console.log(sectionData);
+
 
     setSections([...sections, newSection]);
     setNewSectionName('');
@@ -164,9 +195,7 @@ const styles = StyleSheet.create({
   },
   compactContainer: {
     marginBottom: 0,
-    width: 'auto',
-    minWidth: 150,
-    maxWidth: 200,
+    width: '100%',
   },
   sectionSelector: {
     flexDirection: 'row',
@@ -183,6 +212,8 @@ const styles = StyleSheet.create({
     elevation: 0,
     shadowOpacity: 0,
     backgroundColor: 'transparent',
+    borderRadius: 0,
+    paddingLeft: 0,
   },
   picker: {
     flex: 1,
@@ -190,9 +221,10 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   compactPicker: {
-    height: 40,
-    color: '#fff',
-    fontSize: 14,
+    height: 48,
+    color: '#1F2937',
+    fontSize: 20,
+    fontWeight: '700',
   },
   addSectionButton: {
     backgroundColor: '#3B82F6',
@@ -203,12 +235,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   compactAddButton: {
-    height: 30,
-    width: 30,
-    borderRadius: 6,
-    margin: 2,
+    height: 36,
+    width: 36,
+    borderRadius: 8,
+    margin: 4,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#3B82F6',
   },
   emptyState: {
     backgroundColor: '#fff',
