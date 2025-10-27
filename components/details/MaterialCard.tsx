@@ -48,9 +48,6 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
                         </View>
                         <View style={styles.materialTitleInfo}>
                             <Text style={styles.materialNameText}>{material.name}</Text>
-                            <View style={[styles.categoryTag, { backgroundColor: material.color }]}>
-                                <Text style={styles.categoryText}>{material.category}</Text>
-                            </View>
                         </View>
                     </View>
                     <View style={styles.dateContainer}>

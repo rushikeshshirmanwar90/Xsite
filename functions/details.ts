@@ -1,16 +1,25 @@
 import { domain } from "@/lib/domain";
 import axios from "axios";
+import { Section } from "@/types/details";
 
-export const getSection = async (sectionId: string) => {
+interface SectionResponse {
+    success: boolean;
+    message: string;
+    data: Section[];
+}
+
+export const getSection = async (sectionId: string): Promise<Section[]> => {
     try {
-        const res = await axios.get(`${domain}/api/mini-seciton?sectionId=${sectionId}`);
-
-        const data = res.data;
-
-        return data;
+        console.log("sectionId :", sectionId)
+        const res = await axios.get<SectionResponse>(`${domain}/api/mini-section?sectionId=${sectionId}`);
+        // The API returns { success, message, data }
+        // We need to return the data array
+        return res.data.data;
     } catch (error) {
+        console.log("sectionId :", sectionId)
+        console.log("somthing went wrong")
         console.error('Error', error);
-
+        return [];
     }
 }
 

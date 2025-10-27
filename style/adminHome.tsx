@@ -613,4 +613,22 @@ export const styles = StyleSheet.create({
         backgroundColor: '#0EA5E9',
         borderRadius: 2,
     },
+    
+    // Floating Action Button
+    fab: {
+        position: 'absolute' as const,
+        bottom: 24,
+        right: 24,
+        width: 56,
+        height: 56,
+        backgroundColor: '#3B82F6',
+        borderRadius: 28,
+        alignItems: 'center' as const,
+        justifyContent: 'center' as const,
+        shadowColor: '#3B82F6',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 8,
+    },
 })

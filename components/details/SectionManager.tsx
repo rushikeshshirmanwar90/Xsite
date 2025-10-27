@@ -1,7 +1,9 @@
+import { addSection } from '@/functions/details';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import React, { useEffect, useState } from 'react';
 import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { toast } from 'sonner-native';
 
 type Section = {
   id: string;
@@ -57,7 +59,7 @@ const SectionManager: React.FC<SectionManagerProps> = ({
     }
   }, [propSections]);
 
-  const handleAddSection = () => {
+  const handleAddSection = async () => {
     if (!newSectionName.trim()) return;
 
 
@@ -82,12 +84,13 @@ const SectionManager: React.FC<SectionManagerProps> = ({
       }
     };
 
-
-
-
     console.log(sectionData);
-
-
+    const res = await addSection(sectionData);
+    if(res){
+     toast.success("Section added successfully"); 
+    } else {
+      toast.error("Failed to add section");
+    }
     setSections([...sections, newSection]);
     setNewSectionName('');
     setNewSectionDesc('');

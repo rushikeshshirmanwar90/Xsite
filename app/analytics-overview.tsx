@@ -12,9 +12,8 @@ import PieChart from '@/components/PieChart';
 import { mockProjects } from '@/data/analytics';
 
 export default function AnalyticsOverview() {
-  const totalBudget = mockProjects.reduce((sum, project) => sum + project.totalBudget, 0);
+  const totalBudget = mockProjects.reduce((sum: number, project: { totalBudget: number }) => sum + project.totalBudget, 0);
   const totalUsed = mockProjects.reduce((sum, project) => sum + project.budgetUsed, 0);
-  
   const pieChartData = mockProjects.map(project => ({
     id: project.id,
     value: project.budgetUsed,

@@ -36,7 +36,7 @@ const ProjectScreen: React.FC = () => {
                 const clientId = await getClientId();
                 setClientId(clientId);
                 const res = await axios.get(`${domain}/api/project?clientId=${clientId}`);
-                setProjects(res.data);
+                setProjects(Array.isArray(res.data) ? res.data : []);
             } catch (error) {
                 console.error('Error fetching projects:', error);
                 Alert.alert('Error', 'Failed to load projects');
@@ -53,7 +53,7 @@ const ProjectScreen: React.FC = () => {
         const getStaffData = async () => {
             try {
                 const res = await axios.get(`${domain}/api/staff`);
-                const data = res.data.data;
+                const data = (res.data as any)?.data || [];
                 const filterData = data.map((item: any) => ({
                     fullName: `${item.firstName} ${item.lastName}`,
                     _id: item._id,
@@ -73,15 +73,19 @@ const ProjectScreen: React.FC = () => {
             const payload = {
                 ...newProject,
                 clientId,
-            }
+            };
 
             const res = await axios.post(`${domain}/api/project`, payload);
-            if (res) {
+            if (res.status === 200 || res.status === 201) {
                 setProjects(prev => [...prev, payload]);
                 setShowAddModal(false);
                 Alert.alert('Success', 'Project added successfully!');
+            } else {
+                console.error('Failed to add project: Unexpected response status');
+                Alert.alert('Error', 'Failed to add project. Please try again.');
             }
-            console.error('Failed to add project:');
+        } catch (error) {
+            console.error('Failed to add project:', error);
             Alert.alert('Error', 'Failed to add project. Please try again.');
         } finally {
             setAddingProject(false);
@@ -89,6 +93,7 @@ const ProjectScreen: React.FC = () => {
     };
 
     const handleAddDetails = (projectId: string | undefined, name: string, sectionData: ProjectSection[] | undefined) => {
+        console.log("clicked add details")
         if (!projectId) return;
         router.push({
             pathname: '/manage_project/[id]',

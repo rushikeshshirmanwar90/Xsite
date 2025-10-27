@@ -14,11 +14,12 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
     Alert,
+    RefreshControl,
     ScrollView,
     StatusBar,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -31,18 +32,45 @@ const Index: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [addingProject, setAddingProject] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
 
-    // !! fetching clientId
-    useEffect(() => {
-        const fetchProjectData = async () => {
+    // Fetch project data function
+    const fetchProjectData = async (showLoadingState = true) => {
+        try {
+            if (showLoadingState) {
+                setLoading(true);
+            }
+            setError(null);
+            
             const clientId = await getClientId();
-            setClientId(clientId)
-            const res = await axios.get(`${domain}/api/project?clientId=${clientId}`);
-            setProjects(res.data)
-            setLoading(false)
+            setClientId(clientId);
+            
+            if (clientId) {
+                const projectData = await getProjectData(clientId);
+                setProjects(Array.isArray(projectData) ? projectData : []);
+            }
+        } catch (error) {
+            console.error('Failed to fetch projects:', error);
+            setError('Failed to fetch projects');
+        } finally {
+            setLoading(false);
         }
-        fetchProjectData()
-    }, [loading]);
+    };
+
+    // Initial data fetch
+    useEffect(() => {
+        fetchProjectData();
+    }, []);
+
+    // Pull to refresh handler
+    const onRefresh = async () => {
+        setRefreshing(true);
+        try {
+            await fetchProjectData(false); // Don't show loading state during refresh
+        } finally {
+            setRefreshing(false);
+        }
+    };
 
 
     const router = useRouter();
@@ -52,15 +80,19 @@ const Index: React.FC = () => {
     // Fetch staff data
     useEffect(() => {
         const getStaffData = async () => {
-            const res = await axios.get(`${domain}/api/staff`);
-            const data = res.data.data;
-            const filterData = data.map((item: any) => {
-                return {
-                    fullName: `${item.firstName} ${item.lastName}`,
-                    _id: item._id,
-                }
-            })
-            setStaffMembers(filterData);
+            try {
+                const res = await axios.get(`${domain}/api/staff`);
+                const data = (res.data as any)?.data || [];
+                const filterData = data.map((item: any) => {
+                    return {
+                        fullName: `${item.firstName} ${item.lastName}`,
+                        _id: item._id,
+                    }
+                });
+                setStaffMembers(filterData);
+            } catch (error) {
+                console.error('Failed to fetch staff data:', error);
+            }
         };
 
         getStaffData();
@@ -79,30 +111,33 @@ const Index: React.FC = () => {
     };
 
     const handleAddProject = async (newProject: Project) => {
-
         try {
             setAddingProject(true);
 
-
-            const clientId = await getClientId();
-            setClientId(clientId)
+            const currentClientId = clientId || await getClientId();
+            setClientId(currentClientId);
+            
             const payload = {
                 ...newProject,
-                clientId
-            }
+                clientId: currentClientId
+            };
 
-            const res = await axios.post(`${domain}/api/project`, payload)
+            const res = await axios.post(`${domain}/api/project`, payload);
+            
             if (res) {
-                console.log("data added successfully")
+                console.log("Project added successfully");
+                
+                // Close the modal first
+                setShowAddModal(false);
+                
+                // Refresh the project list to get the latest data
+                await fetchProjectData(false);
+                
+                Alert.alert('Success', 'Project added successfully!');
             } else {
-                console.log("something went wrong")
+                console.log("Something went wrong");
+                Alert.alert('Error', 'Failed to add project. Please try again.');
             }
-            setProjects(prevProjects => [...prevProjects, payload]);
-
-            // Close the modal
-            setShowAddModal(false);
-
-            Alert.alert('Success', 'Project added successfully!');
         } catch (error) {
             console.error('Failed to add project:', error);
             Alert.alert('Error', 'Failed to add project. Please try again.');
@@ -148,7 +183,19 @@ const Index: React.FC = () => {
             </View>
 
 
-            <ScrollView style={styles.projectsList}>
+            <ScrollView 
+                style={styles.projectsList}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#3B82F6']} // Android
+                        tintColor="#3B82F6" // iOS
+                        title="Pull to refresh"
+                        titleColor="#64748B"
+                    />
+                }
+            >
                 {loading ? (
                     <View style={styles.centerContainer}>
                         <Text style={styles.loadingText}>Loading projects...</Text>
@@ -158,22 +205,7 @@ const Index: React.FC = () => {
                         <Text style={styles.errorText}>{error}</Text>
                         <TouchableOpacity
                             style={styles.retryButton}
-                            onPress={() => {
-                                if (clientId) {
-                                    setError(null);
-                                    setLoading(true);
-                                    getProjectData(clientId)
-                                        .then(res => {
-                                            setProjects(Array.isArray(res) ? res : []);
-                                            setError(null);
-                                        })
-                                        .catch(err => {
-                                            console.error('Retry failed:', err);
-                                            setError('Failed to fetch projects');
-                                        })
-                                        .finally(() => setLoading(false));
-                                }
-                            }}
+                            onPress={() => fetchProjectData()}
                         >
                             <Text style={styles.retryButtonText}>Retry</Text>
                         </TouchableOpacity>
@@ -199,6 +231,30 @@ const Index: React.FC = () => {
                     </View>
                 )}
             </ScrollView>
+
+            {/* Floating Action Button */}
+            <TouchableOpacity
+                style={{
+                    position: 'absolute',
+                    bottom: 24,
+                    right: 24,
+                    width: 56,
+                    height: 56,
+                    backgroundColor: '#3B82F6',
+                    borderRadius: 28,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    shadowColor: '#3B82F6',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 8,
+                    elevation: 8,
+                }}
+                onPress={() => setShowAddModal(true)}
+                activeOpacity={0.8}
+            >
+                <Ionicons name="add" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
 
             <AddProjectModal
                 staffMembers={staffMembers}

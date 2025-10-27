@@ -13,21 +13,33 @@ export interface Material {
 }
 
 export interface MaterialEntry {
-  id: string;
   name: string;
   unit: string;
-  quantity: number;
+  qnt: number;
   specs: Record<string, any>;
-  notes: string;
-  date: string;
-  sectionId?: string;
+  cost?: number;
+}
+
+export interface ProjectDetails {
+  projectName: string;
+  projectId: string;
+}
+
+export interface MainSectionDetails {
+  sectionName: string;
+  sectionId: string;
 }
 
 export interface Section {
-  id: string;
+  _id: string;
   name: string;
-  description?: string;
+  projectDetails: ProjectDetails;
+  mainSectionDetails: MainSectionDetails;
+  MaterialUsed: any[];
+  MaterialAvailable: any[];
   createdAt: string;
+  updatedAt: string;
+  __v: number;
 }
 
 export interface MaterialTemplate {

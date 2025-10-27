@@ -4,5 +4,9 @@
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
   },
-  "cSpell.words": ["Exponentor", "Sharda"]
+  "cSpell.words": [
+    "Exponentor",
+    "Sharda"
+  ],
+  "kiroAgent.configureMCP": "Disabled"
 }
