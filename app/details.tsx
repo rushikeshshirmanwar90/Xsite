@@ -1,11 +1,11 @@
 import FloatingActionButton from '@/components/details/FloatingActionButton';
 import Header from '@/components/details/Header';
-import MaterialCard from '@/components/details/MaterialCard';
+import MaterialCardEnhanced from '@/components/details/MaterialCardEnhanced';
 import MaterialFormModal from '@/components/details/MaterialFormModel';
 import PeriodFilter from '@/components/details/PeriodTable';
 import SectionSelectionPrompt from '@/components/details/SectionSelectionPrompt';
 import TabSelector from '@/components/details/TabSelector';
-import { importedMaterials, predefinedSections, usedMaterials } from '@/data/details';
+import { predefinedSections } from '@/data/details';
 import { getClientId } from '@/functions/clientId';
 import { domain } from '@/lib/domain';
 import { styles } from '@/style/details';
@@ -32,7 +32,10 @@ const Details = () => {
 
     const [selectedSection, setSelectedSection] = useState<string | null>(null);
     const [materialEntries, setMaterialEntries] = useState<MaterialEntry[]>([]);
-    const cardAnimations = useRef(importedMaterials.map(() => new Animated.Value(0))).current;
+    const [availableMaterials, setAvailableMaterials] = useState<Material[]>([]);
+    const [usedMaterials, setUsedMaterials] = useState<Material[]>([]);
+    const [loading, setLoading] = useState(false);
+    const cardAnimations = useRef<Animated.Value[]>([]).current;
     const [clientId, setClientId] = useState<string | null>(null);
     const [showSectionPrompt, setShowSectionPrompt] = useState(false);
 
@@ -43,6 +46,287 @@ const Details = () => {
         }
         fetchClientId()
     }, []);
+
+    // Function to get material icon and color based on material name
+    const getMaterialIconAndColor = (materialName: string) => {
+        const materialMap: { [key: string]: { icon: keyof typeof import('@expo/vector-icons').Ionicons.glyphMap, color: string } } = {
+            'cement': { icon: 'cube-outline', color: '#8B5CF6' },
+            'brick': { icon: 'square-outline', color: '#EF4444' },
+            'steel': { icon: 'barbell-outline', color: '#6B7280' },
+            'sand': { icon: 'layers-outline', color: '#F59E0B' },
+            'gravel': { icon: 'diamond-outline', color: '#10B981' },
+            'concrete': { icon: 'cube', color: '#3B82F6' },
+            'wood': { icon: 'leaf-outline', color: '#84CC16' },
+            'paint': { icon: 'color-palette-outline', color: '#EC4899' },
+            'tile': { icon: 'grid-outline', color: '#06B6D4' },
+            'pipe': { icon: 'ellipse-outline', color: '#8B5CF6' },
+        };
+
+        const lowerName = materialName.toLowerCase();
+        for (const [key, value] of Object.entries(materialMap)) {
+            if (lowerName.includes(key)) {
+                return value;
+            }
+        }
+        return { icon: 'cube-outline' as keyof typeof import('@expo/vector-icons').Ionicons.glyphMap, color: '#6B7280' };
+    };
+
+    // Function to fetch mini-section data
+    const fetchMiniSectionData = async (miniSectionId: string) => {
+        if (!miniSectionId) return;
+
+        setLoading(true);
+        try {
+            const response = await axios.get(`${domain}/api/mini-section?id=${miniSectionId}`);
+
+            if ((response.data as any).success) {
+                const sectionData = (response.data as any).data;
+                const materialAvailable = sectionData.MaterialAvailable || [];
+                const materialUsed = sectionData.MaterialUsed || [];
+
+                // Transform MaterialAvailable to Material interface
+                const transformedAvailable: Material[] = materialAvailable.map((material: any, index: number) => {
+                    const { icon, color } = getMaterialIconAndColor(material.name);
+                    return {
+                        id: index + 1,
+                        _id: material._id, // Store MongoDB _id for API calls
+                        name: material.name,
+                        quantity: material.qnt,
+                        unit: material.unit,
+                        price: material.cost || 0,
+                        date: new Date().toLocaleDateString(),
+                        icon,
+                        color,
+                        sectionId: miniSectionId,
+                        specs: material.specs || {}
+                    };
+                });
+
+                // Transform MaterialUsed to Material interface
+                const transformedUsed: Material[] = materialUsed.map((material: any, index: number) => {
+                    const { icon, color } = getMaterialIconAndColor(material.name);
+                    return {
+                        id: index + 1000, // Different ID range to avoid conflicts
+                        _id: material._id, // Store MongoDB _id
+                        name: material.name,
+                        quantity: material.qnt,
+                        unit: material.unit,
+                        price: material.cost || 0,
+                        date: new Date().toLocaleDateString(),
+                        icon,
+                        color,
+                        sectionId: miniSectionId,
+                        specs: material.specs || {}
+                    };
+                });
+
+                setAvailableMaterials(transformedAvailable);
+                setUsedMaterials(transformedUsed);
+
+                // Initialize animations for the materials
+                const totalMaterials = Math.max(transformedAvailable.length, transformedUsed.length);
+                cardAnimations.splice(0); // Clear existing animations
+                for (let i = 0; i < totalMaterials; i++) {
+                    cardAnimations.push(new Animated.Value(0));
+                }
+
+                // Animate cards in
+                Animated.stagger(100,
+                    cardAnimations.map((anim: Animated.Value) =>
+                        Animated.timing(anim, {
+                            toValue: 1,
+                            duration: 300,
+                            useNativeDriver: false,
+                        })
+                    )
+                ).start();
+
+                console.log('Mini-section data loaded:', {
+                    sectionId: miniSectionId,
+                    availableMaterials: transformedAvailable.length,
+                    usedMaterials: transformedUsed.length
+                });
+            }
+        } catch (error) {
+            console.error('Error fetching mini-section data:', error);
+            toast.error('Failed to load section materials');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Fetch data when selectedSection changes
+    useEffect(() => {
+        if (selectedSection) {
+            fetchMiniSectionData(selectedSection);
+        }
+    }, [selectedSection]);
+
+    // Group materials by name and unit
+    const groupMaterialsByName = (materials: Material[], usedMaterialsList: Material[] = []) => {
+        console.log('=== GROUPING MATERIALS ===');
+        console.log('Total materials to group:', materials.length);
+        console.log('Used materials for reference:', usedMaterialsList.length);
+
+        const grouped: { [key: string]: any } = {};
+
+        materials.forEach((material, index) => {
+            const key = `${material.name}-${material.unit}`;
+
+            console.log(`Material ${index + 1}:`, {
+                name: material.name,
+                unit: material.unit,
+                _id: (material as any)._id,
+                id: material.id,
+                quantity: material.quantity,
+                specs: material.specs
+            });
+
+            if (!grouped[key]) {
+                grouped[key] = {
+                    name: material.name,
+                    unit: material.unit,
+                    icon: material.icon,
+                    color: material.color,
+                    date: material.date,
+                    variants: [],
+                    totalQuantity: 0,
+                    totalCost: 0,
+                    totalUsed: 0,
+                    totalImported: 0,
+                };
+            }
+
+            const variantId = (material as any)._id || material.id.toString();
+            console.log(`  → Adding variant with _id: ${variantId}`);
+
+            grouped[key].variants.push({
+                _id: variantId,
+                specs: material.specs || {},
+                quantity: material.quantity,
+                cost: material.price,
+            });
+
+            grouped[key].totalQuantity += material.quantity;
+            grouped[key].totalCost += material.price;
+        });
+
+        // Calculate total used for each material from usedMaterialsList
+        usedMaterialsList.forEach((usedMaterial) => {
+            const key = `${usedMaterial.name}-${usedMaterial.unit}`;
+            if (grouped[key]) {
+                grouped[key].totalUsed += usedMaterial.quantity;
+            }
+        });
+
+        // Calculate total imported (available + used)
+        Object.keys(grouped).forEach((key) => {
+            grouped[key].totalImported = grouped[key].totalQuantity + grouped[key].totalUsed;
+        });
+
+        const result = Object.values(grouped);
+        console.log('Grouped materials:', result.length);
+        result.forEach((group: any) => {
+            console.log(`${group.name} (${group.unit}):`, {
+                variants: group.variants.length,
+                variantIds: group.variants.map((v: any) => v._id),
+                totalQuantity: group.totalQuantity,
+                totalUsed: group.totalUsed,
+                totalImported: group.totalImported,
+                percentageRemaining: group.totalImported > 0
+                    ? Math.round((group.totalQuantity / group.totalImported) * 100)
+                    : 100
+            });
+        });
+        console.log('=========================');
+
+        return result;
+    };
+
+    // Handle adding usage
+    const handleAddUsage = async (
+        materialName: string,
+        unit: string,
+        variantId: string,
+        quantity: number,
+        specs: Record<string, any>
+    ) => {
+        if (!selectedSection) {
+            toast.error('No section selected');
+            return;
+        }
+
+        let loadingToast: any = null;
+
+        try {
+            // Prepare API payload
+            const apiPayload = {
+                sectionId: selectedSection,
+                materialId: variantId,
+                qnt: quantity
+            };
+
+            console.log('=== ADD USAGE REQUEST ===');
+            console.log('Material Name:', materialName);
+            console.log('Unit:', unit);
+            console.log('Variant ID (materialId):', variantId);
+            console.log('Quantity (qnt):', quantity);
+            console.log('Specs:', specs);
+            console.log('Section ID:', selectedSection);
+            console.log('---');
+            console.log('API ENDPOINT:', `${domain}/api/material-usage`);
+            console.log('---');
+            console.log('PAYLOAD BEING SENT:');
+            console.log(JSON.stringify(apiPayload, null, 2));
+            console.log('---');
+            console.log('Payload Details:');
+            console.log('  - sectionId:', apiPayload.sectionId);
+            console.log('  - materialId:', apiPayload.materialId);
+            console.log('  - qnt:', apiPayload.qnt);
+            console.log('  - qnt type:', typeof apiPayload.qnt);
+            console.log('========================');
+
+            // Show loading toast
+            loadingToast = toast.loading('Adding material usage...');
+
+            // Call API to add material usage
+            const response = await axios.post(`${domain}/api/material-usage`, apiPayload);
+
+            const responseData = response.data as any;
+
+            // Check response
+            if (responseData.success) {
+                console.log('=== ADD USAGE SUCCESS ===');
+                console.log('Response:', responseData);
+                console.log('========================');
+
+                // Dismiss loading toast
+                toast.dismiss(loadingToast);
+                toast.success(responseData.message || `Added ${quantity} ${unit} of ${materialName} to used materials`);
+
+                // Refresh data to show updated quantities
+                await fetchMiniSectionData(selectedSection);
+            } else {
+                throw new Error(responseData.error || 'Failed to add material usage');
+            }
+        } catch (error: any) {
+            console.error('=== ADD USAGE ERROR ===');
+            console.error('Error:', error);
+            console.error('======================');
+
+            // Dismiss loading toast if it exists
+            if (loadingToast) {
+                toast.dismiss(loadingToast);
+            }
+
+            // Extract error message
+            const errorMessage = error?.response?.data?.error ||
+                error?.message ||
+                'Failed to add material usage';
+
+            toast.error(errorMessage);
+        }
+    };
 
     // Show section selection prompt when no section is selected
     useEffect(() => {
@@ -56,7 +340,7 @@ const Details = () => {
     }, [selectedSection]);
 
     const getCurrentData = () => {
-        const materials = activeTab === 'imported' ? importedMaterials : usedMaterials;
+        const materials = activeTab === 'imported' ? availableMaterials : usedMaterials;
         console.log('getCurrentData:', {
             activeTab,
             selectedMiniSection: selectedSection,
@@ -64,45 +348,59 @@ const Details = () => {
             materialSectionIds: materials.map(m => m.sectionId)
         });
 
-        if (selectedSection) {
-            const filtered = materials.filter(material => material.sectionId === selectedSection);
-            console.log('Filtered materials:', filtered.length, 'for mini-section:', selectedSection);
-            return filtered;
-        }
-        return [];
+        return materials; // Return all materials since they're already filtered by selectedSection
+    };
+
+    const getGroupedData = () => {
+        const materials = getCurrentData();
+        // Pass used materials to calculate total imported and used
+        return groupMaterialsByName(materials, usedMaterials);
     };
 
     const filteredMaterials = getCurrentData();
+    const groupedMaterials = getGroupedData();
     const totalCost = filteredMaterials.reduce((sum, material) => sum + material.price, 0);
 
     const formatPrice = (price: number) => `₹${price.toLocaleString('en-IN')}`;
 
     const getImportedQuantity = (material: Material) => {
-        const importedMaterial = importedMaterials.find(m => m.id === material.id);
+        const importedMaterial = availableMaterials.find(m =>
+            m.name === material.name && m.unit === material.unit
+        );
         return importedMaterial ? importedMaterial.quantity : 0;
     };
 
     const getAvailableQuantity = (material: Material) => {
-        const importedMaterial = importedMaterials.find(m => m.id === material.id);
-        const usedMaterial = usedMaterials.find(m => m.id === material.id);
+        const importedMaterial = availableMaterials.find(m =>
+            m.name === material.name && m.unit === material.unit
+        );
+        const usedMaterial = usedMaterials.find(m =>
+            m.name === material.name && m.unit === material.unit
+        );
         if (!importedMaterial) return 0;
         if (!usedMaterial) return importedMaterial.quantity;
-        return importedMaterial.quantity - usedMaterial.quantity;
+        return Math.max(0, importedMaterial.quantity - usedMaterial.quantity);
     };
 
     const getAvailabilityPercentage = (material: Material) => {
-        const importedMaterial = importedMaterials.find(m => m.id === material.id);
-        const usedMaterial = usedMaterials.find(m => m.id === material.id);
-        if (!importedMaterial) return 0;
+        const importedMaterial = availableMaterials.find(m =>
+            m.name === material.name && m.unit === material.unit
+        );
+        const usedMaterial = usedMaterials.find(m =>
+            m.name === material.name && m.unit === material.unit
+        );
+        if (!importedMaterial || importedMaterial.quantity === 0) return 0;
         if (!usedMaterial) return 100;
-        const available = importedMaterial.quantity - usedMaterial.quantity;
+        const available = Math.max(0, importedMaterial.quantity - usedMaterial.quantity);
         return Math.round((available / importedMaterial.quantity) * 100);
     };
 
     const getQuantityWasted = (material: Material) => {
-        const usedMaterial = usedMaterials.find(m => m.id === material.id);
+        const usedMaterial = usedMaterials.find(m =>
+            m.name === material.name && m.unit === material.unit
+        );
         if (!usedMaterial) return 0;
-        return Math.round(usedMaterial.quantity * 0.1);
+        return Math.round(usedMaterial.quantity * 0.1); // Assuming 10% wastage
     };
 
     const getSectionName = (sectionId: string | undefined) => {
@@ -209,6 +507,7 @@ const Details = () => {
                 onClose={() => setShowMaterialForm(false)}
                 onSubmit={addMaterialRequest}
             />
+
             <SectionSelectionPrompt
                 visible={showSectionPrompt}
                 onSelectSection={handleSectionSelect}
@@ -226,7 +525,7 @@ const Details = () => {
                 <TabSelector activeTab={activeTab} onSelectTab={setActiveTab} />
                 <View style={styles.materialsSection}>
                     <Text style={styles.sectionTitle}>
-                        {activeTab === 'imported' ? 'Imported Materials' : 'Used Materials'}
+                        {activeTab === 'imported' ? 'Available Materials' : 'Used Materials'}
                     </Text>
                     {!selectedSection ? (
                         <View style={styles.noSectionContainer}>
@@ -242,24 +541,28 @@ const Details = () => {
                                 <Text style={styles.selectSectionButtonText}>Select Mini-Section</Text>
                             </TouchableOpacity>
                         </View>
-                    ) : filteredMaterials.length > 0 ? (
-                        filteredMaterials.map((material, index) => (
-                            <MaterialCard
-                                key={material.id}
+                    ) : loading ? (
+                        <View style={styles.noMaterialsContainer}>
+                            <Text style={styles.noMaterialsTitle}>Loading Materials...</Text>
+                            <Text style={styles.noMaterialsDescription}>
+                                Fetching materials data for this section
+                            </Text>
+                        </View>
+                    ) : groupedMaterials.length > 0 ? (
+                        groupedMaterials.map((material, index) => (
+                            <MaterialCardEnhanced
+                                key={`${material.name}-${material.unit}`}
                                 material={material}
-                                animation={cardAnimations[index]}
+                                animation={cardAnimations[index] || new Animated.Value(1)}
                                 activeTab={activeTab}
-                                getAvailableQuantity={getAvailableQuantity}
-                                getAvailabilityPercentage={getAvailabilityPercentage}
-                                getImportedQuantity={getImportedQuantity}
-                                getQuantityWasted={getQuantityWasted}
+                                onAddUsage={handleAddUsage}
                             />
                         ))
                     ) : (
                         <View style={styles.noMaterialsContainer}>
                             <Text style={styles.noMaterialsTitle}>No Materials Found</Text>
                             <Text style={styles.noMaterialsDescription}>
-                                No {activeTab} materials found for this mini-section
+                                No {activeTab === 'imported' ? 'available' : 'used'} materials found for this mini-section
                             </Text>
                         </View>
                     )}

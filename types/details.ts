@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 export interface Material {
   id: number;
+  _id?: string; // MongoDB _id for API calls
   name: string;
   quantity: number;
   unit: string;
@@ -10,6 +11,7 @@ export interface Material {
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
   sectionId?: string;
+  specs?: Record<string, any>;
 }
 
 export interface MaterialEntry {
