@@ -16,6 +16,7 @@ interface AddMaterialsStepProps {
   editingMaterialIndex: number | null;
   showUnitDropdown: boolean;
   showSpecDropdown: string | null;
+  scrollViewRef?: React.RefObject<ScrollView>;
   onTemplateSelect: (templateKey: string) => void;
   onInputChange: (field: string, value: string) => void;
   onSpecChange: (field: string, value: string | number) => void;
@@ -38,6 +39,7 @@ const AddMaterialsStep: React.FC<AddMaterialsStepProps> = ({
   editingMaterialIndex,
   showUnitDropdown,
   showSpecDropdown,
+  scrollViewRef: externalScrollViewRef,
   onTemplateSelect,
   onInputChange,
   onSpecChange,
@@ -50,13 +52,16 @@ const AddMaterialsStep: React.FC<AddMaterialsStepProps> = ({
   onRemoveMaterial,
   onClose,
 }) => {
-  const scrollViewRef = useRef<ScrollView>(null);
+  const internalScrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = externalScrollViewRef || internalScrollViewRef;
 
   return (
     <ScrollView
       ref={scrollViewRef}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={[sharedStyles.formScrollContent, { paddingBottom: 120 }]}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
     >
       <View style={sharedStyles.formHeader}>
         <Text style={sharedStyles.formTitle}>Add Material Entries</Text>

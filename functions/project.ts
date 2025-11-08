@@ -28,7 +28,8 @@ export const addProject = async (data: Project, clientId: string) => {
     };
 
     const res = await axios.post(`${domain}/api/project`, projectData);
-    return res.data?.data ?? res.data;
+    const responseData = res.data as any;
+    return responseData?.data ?? responseData;
   } catch (error) {
     console.error("Failed to add project:", error);
     throw error;

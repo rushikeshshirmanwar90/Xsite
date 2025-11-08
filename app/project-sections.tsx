@@ -1,22 +1,19 @@
+import { ProjectSection } from '@/types/project';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { 
-  Alert, 
-  StyleSheet, 
-  Text, 
-  TouchableOpacity, 
-  View,
-  ScrollView
+import {
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { domain } from '@/lib/domain';
-import axios from 'axios';
-import { ProjectSection } from '@/types/project';
 
 const ProjectSections = () => {
   const params = useLocalSearchParams();
-  const { id, name, sectionData } = params;
+  const { id, name, sectionData, materialAvailable, materialUsed } = params;
   
   const [sections, setSections] = useState<ProjectSection[]>([]);
   const [loading, setLoading] = useState(false);
@@ -27,6 +24,13 @@ const ProjectSections = () => {
       setSections(parsedData);
     }
   }, [sectionData]);
+
+  useEffect(() => {
+    console.log('Project sections received materials:', {
+      materialAvailableCount: materialAvailable ? JSON.parse(Array.isArray(materialAvailable) ? materialAvailable[0] : materialAvailable).length : 0,
+      materialUsedCount: materialUsed ? JSON.parse(Array.isArray(materialUsed) ? materialUsed[0] : materialUsed).length : 0
+    });
+  }, [materialAvailable, materialUsed]);
 
   const getSectionIcon = (type: string) => {
     switch(type?.toLowerCase()) {
@@ -41,13 +45,20 @@ const ProjectSections = () => {
   };
 
   const handleViewDetails = (section: ProjectSection) => {
+    console.log('Navigating to details with materials:', {
+      sectionId: section._id || section.sectionId,
+      passingMaterialsData: true
+    });
+    
     router.push({
       pathname: '../details',
       params: {
         projectId: id as string,
         projectName: name as string,
         sectionId: section._id || section.sectionId,
-        sectionName: section.name
+        sectionName: section.name,
+        materialAvailable: materialAvailable as string,
+        materialUsed: materialUsed as string
       }
     });
   };

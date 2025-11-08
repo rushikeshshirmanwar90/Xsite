@@ -3,17 +3,15 @@ import Header from '@/components/details/Header';
 import MaterialCardEnhanced from '@/components/details/MaterialCardEnhanced';
 import MaterialFormModal from '@/components/details/MaterialFormModel';
 import PeriodFilter from '@/components/details/PeriodTable';
-import SectionSelectionPrompt from '@/components/details/SectionSelectionPrompt';
 import TabSelector from '@/components/details/TabSelector';
 import { predefinedSections } from '@/data/details';
-import { getClientId } from '@/functions/clientId';
 import { domain } from '@/lib/domain';
 import { styles } from '@/style/details';
 import { Material, MaterialEntry } from '@/types/details';
 import axios from 'axios';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -23,29 +21,19 @@ const Details = () => {
     const projectName = params.projectName as string;
     const sectionId = params.sectionId as string;
     const sectionName = params.sectionName as string;
+    const materialAvailableParam = params.materialAvailable as string;
+    const materialUsedParam = params.materialUsed as string;
 
     const [activeTab, setActiveTab] = useState<'imported' | 'used'>('imported');
     const [selectedPeriod, setSelectedPeriod] = useState('Today');
     const [showMaterialForm, setShowMaterialForm] = useState(false);
 
-    // selectedSection should be for mini-sections (foundation, first slab, etc.), not the main sectionId
-
-    const [selectedSection, setSelectedSection] = useState<string | null>(null);
-    const [materialEntries, setMaterialEntries] = useState<MaterialEntry[]>([]);
     const [availableMaterials, setAvailableMaterials] = useState<Material[]>([]);
     const [usedMaterials, setUsedMaterials] = useState<Material[]>([]);
     const [loading, setLoading] = useState(false);
     const cardAnimations = useRef<Animated.Value[]>([]).current;
-    const [clientId, setClientId] = useState<string | null>(null);
-    const [showSectionPrompt, setShowSectionPrompt] = useState(false);
 
-    useEffect(() => {
-        const fetchClientId = async () => {
-            const clientId = await getClientId();
-            setClientId(clientId)
-        }
-        fetchClientId()
-    }, []);
+
 
     // Function to get material icon and color based on material name
     const getMaterialIconAndColor = (materialName: string) => {
@@ -71,18 +59,62 @@ const Details = () => {
         return { icon: 'cube-outline' as keyof typeof import('@expo/vector-icons').Ionicons.glyphMap, color: '#6B7280' };
     };
 
-    // Function to fetch mini-section data
-    const fetchMiniSectionData = async (miniSectionId: string) => {
-        if (!miniSectionId) return;
-
+    // Function to load materials from params or fetch from API
+    const loadProjectMaterials = async () => {
         setLoading(true);
         try {
-            const response = await axios.get(`${domain}/api/mini-section?id=${miniSectionId}`);
+            let materialAvailable: any[] = [];
+            let materialUsed: any[] = [];
 
-            if ((response.data as any).success) {
-                const sectionData = (response.data as any).data;
-                const materialAvailable = sectionData.MaterialAvailable || [];
-                const materialUsed = sectionData.MaterialUsed || [];
+            // Try to use passed params first (no API call needed!)
+            if (materialAvailableParam) {
+                try {
+                    const parsedAvailable = JSON.parse(
+                        Array.isArray(materialAvailableParam) ? materialAvailableParam[0] : materialAvailableParam
+                    );
+                    materialAvailable = parsedAvailable;
+                    console.log('✓ Using MaterialAvailable from params:', materialAvailable.length);
+                } catch (e) {
+                    console.error('Failed to parse materialAvailableParam:', e);
+                }
+            }
+
+            if (materialUsedParam) {
+                try {
+                    const parsedUsed = JSON.parse(
+                        Array.isArray(materialUsedParam) ? materialUsedParam[0] : materialUsedParam
+                    );
+                    materialUsed = parsedUsed;
+                    console.log('✓ Using MaterialUsed from params:', materialUsed.length);
+                } catch (e) {
+                    console.error('Failed to parse materialUsedParam:', e);
+                }
+            }
+
+            // Fallback: fetch from API if params are not available
+            if (materialAvailable.length === 0 && materialUsed.length === 0 && projectId) {
+                console.log('⚠ No materials in params, fetching from API...');
+                const response = await axios.get(`${domain}/api/project?id=${projectId}`);
+                
+                const responseData = response.data as any;
+                let projectData;
+                
+                if (responseData.success && responseData.data) {
+                    projectData = responseData.data;
+                } else if (Array.isArray(responseData)) {
+                    projectData = responseData[0];
+                } else if (responseData._id) {
+                    projectData = responseData;
+                } else {
+                    throw new Error('Invalid API response format');
+                }
+
+                if (projectData) {
+                    materialAvailable = projectData.MaterialAvailable || [];
+                    materialUsed = projectData.MaterialUsed || [];
+                    console.log('✓ Fetched from API - Available:', materialAvailable.length, 'Used:', materialUsed.length);
+                }
+            }
 
                 // Transform MaterialAvailable to Material interface
                 const transformedAvailable: Material[] = materialAvailable.map((material: any, index: number) => {
@@ -97,7 +129,6 @@ const Details = () => {
                         date: new Date().toLocaleDateString(),
                         icon,
                         color,
-                        sectionId: miniSectionId,
                         specs: material.specs || {}
                     };
                 });
@@ -115,7 +146,6 @@ const Details = () => {
                         date: new Date().toLocaleDateString(),
                         icon,
                         color,
-                        sectionId: miniSectionId,
                         specs: material.specs || {}
                     };
                 });
@@ -141,26 +171,31 @@ const Details = () => {
                     )
                 ).start();
 
-                console.log('Mini-section data loaded:', {
-                    sectionId: miniSectionId,
+                console.log('Project materials loaded successfully:', {
+                    projectId,
                     availableMaterials: transformedAvailable.length,
                     usedMaterials: transformedUsed.length
                 });
-            }
-        } catch (error) {
-            console.error('Error fetching mini-section data:', error);
-            toast.error('Failed to load section materials');
+        } catch (error: any) {
+            console.error('=== ERROR FETCHING PROJECT MATERIALS ===');
+            console.error('Error:', error);
+            console.error('Error message:', error?.message);
+            console.error('Error response:', error?.response?.data);
+            console.error('========================================');
+            
+            const errorMessage = error?.response?.data?.error || 
+                                error?.message || 
+                                'Failed to load project materials';
+            toast.error(errorMessage);
         } finally {
             setLoading(false);
         }
     };
 
-    // Fetch data when selectedSection changes
+    // Load project materials on mount
     useEffect(() => {
-        if (selectedSection) {
-            fetchMiniSectionData(selectedSection);
-        }
-    }, [selectedSection]);
+        loadProjectMaterials();
+    }, [projectId, materialAvailableParam, materialUsedParam]);
 
     // Group materials by name and unit
     const groupMaterialsByName = (materials: Material[], usedMaterialsList: Material[] = []) => {
@@ -243,7 +278,7 @@ const Details = () => {
         return result;
     };
 
-    // Handle adding usage
+    // Handle adding usage - now works at project level
     const handleAddUsage = async (
         materialName: string,
         unit: string,
@@ -251,17 +286,12 @@ const Details = () => {
         quantity: number,
         specs: Record<string, any>
     ) => {
-        if (!selectedSection) {
-            toast.error('No section selected');
-            return;
-        }
-
         let loadingToast: any = null;
 
         try {
-            // Prepare API payload
+            // Prepare API payload - using projectId instead of sectionId
             const apiPayload = {
-                sectionId: selectedSection,
+                projectId: projectId,
                 materialId: variantId,
                 qnt: quantity
             };
@@ -272,18 +302,12 @@ const Details = () => {
             console.log('Variant ID (materialId):', variantId);
             console.log('Quantity (qnt):', quantity);
             console.log('Specs:', specs);
-            console.log('Section ID:', selectedSection);
+            console.log('Project ID:', projectId);
             console.log('---');
             console.log('API ENDPOINT:', `${domain}/api/material-usage`);
             console.log('---');
             console.log('PAYLOAD BEING SENT:');
             console.log(JSON.stringify(apiPayload, null, 2));
-            console.log('---');
-            console.log('Payload Details:');
-            console.log('  - sectionId:', apiPayload.sectionId);
-            console.log('  - materialId:', apiPayload.materialId);
-            console.log('  - qnt:', apiPayload.qnt);
-            console.log('  - qnt type:', typeof apiPayload.qnt);
             console.log('========================');
 
             // Show loading toast
@@ -304,8 +328,8 @@ const Details = () => {
                 toast.dismiss(loadingToast);
                 toast.success(responseData.message || `Added ${quantity} ${unit} of ${materialName} to used materials`);
 
-                // Refresh data to show updated quantities
-                await fetchMiniSectionData(selectedSection);
+                // Refresh project materials to show updated quantities
+                await loadProjectMaterials();
             } else {
                 throw new Error(responseData.error || 'Failed to add material usage');
             }
@@ -328,27 +352,17 @@ const Details = () => {
         }
     };
 
-    // Show section selection prompt when no section is selected
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            if (!selectedSection) {
-                setShowSectionPrompt(true);
-            }
-        }, 500);
 
-        return () => clearTimeout(timer);
-    }, [selectedSection]);
 
     const getCurrentData = () => {
         const materials = activeTab === 'imported' ? availableMaterials : usedMaterials;
         console.log('getCurrentData:', {
             activeTab,
-            selectedMiniSection: selectedSection,
-            totalMaterials: materials.length,
-            materialSectionIds: materials.map(m => m.sectionId)
+            projectId,
+            totalMaterials: materials.length
         });
 
-        return materials; // Return all materials since they're already filtered by selectedSection
+        return materials; // Return all materials from project level
     };
 
     const getGroupedData = () => {
@@ -410,24 +424,15 @@ const Details = () => {
     };
 
     const addMaterialRequest = async (materials: MaterialEntry[], message: string) => {
-        const miniSectionId = selectedSection || sectionId;
-        const miniSectionName = getSectionName(miniSectionId);
-
         console.log("=== MATERIAL REQUEST SUBMISSION ===");
-        console.log("1. clientId:", clientId);
-        console.log("2. miniSectionId:", miniSectionId, `(${miniSectionName})`);
-        console.log("3. message:", message);
-        console.log("4. materials:", materials);
+        console.log("1. projectId:", projectId);
+        console.log("2. message:", message);
+        console.log("3. materials:", materials);
         console.log("=====================================");
 
         // Validation before sending
-        if (!clientId) {
-            toast.error("Client ID is missing");
-            return;
-        }
-
-        if (!miniSectionId) {
-            toast.error("Section ID is missing");
+        if (!projectId) {
+            toast.error("Project ID is missing");
             return;
         }
 
@@ -436,30 +441,66 @@ const Details = () => {
             return;
         }
 
-        // Payload matching your RequestedMaterialSchema
-        const payload = {
-            clientId,
-            sectionId: miniSectionId,
-            materials,
-            message
-        };
+        // Transform materials to match API format
+        const formattedMaterials = materials.map((material: any) => ({
+            projectId: projectId,
+            materialName: material.materialName,
+            unit: material.unit,
+            specs: material.specs || {},
+            qnt: material.qnt,
+            cost: material.cost,
+            mergeIfExists: material.mergeIfExists !== undefined ? material.mergeIfExists : true,
+        }));
 
         console.log("=== PAYLOAD BEING SENT ===");
-        console.log(JSON.stringify(payload, null, 2));
+        console.log(JSON.stringify(formattedMaterials, null, 2));
         console.log("==========================");
 
-        try {
-            const res = await axios.post(`${domain}/api/request-material`, payload);
+        let loadingToast: any = null;
 
-            // Check response status is successful
-            if (res.status !== 201) {
-                toast.error("Failed to send material request");
-                return;
+        try {
+            // Show loading toast
+            loadingToast = toast.loading('Adding materials...');
+
+            const res = await axios.post(`${domain}/api/add-material`, formattedMaterials);
+
+            const responseData = res.data as any;
+
+            // Dismiss loading toast
+            toast.dismiss(loadingToast);
+
+            // Check response
+            if (responseData.success) {
+                console.log("=== ADD MATERIAL SUCCESS ===");
+                console.log("Response:", responseData);
+                console.log("Results:", responseData.results);
+                console.log("===========================");
+
+                // Count successful additions
+                const successCount = responseData.results?.filter((r: any) => r.success).length || 0;
+                const failCount = responseData.results?.filter((r: any) => !r.success).length || 0;
+
+                if (successCount > 0) {
+                    toast.success(`Successfully added ${successCount} material${successCount > 1 ? 's' : ''}!`);
+                }
+
+                if (failCount > 0) {
+                    toast.error(`Failed to add ${failCount} material${failCount > 1 ? 's' : ''}`);
+                }
+
+                // Refresh project materials after adding
+                await loadProjectMaterials();
+            } else {
+                throw new Error(responseData.error || 'Failed to add materials');
             }
-            toast.success("Material request sent successfully");
 
         } catch (error) {
             console.error("Material request error:", error);
+
+            // Dismiss loading toast if it exists
+            if (loadingToast) {
+                toast.dismiss(loadingToast);
+            }
 
             // Enhanced error logging for debugging
             if (error && typeof error === 'object' && 'response' in error) {
@@ -476,22 +517,18 @@ const Details = () => {
                 toast.error(errorMessage);
             } else {
                 console.error("Non-Axios error:", error);
-                toast.error("Failed to send material request");
+                toast.error("Failed to add materials");
             }
         }
     };
 
-    const handleSectionSelect = (miniSectionId: string) => {
-        console.log('Details: Mini-section selected:', miniSectionId);
-        setSelectedSection(miniSectionId);
-        setShowSectionPrompt(false);
-    };
+
 
     return (
         <SafeAreaView style={styles.container}>
             <Header
-                selectedSection={selectedSection}
-                onSectionSelect={setSelectedSection}
+                selectedSection={null}
+                onSectionSelect={() => {}}
                 totalCost={totalCost}
                 formatPrice={formatPrice}
                 getSectionName={getSectionName}
@@ -499,7 +536,7 @@ const Details = () => {
                 sectionName={sectionName}
                 projectId={projectId}
                 sectionId={sectionId}
-                onShowSectionPrompt={() => setShowSectionPrompt(true)}
+                onShowSectionPrompt={() => {}}
             />
             <FloatingActionButton onPress={() => setShowMaterialForm(true)} />
             <MaterialFormModal
@@ -508,14 +545,6 @@ const Details = () => {
                 onSubmit={addMaterialRequest}
             />
 
-            <SectionSelectionPrompt
-                visible={showSectionPrompt}
-                onSelectSection={handleSectionSelect}
-                onClose={() => setShowSectionPrompt(false)}
-                sectionId={sectionId}
-                projectName={projectName}
-                sectionName={sectionName}
-            />
             <ScrollView
                 style={styles.scrollContainer}
                 showsVerticalScrollIndicator={false}
@@ -527,25 +556,11 @@ const Details = () => {
                     <Text style={styles.sectionTitle}>
                         {activeTab === 'imported' ? 'Available Materials' : 'Used Materials'}
                     </Text>
-                    {!selectedSection ? (
-                        <View style={styles.noSectionContainer}>
-                            <Text style={styles.noSectionTitle}>No Mini-Section Selected</Text>
-                            <Text style={styles.noSectionDescription}>
-                                Please select a mini-section (Foundation, First Slab, etc.) to view materials
-                            </Text>
-                            <TouchableOpacity
-                                style={styles.selectSectionButtonLarge}
-                                onPress={() => setShowSectionPrompt(true)}
-                                activeOpacity={0.7}
-                            >
-                                <Text style={styles.selectSectionButtonText}>Select Mini-Section</Text>
-                            </TouchableOpacity>
-                        </View>
-                    ) : loading ? (
+                    {loading ? (
                         <View style={styles.noMaterialsContainer}>
                             <Text style={styles.noMaterialsTitle}>Loading Materials...</Text>
                             <Text style={styles.noMaterialsDescription}>
-                                Fetching materials data for this section
+                                Fetching project materials...
                             </Text>
                         </View>
                     ) : groupedMaterials.length > 0 ? (
@@ -562,7 +577,8 @@ const Details = () => {
                         <View style={styles.noMaterialsContainer}>
                             <Text style={styles.noMaterialsTitle}>No Materials Found</Text>
                             <Text style={styles.noMaterialsDescription}>
-                                No {activeTab === 'imported' ? 'available' : 'used'} materials found for this mini-section
+                                No {activeTab === 'imported' ? 'available' : 'used'} materials found for this project.
+                                {activeTab === 'imported' && ' Add materials using the + button below.'}
                             </Text>
                         </View>
                     )}

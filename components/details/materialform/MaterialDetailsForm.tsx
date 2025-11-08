@@ -29,6 +29,8 @@ const MaterialDetailsForm: React.FC<MaterialDetailsFormProps> = ({
           value={formData.name}
           onChangeText={(value) => onInputChange('name', value)}
           placeholderTextColor="#94A3B8"
+          returnKeyType="next"
+          autoCapitalize="words"
         />
       </View>
 
@@ -71,6 +73,20 @@ const MaterialDetailsForm: React.FC<MaterialDetailsFormProps> = ({
           onChangeText={(value) => onInputChange('quantity', value)}
           keyboardType="decimal-pad"
           placeholderTextColor="#94A3B8"
+          returnKeyType="next"
+        />
+      </View>
+
+      <View style={sharedStyles.formGroup}>
+        <Text style={sharedStyles.label}>Cost (₹) *</Text>
+        <TextInput
+          style={sharedStyles.input}
+          placeholder="Enter cost in rupees"
+          value={formData.cost}
+          onChangeText={(value) => onInputChange('cost', value)}
+          keyboardType="decimal-pad"
+          placeholderTextColor="#94A3B8"
+          returnKeyType="done"
         />
       </View>
     </View>

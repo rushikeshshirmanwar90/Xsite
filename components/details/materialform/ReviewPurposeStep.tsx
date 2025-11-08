@@ -87,6 +87,12 @@ const ReviewPurposeStep: React.FC<ReviewPurposeStepProps> = ({
                       {material.quantity} {material.unit}
                     </Text>
                   </View>
+                  <View style={styles.reviewDetailRow}>
+                    <Text style={styles.reviewDetailLabel}>Cost:</Text>
+                    <Text style={styles.reviewDetailValue}>
+                      ₹{material.cost.toLocaleString('en-IN')}
+                    </Text>
+                  </View>
                   {Object.keys(material.specs).length > 0 && (
                     <View style={styles.reviewSpecsSection}>
                       <Text style={styles.reviewSpecsTitle}>Specifications:</Text>

@@ -11,6 +11,17 @@ export interface Project {
   spent?: number;
   progress?: number;
   section?: ProjectSection[];
+  MaterialAvailable?: MaterialItem[];
+  MaterialUsed?: MaterialItem[];
+}
+
+export interface MaterialItem {
+  _id: string;
+  name: string;
+  unit: string;
+  specs: Record<string, any>;
+  qnt: number;
+  cost: number;
 }
 
 export interface ProjectSection {

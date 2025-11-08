@@ -99,13 +99,21 @@ const Index: React.FC = () => {
     }, [clientId]);
 
     const handleViewDetails = (project: Project) => {
-        // Navigate to the new project sections page
+        console.log('Navigating to project sections with materials:', {
+            projectId: project._id,
+            materialAvailableCount: project.MaterialAvailable?.length || 0,
+            materialUsedCount: project.MaterialUsed?.length || 0
+        });
+        
+        // Navigate to the new project sections page with all material data
         router.push({
             pathname: '/project-sections',
             params: { 
                 id: project._id ?? '',
                 name: project.name, 
-                sectionData: JSON.stringify(project.section) 
+                sectionData: JSON.stringify(project.section || []),
+                materialAvailable: JSON.stringify(project.MaterialAvailable || []),
+                materialUsed: JSON.stringify(project.MaterialUsed || [])
             }
         });
     };

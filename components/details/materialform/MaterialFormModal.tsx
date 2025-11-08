@@ -1,24 +1,24 @@
 import React, { useRef, useState } from 'react';
 import {
-  Alert,
-  Animated,
-  Dimensions,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  StyleSheet,
-  Text,
-  TextStyle,
-  TouchableOpacity,
-  View,
-  ViewStyle
+    Alert,
+    Animated,
+    Dimensions,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    StyleSheet,
+    Text,
+    TextStyle,
+    TouchableOpacity,
+    View,
+    ViewStyle
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AddMaterialsStep from './AddMaterialsStep';
 import { MATERIAL_TEMPLATES } from './constants';
 import CustomSpecModal from './CustomSpecModal';
 import ProgressIndicator from './ProgressIndicator';
 import ReviewPurposeStep from './ReviewPurposeStep';
-import { sharedStyles } from './styles';
 import { CustomSpec, InternalMaterial, MaterialFormData } from './types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -40,11 +40,13 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   const [showUnitDropdown, setShowUnitDropdown] = useState(false);
   const [addedMaterials, setAddedMaterials] = useState<InternalMaterial[]>([]);
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const scrollViewRef = useRef<any>(null);
   const [formData, setFormData] = useState<MaterialFormData>({
     name: '',
     unit: '',
     quantity: '',
     specs: {},
+    cost: '',
   });
   const [customSpecs, setCustomSpecs] = useState<CustomSpec[]>([]);
   const [showAddSpecModal, setShowAddSpecModal] = useState(false);
@@ -58,6 +60,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       unit: template.unit,
       quantity: '',
       specs: {},
+      cost: '',
     });
     setSelectedTemplateKey(templateKey);
     setCustomSpecs([]);
@@ -100,8 +103,21 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   };
 
   const handleAddMaterial = () => {
-    if (!formData.name || !formData.unit || !formData.quantity) {
-      Alert.alert('Error', 'Please fill in all required fields');
+    if (!formData.name || !formData.unit || !formData.quantity || !formData.cost) {
+      Alert.alert('Error', 'Please fill in all required fields (name, unit, quantity, and cost)');
+      return;
+    }
+
+    const quantity = parseFloat(formData.quantity);
+    const cost = parseFloat(formData.cost);
+
+    if (isNaN(quantity) || quantity <= 0) {
+      Alert.alert('Error', 'Please enter a valid quantity greater than 0');
+      return;
+    }
+
+    if (isNaN(cost) || cost < 0) {
+      Alert.alert('Error', 'Please enter a valid cost (0 or greater)');
       return;
     }
 
@@ -111,21 +127,30 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
         ...updatedMaterials[editingMaterialIndex],
         name: formData.name,
         unit: formData.unit,
-        quantity: parseFloat(formData.quantity),
+        quantity,
+        cost,
         specs: formData.specs,
       };
       setAddedMaterials(updatedMaterials);
       setEditingMaterialIndex(null);
+      Alert.alert('✅ Success', 'Material updated successfully!');
     } else {
       const newEntry: InternalMaterial = {
         id: Date.now().toString(),
         name: formData.name,
         unit: formData.unit,
-        quantity: parseFloat(formData.quantity),
+        quantity,
+        cost,
         specs: formData.specs,
         date: new Date().toLocaleDateString('en-IN'),
       };
       setAddedMaterials([...addedMaterials, newEntry]);
+      Alert.alert('✅ Material Added', `${formData.name} has been added successfully!`);
+      
+      // Scroll to top to show the added material
+      setTimeout(() => {
+        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      }, 100);
     }
     resetForm();
   };
@@ -142,6 +167,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       name: materialToEdit.name,
       unit: materialToEdit.unit,
       quantity: String(materialToEdit.quantity),
+      cost: String(materialToEdit.cost || 0),
       specs: materialToEdit.specs || {},
     });
 
@@ -155,6 +181,11 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       setSelectedTemplateKey(templateEntry[0]);
     } else {
       setSelectedTemplateKey(null);
+    }
+
+    // Scroll to top when editing
+    if (currentStep === 1) {
+      handlePreviousStep();
     }
   };
 
@@ -181,18 +212,19 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     setCurrentStep(0);
   };
 
-  const handleSendRequest = () => {
+  const handleSendRequest = async () => {
     if (!purposeMessage.trim()) {
       Alert.alert('Error', 'Please describe what these materials are needed for');
       return;
     }
 
     const formattedMaterials = addedMaterials.map((material) => ({
-      name: material.name,
+      materialName: material.name,
       unit: material.unit,
       qnt: material.quantity,
       specs: material.specs || {},
-      cost: 0, // Default cost as per your schema
+      cost: material.cost || 0,
+      mergeIfExists: true,
     }));
 
     console.log('=== MATERIAL REQUEST ===');
@@ -210,6 +242,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       unit: '',
       quantity: '',
       specs: {},
+      cost: '',
     });
     setSelectedTemplateKey(null);
     setShowSpecDropdown(null);
@@ -219,12 +252,38 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   };
 
   const handleClose = () => {
-    setAddedMaterials([]);
-    setPurposeMessage('');
-    resetForm();
-    setCurrentStep(0);
-    slideAnim.setValue(0);
-    onClose();
+    // If there are added materials or form data, confirm before closing
+    if (addedMaterials.length > 0 || formData.name || formData.quantity || formData.cost) {
+      Alert.alert(
+        'Discard Changes?',
+        'You have unsaved materials. Are you sure you want to close?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Discard',
+            style: 'destructive',
+            onPress: () => {
+              setAddedMaterials([]);
+              setPurposeMessage('');
+              resetForm();
+              setCurrentStep(0);
+              slideAnim.setValue(0);
+              onClose();
+            },
+          },
+        ]
+      );
+    } else {
+      setAddedMaterials([]);
+      setPurposeMessage('');
+      resetForm();
+      setCurrentStep(0);
+      slideAnim.setValue(0);
+      onClose();
+    }
   };
 
   const getSpecFields = () => {
@@ -236,15 +295,21 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   const specFields = getSpecFields();
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={handleClose}>
-      <View style={sharedStyles.formContainer}>
+    <Modal 
+      visible={visible} 
+      animationType="slide" 
+      onRequestClose={handleClose}
+      presentationStyle="fullScreen"
+    >
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ flex: 1 }}
+          keyboardVerticalOffset={0}
         >
           <ProgressIndicator currentStep={currentStep} />
 
-          <View style={{ flex: 1, overflow: 'hidden' }}>
+          <View style={{ flex: 1, overflow: 'hidden', backgroundColor: '#F8FAFC' }}>
             <Animated.View
               style={[
                 {
@@ -254,6 +319,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                   right: 0,
                   bottom: 0,
                   width: SCREEN_WIDTH,
+                  backgroundColor: '#F8FAFC',
                 },
                 { transform: [{ translateX: slideAnim }] }
               ]}
@@ -267,6 +333,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                 editingMaterialIndex={editingMaterialIndex}
                 showUnitDropdown={showUnitDropdown}
                 showSpecDropdown={showSpecDropdown}
+                scrollViewRef={scrollViewRef}
                 onTemplateSelect={handleTemplateSelect}
                 onInputChange={handleInputChange}
                 onSpecChange={handleSpecChange}
@@ -294,6 +361,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                   right: -SCREEN_WIDTH,
                   bottom: 0,
                   width: SCREEN_WIDTH,
+                  backgroundColor: '#F8FAFC',
                 },
                 { transform: [{ translateX: slideAnim }] }
               ]}
@@ -343,13 +411,13 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
             </View>
           )}
         </KeyboardAvoidingView>
-      </View>
 
-      <CustomSpecModal
-        visible={showAddSpecModal}
-        onClose={() => setShowAddSpecModal(false)}
-        onAdd={handleAddCustomSpec}
-      />
+        <CustomSpecModal
+          visible={showAddSpecModal}
+          onClose={() => setShowAddSpecModal(false)}
+          onAdd={handleAddCustomSpec}
+        />
+      </SafeAreaView>
     </Modal>
   );
 };

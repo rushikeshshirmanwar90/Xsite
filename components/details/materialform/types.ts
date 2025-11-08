@@ -19,6 +19,7 @@ export interface InternalMaterial {
   name: string;
   unit: string;
   quantity: number;
+  cost: number;
   specs: Record<string, string | number | boolean>;
   date: string;
 }
@@ -27,6 +28,7 @@ export interface MaterialFormData {
   name: string;
   unit: string;
   quantity: string;
+  cost: string;
   specs: Record<string, any>;
 }
 
