@@ -220,17 +220,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                         </View>
                     </View>
 
-                    {/* Add Usage Button - Only show in imported tab */}
-                    {activeTab === 'imported' && (
-                        <TouchableOpacity
-                            style={styles.addUsageButton}
-                            onPress={handleOpenUsageModal}
-                            activeOpacity={0.7}
-                        >
-                            <Ionicons name="add-circle-outline" size={20} color="#059669" />
-                            <Text style={styles.addUsageButtonText}>Add Usage</Text>
-                        </TouchableOpacity>
-                    )}
+
                 </View>
             </Animated.View>
 

@@ -104,22 +104,25 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
 
   const handleAddMaterial = () => {
     if (!formData.name || !formData.unit || !formData.quantity || !formData.cost) {
-      Alert.alert('Error', 'Please fill in all required fields (name, unit, quantity, and cost)');
+      Alert.alert('Error', 'Please fill in all required fields (name, unit, quantity, and cost per unit)');
       return;
     }
 
     const quantity = parseFloat(formData.quantity);
-    const cost = parseFloat(formData.cost);
+    const costPerUnit = parseFloat(formData.cost);
 
     if (isNaN(quantity) || quantity <= 0) {
       Alert.alert('Error', 'Please enter a valid quantity greater than 0');
       return;
     }
 
-    if (isNaN(cost) || cost < 0) {
-      Alert.alert('Error', 'Please enter a valid cost (0 or greater)');
+    if (isNaN(costPerUnit) || costPerUnit < 0) {
+      Alert.alert('Error', 'Please enter a valid cost per unit (0 or greater)');
       return;
     }
+
+    // Calculate total cost
+    const totalCost = quantity * costPerUnit;
 
     if (editingMaterialIndex !== null) {
       const updatedMaterials = [...addedMaterials];
@@ -128,24 +131,30 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
         name: formData.name,
         unit: formData.unit,
         quantity,
-        cost,
+        cost: totalCost, // Store total cost
         specs: formData.specs,
       };
       setAddedMaterials(updatedMaterials);
       setEditingMaterialIndex(null);
-      Alert.alert('✅ Success', 'Material updated successfully!');
+      
+      // Show toast for update
+      const { toast } = require('sonner-native');
+      toast.success('Material updated successfully');
     } else {
       const newEntry: InternalMaterial = {
         id: Date.now().toString(),
         name: formData.name,
         unit: formData.unit,
         quantity,
-        cost,
+        cost: totalCost, // Store total cost
         specs: formData.specs,
         date: new Date().toLocaleDateString('en-IN'),
       };
       setAddedMaterials([...addedMaterials, newEntry]);
-      Alert.alert('✅ Material Added', `${formData.name} has been added successfully!`);
+      
+      // Show toast for new material
+      const { toast } = require('sonner-native');
+      toast.success(`✓ ${formData.name} added to list`);
       
       // Scroll to top to show the added material
       setTimeout(() => {
@@ -163,11 +172,16 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       value: String(value),
     }));
 
+    // Calculate per-unit cost from total cost
+    const costPerUnit = materialToEdit.quantity > 0 
+      ? (materialToEdit.cost || 0) / materialToEdit.quantity 
+      : 0;
+
     setFormData({
       name: materialToEdit.name,
       unit: materialToEdit.unit,
       quantity: String(materialToEdit.quantity),
-      cost: String(materialToEdit.cost || 0),
+      cost: String(costPerUnit.toFixed(2)), // Show per-unit cost
       specs: materialToEdit.specs || {},
     });
 
@@ -232,8 +246,9 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     console.log('Materials:', JSON.stringify(formattedMaterials, null, 2));
     console.log('========================');
 
-    onSubmit(formattedMaterials, purposeMessage);
-    handleClose();
+    // Call onSubmit and close immediately without showing discard confirmation
+    await onSubmit(formattedMaterials, purposeMessage);
+    handleClose(true); // Skip confirmation when successfully submitted
   };
 
   const resetForm = () => {
@@ -251,7 +266,18 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     setEditingMaterialIndex(null);
   };
 
-  const handleClose = () => {
+  const handleClose = (skipConfirmation = false) => {
+    // If skipConfirmation is true (from successful submit), close immediately
+    if (skipConfirmation) {
+      setAddedMaterials([]);
+      setPurposeMessage('');
+      resetForm();
+      setCurrentStep(0);
+      slideAnim.setValue(0);
+      onClose();
+      return;
+    }
+
     // If there are added materials or form data, confirm before closing
     if (addedMaterials.length > 0 || formData.name || formData.quantity || formData.cost) {
       Alert.alert(
@@ -298,7 +324,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     <Modal 
       visible={visible} 
       animationType="slide" 
-      onRequestClose={handleClose}
+      onRequestClose={() => handleClose(false)}
       presentationStyle="fullScreen"
     >
       <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>

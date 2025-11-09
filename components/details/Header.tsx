@@ -18,6 +18,7 @@ interface HeaderProps {
     projectId?: string;
     sectionId?: string;
     onShowSectionPrompt?: () => void;
+    hideSection?: boolean;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -31,6 +32,7 @@ const Header: React.FC<HeaderProps> = ({
     projectId,
     sectionId,
     onShowSectionPrompt,
+    hideSection = false,
 }) => {
     // State to store fetched sections
     const [sections, setSections] = useState<Section[]>([]);
@@ -143,23 +145,25 @@ const Header: React.FC<HeaderProps> = ({
                         )}
                     </View>
 
-                    {/* Section Dropdown - Replaces the building name title */}
-                    <View style={styles.sectionDropdownContainer}>
-                        <SectionManager
-                            onSectionSelect={onSectionSelect}
-                            selectedSection={selectedSection}
-                            sections={mappedSections}
-                            compact={true}
-                            projectDetails={{
-                                projectName: projectName || "Villa Project",
-                                projectId: projectId || "unknown"
-                            }}
-                            mainSectionDetails={{
-                                sectionName: sectionName || "Main Section",
-                                sectionId: sectionId || "unknown"
-                            }}
-                        />
-                    </View>
+                    {/* Section Dropdown - Only show if not hidden */}
+                    {!hideSection && (
+                        <View style={styles.sectionDropdownContainer}>
+                            <SectionManager
+                                onSectionSelect={onSectionSelect}
+                                selectedSection={selectedSection}
+                                sections={mappedSections}
+                                compact={true}
+                                projectDetails={{
+                                    projectName: projectName || "Villa Project",
+                                    projectId: projectId || "unknown"
+                                }}
+                                mainSectionDetails={{
+                                    sectionName: sectionName || "Main Section",
+                                    sectionId: sectionId || "unknown"
+                                }}
+                            />
+                        </View>
+                    )}
                 </View>
             </View>
         </View>

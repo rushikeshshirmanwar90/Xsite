@@ -1,17 +1,19 @@
-import FloatingActionButton from '@/components/details/FloatingActionButton';
 import Header from '@/components/details/Header';
 import MaterialCardEnhanced from '@/components/details/MaterialCardEnhanced';
 import MaterialFormModal from '@/components/details/MaterialFormModel';
-import PeriodFilter from '@/components/details/PeriodTable';
+import MaterialUsageForm from '@/components/details/MaterialUsageForm';
+import SectionManager from '@/components/details/SectionManager';
 import TabSelector from '@/components/details/TabSelector';
 import { predefinedSections } from '@/data/details';
+import { getSection } from '@/functions/details';
 import { domain } from '@/lib/domain';
 import { styles } from '@/style/details';
-import { Material, MaterialEntry } from '@/types/details';
+import { Material, MaterialEntry, Section } from '@/types/details';
+import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, ScrollView, Text, View } from 'react-native';
+import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -27,9 +29,12 @@ const Details = () => {
     const [activeTab, setActiveTab] = useState<'imported' | 'used'>('imported');
     const [selectedPeriod, setSelectedPeriod] = useState('Today');
     const [showMaterialForm, setShowMaterialForm] = useState(false);
+    const [showUsageForm, setShowUsageForm] = useState(false);
+    const [selectedMiniSection, setSelectedMiniSection] = useState<string | null>(null);
 
     const [availableMaterials, setAvailableMaterials] = useState<Material[]>([]);
     const [usedMaterials, setUsedMaterials] = useState<Material[]>([]);
+    const [miniSections, setMiniSections] = useState<Section[]>([]);
     const [loading, setLoading] = useState(false);
     const cardAnimations = useRef<Animated.Value[]>([]).current;
 
@@ -197,6 +202,26 @@ const Details = () => {
         loadProjectMaterials();
     }, [projectId, materialAvailableParam, materialUsedParam]);
 
+    // Fetch mini-sections for the section selector
+    useEffect(() => {
+        const fetchMiniSections = async () => {
+            if (!sectionId) return;
+            
+            try {
+                console.log('Fetching mini-sections for sectionId:', sectionId);
+                const sections = await getSection(sectionId);
+                if (sections && Array.isArray(sections)) {
+                    setMiniSections(sections);
+                    console.log('Mini-sections loaded:', sections.length);
+                }
+            } catch (error) {
+                console.error('Failed to fetch mini-sections:', error);
+            }
+        };
+
+        fetchMiniSections();
+    }, [sectionId]);
+
     // Group materials by name and unit
     const groupMaterialsByName = (materials: Material[], usedMaterialsList: Material[] = []) => {
         console.log('=== GROUPING MATERIALS ===');
@@ -278,6 +303,64 @@ const Details = () => {
         return result;
     };
 
+    // Handle adding material usage from the form
+    const handleAddMaterialUsage = async (
+        sectionId: string,
+        materialId: string,
+        quantity: number
+    ) => {
+        let loadingToast: any = null;
+
+        try {
+            const apiPayload = {
+                sectionId: sectionId,
+                materialId: materialId,
+                qnt: quantity
+            };
+
+            console.log('=== ADD MATERIAL USAGE REQUEST ===');
+            console.log('Section ID:', sectionId);
+            console.log('Material ID:', materialId);
+            console.log('Quantity:', quantity);
+            console.log('API ENDPOINT:', `${domain}/api/add-material-usage`);
+            console.log('PAYLOAD:', JSON.stringify(apiPayload, null, 2));
+            console.log('==================================');
+
+            loadingToast = toast.loading('Adding material usage...');
+
+            const response = await axios.post(`${domain}/api/add-material-usage`, apiPayload);
+            const responseData = response.data as any;
+
+            if (responseData.success) {
+                console.log('=== ADD MATERIAL USAGE SUCCESS ===');
+                console.log('Response:', responseData);
+                console.log('==================================');
+
+                toast.dismiss(loadingToast);
+                toast.success(responseData.message || 'Material usage added successfully');
+
+                // Refresh materials
+                await loadProjectMaterials();
+            } else {
+                throw new Error(responseData.error || 'Failed to add material usage');
+            }
+        } catch (error: any) {
+            console.error('=== ADD MATERIAL USAGE ERROR ===');
+            console.error('Error:', error);
+            console.error('================================');
+
+            if (loadingToast) {
+                toast.dismiss(loadingToast);
+            }
+
+            const errorMessage = error?.response?.data?.error ||
+                error?.message ||
+                'Failed to add material usage';
+
+            toast.error(errorMessage);
+        }
+    };
+
     // Handle adding usage - now works at project level
     const handleAddUsage = async (
         materialName: string,
@@ -355,14 +438,25 @@ const Details = () => {
 
 
     const getCurrentData = () => {
-        const materials = activeTab === 'imported' ? availableMaterials : usedMaterials;
-        console.log('getCurrentData:', {
-            activeTab,
-            projectId,
-            totalMaterials: materials.length
-        });
+        let materials = activeTab === 'imported' ? availableMaterials : usedMaterials;
+        
+        // Filter by mini-section only for "used" tab
+        if (activeTab === 'used' && selectedMiniSection) {
+            materials = materials.filter(m => m.sectionId === selectedMiniSection);
+            console.log('getCurrentData (filtered by section):', {
+                activeTab,
+                selectedMiniSection,
+                totalMaterials: materials.length
+            });
+        } else {
+            console.log('getCurrentData:', {
+                activeTab,
+                projectId,
+                totalMaterials: materials.length
+            });
+        }
 
-        return materials; // Return all materials from project level
+        return materials;
     };
 
     const getGroupedData = () => {
@@ -537,12 +631,22 @@ const Details = () => {
                 projectId={projectId}
                 sectionId={sectionId}
                 onShowSectionPrompt={() => {}}
+                hideSection={true}
             />
-            <FloatingActionButton onPress={() => setShowMaterialForm(true)} />
             <MaterialFormModal
                 visible={showMaterialForm}
                 onClose={() => setShowMaterialForm(false)}
-                onSubmit={addMaterialRequest}
+                onSubmit={async (materials, message) => {
+                    await addMaterialRequest(materials, message);
+                    setShowMaterialForm(false);
+                }}
+            />
+            <MaterialUsageForm
+                visible={showUsageForm}
+                onClose={() => setShowUsageForm(false)}
+                onSubmit={handleAddMaterialUsage}
+                availableMaterials={availableMaterials}
+                miniSections={miniSections}
             />
 
             <ScrollView
@@ -550,11 +654,129 @@ const Details = () => {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
             >
-                <PeriodFilter selectedPeriod={selectedPeriod} onSelectPeriod={setSelectedPeriod} />
                 <TabSelector activeTab={activeTab} onSelectTab={setActiveTab} />
+                
+                {/* Action Buttons */}
+                <View style={actionStyles.actionButtonsContainer}>
+                    <TouchableOpacity
+                        style={actionStyles.addMaterialButton}
+                        onPress={() => setShowMaterialForm(true)}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons name="add-circle-outline" size={20} color="#059669" />
+                        <Text style={actionStyles.addMaterialButtonText}>Add Material</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
+                        style={actionStyles.addUsageButton}
+                        onPress={() => setShowUsageForm(true)}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons name="arrow-forward-circle-outline" size={20} color="#DC2626" />
+                        <Text style={actionStyles.addUsageButtonText}>Add Usage</Text>
+                    </TouchableOpacity>
+                </View>
+                
+                {/* Compact Filters - Only visible in "Used Materials" tab */}
+                {activeTab === 'used' && (
+                    <View style={sectionStyles.filtersContainer}>
+                        {/* Period Filter - Compact Chips */}
+                        <View style={sectionStyles.filterRow}>
+                            <Ionicons name="time-outline" size={16} color="#64748B" style={sectionStyles.filterIcon} />
+                            <ScrollView 
+                                horizontal 
+                                showsHorizontalScrollIndicator={false}
+                                style={sectionStyles.chipScrollView}
+                            >
+                                {['Today', '1 Week', '15 Days', '1 Month', 'All'].map((period) => (
+                                    <TouchableOpacity
+                                        key={period}
+                                        style={[
+                                            sectionStyles.chip,
+                                            selectedPeriod === period && sectionStyles.chipActive
+                                        ]}
+                                        onPress={() => setSelectedPeriod(period)}
+                                    >
+                                        <Text style={[
+                                            sectionStyles.chipText,
+                                            selectedPeriod === period && sectionStyles.chipTextActive
+                                        ]}>
+                                            {period}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </View>
+
+                        {/* Section Filter - Compact Dropdown */}
+                        <View style={sectionStyles.filterRow}>
+                            <Ionicons name="layers-outline" size={16} color="#64748B" style={sectionStyles.filterIcon} />
+                            {miniSections.length > 0 ? (
+                                <View style={sectionStyles.compactSectionSelector}>
+                                    <SectionManager
+                                        onSectionSelect={(sectionId) => {
+                                            setSelectedMiniSection(sectionId === 'all-sections' ? null : sectionId);
+                                        }}
+                                        selectedSection={selectedMiniSection || 'all-sections'}
+                                        sections={[
+                                            { id: 'all-sections', name: 'All Sections', createdAt: new Date().toISOString() },
+                                            ...miniSections.map(s => ({
+                                                id: s._id,
+                                                name: s.name,
+                                                createdAt: s.createdAt
+                                            }))
+                                        ]}
+                                        compact={true}
+                                        projectDetails={{
+                                            projectName: projectName,
+                                            projectId: projectId
+                                        }}
+                                        mainSectionDetails={{
+                                            sectionName: sectionName,
+                                            sectionId: sectionId
+                                        }}
+                                    />
+                                </View>
+                            ) : (
+                                <View style={sectionStyles.noSectionsCompact}>
+                                    <Text style={sectionStyles.noSectionsTextCompact}>No mini-sections</Text>
+                                    <SectionManager
+                                        onSectionSelect={(sectionId) => {
+                                            setSelectedMiniSection(sectionId);
+                                            if (sectionId) {
+                                                getSection(sectionId).then(sections => {
+                                                    if (sections && Array.isArray(sections)) {
+                                                        setMiniSections(sections);
+                                                    }
+                                                });
+                                            }
+                                        }}
+                                        selectedSection={null}
+                                        sections={[]}
+                                        compact={true}
+                                        projectDetails={{
+                                            projectName: projectName,
+                                            projectId: projectId
+                                        }}
+                                        mainSectionDetails={{
+                                            sectionName: sectionName,
+                                            sectionId: sectionId
+                                        }}
+                                    />
+                                </View>
+                            )}
+                        </View>
+                    </View>
+                )}
+
                 <View style={styles.materialsSection}>
                     <Text style={styles.sectionTitle}>
                         {activeTab === 'imported' ? 'Available Materials' : 'Used Materials'}
+                        {activeTab === 'used' && selectedMiniSection && (
+                            <Text style={{ fontSize: 14, color: '#64748B', fontWeight: '400' }}>
+                                {' '}(Filtered)
+                            </Text>
+                        )}
                     </Text>
                     {loading ? (
                         <View style={styles.noMaterialsContainer}>
@@ -587,5 +809,121 @@ const Details = () => {
         </SafeAreaView>
     );
 };
+
+const actionStyles = StyleSheet.create({
+    actionButtonsContainer: {
+        flexDirection: 'row',
+        marginTop: 16,
+        marginBottom: 8,
+        marginHorizontal: 16,
+        borderRadius: 12,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    addMaterialButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F0FDF4',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRightWidth: 0.5,
+        borderRightColor: '#E5E7EB',
+        gap: 8,
+    },
+    addMaterialButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#059669',
+    },
+    addUsageButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#FEF2F2',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderLeftWidth: 0.5,
+        borderLeftColor: '#E5E7EB',
+        gap: 8,
+    },
+    addUsageButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#DC2626',
+    },
+});
+
+const sectionStyles = StyleSheet.create({
+    filtersContainer: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 12,
+        marginTop: 12,
+        marginBottom: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
+        gap: 12,
+    },
+    filterRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        minHeight: 36,
+    },
+    filterIcon: {
+        marginRight: 8,
+    },
+    chipScrollView: {
+        flex: 1,
+    },
+    chip: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
+        backgroundColor: '#F1F5F9',
+        marginRight: 8,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    chipActive: {
+        backgroundColor: '#3B82F6',
+        borderColor: '#3B82F6',
+    },
+    chipText: {
+        fontSize: 13,
+        color: '#64748B',
+        fontWeight: '500',
+    },
+    chipTextActive: {
+        color: '#FFFFFF',
+    },
+    compactSectionSelector: {
+        flex: 1,
+    },
+    noSectionsCompact: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#FEF3C7',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    noSectionsTextCompact: {
+        fontSize: 13,
+        color: '#92400E',
+        fontWeight: '500',
+        flex: 1,
+    },
+});
 
 export default Details;
