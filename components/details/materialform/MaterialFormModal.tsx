@@ -14,6 +14,7 @@ import {
     ViewStyle
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { toast } from 'sonner-native';
 import AddMaterialsStep from './AddMaterialsStep';
 import { MATERIAL_TEMPLATES } from './constants';
 import CustomSpecModal from './CustomSpecModal';
@@ -138,7 +139,6 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       setEditingMaterialIndex(null);
       
       // Show toast for update
-      const { toast } = require('sonner-native');
       toast.success('Material updated successfully');
     } else {
       const newEntry: InternalMaterial = {
@@ -153,7 +153,6 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       setAddedMaterials([...addedMaterials, newEntry]);
       
       // Show toast for new material
-      const { toast } = require('sonner-native');
       toast.success(`✓ ${formData.name} added to list`);
       
       // Scroll to top to show the added material

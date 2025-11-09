@@ -11,6 +11,7 @@ export interface Material {
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
   sectionId?: string;
+  miniSectionId?: string;
   specs?: Record<string, any>;
 }
 

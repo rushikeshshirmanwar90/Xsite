@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Picker } from '@react-native-picker/picker';
 import React, { useState } from 'react';
 import {
     Modal,
@@ -28,7 +27,7 @@ interface Material {
 interface MaterialUsageFormProps {
     visible: boolean;
     onClose: () => void;
-    onSubmit: (sectionId: string, materialId: string, quantity: number) => void;
+    onSubmit: (miniSectionId: string, materialId: string, quantity: number) => void;
     availableMaterials: Material[];
     miniSections: Array<{ _id: string; name: string }>;
 }
@@ -40,12 +39,13 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
     availableMaterials,
     miniSections
 }) => {
-    const [selectedSectionId, setSelectedSectionId] = useState<string>('');
+    const [selectedMiniSectionId, setSelectedMiniSectionId] = useState<string>('');
     const [selectedMaterialId, setSelectedMaterialId] = useState<string>('');
     const [quantity, setQuantity] = useState<string>('');
+    const [searchQuery, setSearchQuery] = useState<string>('');
 
     const handleSubmit = () => {
-        if (!selectedSectionId) {
+        if (!selectedMiniSectionId) {
             alert('Please select a mini-section');
             return;
         }
@@ -58,16 +58,41 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
             return;
         }
 
-        onSubmit(selectedSectionId, selectedMaterialId, parseFloat(quantity));
+        // Check if quantity exceeds available amount
+        if (selectedMaterial && parseFloat(quantity) > selectedMaterial.quantity) {
+            alert(`Quantity exceeds available amount!\n\nYou entered: ${parseFloat(quantity)} ${selectedMaterial.unit}\nAvailable: ${selectedMaterial.quantity} ${selectedMaterial.unit}`);
+            return;
+        }
+
+        console.log('\n========================================');
+        console.log('MATERIAL USAGE FORM - SUBMISSION');
+        console.log('========================================');
+        console.log('Selected Mini-Section ID:', selectedMiniSectionId);
+        console.log('Selected Material ID:', selectedMaterialId);
+        console.log('Quantity:', parseFloat(quantity));
+        console.log('----------------------------------------');
+        console.log('Selected Material Details:', selectedMaterial);
+        console.log('========================================\n');
+
+        onSubmit(selectedMiniSectionId, selectedMaterialId, parseFloat(quantity));
         handleClose();
     };
 
     const handleClose = () => {
-        setSelectedSectionId('');
+        setSelectedMiniSectionId('');
         setSelectedMaterialId('');
         setQuantity('');
+        setSearchQuery('');
         onClose();
     };
+
+    // Filter materials based on search query
+    const filteredMaterials = availableMaterials.filter(material => {
+        if (!searchQuery) return true;
+        const query = searchQuery.toLowerCase();
+        return material.name.toLowerCase().includes(query) ||
+               material.unit.toLowerCase().includes(query);
+    });
 
     const selectedMaterial = availableMaterials.find(m => m._id === selectedMaterialId);
 
@@ -87,8 +112,8 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                 <Ionicons name="arrow-forward-circle" size={24} color="#3B82F6" />
                             </View>
                             <View>
-                                <Text style={styles.title}>Add Material Usage</Text>
-                                <Text style={styles.subtitle}>Move material to used section</Text>
+                                <Text style={styles.title}>Record Material Usage</Text>
+                                <Text style={styles.subtitle}>Track materials used in your project</Text>
                             </View>
                         </View>
                         <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
@@ -99,53 +124,116 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                     <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false}>
                         {/* Mini-Section Selector */}
                         <View style={styles.fieldContainer}>
-                            <Text style={styles.label}>
-                                Select Mini-Section <Text style={styles.required}>*</Text>
-                            </Text>
-                            <View style={styles.pickerContainer}>
-                                <Picker
-                                    selectedValue={selectedSectionId}
-                                    onValueChange={(value) => setSelectedSectionId(value)}
-                                    style={styles.picker}
-                                >
-                                    <Picker.Item label="Choose a section..." value="" />
-                                    {miniSections.map((section) => (
-                                        <Picker.Item
-                                            key={section._id}
-                                            label={section.name}
-                                            value={section._id}
-                                        />
-                                    ))}
-                                </Picker>
-                            </View>
-                            {miniSections.length === 0 && (
-                                <Text style={styles.helperText}>
-                                    ⚠️ No mini-sections available. Please create one first.
+                            <View style={styles.labelWithHelper}>
+                                <Text style={styles.label}>
+                                    Where is this material being used? <Text style={styles.required}>*</Text>
                                 </Text>
+                                <Text style={styles.labelHelper}>Select the work area or mini-section</Text>
+                            </View>
+                            {miniSections.length > 0 ? (
+                                <View style={styles.sectionList}>
+                                    {miniSections.map((section) => {
+                                        const isSelected = selectedMiniSectionId === section._id;
+                                        return (
+                                            <TouchableOpacity
+                                                key={section._id}
+                                                style={[
+                                                    styles.sectionItem,
+                                                    isSelected && styles.sectionItemSelected
+                                                ]}
+                                                onPress={() => setSelectedMiniSectionId(section._id)}
+                                            >
+                                                <View style={styles.sectionItemLeft}>
+                                                    <View style={styles.sectionIconBadge}>
+                                                        <Ionicons name="layers" size={18} color="#3B82F6" />
+                                                    </View>
+                                                    <Text style={styles.sectionItemName}>{section.name}</Text>
+                                                </View>
+                                                {isSelected && (
+                                                    <Ionicons name="checkmark-circle" size={22} color="#3B82F6" />
+                                                )}
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
+                            ) : (
+                                <View style={styles.noSectionsWarning}>
+                                    <Ionicons name="alert-circle" size={20} color="#F59E0B" />
+                                    <Text style={styles.helperText}>
+                                        No mini-sections available. Please create one first.
+                                    </Text>
+                                </View>
                             )}
                         </View>
 
-                        {/* Material Selector */}
+                        {/* Search & Select Material */}
                         <View style={styles.fieldContainer}>
-                            <Text style={styles.label}>
-                                Select Material <Text style={styles.required}>*</Text>
-                            </Text>
-                            <View style={styles.pickerContainer}>
-                                <Picker
-                                    selectedValue={selectedMaterialId}
-                                    onValueChange={(value) => setSelectedMaterialId(value)}
-                                    style={styles.picker}
-                                >
-                                    <Picker.Item label="Choose a material..." value="" />
-                                    {availableMaterials.map((material) => (
-                                        <Picker.Item
-                                            key={material._id || material.id}
-                                            label={`${material.name} (${material.quantity} ${material.unit} available)`}
-                                            value={material._id || material.id.toString()}
-                                        />
-                                    ))}
-                                </Picker>
+                            <View style={styles.labelWithHelper}>
+                                <Text style={styles.label}>
+                                    Which material are you using? <Text style={styles.required}>*</Text>
+                                </Text>
+                                <Text style={styles.labelHelper}>Search and select from available materials</Text>
                             </View>
+                            <View style={styles.searchContainer}>
+                                <Ionicons name="search" size={20} color="#94A3B8" style={styles.searchIcon} />
+                                <TextInput
+                                    style={styles.searchInput}
+                                    value={searchQuery}
+                                    onChangeText={setSearchQuery}
+                                    placeholder="Search by name or unit..."
+                                    placeholderTextColor="#94A3B8"
+                                />
+                                {searchQuery.length > 0 && (
+                                    <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
+                                        <Ionicons name="close-circle" size={20} color="#94A3B8" />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                            
+                            {/* Material List */}
+                            <ScrollView 
+                                style={styles.materialList}
+                                nestedScrollEnabled={true}
+                                showsVerticalScrollIndicator={true}
+                            >
+                                {filteredMaterials.length > 0 ? (
+                                    filteredMaterials.map((material) => {
+                                        const isSelected = selectedMaterialId === (material._id || material.id.toString());
+                                        return (
+                                            <TouchableOpacity
+                                                key={material._id || material.id}
+                                                style={[
+                                                    styles.materialItem,
+                                                    isSelected && styles.materialItemSelected
+                                                ]}
+                                                onPress={() => setSelectedMaterialId(material._id || material.id.toString())}
+                                            >
+                                                <View style={styles.materialItemLeft}>
+                                                    <View style={[styles.materialIconBadge, { backgroundColor: material.color + '20' }]}>
+                                                        <Ionicons name={material.icon} size={20} color={material.color} />
+                                                    </View>
+                                                    <View style={styles.materialItemInfo}>
+                                                        <Text style={styles.materialItemName}>{material.name}</Text>
+                                                        <Text style={styles.materialItemQuantity}>
+                                                            {material.quantity} {material.unit} available
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                                {isSelected && (
+                                                    <Ionicons name="checkmark-circle" size={24} color="#3B82F6" />
+                                                )}
+                                            </TouchableOpacity>
+                                        );
+                                    })
+                                ) : (
+                                    <View style={styles.emptyState}>
+                                        <Ionicons name="search-outline" size={48} color="#CBD5E1" />
+                                        <Text style={styles.emptyStateText}>
+                                            {searchQuery ? 'No materials match your search' : 'No materials available'}
+                                        </Text>
+                                    </View>
+                                )}
+                            </ScrollView>
                         </View>
 
                         {/* Material Details */}
@@ -160,7 +248,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                 {Object.keys(selectedMaterial.specs || {}).length > 0 && (
                                     <View style={styles.specsContainer}>
                                         <Text style={styles.specsTitle}>Specifications:</Text>
-                                        {Object.entries(selectedMaterial.specs).map(([key, value]) => (
+                                        {Object.entries(selectedMaterial.specs || {}).map(([key, value]) => (
                                             <Text key={key} style={styles.specItem}>
                                                 • {key}: {String(value)}
                                             </Text>
@@ -172,9 +260,17 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
 
                         {/* Quantity Input */}
                         <View style={styles.fieldContainer}>
-                            <Text style={styles.label}>
-                                Quantity to Use <Text style={styles.required}>*</Text>
-                            </Text>
+                            <View style={styles.labelWithHelper}>
+                                <Text style={styles.label}>
+                                    How much are you using? <Text style={styles.required}>*</Text>
+                                </Text>
+                                <Text style={styles.labelHelper}>
+                                    {selectedMaterial 
+                                        ? `Enter quantity in ${selectedMaterial.unit} (Available: ${selectedMaterial.quantity})`
+                                        : 'Enter the quantity you want to use'
+                                    }
+                                </Text>
+                            </View>
                             <TextInput
                                 style={styles.input}
                                 value={quantity}
@@ -202,13 +298,13 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                         <TouchableOpacity
                             style={[
                                 styles.submitButton,
-                                (!selectedSectionId || !selectedMaterialId || !quantity) && styles.submitButtonDisabled
+                                (!selectedMiniSectionId || !selectedMaterialId || !quantity) && styles.submitButtonDisabled
                             ]}
                             onPress={handleSubmit}
-                            disabled={!selectedSectionId || !selectedMaterialId || !quantity}
+                            disabled={!selectedMiniSectionId || !selectedMaterialId || !quantity}
                         >
                             <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-                            <Text style={styles.submitButtonText}>Add Usage</Text>
+                            <Text style={styles.submitButtonText}>Record Usage</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -271,11 +367,19 @@ const styles = StyleSheet.create({
     fieldContainer: {
         marginBottom: 20,
     },
-    label: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#334155',
+    labelWithHelper: {
         marginBottom: 8,
+    },
+    label: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#1E293B',
+        marginBottom: 4,
+    },
+    labelHelper: {
+        fontSize: 13,
+        color: '#64748B',
+        fontWeight: '400',
     },
     required: {
         color: '#EF4444',
@@ -299,10 +403,143 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#1E293B',
     },
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        paddingHorizontal: 12,
+    },
+    searchIcon: {
+        marginRight: 8,
+    },
+    searchInput: {
+        flex: 1,
+        paddingVertical: 14,
+        fontSize: 16,
+        color: '#1E293B',
+    },
+    clearButton: {
+        padding: 4,
+    },
+    searchResultText: {
+        fontSize: 12,
+        color: '#3B82F6',
+        marginTop: 6,
+        fontWeight: '500',
+    },
+    materialList: {
+        maxHeight: 280,
+        marginTop: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        backgroundColor: '#FFFFFF',
+    },
+    materialItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    materialItemSelected: {
+        backgroundColor: '#EFF6FF',
+        borderLeftWidth: 3,
+        borderLeftColor: '#3B82F6',
+    },
+    materialItemLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    materialIconBadge: {
+        width: 40,
+        height: 40,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    materialItemInfo: {
+        flex: 1,
+    },
+    materialItemName: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#1E293B',
+        marginBottom: 2,
+    },
+    materialItemQuantity: {
+        fontSize: 13,
+        color: '#64748B',
+    },
+    emptyState: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 40,
+    },
+    emptyStateText: {
+        fontSize: 14,
+        color: '#94A3B8',
+        marginTop: 12,
+    },
+    sectionList: {
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        backgroundColor: '#FFFFFF',
+        overflow: 'hidden',
+    },
+    sectionItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    sectionItemSelected: {
+        backgroundColor: '#EFF6FF',
+        borderLeftWidth: 3,
+        borderLeftColor: '#3B82F6',
+    },
+    sectionItemLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    sectionIconBadge: {
+        width: 36,
+        height: 36,
+        borderRadius: 8,
+        backgroundColor: '#EFF6FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    sectionItemName: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#1E293B',
+    },
+    noSectionsWarning: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FEF3C7',
+        padding: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+        gap: 8,
+    },
     helperText: {
         fontSize: 12,
-        color: '#F59E0B',
-        marginTop: 6,
+        color: '#92400E',
+        flex: 1,
     },
     errorText: {
         fontSize: 12,
