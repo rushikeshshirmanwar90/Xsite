@@ -3,11 +3,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -16,12 +16,16 @@ const ProjectSections = () => {
   const { id, name, sectionData, materialAvailable, materialUsed } = params;
   
   const [sections, setSections] = useState<ProjectSection[]>([]);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (sectionData) {
       const parsedData = JSON.parse(Array.isArray(sectionData) ? sectionData[0] : sectionData);
       setSections(parsedData);
+      
+      // If there's only one section and we're on this page, show a helpful message
+      if (parsedData.length === 1) {
+        console.log('Single section detected on sections page - user could have been redirected directly');
+      }
     }
   }, [sectionData]);
 
@@ -87,6 +91,16 @@ const ProjectSections = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Single Section Notice */}
+        {sections && sections.length === 1 && (
+          <View style={styles.singleSectionNotice}>
+            <Ionicons name="information-circle" size={20} color="#3B82F6" />
+            <Text style={styles.singleSectionText}>
+              This project has only one section. You can go directly to details.
+            </Text>
+          </View>
+        )}
+        
         {sections && sections.length > 0 ? (
           sections.map((section, index) => (
             <View key={section._id || index} style={styles.sectionCard}>
@@ -98,7 +112,12 @@ const ProjectSections = () => {
                     color="#0EA5E9" 
                   />
                 </View>
-                <Text style={styles.sectionName}>{section.name}</Text>
+                <View style={styles.sectionInfo}>
+                  <Text style={styles.sectionName}>{section.name}</Text>
+                  {sections.length === 1 && (
+                    <Text style={styles.sectionHint}>Tap to view materials and details</Text>
+                  )}
+                </View>
               </View>
               <TouchableOpacity
                 style={styles.viewButton}
@@ -110,9 +129,10 @@ const ProjectSections = () => {
           ))
         ) : (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyTitle}>No Sections Yet</Text>
+            <Ionicons name="folder-open-outline" size={64} color="#CBD5E1" />
+            <Text style={styles.emptyTitle}>No Sections Found</Text>
             <Text style={styles.emptySubtitle}>
-              This project doesn't have any sections yet
+              This project doesn't have any sections yet. Sections help organize your project materials and work areas.
             </Text>
           </View>
         )}
@@ -179,6 +199,8 @@ const styles = StyleSheet.create({
   sectionContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    marginRight: 12,
   },
   sectionIconContainer: {
     width: 40,
@@ -189,16 +211,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
+  singleSectionNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderLeftWidth: 3,
+    borderLeftColor: '#3B82F6',
+  },
+  singleSectionText: {
+    fontSize: 14,
+    color: '#1E40AF',
+    marginLeft: 8,
+    flex: 1,
+  },
+  sectionInfo: {
+    flex: 1,
+    marginRight: 8,
+  },
   sectionName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1E293B',
+    flexShrink: 1,
+  },
+  sectionHint: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
   },
   viewButton: {
     backgroundColor: '#0EA5E9',
     paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     borderRadius: 6,
+    flexShrink: 0,
   },
   viewButtonText: {
     color: '#FFFFFF',

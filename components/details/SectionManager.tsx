@@ -1,8 +1,8 @@
-import { addSection } from '@/functions/details';
+import { addSection, deleteSection, updateSection } from '@/functions/details';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import React, { useEffect, useState } from 'react';
-import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 type Section = {
@@ -15,7 +15,7 @@ type Section = {
 type SectionManagerProps = {
   onSectionSelect: (sectionId: string) => void;
   selectedSection: string | null;
-  onAddSection?: (newSection: Section) => void;
+  onAddSection?: (newSection: Section) => Promise<void> | void;
   sections?: Section[];
   style?: any;
   compact?: boolean;
@@ -32,6 +32,7 @@ type SectionManagerProps = {
 const SectionManager: React.FC<SectionManagerProps> = ({
   onSectionSelect,
   selectedSection,
+  onAddSection,
   sections: propSections,
   style,
   compact = false,
@@ -40,6 +41,8 @@ const SectionManager: React.FC<SectionManagerProps> = ({
 }) => {
   const [sections, setSections] = useState<Section[]>(propSections || []);
   const [showAddSectionModal, setShowAddSectionModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [newSectionName, setNewSectionName] = useState('');
   const [newSectionDesc, setNewSectionDesc] = useState('');
 
@@ -47,6 +50,15 @@ const SectionManager: React.FC<SectionManagerProps> = ({
   useEffect(() => {
     if (propSections && propSections.length > 0) {
       setSections(propSections);
+      
+      // Safety check: if currently selected section doesn't exist in new sections, select first one
+      if (selectedSection && !propSections.find(s => s.id === selectedSection)) {
+        const allSectionsOption = propSections.find(s => s.id === 'all-sections');
+        const firstSection = allSectionsOption || propSections[0];
+        if (firstSection) {
+          onSectionSelect(firstSection.id);
+        }
+      }
     } else if (sections.length === 0) {
       const defaultSection = {
         id: 'default-section',
@@ -62,15 +74,6 @@ const SectionManager: React.FC<SectionManagerProps> = ({
   const handleAddSection = async () => {
     if (!newSectionName.trim()) return;
 
-
-
-    const newSection: Section = {
-      id: `section-${Date.now()}`,
-      name: newSectionName.trim(),
-      description: newSectionDesc.trim(),
-      createdAt: new Date().toISOString(),
-    };
-
     // Log data in the required format
     const sectionData = {
       name: newSectionName.trim(),
@@ -84,18 +87,168 @@ const SectionManager: React.FC<SectionManagerProps> = ({
       }
     };
 
-    console.log(sectionData);
-    const res = await addSection(sectionData);
-    if(res){
-     toast.success("Section added successfully"); 
+    console.log('Adding section:', sectionData);
+    const res: any = await addSection(sectionData);
+    
+    console.log('\n========================================');
+    console.log('ADD SECTION - API RESPONSE');
+    console.log('========================================');
+    console.log('Full response:', JSON.stringify(res, null, 2));
+    console.log('========================================\n');
+    
+    if (res && res.success) {
+      toast.success("Section added successfully");
+      
+      // Use the section data returned from the API
+      const newSection: Section = {
+        id: res.section?._id || res.data?._id || `section-${Date.now()}`,
+        name: res.section?.name || res.data?.name || newSectionName.trim(),
+        description: res.section?.description || res.data?.description || newSectionDesc.trim(),
+        createdAt: res.section?.createdAt || res.data?.createdAt || new Date().toISOString(),
+      };
+      
+      console.log('New section created:', newSection);
+      
+      // Add the new section to the list
+      const updatedSections = [...sections, newSection];
+      setSections(updatedSections);
+      
+      // Call the onAddSection callback if provided
+      if (onAddSection) {
+        await onAddSection(newSection);
+      }
+      
+      // Clear form and close modal
+      setNewSectionName('');
+      setNewSectionDesc('');
+      setShowAddSectionModal(false);
+      
+      // Select the newly added section
+      onSectionSelect(newSection.id);
     } else {
       toast.error("Failed to add section");
+      console.error('Add section failed:', res);
     }
-    setSections([...sections, newSection]);
-    setNewSectionName('');
-    setNewSectionDesc('');
-    setShowAddSectionModal(false);
-    onSectionSelect(newSection.id);
+  };
+
+  const handleEditSection = (section: Section) => {
+    setEditingSectionId(section.id);
+    setNewSectionName(section.name);
+    setNewSectionDesc(section.description || '');
+    setShowEditModal(true);
+  };
+
+  const handleUpdateSection = async () => {
+    if (!newSectionName.trim() || !editingSectionId) return;
+
+    const updateData = {
+      name: newSectionName.trim(),
+      description: newSectionDesc.trim(),
+    };
+
+    console.log('Updating section:', editingSectionId, updateData);
+    const res: any = await updateSection(editingSectionId, updateData);
+
+    console.log('\n========================================');
+    console.log('UPDATE SECTION - API RESPONSE');
+    console.log('========================================');
+    console.log('Full response:', JSON.stringify(res, null, 2));
+    console.log('========================================\n');
+
+    if (res && res.success) {
+      toast.success("Section updated successfully");
+
+      // Update the section in local state
+      const updatedSections = sections.map(s =>
+        s.id === editingSectionId
+          ? { ...s, name: newSectionName.trim(), description: newSectionDesc.trim() }
+          : s
+      );
+      setSections(updatedSections);
+
+      // Call the onAddSection callback to refresh from server
+      if (onAddSection) {
+        const updatedSection: Section = {
+          id: editingSectionId,
+          name: newSectionName.trim(),
+          description: newSectionDesc.trim(),
+          createdAt: sections.find(s => s.id === editingSectionId)?.createdAt || new Date().toISOString(),
+        };
+        await onAddSection(updatedSection);
+      }
+
+      // Clear form and close modal
+      setNewSectionName('');
+      setNewSectionDesc('');
+      setEditingSectionId(null);
+      setShowEditModal(false);
+    } else {
+      toast.error("Failed to update section");
+      console.error('Update section failed:', res);
+    }
+  };
+
+  const handleDeleteSection = (section: Section) => {
+    Alert.alert(
+      'Delete Section',
+      `Are you sure you want to delete "${section.name}"?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            console.log('Deleting section:', section.id);
+            const res: any = await deleteSection(section.id);
+
+            console.log('\n========================================');
+            console.log('DELETE SECTION - API RESPONSE');
+            console.log('========================================');
+            console.log('Full response:', JSON.stringify(res, null, 2));
+            console.log('========================================\n');
+
+            if (res && res.success) {
+              toast.success("Section deleted successfully");
+
+              // Remove from local state
+              const updatedSections = sections.filter(s => s.id !== section.id);
+              
+              // If deleted section was selected, select a safe option before updating state
+              if (selectedSection === section.id) {
+                // Try to select 'all-sections' first, or the first available section
+                const allSectionsOption = updatedSections.find(s => s.id === 'all-sections');
+                const nextSection = allSectionsOption || updatedSections[0];
+                
+                if (nextSection) {
+                  onSectionSelect(nextSection.id);
+                } else {
+                  // No sections left, select null or a default
+                  onSectionSelect('all-sections');
+                }
+              }
+              
+              // Update local state after selecting new section
+              setSections(updatedSections);
+
+              // Call the onAddSection callback to refresh from server
+              if (onAddSection) {
+                try {
+                  await onAddSection(section);
+                } catch (error) {
+                  console.error('Error refreshing sections after delete:', error);
+                }
+              }
+            } else {
+              toast.error("Failed to delete section");
+              console.error('Delete section failed:', res);
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (sections.length === 0) {
@@ -112,13 +265,24 @@ const SectionManager: React.FC<SectionManagerProps> = ({
     );
   }
 
+  // Safety check: ensure we have a valid selected section
+  const safeSelectedSection = selectedSection && sections.find(s => s.id === selectedSection)
+    ? selectedSection
+    : sections[0]?.id;
+  
+  const currentSection = sections.find(s => s.id === safeSelectedSection);
+
   return (
     <View style={[styles.container, compact && styles.compactContainer, style]}>
       <View style={[styles.sectionSelector, compact && styles.compactSelector]}>
         <Picker
-          selectedValue={selectedSection || sections[0]?.id}
+          selectedValue={safeSelectedSection}
           style={[styles.picker, compact && styles.compactPicker]}
-          onValueChange={(itemValue) => onSectionSelect(itemValue)}
+          onValueChange={(itemValue) => {
+            if (itemValue && sections.find(s => s.id === itemValue)) {
+              onSectionSelect(itemValue);
+            }
+          }}
           dropdownIconColor="#000"
         >
           {sections.map((section) => (
@@ -129,12 +293,30 @@ const SectionManager: React.FC<SectionManagerProps> = ({
             />
           ))}
         </Picker>
-        <TouchableOpacity
-          style={[styles.addSectionButton, compact && styles.compactAddButton]}
-          onPress={() => setShowAddSectionModal(true)}
-        >
-          <MaterialIcons name="add" size={compact ? 20 : 24} color="#fff" />
-        </TouchableOpacity>
+        <View style={styles.actionButtons}>
+          {currentSection && currentSection.id !== 'all-sections' && currentSection.id !== 'default-section' && (
+            <>
+              <TouchableOpacity
+                style={[styles.iconButton, compact && styles.compactIconButton]}
+                onPress={() => handleEditSection(currentSection)}
+              >
+                <MaterialIcons name="edit" size={compact ? 18 : 20} color="#3B82F6" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.iconButton, compact && styles.compactIconButton]}
+                onPress={() => handleDeleteSection(currentSection)}
+              >
+                <MaterialIcons name="delete" size={compact ? 18 : 20} color="#EF4444" />
+              </TouchableOpacity>
+            </>
+          )}
+          <TouchableOpacity
+            style={[styles.addSectionButton, compact && styles.compactAddButton]}
+            onPress={() => setShowAddSectionModal(true)}
+          >
+            <MaterialIcons name="add" size={compact ? 20 : 24} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Add Section Modal */}
@@ -171,7 +353,11 @@ const SectionManager: React.FC<SectionManagerProps> = ({
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setShowAddSectionModal(false)}
+                onPress={() => {
+                  setShowAddSectionModal(false);
+                  setNewSectionName('');
+                  setNewSectionDesc('');
+                }}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
@@ -182,6 +368,62 @@ const SectionManager: React.FC<SectionManagerProps> = ({
                 disabled={!newSectionName.trim()}
               >
                 <Text style={styles.addButtonText}>Add Section</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Section Modal */}
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Section</Text>
+
+            <Text style={styles.label}>Section Name *</Text>
+            <TextInput
+              style={styles.input}
+              value={newSectionName}
+              onChangeText={setNewSectionName}
+              placeholder="e.g., Base, First Slab, Second Slab"
+              placeholderTextColor="#999"
+            />
+
+            <Text style={styles.label}>Description (Optional)</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={newSectionDesc}
+              onChangeText={setNewSectionDesc}
+              placeholder="Add a description for this section"
+              placeholderTextColor="#999"
+              multiline
+              numberOfLines={3}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setShowEditModal(false);
+                  setNewSectionName('');
+                  setNewSectionDesc('');
+                  setEditingSectionId(null);
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.updateButton]}
+                onPress={handleUpdateSection}
+                disabled={!newSectionName.trim()}
+              >
+                <Text style={styles.addButtonText}>Update</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -229,6 +471,25 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
   },
+  actionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  iconButton: {
+    height: 40,
+    width: 40,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+  },
+  compactIconButton: {
+    height: 36,
+    width: 36,
+    borderRadius: 8,
+    margin: 2,
+  },
   addSectionButton: {
     backgroundColor: '#3B82F6',
     height: 40,
@@ -241,7 +502,7 @@ const styles = StyleSheet.create({
     height: 36,
     width: 36,
     borderRadius: 8,
-    margin: 4,
+    margin: 2,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#3B82F6',
@@ -330,6 +591,9 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: '#4B5563',
     fontWeight: '500',
+  },
+  updateButton: {
+    backgroundColor: '#10B981',
   },
 });
 

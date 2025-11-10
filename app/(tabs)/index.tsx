@@ -1,5 +1,4 @@
 // App.tsx
-import AddProjectModal from '@/components/AddProjectModel';
 import ProjectCard from '@/components/ProjectCard';
 import { getClientId } from '@/functions/clientId';
 import { getProjectData } from '@/functions/project';
@@ -13,7 +12,6 @@ import axios from 'axios';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    Alert,
     RefreshControl,
     ScrollView,
     StatusBar,
@@ -26,12 +24,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // Main App Component
 const Index: React.FC = () => {
     const [projects, setProjects] = useState<Project[]>([]);
-    const [showAddModal, setShowAddModal] = useState(false);
     const [staffMembers, setStaffMembers] = useState<StaffMembers[]>([]);
     const [clientId, setClientId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [addingProject, setAddingProject] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
 
     // Fetch project data function
@@ -99,58 +95,59 @@ const Index: React.FC = () => {
     }, [clientId]);
 
     const handleViewDetails = (project: Project) => {
-        console.log('Navigating to project sections with materials:', {
+        console.log('Navigating to project with materials:', {
             projectId: project._id,
             materialAvailableCount: project.MaterialAvailable?.length || 0,
-            materialUsedCount: project.MaterialUsed?.length || 0
+            materialUsedCount: project.MaterialUsed?.length || 0,
+            sectionsCount: project.section?.length || 0
         });
         
-        // Navigate to the new project sections page with all material data
-        router.push({
-            pathname: '/project-sections',
-            params: { 
-                id: project._id ?? '',
-                name: project.name, 
-                sectionData: JSON.stringify(project.section || []),
-                materialAvailable: JSON.stringify(project.MaterialAvailable || []),
-                materialUsed: JSON.stringify(project.MaterialUsed || [])
-            }
-        });
-    };
-
-    const handleAddProject = async (newProject: Project) => {
-        try {
-            setAddingProject(true);
-
-            const currentClientId = clientId || await getClientId();
-            setClientId(currentClientId);
+        const sections = project.section || [];
+        
+        // If only one section, navigate directly to details
+        if (sections.length === 1) {
+            const section = sections[0];
+            console.log('Single section found - navigating directly to details:', section.name);
             
-            const payload = {
-                ...newProject,
-                clientId: currentClientId
-            };
-
-            const res = await axios.post(`${domain}/api/project`, payload);
+            router.push({
+                pathname: '/details',
+                params: {
+                    projectId: project._id ?? '',
+                    projectName: project.name,
+                    sectionId: section._id || section.sectionId,
+                    sectionName: section.name,
+                    materialAvailable: JSON.stringify(project.MaterialAvailable || []),
+                    materialUsed: JSON.stringify(project.MaterialUsed || [])
+                }
+            });
+        } else if (sections.length > 1) {
+            // Multiple sections - show section selection page
+            console.log('Multiple sections found - showing section selection');
             
-            if (res) {
-                console.log("Project added successfully");
-                
-                // Close the modal first
-                setShowAddModal(false);
-                
-                // Refresh the project list to get the latest data
-                await fetchProjectData(false);
-                
-                Alert.alert('Success', 'Project added successfully!');
-            } else {
-                console.log("Something went wrong");
-                Alert.alert('Error', 'Failed to add project. Please try again.');
-            }
-        } catch (error) {
-            console.error('Failed to add project:', error);
-            Alert.alert('Error', 'Failed to add project. Please try again.');
-        } finally {
-            setAddingProject(false);
+            router.push({
+                pathname: '/project-sections',
+                params: { 
+                    id: project._id ?? '',
+                    name: project.name, 
+                    sectionData: JSON.stringify(sections),
+                    materialAvailable: JSON.stringify(project.MaterialAvailable || []),
+                    materialUsed: JSON.stringify(project.MaterialUsed || [])
+                }
+            });
+        } else {
+            // No sections - show empty state or create section option
+            console.log('No sections found - showing section selection with empty state');
+            
+            router.push({
+                pathname: '/project-sections',
+                params: { 
+                    id: project._id ?? '',
+                    name: project.name, 
+                    sectionData: JSON.stringify([]),
+                    materialAvailable: JSON.stringify(project.MaterialAvailable || []),
+                    materialUsed: JSON.stringify(project.MaterialUsed || [])
+                }
+            });
         }
     };
 
@@ -160,7 +157,6 @@ const Index: React.FC = () => {
         subtitle: "Project Management Dashboard"
     };
     const companyInitials = generateInitials(COMPANY_CONFIG.name);
-
 
     return (
         <SafeAreaView style={styles.container}>
@@ -189,7 +185,6 @@ const Index: React.FC = () => {
                 <Text style={styles.sectionTitle}>My Projects</Text>
                 <View style={styles.sectionDivider} />
             </View>
-
 
             <ScrollView 
                 style={styles.projectsList}
@@ -239,37 +234,6 @@ const Index: React.FC = () => {
                     </View>
                 )}
             </ScrollView>
-
-            {/* Floating Action Button */}
-            <TouchableOpacity
-                style={{
-                    position: 'absolute',
-                    bottom: 24,
-                    right: 24,
-                    width: 56,
-                    height: 56,
-                    backgroundColor: '#3B82F6',
-                    borderRadius: 28,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    shadowColor: '#3B82F6',
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 8,
-                    elevation: 8,
-                }}
-                onPress={() => setShowAddModal(true)}
-                activeOpacity={0.8}
-            >
-                <Ionicons name="add" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-
-            <AddProjectModal
-                staffMembers={staffMembers}
-                visible={showAddModal}
-                onClose={() => setShowAddModal(false)}
-                onAdd={handleAddProject}
-            />
         </SafeAreaView>
     );
 };

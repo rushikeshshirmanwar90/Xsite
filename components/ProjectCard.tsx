@@ -8,9 +8,7 @@ interface ProjectCardProps {
     onViewDetails: (project: Project) => void;
 }
 
-
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails }) => {
-
 
     const formatCurrency = (amount: number): string => {
         return new Intl.NumberFormat('en-IN', {
@@ -21,12 +19,20 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails }) => 
         }).format(amount);
     };
 
-    // Use static data when backend data is not available
-    const staticProgress = 65; // Static project progress percentage
-    const staticBudget = 500000; // Static total budget
-    const staticSpent = 325000; // Static spent amount
+    // Calculate total expenses from MaterialAvailable (sum of all material costs)
+    const calculateTotalExpenses = (): number => {
+        if (!project.MaterialAvailable || project.MaterialAvailable.length === 0) {
+            return 0;
+        }
+        
+        return project.MaterialAvailable.reduce((total, material) => {
+            return total + (material.cost || 0);
+        }, 0);
+    };
 
-    const budgetProgress = ((project?.spent ?? staticSpent) / (project?.budget ?? staticBudget)) * 100;
+    const totalExpenses = calculateTotalExpenses();
+    const expectedBudget = project?.budget || 0;
+    const budgetProgress = expectedBudget > 0 ? (totalExpenses / expectedBudget) * 100 : 0;
 
 
 
@@ -70,28 +76,29 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails }) => 
                         <Ionicons name="card" size={16} color="#10B981" />
                     </View>
                     <View style={styles.budgetInfo}>
+                        <View style={styles.budgetHeader}>
+                            <Text style={styles.budgetLabel}>Budget Overview</Text>
+                            <Text style={[styles.budgetPercentage, {
+                                color: budgetProgress > 90 ? '#EF4444' : budgetProgress > 70 ? '#F59E0B' : '#10B981'
+                            }]}>
+                                {budgetProgress.toFixed(1)}%
+                            </Text>
+                        </View>
                         <Text style={styles.budgetText}>
-                            {formatCurrency(project.spent ?? staticSpent)} / {formatCurrency(project.budget ?? staticBudget)}
+                            {formatCurrency(totalExpenses)} / {formatCurrency(expectedBudget)}
                         </Text>
                         <View style={styles.budgetProgressBar}>
                             <View style={[styles.budgetProgressFill, {
                                 width: `${Math.min(budgetProgress, 100)}%`,
-                                backgroundColor: budgetProgress > 90 ? '#EF4444' : '#10B981'
+                                backgroundColor: budgetProgress > 90 ? '#EF4444' : budgetProgress > 70 ? '#F59E0B' : '#10B981'
                             }]} />
                         </View>
-                    </View>
-                </View>
-
-                <View style={styles.progressContainer}>
-                    <View style={styles.progressHeader}>
-                        <Text style={styles.progressLabel}>Project Progress</Text>
-                        <Text style={[styles.progressValue, { color: '#0EA5E9' }]}>{project.progress ?? staticProgress}%</Text>
-                    </View>
-                    <View style={styles.progressBar}>
-                        <View style={[styles.progressFill, {
-                            width: `${project.progress ?? staticProgress}%`,
-                            backgroundColor: '#0EA5E9'
-                        }]} />
+                        <Text style={styles.budgetSubtext}>
+                            {totalExpenses > expectedBudget 
+                                ? `Over budget by ${formatCurrency(totalExpenses - expectedBudget)}`
+                                : `Remaining: ${formatCurrency(expectedBudget - totalExpenses)}`
+                            }
+                        </Text>
                     </View>
                 </View>
 
@@ -423,59 +430,53 @@ const styles = StyleSheet.create({
     },
     budgetRow: {
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         marginBottom: 16,
+        paddingTop: 4,
     },
     budgetInfo: {
         flex: 1,
     },
-    budgetText: {
-        fontSize: 13,
-        color: '#374151',
-        fontWeight: '600',
-        marginBottom: 4,
-    },
-    budgetProgressBar: {
-        height: 4,
-        backgroundColor: '#F1F5F9',
-        borderRadius: 2,
-        overflow: 'hidden',
-    },
-    budgetProgressFill: {
-        height: '100%',
-        borderRadius: 2,
-    },
-    progressContainer: {
-        marginTop: 20,
-        marginBottom: 20,
-    },
-    progressHeader: {
+    budgetHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 8,
+        marginBottom: 6,
     },
-    progressLabel: {
-        fontSize: 13,
+    budgetLabel: {
+        fontSize: 12,
         color: '#6B7280',
         fontWeight: '600',
         textTransform: 'uppercase',
         letterSpacing: 0.5,
     },
-    progressValue: {
+    budgetPercentage: {
         fontSize: 13,
         fontWeight: '700',
     },
-    progressBar: {
+    budgetText: {
+        fontSize: 15,
+        color: '#1F2937',
+        fontWeight: '700',
+        marginBottom: 8,
+    },
+    budgetProgressBar: {
         height: 6,
         backgroundColor: '#F1F5F9',
         borderRadius: 3,
         overflow: 'hidden',
+        marginBottom: 6,
     },
-    progressFill: {
+    budgetProgressFill: {
         height: '100%',
         borderRadius: 3,
     },
+    budgetSubtext: {
+        fontSize: 11,
+        color: '#6B7280',
+        fontWeight: '500',
+    },
+
     viewButton: {
         flexDirection: 'row',
         alignItems: 'center',

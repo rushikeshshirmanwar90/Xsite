@@ -125,23 +125,29 @@ export default function LoginScreen() {
 
         setLoading(true);
         try {
-
-            console.log(userType)
+            console.log('Setting password for user type:', userType);
 
             const res = await addPassword(email, password, userType);
             if (res) {
                 const user = await getUser(email, userType);
-                console.log(user)
+                console.log('User data retrieved:', user);
+                
+                // Store user data in AsyncStorage with 'user' key for consistency
                 const jsonUser = JSON.stringify(user);
-                await AsyncStorage.setItem(userType, jsonUser);
+                await AsyncStorage.setItem('user', jsonUser);
+                
+                // Also store userType separately for reference
+                await AsyncStorage.setItem('userType', userType);
+                
                 toast.success('Password set successfully');
                 router.replace({
                     pathname: "/(tabs)"
                 });
             } else {
-                toast.error("something went wrong, please try again later")
+                toast.error("Something went wrong, please try again later");
             }
         } catch (error) {
+            console.error('Password setup error:', error);
             toast.error('Failed to set password');
         } finally {
             setLoading(false);
@@ -158,14 +164,19 @@ export default function LoginScreen() {
 
         try {
             const result = await login(email, password);
-            console.log("===========")
-            console.log(result)
-            console.log("===========")
+            console.log('Login result:', result);
+            
             if (result.success) {
                 const user = await getUser(email, userType);
-                console.log("user data : ", user)
+                console.log('User data retrieved:', user);
+                
+                // Store user data in AsyncStorage with 'user' key for consistency
                 const jsonUser = JSON.stringify(user);
                 await AsyncStorage.setItem("user", jsonUser);
+                
+                // Also store userType separately for reference
+                await AsyncStorage.setItem('userType', userType);
+                
                 toast.success("User logged in successfully");
                 router.replace({
                     pathname: "/(tabs)",
@@ -174,6 +185,7 @@ export default function LoginScreen() {
                 toast.error(result.error || "Invalid email or password");
             }
         } catch (error) {
+            console.error('Login error:', error);
             toast.error("Failed to login due to an unexpected error");
         } finally {
             setLoading(false);

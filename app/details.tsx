@@ -10,10 +10,11 @@ import { domain } from '@/lib/domain';
 import { styles } from '@/style/details';
 import { Material, MaterialEntry, Section } from '@/types/details';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -26,10 +27,15 @@ const Details = () => {
     const materialAvailableParam = params.materialAvailable as string;
     const materialUsedParam = params.materialUsed as string;
     const [activeTab, setActiveTab] = useState<'imported' | 'used'>('imported');
-    const [selectedPeriod, setSelectedPeriod] = useState('Today');
+    const [selectedPeriod, setSelectedPeriod] = useState('All');
     const [showMaterialForm, setShowMaterialForm] = useState(false);
     const [showUsageForm, setShowUsageForm] = useState(false);
     const [selectedMiniSection, setSelectedMiniSection] = useState<string | null>(null);
+    const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
+    const [customStartDate, setCustomStartDate] = useState<Date>(new Date());
+    const [customEndDate, setCustomEndDate] = useState<Date>(new Date());
+    const [showStartPicker, setShowStartPicker] = useState(false);
+    const [showEndPicker, setShowEndPicker] = useState(false);
 
     const [availableMaterials, setAvailableMaterials] = useState<Material[]>([]);
     const [usedMaterials, setUsedMaterials] = useState<Material[]>([]);
@@ -169,7 +175,10 @@ const Details = () => {
                     color,
                     specs: material.specs || {},
                     sectionId: material.sectionId || material.miniSectionId,
-                    miniSectionId: material.miniSectionId
+                    miniSectionId: material.miniSectionId,
+                    addedAt: material.addedAt,
+                    createdAt: material.createdAt,
+                    updatedAt: material.updatedAt
                 };
             });
 
@@ -627,26 +636,132 @@ const Details = () => {
 
 
 
+    // Function to filter materials by date
+    const filterByDate = (materials: Material[]) => {
+        console.log('\n========================================');
+        console.log('DATE FILTERING');
+        console.log('========================================');
+        console.log('Selected Period:', selectedPeriod);
+        console.log('Total Materials:', materials.length);
+        
+        if (selectedPeriod === 'All') {
+            console.log('Period is "All" - showing all materials');
+            console.log('========================================\n');
+            return materials;
+        }
+
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        today.setHours(0, 0, 0, 0);
+        
+        console.log('Today (midnight):', today.toISOString());
+
+        const filtered = materials.filter(material => {
+            // Get the date from addedAt, createdAt, or updatedAt field
+            const materialDateStr = (material as any).addedAt || (material as any).createdAt || (material as any).updatedAt;
+            
+            if (!materialDateStr) {
+                console.log(`❌ ${material.name}: NO DATE FIELD - including anyway`);
+                return true; // Include materials without dates
+            }
+
+            const materialDate = new Date(materialDateStr);
+            const materialDay = new Date(materialDate.getFullYear(), materialDate.getMonth(), materialDate.getDate());
+            materialDay.setHours(0, 0, 0, 0);
+
+            console.log(`\n📦 ${material.name}:`);
+            console.log(`   Raw date: ${materialDateStr}`);
+            console.log(`   Parsed: ${materialDay.toISOString()}`);
+            console.log(`   Display: ${materialDay.toLocaleDateString()}`);
+
+            let result = false;
+
+            switch (selectedPeriod) {
+                case 'Today':
+                    result = materialDay.getTime() === today.getTime();
+                    console.log(`   ✓ Today check: ${result}`);
+                    console.log(`   Material: ${materialDay.getTime()}, Today: ${today.getTime()}`);
+                    break;
+                
+                case '1 Week':
+                    const oneWeekAgo = new Date(today);
+                    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+                    result = materialDay.getTime() >= oneWeekAgo.getTime() && materialDay.getTime() <= today.getTime();
+                    console.log(`   ✓ 1 Week check: ${result}`);
+                    console.log(`   Range: ${oneWeekAgo.toLocaleDateString()} to ${today.toLocaleDateString()}`);
+                    break;
+                
+                case '15 Days':
+                    const fifteenDaysAgo = new Date(today);
+                    fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
+                    result = materialDay.getTime() >= fifteenDaysAgo.getTime() && materialDay.getTime() <= today.getTime();
+                    console.log(`   ✓ 15 Days check: ${result}`);
+                    break;
+                
+                case '1 Month':
+                    const oneMonthAgo = new Date(today);
+                    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+                    result = materialDay.getTime() >= oneMonthAgo.getTime() && materialDay.getTime() <= today.getTime();
+                    console.log(`   ✓ 1 Month check: ${result}`);
+                    break;
+                
+                case 'Custom':
+                    const startDay = new Date(customStartDate);
+                    startDay.setHours(0, 0, 0, 0);
+                    const endDay = new Date(customEndDate);
+                    endDay.setHours(23, 59, 59, 999);
+                    result = materialDay.getTime() >= startDay.getTime() && materialDay.getTime() <= endDay.getTime();
+                    console.log(`   ✓ Custom check: ${result}`);
+                    console.log(`   Range: ${startDay.toLocaleDateString()} to ${endDay.toLocaleDateString()}`);
+                    break;
+                
+                default:
+                    result = true;
+            }
+
+            console.log(`   → ${result ? '✅ INCLUDED' : '❌ EXCLUDED'}`);
+            return result;
+        });
+
+        console.log('\n========================================');
+        console.log(`Filtered: ${filtered.length} of ${materials.length} materials`);
+        console.log('========================================\n');
+        
+        return filtered;
+    };
+
     const getCurrentData = () => {
         let materials = activeTab === 'imported' ? availableMaterials : usedMaterials;
         
-        // Filter by mini-section only for "used" tab
-        if (activeTab === 'used' && selectedMiniSection) {
-            console.log('\n========================================');
-            console.log('FILTERING USED MATERIALS');
-            console.log('========================================');
-            console.log('Selected Mini-Section:', selectedMiniSection);
-            console.log('Total Used Materials:', materials.length);
-            
+        // For "used" tab, always filter by main sectionId first
+        if (activeTab === 'used') {
+            // Filter by main section (sectionId) to exclude materials from other project sections
             materials = materials.filter(m => {
-                // Check both sectionId and miniSectionId for compatibility
-                const matches = m.miniSectionId === selectedMiniSection || m.sectionId === selectedMiniSection;
-                console.log(`Material: ${m.name}, miniSectionId: ${m.miniSectionId}, sectionId: ${m.sectionId}, matches: ${matches}`);
-                return matches;
+                // Check if material belongs to current main section
+                const materialSectionId = m.sectionId || m.miniSectionId;
+                
+                // If material has a miniSectionId, check if it belongs to current main section
+                if (m.miniSectionId) {
+                    // Find the mini-section in our list to verify it belongs to current main section
+                    const belongsToCurrentSection = miniSections.some(
+                        section => section._id === m.miniSectionId
+                    );
+                    return belongsToCurrentSection;
+                }
+                
+                // Fallback: check if sectionId matches (for materials without miniSectionId)
+                return materialSectionId === sectionId;
             });
             
-            console.log('Filtered Materials Count:', materials.length);
-            console.log('========================================\n');
+            // Then filter by specific mini-section if one is selected
+            if (selectedMiniSection) {
+                materials = materials.filter(m => {
+                    return m.miniSectionId === selectedMiniSection;
+                });
+            }
+            
+            // Finally, filter by date
+            materials = filterByDate(materials);
         }
 
         return materials;
@@ -843,14 +958,19 @@ const Details = () => {
                                 showsHorizontalScrollIndicator={false}
                                 style={sectionStyles.chipScrollView}
                             >
-                                {['Today', '1 Week', '15 Days', '1 Month', 'All'].map((period) => (
+                                {['Today', '1 Week', '15 Days', '1 Month', 'All', 'Custom'].map((period) => (
                                     <TouchableOpacity
                                         key={period}
                                         style={[
                                             sectionStyles.chip,
                                             selectedPeriod === period && sectionStyles.chipActive
                                         ]}
-                                        onPress={() => setSelectedPeriod(period)}
+                                        onPress={() => {
+                                            if (period === 'Custom') {
+                                                setShowCustomDatePicker(true);
+                                            }
+                                            setSelectedPeriod(period);
+                                        }}
                                     >
                                         <Text style={[
                                             sectionStyles.chipText,
@@ -862,6 +982,19 @@ const Details = () => {
                                 ))}
                             </ScrollView>
                         </View>
+                        
+                        {/* Custom Date Range Display */}
+                        {selectedPeriod === 'Custom' && (
+                            <View style={sectionStyles.customDateDisplay}>
+                                <Ionicons name="calendar-outline" size={14} color="#3B82F6" />
+                                <Text style={sectionStyles.customDateText}>
+                                    {customStartDate.toLocaleDateString()} - {customEndDate.toLocaleDateString()}
+                                </Text>
+                                <TouchableOpacity onPress={() => setShowCustomDatePicker(true)}>
+                                    <Ionicons name="create-outline" size={16} color="#3B82F6" />
+                                </TouchableOpacity>
+                            </View>
+                        )}
 
                         {/* Section Filter - Compact Dropdown */}
                         <View style={sectionStyles.filterRow}>
@@ -871,6 +1004,13 @@ const Details = () => {
                                     <SectionManager
                                         onSectionSelect={(sectionId) => {
                                             setSelectedMiniSection(sectionId === 'all-sections' ? null : sectionId);
+                                        }}
+                                        onAddSection={async (newSection) => {
+                                            // Refetch sections after adding a new one
+                                            const sections = await getSection(sectionId);
+                                            if (sections && Array.isArray(sections)) {
+                                                setMiniSections(sections);
+                                            }
                                         }}
                                         selectedSection={selectedMiniSection || 'all-sections'}
                                         sections={[
@@ -898,12 +1038,12 @@ const Details = () => {
                                     <SectionManager
                                         onSectionSelect={(sectionId) => {
                                             setSelectedMiniSection(sectionId);
-                                            if (sectionId) {
-                                                getSection(sectionId).then(sections => {
-                                                    if (sections && Array.isArray(sections)) {
-                                                        setMiniSections(sections);
-                                                    }
-                                                });
+                                        }}
+                                        onAddSection={async (newSection) => {
+                                            // Refetch sections after adding a new one
+                                            const sections = await getSection(sectionId);
+                                            if (sections && Array.isArray(sections)) {
+                                                setMiniSections(sections);
                                             }
                                         }}
                                         selectedSection={null}
@@ -961,6 +1101,98 @@ const Details = () => {
                     )}
                 </View>
             </ScrollView>
+
+            {/* Custom Date Picker Modal */}
+            <Modal
+                visible={showCustomDatePicker}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setShowCustomDatePicker(false)}
+            >
+                <View style={sectionStyles.modalOverlay}>
+                    <View style={sectionStyles.modalContent}>
+                        <Text style={sectionStyles.modalTitle}>Select Date Range</Text>
+                        
+                        <Text style={sectionStyles.dateLabel}>Start Date</Text>
+                        <TouchableOpacity
+                            style={sectionStyles.dateButton}
+                            onPress={() => setShowStartPicker(true)}
+                        >
+                            <Ionicons name="calendar" size={20} color="#3B82F6" />
+                            <Text style={sectionStyles.dateButtonText}>
+                                {customStartDate.toLocaleDateString()}
+                            </Text>
+                        </TouchableOpacity>
+
+                        <Text style={sectionStyles.dateLabel}>End Date</Text>
+                        <TouchableOpacity
+                            style={sectionStyles.dateButton}
+                            onPress={() => setShowEndPicker(true)}
+                        >
+                            <Ionicons name="calendar" size={20} color="#3B82F6" />
+                            <Text style={sectionStyles.dateButtonText}>
+                                {customEndDate.toLocaleDateString()}
+                            </Text>
+                        </TouchableOpacity>
+
+                        <View style={sectionStyles.modalButtons}>
+                            <TouchableOpacity
+                                style={sectionStyles.modalCancelButton}
+                                onPress={() => {
+                                    setShowCustomDatePicker(false);
+                                    setSelectedPeriod('All');
+                                }}
+                            >
+                                <Text style={sectionStyles.modalCancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={sectionStyles.modalApplyButton}
+                                onPress={() => {
+                                    if (customStartDate > customEndDate) {
+                                        toast.error('Start date must be before end date');
+                                        return;
+                                    }
+                                    setShowCustomDatePicker(false);
+                                    toast.success(`Showing materials from ${customStartDate.toLocaleDateString()} to ${customEndDate.toLocaleDateString()}`);
+                                }}
+                            >
+                                <Text style={sectionStyles.modalApplyText}>Apply</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Date Pickers */}
+            {showStartPicker && (
+                <DateTimePicker
+                    value={customStartDate}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={(event, selectedDate) => {
+                        setShowStartPicker(Platform.OS === 'ios');
+                        if (selectedDate) {
+                            setCustomStartDate(selectedDate);
+                        }
+                    }}
+                    maximumDate={new Date()}
+                />
+            )}
+            {showEndPicker && (
+                <DateTimePicker
+                    value={customEndDate}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={(event, selectedDate) => {
+                        setShowEndPicker(Platform.OS === 'ios');
+                        if (selectedDate) {
+                            setCustomEndDate(selectedDate);
+                        }
+                    }}
+                    maximumDate={new Date()}
+                    minimumDate={customStartDate}
+                />
+            )}
         </SafeAreaView>
     );
 };
@@ -1078,6 +1310,92 @@ const sectionStyles = StyleSheet.create({
         color: '#92400E',
         fontWeight: '500',
         flex: 1,
+    },
+    customDateDisplay: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#EFF6FF',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 8,
+        gap: 8,
+        marginTop: 8,
+    },
+    customDateText: {
+        fontSize: 12,
+        color: '#1E40AF',
+        fontWeight: '500',
+        flex: 1,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    modalContent: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 24,
+        width: '100%',
+        maxWidth: 400,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#1E293B',
+        marginBottom: 20,
+    },
+    dateLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#334155',
+        marginBottom: 8,
+        marginTop: 12,
+    },
+    dateButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        padding: 14,
+        gap: 12,
+    },
+    dateButtonText: {
+        fontSize: 15,
+        color: '#1E293B',
+        flex: 1,
+    },
+    modalButtons: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        marginTop: 24,
+        gap: 12,
+    },
+    modalCancelButton: {
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 8,
+        backgroundColor: '#F1F5F9',
+    },
+    modalCancelText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#64748B',
+    },
+    modalApplyButton: {
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 8,
+        backgroundColor: '#3B82F6',
+    },
+    modalApplyText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#FFFFFF',
     },
 });
 

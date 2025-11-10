@@ -13,6 +13,9 @@ export interface Material {
   sectionId?: string;
   miniSectionId?: string;
   specs?: Record<string, any>;
+  addedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface MaterialEntry {

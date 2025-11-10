@@ -5,7 +5,7 @@ export const getUser = async (email: string, userType: string) => {
   try {
     const res = await axios.get(`${domain}/api/${userType}?email=${email}`);
     if (res.status === 200) {
-      return res.data.data;
+      return (res.data as any).data;
     }
     return null;
   } catch (error) {
@@ -19,7 +19,7 @@ export const confirmMail = async (email: string) => {
     email: email,
   });
 
-  const data = res.data.isUser;
+  const data = (res.data as any).isUser;
 
   if (res.status === 200) {
     const obj = { verified: true, isUser: true, userType: data.userType };
@@ -78,7 +78,7 @@ export const login = async (email: string, password: string) => {
     if (res.status === 200) {
       return { success: true };
     } else {
-      return { success: false, error: res.data.message || "Login failed" };
+      return { success: false, error: (res.data as any).message || "Login failed" };
     }
   } catch (error: any) {
     console.log("Failed to login");

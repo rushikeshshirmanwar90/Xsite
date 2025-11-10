@@ -1,6 +1,6 @@
 import { domain } from "@/lib/domain";
-import axios from "axios";
 import { Section } from "@/types/details";
+import axios from "axios";
 
 interface SectionResponse {
     success: boolean;
@@ -27,13 +27,43 @@ export const addSection = async (data: any) => {
     try {
         const res = await axios.post(`${domain}/api/mini-section`, data);
 
-        if (res) {
-            return true
+        if (res && res.data) {
+            return res.data; // Return the full response data including the new section
         } else {
-            return false
+            return null;
         }
     } catch (error) {
-        console.log('Error', error)
-        return false
+        console.log('Error', error);
+        return null;
+    }
+}
+
+export const updateSection = async (sectionId: string, data: any) => {
+    try {
+        const res = await axios.put(`${domain}/api/mini-section?id=${sectionId}`, data);
+
+        if (res && res.data) {
+            return res.data;
+        } else {
+            return null;
+        }
+    } catch (error) {
+        console.log('Error updating section:', error);
+        return null;
+    }
+}
+
+export const deleteSection = async (sectionId: string) => {
+    try {
+        const res = await axios.delete(`${domain}/api/mini-section?id=${sectionId}`);
+
+        if (res && res.data) {
+            return res.data;
+        } else {
+            return null;
+        }
+    } catch (error) {
+        console.log('Error deleting section:', error);
+        return null;
     }
 }

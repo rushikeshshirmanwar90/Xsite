@@ -53,6 +53,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   const [showAddSpecModal, setShowAddSpecModal] = useState(false);
   const [editingMaterialIndex, setEditingMaterialIndex] = useState<number | null>(null);
   const [purposeMessage, setPurposeMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleTemplateSelect = (templateKey: string) => {
     const template = MATERIAL_TEMPLATES[templateKey];
@@ -231,6 +232,10 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       return;
     }
 
+    if (isSubmitting) {
+      return; // Prevent double submission
+    }
+
     const formattedMaterials = addedMaterials.map((material) => ({
       materialName: material.name,
       unit: material.unit,
@@ -245,9 +250,17 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     console.log('Materials:', JSON.stringify(formattedMaterials, null, 2));
     console.log('========================');
 
-    // Call onSubmit and close immediately without showing discard confirmation
-    await onSubmit(formattedMaterials, purposeMessage);
-    handleClose(true); // Skip confirmation when successfully submitted
+    try {
+      setIsSubmitting(true);
+      // Call onSubmit and close immediately without showing discard confirmation
+      await onSubmit(formattedMaterials, purposeMessage);
+      handleClose(true); // Skip confirmation when successfully submitted
+    } catch (error) {
+      console.error('Error submitting materials:', error);
+      // Don't close the modal if there's an error
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const resetForm = () => {
@@ -425,13 +438,28 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
           {currentStep === 1 && (
             <View style={styles.floatingButtonContainer}>
               <TouchableOpacity
-                style={styles.floatingSendButton}
+                style={[
+                  styles.floatingSendButton,
+                  isSubmitting && styles.floatingSendButtonDisabled
+                ]}
                 onPress={handleSendRequest}
                 activeOpacity={0.8}
+                disabled={isSubmitting}
               >
-                <Text style={styles.floatingSendButtonText}>
-                  📤 Send Material Request
-                </Text>
+                {isSubmitting ? (
+                  <View style={styles.loadingContainer}>
+                    <Animated.View style={styles.loadingSpinner}>
+                      <Text style={styles.loadingText}>⏳</Text>
+                    </Animated.View>
+                    <Text style={styles.floatingSendButtonText}>
+                      Sending Request...
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={styles.floatingSendButtonText}>
+                    📤 Send Material Request
+                  </Text>
+                )}
               </TouchableOpacity>
             </View>
           )}
@@ -499,6 +527,25 @@ const styles = StyleSheet.create<Styles>({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600' as const,
+  },
+  floatingSendButtonDisabled: {
+    backgroundColor: '#93C5FD',
+    opacity: 0.7,
+  },
+  loadingContainer: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 12,
+  },
+  loadingSpinner: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  loadingText: {
+    fontSize: 20,
   },
 });
 
