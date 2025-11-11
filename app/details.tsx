@@ -14,7 +14,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -41,6 +41,9 @@ const Details = () => {
     const [usedMaterials, setUsedMaterials] = useState<Material[]>([]);
     const [miniSections, setMiniSections] = useState<Section[]>([]);
     const [loading, setLoading] = useState(false);
+    const [showAddSectionModal, setShowAddSectionModal] = useState(false);
+    const [newSectionName, setNewSectionName] = useState('');
+    const [newSectionDesc, setNewSectionDesc] = useState('');
     const cardAnimations = useRef<Animated.Value[]>([]).current;
 
 
@@ -634,6 +637,70 @@ const Details = () => {
         toast.error('Please use the "Add Usage" button at the top to add material usage');
     };
 
+    const handleAddSection = async () => {
+        if (!newSectionName.trim()) {
+            toast.error('Please enter a section name');
+            return;
+        }
+
+        const { addSection } = require('@/functions/details');
+        
+        const sectionData = {
+            name: newSectionName.trim(),
+            projectDetails: {
+                projectName: projectName,
+                projectId: projectId
+            },
+            mainSectionDetails: {
+                sectionName: sectionName,
+                sectionId: sectionId
+            }
+        };
+
+        console.log('Adding section:', sectionData);
+        
+        let loadingToast: any = null;
+        try {
+            loadingToast = toast.loading('Adding section...');
+            const res: any = await addSection(sectionData);
+            
+            console.log('\n========================================');
+            console.log('ADD SECTION - API RESPONSE');
+            console.log('========================================');
+            console.log('Full response:', JSON.stringify(res, null, 2));
+            console.log('========================================\n');
+            
+            toast.dismiss(loadingToast);
+            
+            if (res && res.success) {
+                toast.success("Section added successfully");
+                
+                // Refetch sections after adding a new one
+                const sections = await getSection(sectionId);
+                if (sections && Array.isArray(sections)) {
+                    setMiniSections(sections);
+                }
+                
+                // Clear form and close modal
+                setNewSectionName('');
+                setNewSectionDesc('');
+                setShowAddSectionModal(false);
+            } else {
+                throw new Error(res?.error || 'Failed to add section');
+            }
+        } catch (error: any) {
+            if (loadingToast) {
+                toast.dismiss(loadingToast);
+            }
+            console.error('Add section error:', error);
+            const errorMessage = error?.response?.data?.error ||
+                error?.response?.data?.message ||
+                error?.message ||
+                'Failed to add section';
+            toast.error(errorMessage);
+        }
+    };
+
 
 
     // Function to filter materials by date
@@ -1033,8 +1100,11 @@ const Details = () => {
                                     />
                                 </View>
                             ) : (
-                                <View style={sectionStyles.noSectionsCompact}>
-                                    <Text style={sectionStyles.noSectionsTextCompact}>No mini-sections</Text>
+                                <View style={sectionStyles.noSectionsWrapper}>
+                                    <View style={sectionStyles.noSectionsCompact}>
+                                        <Ionicons name="alert-circle-outline" size={16} color="#D97706" />
+                                        <Text style={sectionStyles.noSectionsTextCompact}>No mini-sections</Text>
+                                    </View>
                                     <SectionManager
                                         onSectionSelect={(sectionId) => {
                                             setSelectedMiniSection(sectionId);
@@ -1092,11 +1162,50 @@ const Details = () => {
                         ))
                     ) : (
                         <View style={styles.noMaterialsContainer}>
-                            <Text style={styles.noMaterialsTitle}>No Materials Found</Text>
-                            <Text style={styles.noMaterialsDescription}>
-                                No {activeTab === 'imported' ? 'available' : 'used'} materials found for this project.
-                                {activeTab === 'imported' && ' Add materials using the + button below.'}
-                            </Text>
+                            {activeTab === 'used' && miniSections.length === 0 ? (
+                                <>
+                                    <Ionicons name="layers-outline" size={64} color="#CBD5E1" />
+                                    <Text style={styles.noMaterialsTitle}>No Mini-Sections Found</Text>
+                                    <Text style={[styles.noMaterialsDescription, { marginBottom: 20 }]}>
+                                        Create mini-sections to organize and track material usage in different areas of your project.
+                                    </Text>
+                                    <TouchableOpacity
+                                        style={{
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            backgroundColor: '#3B82F6',
+                                            paddingVertical: 12,
+                                            paddingHorizontal: 24,
+                                            borderRadius: 10,
+                                            gap: 8,
+                                            marginTop: 8,
+                                            shadowColor: '#3B82F6',
+                                            shadowOffset: { width: 0, height: 4 },
+                                            shadowOpacity: 0.3,
+                                            shadowRadius: 8,
+                                            elevation: 4,
+                                        }}
+                                        onPress={() => {
+                                            setShowAddSectionModal(true);
+                                        }}
+                                    >
+                                        <Ionicons name="add-circle" size={20} color="#FFFFFF" />
+                                        <Text style={{ fontSize: 15, fontWeight: '600', color: '#FFFFFF' }}>
+                                            Add Section
+                                        </Text>
+                                    </TouchableOpacity>
+                                </>
+                            ) : (
+                                <>
+                                    <Ionicons name="cube-outline" size={64} color="#CBD5E1" />
+                                    <Text style={styles.noMaterialsTitle}>No Materials Found</Text>
+                                    <Text style={styles.noMaterialsDescription}>
+                                        No {activeTab === 'imported' ? 'available' : 'used'} materials found for this project.
+                                        {activeTab === 'imported' && ' Add materials using the + button above.'}
+                                    </Text>
+                                </>
+                            )}
                         </View>
                     )}
                 </View>
@@ -1193,6 +1302,61 @@ const Details = () => {
                     minimumDate={customStartDate}
                 />
             )}
+
+            {/* Add Section Modal */}
+            <Modal
+                visible={showAddSectionModal}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setShowAddSectionModal(false)}
+            >
+                <View style={sectionStyles.modalOverlay}>
+                    <View style={sectionStyles.modalContent}>
+                        <Text style={sectionStyles.modalTitle}>Add New Section</Text>
+
+                        <Text style={sectionStyles.dateLabel}>Section Name *</Text>
+                        <TextInput
+                            style={sectionStyles.dateButton}
+                            value={newSectionName}
+                            onChangeText={setNewSectionName}
+                            placeholder="e.g., Base, First Slab, Second Slab"
+                            placeholderTextColor="#94A3B8"
+                        />
+
+                        <Text style={sectionStyles.dateLabel}>Description (Optional)</Text>
+                        <TextInput
+                            style={[sectionStyles.dateButton, { minHeight: 80, textAlignVertical: 'top' }]}
+                            value={newSectionDesc}
+                            onChangeText={setNewSectionDesc}
+                            placeholder="Add a description for this section"
+                            placeholderTextColor="#94A3B8"
+                            multiline
+                            numberOfLines={3}
+                        />
+
+                        <View style={sectionStyles.modalButtons}>
+                            <TouchableOpacity
+                                style={sectionStyles.modalCancelButton}
+                                onPress={() => {
+                                    setShowAddSectionModal(false);
+                                    setNewSectionName('');
+                                    setNewSectionDesc('');
+                                }}
+                            >
+                                <Text style={sectionStyles.modalCancelText}>Cancel</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={sectionStyles.modalApplyButton}
+                                onPress={handleAddSection}
+                                disabled={!newSectionName.trim()}
+                            >
+                                <Text style={sectionStyles.modalApplyText}>Add Section</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -1251,6 +1415,7 @@ const sectionStyles = StyleSheet.create({
         padding: 12,
         marginTop: 12,
         marginBottom: 8,
+        marginHorizontal: 16,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
@@ -1261,7 +1426,7 @@ const sectionStyles = StyleSheet.create({
     filterRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        minHeight: 36,
+        overflow: 'visible',
     },
     filterIcon: {
         marginRight: 8,
@@ -1292,24 +1457,43 @@ const sectionStyles = StyleSheet.create({
     },
     compactSectionSelector: {
         flex: 1,
+        overflow: 'visible',
     },
-    noSectionsCompact: {
+    noSectionsWrapper: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        backgroundColor: '#FEF3C7',
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 8,
+        gap: 8,
+        overflow: 'visible',
+    },
+    noSectionsCompact: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFBEB',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
         borderWidth: 1,
         borderColor: '#FDE68A',
+        gap: 4,
+    },
+    addSectionButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#3B82F6',
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#3B82F6',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 3,
     },
     noSectionsTextCompact: {
-        fontSize: 13,
+        fontSize: 11,
         color: '#92400E',
         fontWeight: '500',
-        flex: 1,
     },
     customDateDisplay: {
         flexDirection: 'row',
