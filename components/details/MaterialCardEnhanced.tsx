@@ -201,16 +201,29 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                             </View>
                             <View style={styles.statDivider} />
                             <View style={styles.statItem}>
-                                <Text style={styles.statLabel}>Currently Available</Text>
-                                <Text style={[styles.statValue, styles.statValueAvailable]}>
+                                <Text style={styles.statLabel}>
+                                    {activeTab === 'used' ? 'Quantity Used' : 'Currently Available'}
+                                </Text>
+                                <Text style={[
+                                    styles.statValue,
+                                    activeTab === 'used' ? styles.statValueUsed : styles.statValueAvailable
+                                ]}>
                                     {material.totalQuantity} {material.unit}
                                 </Text>
                             </View>
                             <View style={styles.statDivider} />
                             <View style={styles.statItem}>
-                                <Text style={styles.statLabel}>Used So Far</Text>
-                                <Text style={[styles.statValue, styles.statValueUsed]}>
-                                    {material.totalUsed || 0} {material.unit}
+                                <Text style={styles.statLabel}>
+                                    {activeTab === 'used' ? 'Still Available' : 'Used So Far'}
+                                </Text>
+                                <Text style={[
+                                    styles.statValue,
+                                    activeTab === 'used' ? styles.statValueAvailable : styles.statValueUsed
+                                ]}>
+                                    {activeTab === 'used'
+                                        ? (material.totalImported ? material.totalImported - material.totalQuantity : 0)
+                                        : (material.totalUsed || 0)
+                                    } {material.unit}
                                 </Text>
                             </View>
                         </View>
@@ -219,19 +232,19 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                         {activeTab === 'imported' && (
                             <View style={styles.progressBarContainer}>
                                 <View style={styles.progressBarBackground}>
-                                    <View 
+                                    <View
                                         style={[
-                                            styles.progressBarFill, 
-                                            { 
-                                                width: material.totalImported 
+                                            styles.progressBarFill,
+                                            {
+                                                width: material.totalImported
                                                     ? `${Math.min((material.totalQuantity / material.totalImported) * 100, 100)}%`
                                                     : '100%'
                                             }
-                                        ]} 
+                                        ]}
                                     />
                                 </View>
                                 <Text style={styles.progressPercentage}>
-                                    {material.totalImported 
+                                    {material.totalImported
                                         ? `${Math.round((material.totalQuantity / material.totalImported) * 100)}% remaining`
                                         : '100% remaining'}
                                 </Text>

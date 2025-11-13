@@ -46,8 +46,6 @@ const Details = () => {
     const [newSectionDesc, setNewSectionDesc] = useState('');
     const cardAnimations = useRef<Animated.Value[]>([]).current;
 
-
-
     // Function to get material icon and color based on material name
     const getMaterialIconAndColor = (materialName: string) => {
         const materialMap: { [key: string]: { icon: keyof typeof import('@expo/vector-icons').Ionicons.glyphMap, color: string } } = {
@@ -77,14 +75,14 @@ const Details = () => {
         if (!projectId) {
             return;
         }
-        
+
         setLoading(true);
-        
+
         try {
             // Get clientId from storage
             const { getClientId } = require('@/functions/clientId');
             const clientId = await getClientId();
-            
+
             if (!clientId) {
                 throw new Error('Client ID not found');
             }
@@ -108,7 +106,7 @@ const Details = () => {
                 const availableResponse = await axios.get(`${domain}/api/material?projectId=${projectId}&clientId=${clientId}`);
                 console.log('Available Response:', JSON.stringify(availableResponse.data, null, 2));
                 const availableData = availableResponse.data as any;
-                
+
                 if (availableData.success) {
                     materialAvailable = availableData.MaterialAvailable || [];
                     console.log('✓ MaterialAvailable extracted:', materialAvailable.length, 'items');
@@ -127,14 +125,34 @@ const Details = () => {
                 const usedResponse = await axios.get(`${domain}/api/material-usage?projectId=${projectId}&clientId=${clientId}`);
                 console.log('Used Response:', JSON.stringify(usedResponse.data, null, 2));
                 const usedData = usedResponse.data as any;
-                
+
+                console.log('\n🔍 CHECKING API RESPONSE STRUCTURE:');
+                console.log('usedData.success:', usedData.success);
+                console.log('usedData.MaterialUsed:', usedData.MaterialUsed);
+                console.log('usedData.materialUsed:', usedData.materialUsed);
+                console.log('usedData.MaterialAvailable:', usedData.MaterialAvailable);
+                console.log('usedData.data:', usedData.data);
+                console.log('All keys in response:', Object.keys(usedData));
+                console.log('Full response data:', JSON.stringify(usedData, null, 2));
+
                 if (usedData.success) {
-                    // Check both MaterialUsed and MaterialAvailable fields (API might return either)
-                    materialUsed = usedData.MaterialUsed || usedData.MaterialAvailable || [];
+                    // Check multiple possible field names for used materials
+                    materialUsed = usedData.MaterialUsed ||
+                        usedData.materialUsed ||
+                        usedData.usedMaterials ||
+                        usedData.data?.MaterialUsed ||
+                        usedData.data?.materialUsed ||
+                        [];
+
                     console.log('✓ MaterialUsed extracted:', materialUsed.length, 'items');
-                    console.log('Field used:', usedData.MaterialUsed ? 'MaterialUsed' : 'MaterialAvailable');
                     if (materialUsed.length > 0) {
-                        console.log('Sample used material:', JSON.stringify(materialUsed[0], null, 2));
+                        console.log('✅ Found used materials! Sample:', JSON.stringify(materialUsed[0], null, 2));
+                    } else {
+                        console.warn('⚠️ MaterialUsed array is EMPTY!');
+                        console.warn('This could mean:');
+                        console.warn('1. No materials have been used yet');
+                        console.warn('2. API is returning data in a different field');
+                        console.warn('3. The material usage was not saved properly');
                     }
                 } else {
                     console.warn('⚠ MaterialUsed API returned success: false');
@@ -145,7 +163,21 @@ const Details = () => {
             }
 
             console.log('Extracted - Available:', materialAvailable.length, 'Used:', materialUsed.length);
-            
+
+            // Log raw data to check if API is returning correct data
+            console.log('\n========================================');
+            console.log('RAW API DATA COMPARISON');
+            console.log('========================================');
+            console.log('MaterialAvailable (first item):');
+            if (materialAvailable.length > 0) {
+                console.log(JSON.stringify(materialAvailable[0], null, 2));
+            }
+            console.log('\nMaterialUsed (first item):');
+            if (materialUsed.length > 0) {
+                console.log(JSON.stringify(materialUsed[0], null, 2));
+            }
+            console.log('========================================\n');
+
             // Transform MaterialAvailable
             const transformedAvailable: Material[] = materialAvailable.map((material: any, index: number) => {
                 const { icon, color } = getMaterialIconAndColor(material.name);
@@ -186,18 +218,41 @@ const Details = () => {
             });
 
             console.log('MATERIALS RELOADED SUCCESSFULLY');
-           
+            console.log('Available Materials:', transformedAvailable.length);
+            console.log('Used Materials:', transformedUsed.length);
+
+            console.log('\n========================================');
+            console.log('TRANSFORMED DATA');
+            console.log('========================================');
+            console.log('Transformed Available (first item):');
+            if (transformedAvailable.length > 0) {
+                console.log(JSON.stringify(transformedAvailable[0], null, 2));
+            }
+            console.log('\nTransformed Used (first item):');
+            if (transformedUsed.length > 0) {
+                console.log(JSON.stringify(transformedUsed[0], null, 2));
+            } else {
+                console.error('❌ NO USED MATERIALS TO TRANSFORM!');
+                console.error('The materialUsed array from API was empty');
+            }
+            console.log('========================================\n');
+
+            console.log('🚨 SETTING STATE NOW:');
+            console.log('  - availableMaterials:', transformedAvailable.length);
+            console.log('  - usedMaterials:', transformedUsed.length);
 
             setAvailableMaterials(transformedAvailable);
             setUsedMaterials(transformedUsed);
-            
+
+            console.log('✅ State updated!\n');
+
             // Reinitialize animations
             const totalMaterials = Math.max(transformedAvailable.length, transformedUsed.length);
             cardAnimations.splice(0);
             for (let i = 0; i < totalMaterials; i++) {
                 cardAnimations.push(new Animated.Value(0));
             }
-            
+
             Animated.stagger(100,
                 cardAnimations.map((anim: Animated.Value) =>
                     Animated.timing(anim, {
@@ -228,7 +283,7 @@ const Details = () => {
                     // Get clientId from storage
                     const { getClientId } = require('@/functions/clientId');
                     const clientId = await getClientId();
-                    
+
                     if (clientId) {
                         // Fetch MaterialAvailable
                         try {
@@ -249,13 +304,19 @@ const Details = () => {
                             const usedData = usedResponse.data as any;
                             console.log('Force Refresh - Used Response:', JSON.stringify(usedData, null, 2));
                             if (usedData.success) {
-                                materialUsed = usedData.MaterialUsed || usedData.MaterialAvailable || [];
+                                // Check multiple possible field names for used materials
+                                materialUsed = usedData.MaterialUsed ||
+                                    usedData.materialUsed ||
+                                    usedData.usedMaterials ||
+                                    usedData.data?.MaterialUsed ||
+                                    usedData.data?.materialUsed ||
+                                    [];
                                 console.log('✓ Force Refresh - MaterialUsed:', materialUsed.length, 'items');
                             }
                         } catch (usedError: any) {
                             console.error('❌ Force Refresh - Error fetching MaterialUsed:', usedError?.response?.data || usedError.message);
                         }
-                        
+
                         console.log('Force Refresh - Extracted Available:', materialAvailable.length, 'Used:', materialUsed.length);
                     }
                 } catch (apiError: any) {
@@ -291,7 +352,7 @@ const Details = () => {
                         // Get clientId from storage
                         const { getClientId } = require('@/functions/clientId');
                         const clientId = await getClientId();
-                        
+
                         if (clientId) {
                             // Fetch MaterialAvailable
                             try {
@@ -312,13 +373,19 @@ const Details = () => {
                                 const usedData = usedResponse.data as any;
                                 console.log('Fallback API - Used Response:', JSON.stringify(usedData, null, 2));
                                 if (usedData.success) {
-                                    materialUsed = usedData.MaterialUsed || usedData.MaterialAvailable || [];
+                                    // Check multiple possible field names for used materials
+                                    materialUsed = usedData.MaterialUsed ||
+                                        usedData.materialUsed ||
+                                        usedData.usedMaterials ||
+                                        usedData.data?.MaterialUsed ||
+                                        usedData.data?.materialUsed ||
+                                        [];
                                     console.log('✓ Fallback API - MaterialUsed:', materialUsed.length, 'items');
                                 }
                             } catch (usedError: any) {
                                 console.error('❌ Fallback API - Error fetching MaterialUsed:', usedError?.response?.data || usedError.message);
                             }
-                            
+
                             console.log('Fallback API - Extracted Available:', materialAvailable.length, 'Used:', materialUsed.length);
                         }
                     } catch (apiError: any) {
@@ -327,75 +394,74 @@ const Details = () => {
                 }
             }
 
-                // Transform MaterialAvailable to Material interface
-                const transformedAvailable: Material[] = materialAvailable.map((material: any, index: number) => {
-                    const { icon, color } = getMaterialIconAndColor(material.name);
-                    return {
-                        id: index + 1,
-                        _id: material._id, // Store MongoDB _id for API calls
-                        name: material.name,
-                        quantity: material.qnt,
-                        unit: material.unit,
-                        price: material.cost || 0,
-                        date: new Date().toLocaleDateString(),
-                        icon,
-                        color,
-                        specs: material.specs || {}
-                    };
-                });
+            // Transform MaterialAvailable to Material interface
+            const transformedAvailable: Material[] = materialAvailable.map((material: any, index: number) => {
+                const { icon, color } = getMaterialIconAndColor(material.name);
+                return {
+                    id: index + 1,
+                    _id: material._id, // Store MongoDB _id for API calls
+                    name: material.name,
+                    quantity: material.qnt,
+                    unit: material.unit,
+                    price: material.cost || 0,
+                    date: new Date().toLocaleDateString(),
+                    icon,
+                    color,
+                    specs: material.specs || {}
+                };
+            });
 
-                // Transform MaterialUsed to Material interface
-                const transformedUsed: Material[] = materialUsed.map((material: any, index: number) => {
-                    const { icon, color } = getMaterialIconAndColor(material.name);
-                    return {
-                        id: index + 1000, // Different ID range to avoid conflicts
-                        _id: material._id, // Store MongoDB _id
-                        name: material.name,
-                        quantity: material.qnt,
-                        unit: material.unit,
-                        price: material.cost || 0,
-                        date: new Date().toLocaleDateString(),
-                        icon,
-                        color,
-                        specs: material.specs || {},
-                        sectionId: material.sectionId || material.miniSectionId, // Preserve section/mini-section ID
-                        miniSectionId: material.miniSectionId, // Also store miniSectionId separately
-                        addedAt: material.addedAt,
-                        createdAt: material.createdAt,
-                        updatedAt: material.updatedAt
-                    };
-                });
-                
-                console.log('\n========================================');
-                console.log('INITIAL MATERIALS LOADED');
-                console.log('========================================');
-                console.log('Available Materials:', transformedAvailable.length);
-                console.log('Used Materials:', transformedUsed.length);
-                console.log('Source:', materialAvailableParam ? 'Params' : 'API');
-                console.log('========================================\n');
+            // Transform MaterialUsed to Material interface
+            const transformedUsed: Material[] = materialUsed.map((material: any, index: number) => {
+                const { icon, color } = getMaterialIconAndColor(material.name);
+                return {
+                    id: index + 1000, // Different ID range to avoid conflicts
+                    _id: material._id, // Store MongoDB _id
+                    name: material.name,
+                    quantity: material.qnt,
+                    unit: material.unit,
+                    price: material.cost || 0,
+                    date: new Date().toLocaleDateString(),
+                    icon,
+                    color,
+                    specs: material.specs || {},
+                    sectionId: material.sectionId || material.miniSectionId, // Preserve section/mini-section ID
+                    miniSectionId: material.miniSectionId, // Also store miniSectionId separately
+                    addedAt: material.addedAt,
+                    createdAt: material.createdAt,
+                    updatedAt: material.updatedAt
+                };
+            });
 
-                setAvailableMaterials(transformedAvailable);
-                setUsedMaterials(transformedUsed);
+            console.log('\n========================================');
+            console.log('INITIAL MATERIALS LOADED');
+            console.log('========================================');
+            console.log('Available Materials:', transformedAvailable.length);
+            console.log('Used Materials:', transformedUsed.length);
+            console.log('Source:', materialAvailableParam ? 'Params' : 'API');
+            console.log('========================================\n');
 
-                // Initialize animations for the materials
-                const totalMaterials = Math.max(transformedAvailable.length, transformedUsed.length);
-                cardAnimations.splice(0); // Clear existing animations
-                for (let i = 0; i < totalMaterials; i++) {
-                    cardAnimations.push(new Animated.Value(0));
-                }
+            setAvailableMaterials(transformedAvailable);
+            setUsedMaterials(transformedUsed);
 
-                // Animate cards in
-                Animated.stagger(100,
-                    cardAnimations.map((anim: Animated.Value) =>
-                        Animated.timing(anim, {
-                            toValue: 1,
-                            duration: 300,
-                            useNativeDriver: false,
-                        })
-                    )
-                ).start();
+            // Initialize animations for the materials
+            const totalMaterials = Math.max(transformedAvailable.length, transformedUsed.length);
+            cardAnimations.splice(0); // Clear existing animations
+            for (let i = 0; i < totalMaterials; i++) {
+                cardAnimations.push(new Animated.Value(0));
+            }
+
+            // Animate cards in
+            Animated.stagger(100,
+                cardAnimations.map((anim: Animated.Value) =>
+                    Animated.timing(anim, {
+                        toValue: 1,
+                        duration: 300,
+                        useNativeDriver: false,
+                    })
+                )
+            ).start();
         } catch (error: any) {
-            
             // Only show error toast if it's a critical error (not from API fetch)
             if (!error?.message?.includes('API') && !error?.response) {
                 const errorMessage = error?.message || 'Failed to process materials';
@@ -410,22 +476,39 @@ const Details = () => {
     useEffect(() => {
         loadProjectMaterials();
     }, [projectId, materialAvailableParam, materialUsedParam]);
-    
+
     // Debug: Log when usedMaterials state changes
     useEffect(() => {
         console.log('\n🔄 usedMaterials STATE CHANGED');
         console.log('New count:', usedMaterials.length);
         usedMaterials.forEach((m, idx) => {
-            console.log(`  ${idx + 1}. ${m.name} (sectionId: ${m.sectionId}, miniSectionId: ${m.miniSectionId})`);
+            console.log(`  ${idx + 1}. ${m.name} - Qty: ${m.quantity} ${m.unit} (sectionId: ${m.sectionId}, miniSectionId: ${m.miniSectionId})`);
         });
         console.log('');
     }, [usedMaterials]);
+
+    // Debug: Log when availableMaterials state changes
+    useEffect(() => {
+        console.log('\n📦 availableMaterials STATE CHANGED');
+        console.log('New count:', availableMaterials.length);
+        availableMaterials.forEach((m, idx) => {
+            console.log(`  ${idx + 1}. ${m.name} - Qty: ${m.quantity} ${m.unit}`);
+        });
+        console.log('');
+    }, [availableMaterials]);
+
+    // Debug: Log when activeTab changes
+    useEffect(() => {
+        console.log('\n🔀 ACTIVE TAB CHANGED TO:', activeTab);
+        console.log('Available materials count:', availableMaterials.length);
+        console.log('Used materials count:', usedMaterials.length);
+    }, [activeTab]);
 
     // Fetch mini-sections for the section selector
     useEffect(() => {
         const fetchMiniSections = async () => {
             if (!sectionId) return;
-            
+
             try {
                 const sections = await getSection(sectionId);
                 if (sections && Array.isArray(sections)) {
@@ -439,8 +522,19 @@ const Details = () => {
         fetchMiniSections();
     }, [sectionId]);
 
-    // Group materials by name and unit
+    // FIXED: Group materials by name and unit - CORRECTED LOGIC
     const groupMaterialsByName = (materials: Material[], isUsedTab: boolean = false) => {
+        console.log('\n========================================');
+        console.log('GROUPING MATERIALS');
+        console.log('========================================');
+        console.log('Input materials count:', materials.length);
+        console.log('Is Used Tab:', isUsedTab);
+        console.log('Materials to group:');
+        materials.forEach((m, idx) => {
+            console.log(`  ${idx + 1}. ${m.name} - Qty: ${m.quantity} ${m.unit}`);
+        });
+        console.log('========================================\n');
+
         const grouped: { [key: string]: any } = {};
 
         materials.forEach((material, index) => {
@@ -458,7 +552,7 @@ const Details = () => {
                     totalCost: 0,
                     totalUsed: 0,
                     totalImported: 0,
-                    miniSectionId: material.miniSectionId, // Add mini-section ID
+                    miniSectionId: material.miniSectionId,
                 };
             }
 
@@ -469,42 +563,58 @@ const Details = () => {
                 specs: material.specs || {},
                 quantity: material.quantity,
                 cost: material.price,
-                miniSectionId: material.miniSectionId, // Add mini-section ID to variant
+                miniSectionId: material.miniSectionId,
             });
 
             grouped[key].totalQuantity += material.quantity;
             grouped[key].totalCost += material.price;
         });
 
-        // Calculate stats based on which tab we're in
+        // FIXED: Correct calculation logic for both tabs
         Object.keys(grouped).forEach((key) => {
             if (isUsedTab) {
-                // In "used" tab: totalQuantity is the used amount
-                // We need to find the available amount from availableMaterials
+                // In "used" tab: totalQuantity IS the used amount (don't change it)
+                const usedQuantity = grouped[key].totalQuantity;
+
+                // Find available quantity for stats only
                 const availableQuantity = availableMaterials
                     .filter(m => `${m.name}-${m.unit}` === key)
                     .reduce((sum, m) => sum + m.quantity, 0);
-                
-                const usedQuantity = grouped[key].totalQuantity; // This is already the used quantity
-                
+
                 grouped[key].totalUsed = usedQuantity;
                 grouped[key].totalImported = availableQuantity + usedQuantity;
-                grouped[key].totalQuantity = availableQuantity; // Show available in "Currently Available"
+                // Keep totalQuantity as used quantity for display
+
+                console.log(`Used Tab - ${key}: Used=${usedQuantity}, Available=${availableQuantity}, Total=${grouped[key].totalImported}`);
             } else {
-                // In "imported" tab: totalQuantity is the available amount
-                // Calculate total used from usedMaterials
+                // In "imported" tab: totalQuantity is available amount
+                const availableQuantity = grouped[key].totalQuantity;
+
+                // Calculate used quantity for stats
                 const usedQuantity = usedMaterials
                     .filter(m => `${m.name}-${m.unit}` === key)
                     .reduce((sum, m) => sum + m.quantity, 0);
-                
+
                 grouped[key].totalUsed = usedQuantity;
-                grouped[key].totalImported = grouped[key].totalQuantity + usedQuantity;
+                grouped[key].totalImported = availableQuantity + usedQuantity;
+                // Keep totalQuantity as available quantity for display
+
+                console.log(`Imported Tab - ${key}: Available=${availableQuantity}, Used=${usedQuantity}, Total=${grouped[key].totalImported}`);
             }
         });
 
-        return Object.values(grouped);
-    };
+        const result = Object.values(grouped);
+        console.log('\n========================================');
+        console.log('GROUPED RESULT');
+        console.log('========================================');
+        console.log('Grouped materials count:', result.length);
+        result.forEach((g: any, idx) => {
+            console.log(`  ${idx + 1}. ${g.name} - Display Qty: ${g.totalQuantity} ${g.unit} (Used: ${g.totalUsed}, Total: ${g.totalImported})`);
+        });
+        console.log('========================================\n');
 
+        return result;
+    };
     // Handle adding material usage from the form
     const handleAddMaterialUsage = async (
         miniSectionId: string,
@@ -518,16 +628,16 @@ const Details = () => {
             materialId: materialId,
             qnt: quantity
         };
-        
+
         console.log('\n========================================');
         console.log('ADD MATERIAL USAGE - DEBUG INFO');
         console.log('========================================');
         console.log('Material ID received:', materialId);
         console.log('Material ID type:', typeof materialId);
-        
+
         const selectedMaterial = availableMaterials.find(m => m._id === materialId);
         console.log('Found material:', selectedMaterial ? selectedMaterial.name : 'NOT FOUND');
-        
+
         if (!selectedMaterial) {
             console.log('❌ Material not found in availableMaterials!');
             console.log('Available materials:');
@@ -542,10 +652,10 @@ const Details = () => {
                 unit: selectedMaterial.unit
             });
         }
-        
+
         console.log('API Payload:', JSON.stringify(apiPayload, null, 2));
         console.log('========================================\n');
-                
+
         let loadingToast: any = null;
         try {
             loadingToast = toast.loading('Adding material usage...');
@@ -561,107 +671,17 @@ const Details = () => {
             if (responseData.success) {
                 toast.dismiss(loadingToast);
                 toast.success(responseData.message || 'Material usage added successfully');
-                
-                // Use the data returned from the API instead of refetching
-                if (responseData.data) {
-                    const { materialAvailable, materialUsed } = responseData.data;
-                    
-                    console.log('\n========================================');
-                    console.log('UPDATING FROM API RESPONSE');
-                    console.log('========================================');
-                    console.log('MaterialAvailable from response:', materialAvailable?.length || 0);
-                    console.log('MaterialUsed from response:', materialUsed?.length || 0);
-                    if (materialUsed && materialUsed.length > 0) {
-                        console.log('Sample MaterialUsed item:', JSON.stringify(materialUsed[0], null, 2));
-                    }
-                    console.log('========================================\n');
-                    
-                    // Transform MaterialAvailable
-                    const transformedAvailable: Material[] = (materialAvailable || []).map((material: any, index: number) => {
-                        const { icon, color } = getMaterialIconAndColor(material.name);
-                        return {
-                            id: index + 1,
-                            _id: material._id,
-                            name: material.name,
-                            quantity: material.qnt,
-                            unit: material.unit,
-                            price: material.cost || 0,
-                            date: new Date().toLocaleDateString(),
-                            icon,
-                            color,
-                            specs: material.specs || {}
-                        };
-                    });
 
-                    // Transform MaterialUsed
-                    const transformedUsed: Material[] = (materialUsed || []).map((material: any, index: number) => {
-                        const { icon, color } = getMaterialIconAndColor(material.name);
-                        return {
-                            id: index + 1000,
-                            _id: material._id,
-                            name: material.name,
-                            quantity: material.qnt,
-                            unit: material.unit,
-                            price: material.cost || 0,
-                            date: new Date().toLocaleDateString(),
-                            icon,
-                            color,
-                            specs: material.specs || {},
-                            sectionId: material.sectionId || material.miniSectionId,
-                            miniSectionId: material.miniSectionId,
-                            addedAt: material.addedAt,
-                            createdAt: material.createdAt,
-                            updatedAt: material.updatedAt
-                        };
-                    });
+                // Refresh materials from API to get the latest data
+                console.log('\n========================================');
+                console.log('REFRESHING MATERIALS AFTER USAGE ADD');
+                console.log('========================================\n');
 
-                    console.log('\n========================================');
-                    console.log('SETTING STATE');
-                    console.log('========================================');
-                    console.log('Setting availableMaterials:', transformedAvailable.length);
-                    console.log('Setting usedMaterials:', transformedUsed.length);
-                    console.log('Available materials details:');
-                    transformedAvailable.forEach((m, idx) => {
-                        console.log(`  ${idx + 1}. ${m.name} - Qty: ${m.quantity}`);
-                    });
-                    console.log('Used materials details:');
-                    transformedUsed.forEach((m, idx) => {
-                        console.log(`  ${idx + 1}. ${m.name} - Qty: ${m.quantity}, sectionId: ${m.sectionId}, miniSectionId: ${m.miniSectionId}`);
-                    });
-                    console.log('========================================\n');
-                    
-                    setAvailableMaterials(transformedAvailable);
-                    setUsedMaterials(transformedUsed);
-                    
-                    // Refetch mini-sections to ensure they're up to date
-                    try {
-                        const sections = await getSection(sectionId);
-                        if (sections && Array.isArray(sections)) {
-                            setMiniSections(sections);
-                            console.log('✓ Mini-sections refreshed:', sections.length);
-                        }
-                    } catch (error) {
-                        console.error('Error refreshing mini-sections:', error);
-                    }
-                    
-                    // Reinitialize animations
-                    const totalMaterials = Math.max(transformedAvailable.length, transformedUsed.length);
-                    cardAnimations.splice(0);
-                    for (let i = 0; i < totalMaterials; i++) {
-                        cardAnimations.push(new Animated.Value(0));
-                    }
-                    
-                    Animated.stagger(100,
-                        cardAnimations.map((anim: Animated.Value) =>
-                            Animated.timing(anim, {
-                                toValue: 1,
-                                duration: 300,
-                                useNativeDriver: false,
-                            })
-                        )
-                    ).start();
-                }
-                
+                await reloadProjectMaterials();
+
+                // Add a small delay to ensure state is updated before switching tabs
+                await new Promise(resolve => setTimeout(resolve, 200));
+
                 // Switch to "used" tab to show the newly added usage
                 setActiveTab('used');
             } else {
@@ -671,14 +691,14 @@ const Details = () => {
             if (loadingToast) {
                 toast.dismiss(loadingToast);
             }
-            
+
             console.log('\n========================================');
             console.log('API RESPONSE - ERROR');
             console.log('========================================');
             console.log('Error Message:', error?.message);
             console.log('Error Response:', JSON.stringify(error?.response?.data, null, 2));
             console.log('========================================\n');
-            
+
             const errorMessage = error?.response?.data?.error ||
                 error?.response?.data?.message ||
                 error?.message ||
@@ -704,7 +724,7 @@ const Details = () => {
         }
 
         const { addSection } = require('@/functions/details');
-        
+
         const sectionData = {
             name: newSectionName.trim(),
             projectDetails: {
@@ -718,29 +738,29 @@ const Details = () => {
         };
 
         console.log('Adding section:', sectionData);
-        
+
         let loadingToast: any = null;
         try {
             loadingToast = toast.loading('Adding section...');
             const res: any = await addSection(sectionData);
-            
+
             console.log('\n========================================');
             console.log('ADD SECTION - API RESPONSE');
             console.log('========================================');
             console.log('Full response:', JSON.stringify(res, null, 2));
             console.log('========================================\n');
-            
+
             toast.dismiss(loadingToast);
-            
+
             if (res && res.success) {
                 toast.success("Section added successfully");
-                
+
                 // Refetch sections after adding a new one
                 const sections = await getSection(sectionId);
                 if (sections && Array.isArray(sections)) {
                     setMiniSections(sections);
                 }
-                
+
                 // Clear form and close modal
                 setNewSectionName('');
                 setNewSectionDesc('');
@@ -761,100 +781,7 @@ const Details = () => {
         }
     };
 
-    // Function to filter materials by date
-    const filterByDate = (materials: Material[]) => {
-        console.log('\n========================================');
-        console.log('DATE FILTERING');
-        console.log('========================================');
-        console.log('Selected Period:', selectedPeriod);
-        console.log('Total Materials:', materials.length);
-        
-        if (selectedPeriod === 'All') {
-            console.log('Period is "All" - showing all materials');
-            console.log('========================================\n');
-            return materials;
-        }
-
-        const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        today.setHours(0, 0, 0, 0);
-        
-        console.log('Today (midnight):', today.toISOString());
-
-        const filtered = materials.filter(material => {
-            // Get the date from addedAt, createdAt, or updatedAt field
-            const materialDateStr = (material as any).addedAt || (material as any).createdAt || (material as any).updatedAt;
-            
-            if (!materialDateStr) {
-                console.log(`❌ ${material.name}: NO DATE FIELD - including anyway`);
-                return true; // Include materials without dates
-            }
-
-            const materialDate = new Date(materialDateStr);
-            const materialDay = new Date(materialDate.getFullYear(), materialDate.getMonth(), materialDate.getDate());
-            materialDay.setHours(0, 0, 0, 0);
-
-            console.log(`\n📦 ${material.name}:`);
-            console.log(`   Raw date: ${materialDateStr}`);
-            console.log(`   Parsed: ${materialDay.toISOString()}`);
-            console.log(`   Display: ${materialDay.toLocaleDateString()}`);
-
-            let result = false;
-
-            switch (selectedPeriod) {
-                case 'Today':
-                    result = materialDay.getTime() === today.getTime();
-                    console.log(`   ✓ Today check: ${result}`);
-                    console.log(`   Material: ${materialDay.getTime()}, Today: ${today.getTime()}`);
-                    break;
-                
-                case '1 Week':
-                    const oneWeekAgo = new Date(today);
-                    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-                    result = materialDay.getTime() >= oneWeekAgo.getTime() && materialDay.getTime() <= today.getTime();
-                    console.log(`   ✓ 1 Week check: ${result}`);
-                    console.log(`   Range: ${oneWeekAgo.toLocaleDateString()} to ${today.toLocaleDateString()}`);
-                    break;
-                
-                case '15 Days':
-                    const fifteenDaysAgo = new Date(today);
-                    fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
-                    result = materialDay.getTime() >= fifteenDaysAgo.getTime() && materialDay.getTime() <= today.getTime();
-                    console.log(`   ✓ 15 Days check: ${result}`);
-                    break;
-                
-                case '1 Month':
-                    const oneMonthAgo = new Date(today);
-                    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-                    result = materialDay.getTime() >= oneMonthAgo.getTime() && materialDay.getTime() <= today.getTime();
-                    console.log(`   ✓ 1 Month check: ${result}`);
-                    break;
-                
-                case 'Custom':
-                    const startDay = new Date(customStartDate);
-                    startDay.setHours(0, 0, 0, 0);
-                    const endDay = new Date(customEndDate);
-                    endDay.setHours(23, 59, 59, 999);
-                    result = materialDay.getTime() >= startDay.getTime() && materialDay.getTime() <= endDay.getTime();
-                    console.log(`   ✓ Custom check: ${result}`);
-                    console.log(`   Range: ${startDay.toLocaleDateString()} to ${endDay.toLocaleDateString()}`);
-                    break;
-                
-                default:
-                    result = true;
-            }
-
-            console.log(`   → ${result ? '✅ INCLUDED' : '❌ EXCLUDED'}`);
-            return result;
-        });
-
-        console.log('\n========================================');
-        console.log(`Filtered: ${filtered.length} of ${materials.length} materials`);
-        console.log('========================================\n');
-        
-        return filtered;
-    };
-
+    // FIXED: Get current data with proper filtering
     const getCurrentData = () => {
         console.log('\n========================================');
         console.log('GET CURRENT DATA - START');
@@ -862,18 +789,19 @@ const Details = () => {
         console.log('Active Tab:', activeTab);
         console.log('availableMaterials.length:', availableMaterials.length);
         console.log('usedMaterials.length:', usedMaterials.length);
-        
+
+        // FIXED: Use the correct array based on active tab
         let materials = activeTab === 'imported' ? availableMaterials : usedMaterials;
-        
+
         console.log('Selected materials array:', activeTab === 'imported' ? 'availableMaterials' : 'usedMaterials');
         console.log('Total materials before filtering:', materials.length);
         console.log('Current sectionId:', sectionId);
         console.log('Selected mini-section:', selectedMiniSection);
-        
+
         // For "used" tab, only filter by selected mini-section if one is chosen
         if (activeTab === 'used') {
             console.log('✓ Processing USED materials tab...');
-            
+
             // Log all materials for debugging
             console.log('Materials in usedMaterials array:');
             materials.forEach((m, idx) => {
@@ -881,7 +809,7 @@ const Details = () => {
                 console.log('     sectionId:', m.sectionId);
                 console.log('     miniSectionId:', m.miniSectionId);
             });
-            
+
             // Only filter by specific mini-section if one is selected
             // Otherwise show ALL used materials (no section filtering)
             if (selectedMiniSection && selectedMiniSection !== 'all-sections') {
@@ -896,8 +824,12 @@ const Details = () => {
         } else {
             console.log('✓ Processing IMPORTED materials tab...');
         }
-        
+
         console.log('Final materials count:', materials.length);
+        console.log('Final materials:');
+        materials.forEach((m, idx) => {
+            console.log(`  ${idx + 1}. ${m.name} - Qty: ${m.quantity} ${m.unit}`);
+        });
         console.log('========================================\n');
 
         return materials;
@@ -913,25 +845,31 @@ const Details = () => {
     const filteredMaterials = getCurrentData();
     const groupedMaterials = getGroupedData();
     const totalCost = filteredMaterials.reduce((sum, material) => sum + material.price, 0);
-    
-    // Log the final data being displayed
+
+    // Log the final data being displayed - ENHANCED DEBUGGING
     console.log('\n========================================');
-    console.log('RENDER DATA');
+    console.log('RENDER DATA - DETAILED');
     console.log('========================================');
     console.log('Active Tab:', activeTab);
-    console.log('Filtered Materials:', filteredMaterials.length);
-    if (filteredMaterials.length > 0) {
-        console.log('First filtered material:', filteredMaterials[0].name, '- Qty:', filteredMaterials[0].quantity);
-    }
-    console.log('Grouped Materials:', groupedMaterials.length);
-    if (groupedMaterials.length > 0) {
-        console.log('First grouped material:', groupedMaterials[0].name);
-        console.log('  - totalQuantity:', groupedMaterials[0].totalQuantity);
-        console.log('  - totalUsed:', groupedMaterials[0].totalUsed);
-        console.log('  - totalImported:', groupedMaterials[0].totalImported);
-    }
-    console.log('Used Materials State:', usedMaterials.length);
-    console.log('Available Materials State:', availableMaterials.length);
+    console.log('Available Materials State Count:', availableMaterials.length);
+    console.log('Used Materials State Count:', usedMaterials.length);
+    console.log('\nAvailable Materials in State:');
+    availableMaterials.forEach((m, idx) => {
+        console.log(`  ${idx + 1}. ${m.name} - Qty: ${m.quantity} ${m.unit} (_id: ${m._id})`);
+    });
+    console.log('\nUsed Materials in State:');
+    usedMaterials.forEach((m, idx) => {
+        console.log(`  ${idx + 1}. ${m.name} - Qty: ${m.quantity} ${m.unit} (_id: ${m._id}, miniSectionId: ${m.miniSectionId})`);
+    });
+    console.log('\nFiltered Materials (what getCurrentData returned):', filteredMaterials.length);
+    filteredMaterials.forEach((m, idx) => {
+        console.log(`  ${idx + 1}. ${m.name} - Qty: ${m.quantity} ${m.unit}`);
+    });
+    console.log('\nGrouped Materials (what will be displayed):', groupedMaterials.length);
+    groupedMaterials.forEach((g: any, idx) => {
+        console.log(`  ${idx + 1}. ${g.name} - totalQuantity: ${g.totalQuantity} ${g.unit}`);
+        console.log(`      totalUsed: ${g.totalUsed}, totalImported: ${g.totalImported}`);
+    });
     console.log('========================================\n');
 
     const formatPrice = (price: number) => `₹${price.toLocaleString('en-IN')}`;
@@ -969,7 +907,6 @@ const Details = () => {
             cost: material.cost,
             mergeIfExists: material.mergeIfExists !== undefined ? material.mergeIfExists : true,
         }));
-
 
         console.log("=== PAYLOAD BEING SENT ===");
         console.log(JSON.stringify(formattedMaterials, null, 2));
@@ -1041,13 +978,11 @@ const Details = () => {
         }
     };
 
-
-
     return (
         <SafeAreaView style={styles.container}>
             <Header
                 selectedSection={null}
-                onSectionSelect={() => {}}
+                onSectionSelect={() => { }}
                 totalCost={totalCost}
                 formatPrice={formatPrice}
                 getSectionName={getSectionName}
@@ -1055,7 +990,7 @@ const Details = () => {
                 sectionName={sectionName}
                 projectId={projectId}
                 sectionId={sectionId}
-                onShowSectionPrompt={() => {}}
+                onShowSectionPrompt={() => { }}
                 hideSection={true}
             />
             <MaterialFormModal
@@ -1080,7 +1015,7 @@ const Details = () => {
                 contentContainerStyle={styles.scrollContent}
             >
                 <TabSelector activeTab={activeTab} onSelectTab={setActiveTab} />
-                
+
                 {/* Action Buttons - Only visible in "imported" tab */}
                 {activeTab === 'imported' && (
                     <View style={actionStyles.actionButtonsContainer}>
@@ -1092,7 +1027,7 @@ const Details = () => {
                             <Ionicons name="add-circle-outline" size={20} color="#059669" />
                             <Text style={actionStyles.addMaterialButtonText}>Add Material</Text>
                         </TouchableOpacity>
-                        
+
                         <TouchableOpacity
                             style={actionStyles.addUsageButton}
                             onPress={() => setShowUsageForm(true)}
@@ -1103,7 +1038,7 @@ const Details = () => {
                         </TouchableOpacity>
                     </View>
                 )}
-                
+
                 {/* Compact Filters - Only visible in "Used Materials" tab */}
                 {activeTab === 'used' && (
                     <View style={sectionStyles.filtersContainer}>
@@ -1267,7 +1202,7 @@ const Details = () => {
                 <View style={sectionStyles.modalOverlay}>
                     <View style={sectionStyles.modalContent}>
                         <Text style={sectionStyles.modalTitle}>Select Date Range</Text>
-                        
+
                         <Text style={sectionStyles.dateLabel}>Start Date</Text>
                         <TouchableOpacity
                             style={sectionStyles.dateButton}
@@ -1477,30 +1412,6 @@ const sectionStyles = StyleSheet.create({
     filterIcon: {
         marginRight: 8,
     },
-    chipScrollView: {
-        flex: 1,
-    },
-    chip: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 16,
-        backgroundColor: '#F1F5F9',
-        marginRight: 8,
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-    },
-    chipActive: {
-        backgroundColor: '#3B82F6',
-        borderColor: '#3B82F6',
-    },
-    chipText: {
-        fontSize: 13,
-        color: '#64748B',
-        fontWeight: '500',
-    },
-    chipTextActive: {
-        color: '#FFFFFF',
-    },
     compactSectionSelector: {
         flex: 1,
         overflow: 'visible',
@@ -1523,39 +1434,10 @@ const sectionStyles = StyleSheet.create({
         borderColor: '#FDE68A',
         gap: 4,
     },
-    addSectionButton: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: '#3B82F6',
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#3B82F6',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-        elevation: 3,
-    },
     noSectionsTextCompact: {
         fontSize: 11,
         color: '#92400E',
         fontWeight: '500',
-    },
-    customDateDisplay: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#EFF6FF',
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 8,
-        gap: 8,
-        marginTop: 8,
-    },
-    customDateText: {
-        fontSize: 12,
-        color: '#1E40AF',
-        fontWeight: '500',
-        flex: 1,
     },
     modalOverlay: {
         flex: 1,
