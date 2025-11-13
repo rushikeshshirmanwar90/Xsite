@@ -19,18 +19,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails }) => 
         }).format(amount);
     };
 
-    // Calculate total expenses from MaterialAvailable (sum of all material costs)
-    const calculateTotalExpenses = (): number => {
-        if (!project.MaterialAvailable || project.MaterialAvailable.length === 0) {
-            return 0;
-        }
-        
-        return project.MaterialAvailable.reduce((total, material) => {
-            return total + (material.cost || 0);
-        }, 0);
-    };
-
-    const totalExpenses = calculateTotalExpenses();
+    // Use the spent attribute from project for total expenses
+    const totalExpenses = project?.spent || 0;
     const expectedBudget = project?.budget || 0;
     const budgetProgress = expectedBudget > 0 ? (totalExpenses / expectedBudget) * 100 : 0;
 

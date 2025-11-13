@@ -7,6 +7,7 @@ interface MaterialVariant {
     specs: Record<string, any>;
     quantity: number;
     cost: number;
+    miniSectionId?: string;
 }
 
 interface GroupedMaterial {
@@ -20,6 +21,12 @@ interface GroupedMaterial {
     totalCost: number;
     totalImported?: number; // Total quantity ever imported
     totalUsed?: number; // Total quantity used so far
+    miniSectionId?: string;
+}
+
+interface MiniSection {
+    _id: string;
+    name: string;
 }
 
 interface MaterialCardEnhancedProps {
@@ -27,6 +34,8 @@ interface MaterialCardEnhancedProps {
     animation: Animated.Value;
     activeTab: 'imported' | 'used';
     onAddUsage: (materialName: string, unit: string, variantId: string, quantity: number, specs: Record<string, any>) => void;
+    miniSections?: MiniSection[];
+    showMiniSectionLabel?: boolean;
 }
 
 const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
@@ -34,7 +43,15 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
     animation,
     activeTab,
     onAddUsage,
+    miniSections = [],
+    showMiniSectionLabel = false,
 }) => {
+    // Get mini-section name by ID
+    const getMiniSectionName = (miniSectionId?: string): string => {
+        if (!miniSectionId) return 'Unassigned';
+        const section = miniSections.find(s => s._id === miniSectionId);
+        return section ? section.name : 'Unknown Section';
+    };
     const [showUsageModal, setShowUsageModal] = useState(false);
     const [selectedVariant, setSelectedVariant] = useState<MaterialVariant | null>(null);
     const [usageQuantity, setUsageQuantity] = useState('');
@@ -153,6 +170,14 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                             </View>
                             <View style={styles.materialTitleInfo}>
                                 <Text style={styles.materialNameText}>{material.name}</Text>
+                                {showMiniSectionLabel && material.miniSectionId && (
+                                    <View style={styles.miniSectionBadge}>
+                                        <Ionicons name="location" size={12} color="#3B82F6" />
+                                        <Text style={styles.miniSectionText}>
+                                            {getMiniSectionName(material.miniSectionId)}
+                                        </Text>
+                                    </View>
+                                )}
                                 {material.variants.length > 1 && (
                                     <Text style={styles.variantCountText}>
                                         {material.variants.length} variants
@@ -190,26 +215,28 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                             </View>
                         </View>
 
-                        {/* Progress Bar */}
-                        <View style={styles.progressBarContainer}>
-                            <View style={styles.progressBarBackground}>
-                                <View 
-                                    style={[
-                                        styles.progressBarFill, 
-                                        { 
-                                            width: material.totalImported 
-                                                ? `${Math.min((material.totalQuantity / material.totalImported) * 100, 100)}%`
-                                                : '100%'
-                                        }
-                                    ]} 
-                                />
+                        {/* Progress Bar - Only show in imported tab */}
+                        {activeTab === 'imported' && (
+                            <View style={styles.progressBarContainer}>
+                                <View style={styles.progressBarBackground}>
+                                    <View 
+                                        style={[
+                                            styles.progressBarFill, 
+                                            { 
+                                                width: material.totalImported 
+                                                    ? `${Math.min((material.totalQuantity / material.totalImported) * 100, 100)}%`
+                                                    : '100%'
+                                            }
+                                        ]} 
+                                    />
+                                </View>
+                                <Text style={styles.progressPercentage}>
+                                    {material.totalImported 
+                                        ? `${Math.round((material.totalQuantity / material.totalImported) * 100)}% remaining`
+                                        : '100% remaining'}
+                                </Text>
                             </View>
-                            <Text style={styles.progressPercentage}>
-                                {material.totalImported 
-                                    ? `${Math.round((material.totalQuantity / material.totalImported) * 100)}% remaining`
-                                    : '100% remaining'}
-                            </Text>
-                        </View>
+                        )}
 
                         {/* Cost Information */}
                         <View style={styles.costRow}>
@@ -411,6 +438,23 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#1F2937',
         marginBottom: 2,
+    },
+    miniSectionBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#EFF6FF',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+        marginTop: 4,
+        marginBottom: 2,
+        alignSelf: 'flex-start',
+        gap: 4,
+    },
+    miniSectionText: {
+        fontSize: 11,
+        color: '#3B82F6',
+        fontWeight: '600',
     },
     variantCountText: {
         fontSize: 12,

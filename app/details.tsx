@@ -359,7 +359,10 @@ const Details = () => {
                         color,
                         specs: material.specs || {},
                         sectionId: material.sectionId || material.miniSectionId, // Preserve section/mini-section ID
-                        miniSectionId: material.miniSectionId // Also store miniSectionId separately
+                        miniSectionId: material.miniSectionId, // Also store miniSectionId separately
+                        addedAt: material.addedAt,
+                        createdAt: material.createdAt,
+                        updatedAt: material.updatedAt
                     };
                 });
                 
@@ -407,6 +410,16 @@ const Details = () => {
     useEffect(() => {
         loadProjectMaterials();
     }, [projectId, materialAvailableParam, materialUsedParam]);
+    
+    // Debug: Log when usedMaterials state changes
+    useEffect(() => {
+        console.log('\n🔄 usedMaterials STATE CHANGED');
+        console.log('New count:', usedMaterials.length);
+        usedMaterials.forEach((m, idx) => {
+            console.log(`  ${idx + 1}. ${m.name} (sectionId: ${m.sectionId}, miniSectionId: ${m.miniSectionId})`);
+        });
+        console.log('');
+    }, [usedMaterials]);
 
     // Fetch mini-sections for the section selector
     useEffect(() => {
@@ -427,7 +440,7 @@ const Details = () => {
     }, [sectionId]);
 
     // Group materials by name and unit
-    const groupMaterialsByName = (materials: Material[], usedMaterialsList: Material[] = []) => {
+    const groupMaterialsByName = (materials: Material[], isUsedTab: boolean = false) => {
         const grouped: { [key: string]: any } = {};
 
         materials.forEach((material, index) => {
@@ -445,6 +458,7 @@ const Details = () => {
                     totalCost: 0,
                     totalUsed: 0,
                     totalImported: 0,
+                    miniSectionId: material.miniSectionId, // Add mini-section ID
                 };
             }
 
@@ -455,23 +469,37 @@ const Details = () => {
                 specs: material.specs || {},
                 quantity: material.quantity,
                 cost: material.price,
+                miniSectionId: material.miniSectionId, // Add mini-section ID to variant
             });
 
             grouped[key].totalQuantity += material.quantity;
             grouped[key].totalCost += material.price;
         });
 
-        // Calculate total used for each material from usedMaterialsList
-        usedMaterialsList.forEach((usedMaterial) => {
-            const key = `${usedMaterial.name}-${usedMaterial.unit}`;
-            if (grouped[key]) {
-                grouped[key].totalUsed += usedMaterial.quantity;
-            }
-        });
-
-        // Calculate total imported (available + used)
+        // Calculate stats based on which tab we're in
         Object.keys(grouped).forEach((key) => {
-            grouped[key].totalImported = grouped[key].totalQuantity + grouped[key].totalUsed;
+            if (isUsedTab) {
+                // In "used" tab: totalQuantity is the used amount
+                // We need to find the available amount from availableMaterials
+                const availableQuantity = availableMaterials
+                    .filter(m => `${m.name}-${m.unit}` === key)
+                    .reduce((sum, m) => sum + m.quantity, 0);
+                
+                const usedQuantity = grouped[key].totalQuantity; // This is already the used quantity
+                
+                grouped[key].totalUsed = usedQuantity;
+                grouped[key].totalImported = availableQuantity + usedQuantity;
+                grouped[key].totalQuantity = availableQuantity; // Show available in "Currently Available"
+            } else {
+                // In "imported" tab: totalQuantity is the available amount
+                // Calculate total used from usedMaterials
+                const usedQuantity = usedMaterials
+                    .filter(m => `${m.name}-${m.unit}` === key)
+                    .reduce((sum, m) => sum + m.quantity, 0);
+                
+                grouped[key].totalUsed = usedQuantity;
+                grouped[key].totalImported = grouped[key].totalQuantity + usedQuantity;
+            }
         });
 
         return Object.values(grouped);
@@ -543,6 +571,9 @@ const Details = () => {
                     console.log('========================================');
                     console.log('MaterialAvailable from response:', materialAvailable?.length || 0);
                     console.log('MaterialUsed from response:', materialUsed?.length || 0);
+                    if (materialUsed && materialUsed.length > 0) {
+                        console.log('Sample MaterialUsed item:', JSON.stringify(materialUsed[0], null, 2));
+                    }
                     console.log('========================================\n');
                     
                     // Transform MaterialAvailable
@@ -577,12 +608,41 @@ const Details = () => {
                             color,
                             specs: material.specs || {},
                             sectionId: material.sectionId || material.miniSectionId,
-                            miniSectionId: material.miniSectionId
+                            miniSectionId: material.miniSectionId,
+                            addedAt: material.addedAt,
+                            createdAt: material.createdAt,
+                            updatedAt: material.updatedAt
                         };
                     });
 
+                    console.log('\n========================================');
+                    console.log('SETTING STATE');
+                    console.log('========================================');
+                    console.log('Setting availableMaterials:', transformedAvailable.length);
+                    console.log('Setting usedMaterials:', transformedUsed.length);
+                    console.log('Available materials details:');
+                    transformedAvailable.forEach((m, idx) => {
+                        console.log(`  ${idx + 1}. ${m.name} - Qty: ${m.quantity}`);
+                    });
+                    console.log('Used materials details:');
+                    transformedUsed.forEach((m, idx) => {
+                        console.log(`  ${idx + 1}. ${m.name} - Qty: ${m.quantity}, sectionId: ${m.sectionId}, miniSectionId: ${m.miniSectionId}`);
+                    });
+                    console.log('========================================\n');
+                    
                     setAvailableMaterials(transformedAvailable);
                     setUsedMaterials(transformedUsed);
+                    
+                    // Refetch mini-sections to ensure they're up to date
+                    try {
+                        const sections = await getSection(sectionId);
+                        if (sections && Array.isArray(sections)) {
+                            setMiniSections(sections);
+                            console.log('✓ Mini-sections refreshed:', sections.length);
+                        }
+                    } catch (error) {
+                        console.error('Error refreshing mini-sections:', error);
+                    }
                     
                     // Reinitialize animations
                     const totalMaterials = Math.max(transformedAvailable.length, transformedUsed.length);
@@ -701,8 +761,6 @@ const Details = () => {
         }
     };
 
-
-
     // Function to filter materials by date
     const filterByDate = (materials: Material[]) => {
         console.log('\n========================================');
@@ -798,51 +856,83 @@ const Details = () => {
     };
 
     const getCurrentData = () => {
+        console.log('\n========================================');
+        console.log('GET CURRENT DATA - START');
+        console.log('========================================');
+        console.log('Active Tab:', activeTab);
+        console.log('availableMaterials.length:', availableMaterials.length);
+        console.log('usedMaterials.length:', usedMaterials.length);
+        
         let materials = activeTab === 'imported' ? availableMaterials : usedMaterials;
         
-        // For "used" tab, always filter by main sectionId first
+        console.log('Selected materials array:', activeTab === 'imported' ? 'availableMaterials' : 'usedMaterials');
+        console.log('Total materials before filtering:', materials.length);
+        console.log('Current sectionId:', sectionId);
+        console.log('Selected mini-section:', selectedMiniSection);
+        
+        // For "used" tab, only filter by selected mini-section if one is chosen
         if (activeTab === 'used') {
-            // Filter by main section (sectionId) to exclude materials from other project sections
-            materials = materials.filter(m => {
-                // Check if material belongs to current main section
-                const materialSectionId = m.sectionId || m.miniSectionId;
-                
-                // If material has a miniSectionId, check if it belongs to current main section
-                if (m.miniSectionId) {
-                    // Find the mini-section in our list to verify it belongs to current main section
-                    const belongsToCurrentSection = miniSections.some(
-                        section => section._id === m.miniSectionId
-                    );
-                    return belongsToCurrentSection;
-                }
-                
-                // Fallback: check if sectionId matches (for materials without miniSectionId)
-                return materialSectionId === sectionId;
+            console.log('✓ Processing USED materials tab...');
+            
+            // Log all materials for debugging
+            console.log('Materials in usedMaterials array:');
+            materials.forEach((m, idx) => {
+                console.log(`  ${idx + 1}. ${m.name} - Qty: ${m.quantity}`);
+                console.log('     sectionId:', m.sectionId);
+                console.log('     miniSectionId:', m.miniSectionId);
             });
             
-            // Then filter by specific mini-section if one is selected
-            if (selectedMiniSection) {
+            // Only filter by specific mini-section if one is selected
+            // Otherwise show ALL used materials (no section filtering)
+            if (selectedMiniSection && selectedMiniSection !== 'all-sections') {
+                console.log('Filtering by selected mini-section:', selectedMiniSection);
                 materials = materials.filter(m => {
                     return m.miniSectionId === selectedMiniSection;
                 });
+                console.log('After mini-section filtering:', materials.length, 'materials');
+            } else {
+                console.log('✓ No mini-section filter - showing ALL used materials');
             }
-            
-            // Finally, filter by date
-            materials = filterByDate(materials);
+        } else {
+            console.log('✓ Processing IMPORTED materials tab...');
         }
+        
+        console.log('Final materials count:', materials.length);
+        console.log('========================================\n');
 
         return materials;
     };
 
     const getGroupedData = () => {
         const materials = getCurrentData();
-        // Pass used materials to calculate total imported and used
-        return groupMaterialsByName(materials, usedMaterials);
+        const isUsedTab = activeTab === 'used';
+        return groupMaterialsByName(materials, isUsedTab);
     };
 
+    // Calculate these values - they will update when dependencies change
     const filteredMaterials = getCurrentData();
     const groupedMaterials = getGroupedData();
     const totalCost = filteredMaterials.reduce((sum, material) => sum + material.price, 0);
+    
+    // Log the final data being displayed
+    console.log('\n========================================');
+    console.log('RENDER DATA');
+    console.log('========================================');
+    console.log('Active Tab:', activeTab);
+    console.log('Filtered Materials:', filteredMaterials.length);
+    if (filteredMaterials.length > 0) {
+        console.log('First filtered material:', filteredMaterials[0].name, '- Qty:', filteredMaterials[0].quantity);
+    }
+    console.log('Grouped Materials:', groupedMaterials.length);
+    if (groupedMaterials.length > 0) {
+        console.log('First grouped material:', groupedMaterials[0].name);
+        console.log('  - totalQuantity:', groupedMaterials[0].totalQuantity);
+        console.log('  - totalUsed:', groupedMaterials[0].totalUsed);
+        console.log('  - totalImported:', groupedMaterials[0].totalImported);
+    }
+    console.log('Used Materials State:', usedMaterials.length);
+    console.log('Available Materials State:', availableMaterials.length);
+    console.log('========================================\n');
 
     const formatPrice = (price: number) => `₹${price.toLocaleString('en-IN')}`;
     const getSectionName = (sectionId: string | undefined) => {
@@ -1017,52 +1107,6 @@ const Details = () => {
                 {/* Compact Filters - Only visible in "Used Materials" tab */}
                 {activeTab === 'used' && (
                     <View style={sectionStyles.filtersContainer}>
-                        {/* Period Filter - Compact Chips */}
-                        <View style={sectionStyles.filterRow}>
-                            <Ionicons name="time-outline" size={16} color="#64748B" style={sectionStyles.filterIcon} />
-                            <ScrollView 
-                                horizontal 
-                                showsHorizontalScrollIndicator={false}
-                                style={sectionStyles.chipScrollView}
-                            >
-                                {['Today', '1 Week', '15 Days', '1 Month', 'All', 'Custom'].map((period) => (
-                                    <TouchableOpacity
-                                        key={period}
-                                        style={[
-                                            sectionStyles.chip,
-                                            selectedPeriod === period && sectionStyles.chipActive
-                                        ]}
-                                        onPress={() => {
-                                            if (period === 'Custom') {
-                                                setShowCustomDatePicker(true);
-                                            }
-                                            setSelectedPeriod(period);
-                                        }}
-                                    >
-                                        <Text style={[
-                                            sectionStyles.chipText,
-                                            selectedPeriod === period && sectionStyles.chipTextActive
-                                        ]}>
-                                            {period}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </ScrollView>
-                        </View>
-                        
-                        {/* Custom Date Range Display */}
-                        {selectedPeriod === 'Custom' && (
-                            <View style={sectionStyles.customDateDisplay}>
-                                <Ionicons name="calendar-outline" size={14} color="#3B82F6" />
-                                <Text style={sectionStyles.customDateText}>
-                                    {customStartDate.toLocaleDateString()} - {customEndDate.toLocaleDateString()}
-                                </Text>
-                                <TouchableOpacity onPress={() => setShowCustomDatePicker(true)}>
-                                    <Ionicons name="create-outline" size={16} color="#3B82F6" />
-                                </TouchableOpacity>
-                            </View>
-                        )}
-
                         {/* Section Filter - Compact Dropdown */}
                         <View style={sectionStyles.filterRow}>
                             <Ionicons name="layers-outline" size={16} color="#64748B" style={sectionStyles.filterIcon} />
@@ -1158,6 +1202,8 @@ const Details = () => {
                                 animation={cardAnimations[index] || new Animated.Value(1)}
                                 activeTab={activeTab}
                                 onAddUsage={handleAddUsage}
+                                miniSections={miniSections}
+                                showMiniSectionLabel={activeTab === 'used' && !selectedMiniSection}
                             />
                         ))
                     ) : (
