@@ -543,6 +543,15 @@ export const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 4,
     },
+    companyLogo: {
+        width: 48,
+        height: 48,
+        borderRadius: 12,
+        marginRight: 12,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
     avatarText: {
         color: '#FFFFFF',
         fontSize: 16,
@@ -613,7 +622,7 @@ export const styles = StyleSheet.create({
         backgroundColor: '#0EA5E9',
         borderRadius: 2,
     },
-    
+
     // Floating Action Button
     fab: {
         position: 'absolute' as const,

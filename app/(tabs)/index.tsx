@@ -12,6 +12,7 @@ import axios from 'axios';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
+    Image,
     RefreshControl,
     ScrollView,
     StatusBar,
@@ -29,18 +30,40 @@ const Index: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
+    const [companyName, setCompanyName] = useState<string>('Company Name');
+    const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+
+    // Performance optimization
+    const isLoadingRef = React.useRef(false);
+    const lastLoadTimeRef = React.useRef<number>(0);
+    const DEBOUNCE_DELAY = 500;
 
     // Fetch project data function
     const fetchProjectData = async (showLoadingState = true) => {
+        // Prevent duplicate calls
+        if (isLoadingRef.current) {
+            console.log('⏸️ Skipping fetch - already loading');
+            return;
+        }
+
+        // Debounce
+        const now = Date.now();
+        if (now - lastLoadTimeRef.current < DEBOUNCE_DELAY) {
+            console.log('⏸️ Skipping fetch - debounced');
+            return;
+        }
+        lastLoadTimeRef.current = now;
+
         try {
+            isLoadingRef.current = true;
             if (showLoadingState) {
                 setLoading(true);
             }
             setError(null);
-            
+
             const clientId = await getClientId();
             setClientId(clientId);
-            
+
             if (clientId) {
                 const projectData = await getProjectData(clientId);
                 setProjects(Array.isArray(projectData) ? projectData : []);
@@ -49,9 +72,33 @@ const Index: React.FC = () => {
             console.error('Failed to fetch projects:', error);
             setError('Failed to fetch projects');
         } finally {
+            isLoadingRef.current = false;
             setLoading(false);
         }
     };
+
+    // Fetch client data for company name and logo
+    useEffect(() => {
+        const fetchClientData = async () => {
+            try {
+                const clientId = await getClientId();
+                if (clientId) {
+                    const response = await axios.get(`${domain}/api/client?id=${clientId}`);
+                    const responseData = response.data as any;
+
+                    if (responseData && responseData.clientData) {
+                        const client = responseData.clientData;
+                        setCompanyName(client.companyName || client.name || 'Company Name');
+                        setCompanyLogo(client.logo || null);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching client data:', error);
+            }
+        };
+
+        fetchClientData();
+    }, []);
 
     // Initial data fetch
     useEffect(() => {
@@ -60,6 +107,11 @@ const Index: React.FC = () => {
 
     // Pull to refresh handler
     const onRefresh = async () => {
+        // Prevent multiple refresh calls
+        if (refreshing || isLoadingRef.current) {
+            return;
+        }
+
         setRefreshing(true);
         try {
             await fetchProjectData(false); // Don't show loading state during refresh
@@ -101,14 +153,14 @@ const Index: React.FC = () => {
             materialUsedCount: project.MaterialUsed?.length || 0,
             sectionsCount: project.section?.length || 0
         });
-        
+
         const sections = project.section || [];
-        
+
         // If only one section, navigate directly to details
         if (sections.length === 1) {
             const section = sections[0];
             console.log('Single section found - navigating directly to details:', section.name);
-            
+
             router.push({
                 pathname: '/details',
                 params: {
@@ -123,12 +175,12 @@ const Index: React.FC = () => {
         } else if (sections.length > 1) {
             // Multiple sections - show section selection page
             console.log('Multiple sections found - showing section selection');
-            
+
             router.push({
                 pathname: '/project-sections',
-                params: { 
+                params: {
                     id: project._id ?? '',
-                    name: project.name, 
+                    name: project.name,
                     sectionData: JSON.stringify(sections),
                     materialAvailable: JSON.stringify(project.MaterialAvailable || []),
                     materialUsed: JSON.stringify(project.MaterialUsed || [])
@@ -137,12 +189,12 @@ const Index: React.FC = () => {
         } else {
             // No sections - show empty state or create section option
             console.log('No sections found - showing section selection with empty state');
-            
+
             router.push({
                 pathname: '/project-sections',
-                params: { 
+                params: {
                     id: project._id ?? '',
-                    name: project.name, 
+                    name: project.name,
                     sectionData: JSON.stringify([]),
                     materialAvailable: JSON.stringify(project.MaterialAvailable || []),
                     materialUsed: JSON.stringify(project.MaterialUsed || [])
@@ -151,24 +203,27 @@ const Index: React.FC = () => {
         }
     };
 
-    // Company configuration
-    const COMPANY_CONFIG = {
-        name: "Company Name",
-        subtitle: "Project Management Dashboard"
-    };
-    const companyInitials = generateInitials(COMPANY_CONFIG.name);
+    const companyInitials = generateInitials(companyName);
 
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
             <View style={styles.fixedHeader}>
                 <View style={styles.userInfo}>
-                    <View style={styles.avatarContainer}>
-                        <Text style={styles.avatarText}>{companyInitials}</Text>
-                    </View>
+                    {companyLogo ? (
+                        <Image
+                            source={{ uri: companyLogo }}
+                            style={styles.companyLogo}
+                            resizeMode="contain"
+                        />
+                    ) : (
+                        <View style={styles.avatarContainer}>
+                            <Text style={styles.avatarText}>{companyInitials}</Text>
+                        </View>
+                    )}
                     <View style={styles.userDetails}>
-                        <Text style={styles.userName}>{COMPANY_CONFIG.name}</Text>
-                        <Text style={styles.userSubtitle}>{COMPANY_CONFIG.subtitle}</Text>
+                        <Text style={styles.userName}>{companyName}</Text>
+                        <Text style={styles.userSubtitle}>Project Management Dashboard</Text>
                     </View>
                 </View>
                 <TouchableOpacity style={styles.notificationButton}
@@ -186,7 +241,7 @@ const Index: React.FC = () => {
                 <View style={styles.sectionDivider} />
             </View>
 
-            <ScrollView 
+            <ScrollView
                 style={styles.projectsList}
                 refreshControl={
                     <RefreshControl
@@ -201,16 +256,23 @@ const Index: React.FC = () => {
             >
                 {loading ? (
                     <View style={styles.centerContainer}>
+                        <View style={{ alignItems: 'center', marginBottom: 16 }}>
+                            <Ionicons name="sync" size={48} color="#3B82F6" />
+                        </View>
                         <Text style={styles.loadingText}>Loading projects...</Text>
+                        <Text style={[styles.loadingText, { fontSize: 12, marginTop: 4, color: '#94A3B8' }]}>Please wait...</Text>
                     </View>
                 ) : error ? (
                     <View style={styles.centerContainer}>
                         <Text style={styles.errorText}>{error}</Text>
                         <TouchableOpacity
-                            style={styles.retryButton}
+                            style={[styles.retryButton, loading && { opacity: 0.5 }]}
                             onPress={() => fetchProjectData()}
+                            disabled={loading}
                         >
-                            <Text style={styles.retryButtonText}>Retry</Text>
+                            <Text style={styles.retryButtonText}>
+                                {loading ? 'Loading...' : 'Retry'}
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 ) : (

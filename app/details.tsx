@@ -9,7 +9,9 @@ import { getSection } from '@/functions/details';
 import { domain } from '@/lib/domain';
 import { styles } from '@/style/details';
 import { Material, MaterialEntry, Section } from '@/types/details';
+import { logMaterialImported } from '@/utils/activityLogger';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import { useLocalSearchParams } from 'expo-router';
@@ -46,6 +48,80 @@ const Details = () => {
     const [newSectionDesc, setNewSectionDesc] = useState('');
     const cardAnimations = useRef<Animated.Value[]>([]).current;
 
+    // Performance optimization: Request cancellation and debouncing
+    const abortControllerRef = useRef<AbortController | null>(null);
+    const isLoadingRef = useRef(false);
+    const lastLoadTimeRef = useRef<number>(0);
+    const DEBOUNCE_DELAY = 500; // 500ms debounce
+
+    // Helper function to get user data
+    const getUserData = async () => {
+        try {
+            const userDetailsString = await AsyncStorage.getItem("user");
+            if (userDetailsString) {
+                const userData = JSON.parse(userDetailsString);
+                return {
+                    userId: userData._id || userData.id || userData.clientId || 'unknown',
+                    fullName: userData.name || userData.username || 'Unknown User',
+                };
+            }
+        } catch (error) {
+            console.error('Error getting user data:', error);
+        }
+        return {
+            userId: 'unknown',
+            fullName: 'Unknown User',
+        };
+    };
+
+    // Helper function to get client ID
+    const getClientIdFromStorage = async () => {
+        try {
+            const userDetailsString = await AsyncStorage.getItem("user");
+            if (userDetailsString) {
+                const userData = JSON.parse(userDetailsString);
+                return userData.clientId || '';
+            }
+        } catch (error) {
+            console.error('Error getting client ID:', error);
+        }
+        return '';
+    };
+
+    // Function to log material activity
+    const logMaterialActivity = async (
+        materials: any[],
+        activity: 'imported' | 'used',
+        message: string = ''
+    ) => {
+        try {
+            const user = await getUserData();
+            const clientId = await getClientIdFromStorage();
+
+            if (!clientId) {
+                console.warn('Client ID not found, skipping activity log');
+                return;
+            }
+
+            const activityPayload = {
+                clientId,
+                projectId,
+                materials,
+                message,
+                activity,
+                user,
+            };
+
+            console.log('Logging material activity:', activityPayload);
+
+            await axios.post(`${domain}/api/materialActivity`, activityPayload);
+            console.log('✅ Material activity logged successfully');
+        } catch (error) {
+            console.error('Failed to log material activity:', error);
+            // Don't throw error - activity logging is not critical
+        }
+    };
+
     // Function to get material icon and color based on material name
     const getMaterialIconAndColor = (materialName: string) => {
         const materialMap: { [key: string]: { icon: keyof typeof import('@expo/vector-icons').Ionicons.glyphMap, color: string } } = {
@@ -76,6 +152,31 @@ const Details = () => {
             return;
         }
 
+        // Prevent duplicate simultaneous calls
+        if (isLoadingRef.current) {
+            console.log('⏸️ Skipping reload - already loading');
+            return;
+        }
+
+        // Debounce: Prevent rapid successive calls
+        const now = Date.now();
+        if (now - lastLoadTimeRef.current < DEBOUNCE_DELAY) {
+            console.log('⏸️ Skipping reload - too soon (debounced)');
+            return;
+        }
+        lastLoadTimeRef.current = now;
+
+        // Cancel any pending requests
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            console.log('🚫 Cancelled previous request');
+        }
+
+        // Create new abort controller for this request
+        abortControllerRef.current = new AbortController();
+        const signal = abortControllerRef.current.signal;
+
+        isLoadingRef.current = true;
         setLoading(true);
 
         try {
@@ -103,7 +204,16 @@ const Details = () => {
 
             // Fetch MaterialAvailable
             try {
-                const availableResponse = await axios.get(`${domain}/api/material?projectId=${projectId}&clientId=${clientId}`);
+                const availableResponse = await axios.get(`${domain}/api/material?projectId=${projectId}&clientId=${clientId}`, {
+                    timeout: 10000, // 10 second timeout
+                });
+
+                // Check if request was cancelled
+                if (signal.aborted) {
+                    console.log('🚫 Request was cancelled');
+                    return;
+                }
+
                 console.log('Available Response:', JSON.stringify(availableResponse.data, null, 2));
                 const availableData = availableResponse.data as any;
 
@@ -122,7 +232,16 @@ const Details = () => {
 
             // Fetch MaterialUsed
             try {
-                const usedResponse = await axios.get(`${domain}/api/material-usage?projectId=${projectId}&clientId=${clientId}`);
+                const usedResponse = await axios.get(`${domain}/api/material-usage?projectId=${projectId}&clientId=${clientId}`, {
+                    timeout: 10000, // 10 second timeout
+                });
+
+                // Check if request was cancelled
+                if (signal.aborted) {
+                    console.log('🚫 Request was cancelled');
+                    return;
+                }
+
                 console.log('Used Response:', JSON.stringify(usedResponse.data, null, 2));
                 const usedData = usedResponse.data as any;
 
@@ -181,6 +300,12 @@ const Details = () => {
             // Transform MaterialAvailable
             const transformedAvailable: Material[] = materialAvailable.map((material: any, index: number) => {
                 const { icon, color } = getMaterialIconAndColor(material.name);
+
+                // Validate that material has _id
+                if (!material._id) {
+                    console.warn(`⚠️ Material "${material.name}" is missing _id field!`, material);
+                }
+
                 return {
                     id: index + 1,
                     _id: material._id,
@@ -263,10 +388,24 @@ const Details = () => {
                 )
             ).start();
         } catch (error: any) {
+            // Don't show error if request was cancelled
+            if (error.name === 'AbortError' || error.name === 'CanceledError' || error.message?.includes('cancel')) {
+                console.log('🚫 Request cancelled');
+                return;
+            }
+
             console.error('Error reloading materials:', error);
-            toast.error('Failed to refresh materials');
+
+            // Only show error toast if it's not a timeout
+            if (error.code !== 'ECONNABORTED') {
+                toast.error('Failed to refresh materials');
+            } else {
+                toast.error('Request timeout - please try again');
+            }
         } finally {
+            isLoadingRef.current = false;
             setLoading(false);
+            abortControllerRef.current = null;
         }
     };
 
@@ -475,6 +614,14 @@ const Details = () => {
     // Load project materials on mount
     useEffect(() => {
         loadProjectMaterials();
+
+        // Cleanup: Cancel any pending requests when component unmounts
+        return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+                console.log('🧹 Cleanup: Cancelled pending requests');
+            }
+        };
     }, [projectId, materialAvailableParam, materialUsedParam]);
 
     // Debug: Log when usedMaterials state changes
@@ -621,6 +768,12 @@ const Details = () => {
         materialId: string,
         quantity: number
     ) => {
+        // Prevent duplicate submissions
+        if (isLoadingRef.current) {
+            toast.error('Please wait for the current operation to complete');
+            return;
+        }
+
         const apiPayload = {
             projectId: projectId,
             sectionId: sectionId,
@@ -634,43 +787,109 @@ const Details = () => {
         console.log('========================================');
         console.log('Material ID received:', materialId);
         console.log('Material ID type:', typeof materialId);
+        console.log('Material ID length:', materialId?.length);
+        console.log('Section ID being sent:', sectionId);
+        console.log('Mini Section ID being sent:', miniSectionId);
 
         const selectedMaterial = availableMaterials.find(m => m._id === materialId);
         console.log('Found material:', selectedMaterial ? selectedMaterial.name : 'NOT FOUND');
 
         if (!selectedMaterial) {
             console.log('❌ Material not found in availableMaterials!');
-            console.log('Available materials:');
+            console.log('Total available materials:', availableMaterials.length);
+            console.log('\nSearching for material with ID:', materialId);
+            console.log('\nAll available materials:');
             availableMaterials.forEach((m, idx) => {
-                console.log(`  ${idx + 1}. ${m.name}: _id="${m._id}" (type: ${typeof m._id})`);
+                console.log(`  ${idx + 1}. ${m.name}:`);
+                console.log(`     _id: "${m._id}" (type: ${typeof m._id})`);
+                console.log(`     id: ${m.id} (type: ${typeof m.id})`);
+                console.log(`     sectionId: "${m.sectionId}" (type: ${typeof m.sectionId})`);
+                console.log(`     Match: ${m._id === materialId ? '✓ YES' : '✗ NO'}`);
             });
+
+            toast.error('Material not found. Please refresh the page and try again.');
+            return;
         } else {
             console.log('✓ Material found:', {
                 name: selectedMaterial.name,
                 _id: selectedMaterial._id,
                 quantity: selectedMaterial.quantity,
-                unit: selectedMaterial.unit
+                unit: selectedMaterial.unit,
+                sectionId: selectedMaterial.sectionId
             });
+
+            console.log('\n⚠️ IMPORTANT - API MATCHING LOGIC:');
+            console.log('The API will look for a material where:');
+            console.log('  1. _id matches:', materialId);
+            console.log('  2. AND (sectionId is empty OR sectionId matches:', sectionId, ')');
+            console.log('\nMaterial sectionId:', selectedMaterial.sectionId || '(empty/undefined)');
+            console.log('Request sectionId:', sectionId);
+
+            if (selectedMaterial.sectionId && selectedMaterial.sectionId !== sectionId) {
+                console.log('⚠️ WARNING: Material has sectionId', selectedMaterial.sectionId, 'but request is for', sectionId);
+                console.log('This might cause "Material not found" error from API!');
+            }
         }
 
         console.log('API Payload:', JSON.stringify(apiPayload, null, 2));
+        console.log('API Endpoint:', `${domain}/api/material-usage`);
+        console.log('\n📝 API BEHAVIOR NOTE:');
+        console.log('The API searches for material in MaterialAvailable where:');
+        console.log('  - material._id === materialId (', materialId, ')');
+        console.log('  - AND (material.sectionId is empty OR material.sectionId === sectionId)');
+        console.log('\nIf material has a different sectionId, API will return:');
+        console.log('  "Material not found in MaterialAvailable"');
         console.log('========================================\n');
 
         let loadingToast: any = null;
         try {
+            isLoadingRef.current = true;
             loadingToast = toast.loading('Adding material usage...');
+
+            console.log('\n🚀 SENDING API REQUEST...');
+            console.log('URL:', `${domain}/api/material-usage`);
+            console.log('Method: POST');
+            console.log('Payload:', JSON.stringify(apiPayload, null, 2));
+            console.log('Payload Details:');
+            console.log('  - projectId:', apiPayload.projectId, '(type:', typeof apiPayload.projectId, ')');
+            console.log('  - sectionId:', apiPayload.sectionId, '(type:', typeof apiPayload.sectionId, ')');
+            console.log('  - miniSectionId:', apiPayload.miniSectionId, '(type:', typeof apiPayload.miniSectionId, ')');
+            console.log('  - materialId:', apiPayload.materialId, '(type:', typeof apiPayload.materialId, ')');
+            console.log('  - qnt:', apiPayload.qnt, '(type:', typeof apiPayload.qnt, ')');
+
             const response = await axios.post(`${domain}/api/material-usage`, apiPayload);
             const responseData = response.data as any;
 
             console.log('\n========================================');
-            console.log('API RESPONSE - SUCCESS');
+            console.log('✅ API RESPONSE - SUCCESS');
             console.log('========================================');
-            console.log(JSON.stringify(responseData, null, 2));
+            console.log('Status:', response.status);
+            console.log('Response Data:', JSON.stringify(responseData, null, 2));
+            console.log('Success:', responseData.success);
+            console.log('Message:', responseData.message);
             console.log('========================================\n');
 
             if (responseData.success) {
                 toast.dismiss(loadingToast);
                 toast.success(responseData.message || 'Material usage added successfully');
+
+                // Log material activity for used materials
+                if (selectedMaterial) {
+                    const usedMaterialLog = [{
+                        name: selectedMaterial.name,
+                        unit: selectedMaterial.unit,
+                        specs: selectedMaterial.specs || {},
+                        qnt: quantity,
+                        cost: selectedMaterial.price || 0,
+                        addedAt: new Date(),
+                    }];
+
+                    await logMaterialActivity(
+                        usedMaterialLog,
+                        'used',
+                        `Used in ${sectionName} - Mini Section ID: ${miniSectionId}`
+                    );
+                }
 
                 // Refresh materials from API to get the latest data
                 console.log('\n========================================');
@@ -693,17 +912,32 @@ const Details = () => {
             }
 
             console.log('\n========================================');
-            console.log('API RESPONSE - ERROR');
+            console.log('❌ API RESPONSE - ERROR');
             console.log('========================================');
+            console.log('Error Object:', error);
+            console.log('Error Name:', error?.name);
             console.log('Error Message:', error?.message);
-            console.log('Error Response:', JSON.stringify(error?.response?.data, null, 2));
+            console.log('Error Code:', error?.code);
+            console.log('\n--- Response Details ---');
+            console.log('Status:', error?.response?.status);
+            console.log('Status Text:', error?.response?.statusText);
+            console.log('Response Headers:', error?.response?.headers);
+            console.log('Response Data:', JSON.stringify(error?.response?.data, null, 2));
+            console.log('\n--- Request Details ---');
+            console.log('Request URL:', error?.config?.url);
+            console.log('Request Method:', error?.config?.method);
+            console.log('Request Data:', error?.config?.data);
             console.log('========================================\n');
 
             const errorMessage = error?.response?.data?.error ||
                 error?.response?.data?.message ||
                 error?.message ||
                 'Failed to add material usage';
+
+            console.log('🔴 Showing error toast:', errorMessage);
             toast.error(errorMessage);
+        } finally {
+            isLoadingRef.current = false;
         }
     };
 
@@ -886,6 +1120,12 @@ const Details = () => {
         console.log("3. materials:", materials);
         console.log("=====================================");
 
+        // Prevent duplicate submissions
+        if (isLoadingRef.current) {
+            toast.error('Please wait for the current operation to complete');
+            return;
+        }
+
         // Validation before sending
         if (!projectId) {
             toast.error("Project ID is missing");
@@ -938,6 +1178,28 @@ const Details = () => {
 
                 if (successCount > 0) {
                     toast.success(`Successfully added ${successCount} material${successCount > 1 ? 's' : ''}!`);
+
+                    // Log material activity for imported materials
+                    const successfulMaterials = materials.map((material: any) => ({
+                        name: material.materialName,
+                        unit: material.unit,
+                        specs: material.specs || {},
+                        qnt: material.qnt,
+                        cost: material.cost || 0,
+                        addedAt: new Date(),
+                    }));
+
+                    await logMaterialActivity(successfulMaterials, 'imported', message);
+
+                    // Log to general activity API
+                    const totalCost = materials.reduce((sum: number, m: any) => sum + (m.cost || 0), 0);
+                    await logMaterialImported(
+                        projectId,
+                        projectName,
+                        successCount,
+                        totalCost,
+                        message
+                    );
                 }
 
                 if (failCount > 0) {
@@ -1124,9 +1386,19 @@ const Details = () => {
                     </Text>
                     {loading ? (
                         <View style={styles.noMaterialsContainer}>
+                            <Animated.View style={{
+                                transform: [{
+                                    rotate: cardAnimations[0]?.interpolate({
+                                        inputRange: [0, 1],
+                                        outputRange: ['0deg', '360deg'],
+                                    }) || '0deg'
+                                }]
+                            }}>
+                                <Ionicons name="sync" size={48} color="#3B82F6" />
+                            </Animated.View>
                             <Text style={styles.noMaterialsTitle}>Loading Materials...</Text>
                             <Text style={styles.noMaterialsDescription}>
-                                Fetching project materials...
+                                Please wait while we fetch your data...
                             </Text>
                         </View>
                     ) : groupedMaterials.length > 0 ? (

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Modal,
     ScrollView,
@@ -44,6 +44,29 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
     const [quantity, setQuantity] = useState<string>('');
     const [searchQuery, setSearchQuery] = useState<string>('');
 
+    // Log when form opens and materials are passed
+    useEffect(() => {
+        if (visible) {
+            console.log('\n========================================');
+            console.log('📝 MATERIAL USAGE FORM OPENED');
+            console.log('========================================');
+            console.log('Available Materials Count:', availableMaterials.length);
+            console.log('Mini Sections Count:', miniSections.length);
+            console.log('\n--- Available Materials ---');
+            availableMaterials.forEach((m, idx) => {
+                console.log(`  ${idx + 1}. ${m.name}:`);
+                console.log(`     _id: "${m._id}" (type: ${typeof m._id}, exists: ${!!m._id})`);
+                console.log(`     id: ${m.id} (type: ${typeof m.id})`);
+                console.log(`     quantity: ${m.quantity} ${m.unit}`);
+            });
+            console.log('\n--- Mini Sections ---');
+            miniSections.forEach((s, idx) => {
+                console.log(`  ${idx + 1}. ${s.name} (_id: ${s._id})`);
+            });
+            console.log('========================================\n');
+        }
+    }, [visible, availableMaterials, miniSections]);
+
     const handleSubmit = () => {
         if (!selectedMiniSectionId) {
             alert('Please select a mini-section');
@@ -65,13 +88,34 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
         }
 
         console.log('\n========================================');
-        console.log('MATERIAL USAGE FORM - SUBMISSION');
+        console.log('📋 MATERIAL USAGE FORM - SUBMISSION');
         console.log('========================================');
-        console.log('Selected Mini-Section ID:', selectedMiniSectionId);
-        console.log('Selected Material ID:', selectedMaterialId);
-        console.log('Quantity:', parseFloat(quantity));
-        console.log('----------------------------------------');
-        console.log('Selected Material Details:', selectedMaterial);
+        console.log('Form Values:');
+        console.log('  - Selected Mini-Section ID:', selectedMiniSectionId, '(type:', typeof selectedMiniSectionId, ')');
+        console.log('  - Selected Material ID:', selectedMaterialId, '(type:', typeof selectedMaterialId, ')');
+        console.log('  - Quantity:', parseFloat(quantity), '(type:', typeof parseFloat(quantity), ')');
+        console.log('\n--- Selected Material Full Details ---');
+        if (selectedMaterial) {
+            console.log('  - Name:', selectedMaterial.name);
+            console.log('  - _id:', selectedMaterial._id, '(type:', typeof selectedMaterial._id, ')');
+            console.log('  - id:', selectedMaterial.id, '(type:', typeof selectedMaterial.id, ')');
+            console.log('  - Quantity Available:', selectedMaterial.quantity, selectedMaterial.unit);
+            console.log('  - Price:', selectedMaterial.price);
+            console.log('  - Full Object:', JSON.stringify(selectedMaterial, null, 2));
+        } else {
+            console.log('  ⚠️ Selected material object is NULL/UNDEFINED!');
+        }
+        console.log('\n--- All Available Materials ---');
+        console.log('Total:', availableMaterials.length);
+        availableMaterials.forEach((m, idx) => {
+            console.log(`  ${idx + 1}. ${m.name} - _id: "${m._id}" | id: ${m.id}`);
+        });
+        console.log('========================================');
+        console.log('🚀 Calling onSubmit with:', {
+            miniSectionId: selectedMiniSectionId,
+            materialId: selectedMaterialId,
+            quantity: parseFloat(quantity)
+        });
         console.log('========================================\n');
 
         onSubmit(selectedMiniSectionId, selectedMaterialId, parseFloat(quantity));
@@ -91,7 +135,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
         if (!searchQuery) return true;
         const query = searchQuery.toLowerCase();
         return material.name.toLowerCase().includes(query) ||
-               material.unit.toLowerCase().includes(query);
+            material.unit.toLowerCase().includes(query);
     });
 
     const selectedMaterial = availableMaterials.find(m => m._id === selectedMaterialId);
@@ -189,16 +233,16 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                     </TouchableOpacity>
                                 )}
                             </View>
-                            
+
                             {/* Material List */}
-                            <ScrollView 
+                            <ScrollView
                                 style={styles.materialList}
                                 nestedScrollEnabled={true}
                                 showsVerticalScrollIndicator={true}
                             >
                                 {filteredMaterials.length > 0 ? (
                                     filteredMaterials.map((material) => {
-                                        const isSelected = selectedMaterialId === (material._id || material.id.toString());
+                                        const isSelected = selectedMaterialId === material._id;
                                         return (
                                             <TouchableOpacity
                                                 key={material._id || material.id}
@@ -206,7 +250,13 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                                     styles.materialItem,
                                                     isSelected && styles.materialItemSelected
                                                 ]}
-                                                onPress={() => setSelectedMaterialId(material._id || material.id.toString())}
+                                                onPress={() => {
+                                                    if (!material._id) {
+                                                        alert('Error: Material ID not found. Please refresh and try again.');
+                                                        return;
+                                                    }
+                                                    setSelectedMaterialId(material._id);
+                                                }}
                                             >
                                                 <View style={styles.materialItemLeft}>
                                                     <View style={[styles.materialIconBadge, { backgroundColor: material.color + '20' }]}>
@@ -265,7 +315,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                     How much are you using? <Text style={styles.required}>*</Text>
                                 </Text>
                                 <Text style={styles.labelHelper}>
-                                    {selectedMaterial 
+                                    {selectedMaterial
                                         ? `Enter quantity in ${selectedMaterial.unit} (Available: ${selectedMaterial.quantity})`
                                         : 'Enter the quantity you want to use'
                                     }

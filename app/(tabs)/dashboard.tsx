@@ -8,7 +8,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Animated,
   RefreshControl,
   ScrollView,
@@ -29,6 +28,11 @@ const AnalyticsDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Performance optimization
+  const isLoadingRef = React.useRef(false);
+  const lastLoadTimeRef = React.useRef<number>(0);
+  const DEBOUNCE_DELAY = 500;
 
   // Calculate total material value (both available and used)
   const calculateTotalMaterialValue = (project: Project): number => {
@@ -66,7 +70,7 @@ const AnalyticsDashboard: React.FC = () => {
     const available = calculateAvailableMaterials(project);
     const used = calculateUsedMaterials(project);
     const total = available + used;
-    
+
     return {
       _id: project._id || '',
       name: project.name,
@@ -91,14 +95,29 @@ const AnalyticsDashboard: React.FC = () => {
   const totalProjects = projects.length;
   const projectsWithMaterials = activeProjects.length;
   const projectsWithoutMaterials = totalProjects - projectsWithMaterials;
-  
+
   // Calculate totals for all projects
   const totalAvailable = transformedProjectData.reduce((sum, p) => sum + p.available, 0);
   const totalUsed = transformedProjectData.reduce((sum, p) => sum + p.used, 0);
 
   // Fetch projects data
   const fetchProjects = async (showLoadingState = true) => {
+    // Prevent duplicate calls
+    if (isLoadingRef.current) {
+      console.log('⏸️ Skipping fetch - already loading');
+      return;
+    }
+
+    // Debounce
+    const now = Date.now();
+    if (now - lastLoadTimeRef.current < DEBOUNCE_DELAY) {
+      console.log('⏸️ Skipping fetch - debounced');
+      return;
+    }
+    lastLoadTimeRef.current = now;
+
     try {
+      isLoadingRef.current = true;
       if (showLoadingState) {
         setLoading(true);
       }
@@ -111,19 +130,25 @@ const AnalyticsDashboard: React.FC = () => {
 
       const projectData = await getProjectData(clientId);
       const projectsArray = Array.isArray(projectData) ? projectData : [];
-      
+
       console.log('Dashboard - Fetched projects:', projectsArray.length);
       setProjects(projectsArray);
     } catch (err: any) {
       console.error('Failed to fetch projects:', err);
       setError(err?.message || 'Failed to load projects');
     } finally {
+      isLoadingRef.current = false;
       setLoading(false);
     }
   };
 
   // Pull to refresh handler
   const onRefresh = async () => {
+    // Prevent multiple refresh calls
+    if (refreshing || isLoadingRef.current) {
+      return;
+    }
+
     setRefreshing(true);
     try {
       await fetchProjects(false);
@@ -177,8 +202,8 @@ const AnalyticsDashboard: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView 
-        style={styles.scrollView} 
+      <ScrollView
+        style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -199,15 +224,15 @@ const AnalyticsDashboard: React.FC = () => {
               <Text style={styles.projectSubtitle}>Financial Overview</Text>
             </View>
           </View>
-          <TouchableOpacity 
-            style={styles.refreshButton}
+          <TouchableOpacity
+            style={[styles.refreshButton, (refreshing || loading) && { opacity: 0.5 }]}
             onPress={onRefresh}
-            disabled={refreshing}
+            disabled={refreshing || loading}
           >
-            <Ionicons 
-              name="refresh" 
-              size={22} 
-              color={refreshing ? "#94A3B8" : "#3B82F6"} 
+            <Ionicons
+              name={refreshing ? "sync" : "refresh"}
+              size={22}
+              color={(refreshing || loading) ? "#94A3B8" : "#3B82F6"}
             />
           </TouchableOpacity>
         </View>
@@ -231,15 +256,31 @@ const AnalyticsDashboard: React.FC = () => {
         {/* Content */}
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#3B82F6" />
+            <Animated.View style={{
+              transform: [{
+                rotate: fadeAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0deg', '360deg'],
+                })
+              }]
+            }}>
+              <Ionicons name="sync" size={48} color="#3B82F6" />
+            </Animated.View>
             <Text style={styles.loadingText}>Loading projects...</Text>
+            <Text style={[styles.loadingText, { fontSize: 12, marginTop: 4 }]}>Please wait...</Text>
           </View>
         ) : error ? (
           <View style={styles.errorContainer}>
             <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
             <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={() => fetchProjects()}>
-              <Text style={styles.retryButtonText}>Retry</Text>
+            <TouchableOpacity
+              style={[styles.retryButton, loading && { opacity: 0.5 }]}
+              onPress={() => fetchProjects()}
+              disabled={loading}
+            >
+              <Text style={styles.retryButtonText}>
+                {loading ? 'Loading...' : 'Retry'}
+              </Text>
             </TouchableOpacity>
           </View>
         ) : activeProjects.length === 0 ? (

@@ -1,374 +1,534 @@
-import {
-    convertMaterialRequestToNotification,
-    DeletedNotification,
-    EmptyState,
-    fetchMaterialRequests,
-    getProjectName,
-    getSectionName,
-    LoadingState,
-    markMaterialAsImported,
-    MaterialImportModal,
-    Notification,
-    NotificationBanners,
-    NotificationHeader,
-    sanctionMaterialRequest,
-    SwipeableNotificationItem,
-    Toast
-} from '@/components/notification';
 import { getClientId } from '@/functions/clientId';
+import { domain } from '@/lib/domain';
+import { Ionicons } from '@expo/vector-icons';
+import axios from 'axios';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-    Alert,
+    ActivityIndicator,
+    RefreshControl,
     ScrollView,
-    StatusBar,
     StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const NotificationScreen: React.FC = () => {
-    const [notifications, setNotifications] = useState<Notification[]>([]);
-    const [toastVisible, setToastVisible] = useState(false);
-    const [toastMessage, setToastMessage] = useState('');
-    const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
-    const [lastDeleted, setLastDeleted] = useState<DeletedNotification | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [importModalVisible, setImportModalVisible] = useState(false);
-    const [selectedNotificationForImport, setSelectedNotificationForImport] = useState<Notification | null>(null);
+interface Activity {
+    _id: string;
+    user: {
+        userId: string;
+        fullName: string;
+        email?: string;
+    };
+    projectName?: string;
+    sectionName?: string;
+    miniSectionName?: string;
+    activityType: string;
+    category: string;
+    action: string;
+    description: string;
+    message?: string;
+    createdAt: string;
+}
+
+interface MaterialActivity {
+    _id: string;
+    user: {
+        userId: string;
+        fullName: string;
+    };
+    projectId: string;
+    materials: Array<{
+        name: string;
+        unit: string;
+        qnt: number;
+        cost: number;
+    }>;
+    message?: string;
+    activity: 'imported' | 'used';
+    createdAt: string;
+}
+
+type TabType = 'all' | 'project' | 'material';
+
+const NotificationPage: React.FC = () => {
     const router = useRouter();
+    const [activeTab, setActiveTab] = useState<TabType>('all');
+    const [activities, setActivities] = useState<Activity[]>([]);
+    const [materialActivities, setMaterialActivities] = useState<MaterialActivity[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    // Remove sectionIds since we're fetching all material requests directly
+    // Performance optimization
+    const isLoadingRef = React.useRef(false);
+    const lastLoadTimeRef = React.useRef<number>(0);
+    const DEBOUNCE_DELAY = 500;
 
-    const unreadCount = useMemo(() => {
-        return notifications.filter(n => !n.isRead).length;
-    }, [notifications]);
-
-    const pendingApprovals = useMemo(() => {
-        return notifications.filter(n => n.requiresApproval && n.approvalStatus === 'pending').length;
-    }, [notifications]);
-
-    const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
-        setToastMessage(message);
-        setToastType(type);
-        setToastVisible(true);
-    };
-
-    const handleNotificationPress = (notification: Notification) => {
-        // Mark as read
-        setNotifications(prev =>
-            prev.map(n =>
-                n.id === notification.id ? { ...n, isRead: true } : n
-            )
-        );
-    };
-
-    const handleDeleteNotification = (notification: Notification) => {
-        // Find the original index of the notification
-        const originalIndex = notifications.findIndex(n => n.id === notification.id);
-
-        const deletedNotification: DeletedNotification = {
-            ...notification,
-            deletedAt: Date.now(),
-            originalIndex: originalIndex,
-        };
-
-        setLastDeleted(deletedNotification);
-        setNotifications(prev => prev.filter(n => n.id !== notification.id));
-        showToast('Notification deleted', 'info');
-    };
-
-    const handleApprove = async (id: string) => {
-        const notification = notifications.find(n => n.id === id);
-        if (!notification) return;
-
-        // Show material details in the confirmation with costs
-        const materialsList = notification.materialRequest?.materials
-            .map(m => `• ${m.name}: ${m.qnt} ${m.unit}${(m.cost && m.cost > 0) ? ` - ₹${m.cost.toLocaleString('en-IN')}` : ' - Cost: TBD'}`)
-            .join('\n') || '';
-
-        const totalQuantity = notification.materialRequest?.materials.reduce((sum, m) => sum + m.qnt, 0) || 0;
-        const totalCost = notification.materialRequest?.materials.reduce((sum, m) => sum + (m.cost || 0), 0) || 0;
-
-        Alert.alert(
-            'Approve Material Request',
-            `Are you sure you want to approve this material request for ${notification.sectionName}?\n\nTotal Items: ${totalQuantity}\nTotal Cost: ₹${totalCost.toLocaleString('en-IN')}\n\nMaterials:\n${materialsList}`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Approve',
-                    style: 'default',
-                    onPress: async () => {
-                        // Show loading toast
-                        showToast('Processing approval...', 'info');
-
-                        try {
-                            const success = await sanctionMaterialRequest(id, true);
-                            if (success) {
-                                setNotifications(prev =>
-                                    prev.map(n =>
-                                        n.id === id ? { ...n, approvalStatus: 'approved' as const, isRead: true } : n
-                                    )
-                                );
-                                showToast('✅ Material request approved successfully', 'success');
-                            } else {
-                                showToast('❌ Failed to approve material request', 'error');
-                            }
-                        } catch (error) {
-                            console.error('Approval error:', error);
-                            showToast('❌ Network error while approving request', 'error');
-                        }
-                    }
-                }
-            ]
-        );
-    };
-
-    const handleReject = async (id: string) => {
-        const notification = notifications.find(n => n.id === id);
-        if (!notification) return;
-
-        // Show material details in the confirmation with costs
-        const materialsList = notification.materialRequest?.materials
-            .map(m => `• ${m.name}: ${m.qnt} ${m.unit}${(m.cost && m.cost > 0) ? ` - ₹${m.cost.toLocaleString('en-IN')}` : ' - Cost: TBD'}`)
-            .join('\n') || '';
-
-        const totalQuantity = notification.materialRequest?.materials.reduce((sum, m) => sum + m.qnt, 0) || 0;
-        const totalCost = notification.materialRequest?.materials.reduce((sum, m) => sum + (m.cost || 0), 0) || 0;
-
-        Alert.alert(
-            'Reject Material Request',
-            `Are you sure you want to reject this material request for ${notification.sectionName}?\n\nTotal Items: ${totalQuantity}\nTotal Cost: ₹${totalCost.toLocaleString('en-IN')}\n\nMaterials:\n${materialsList}`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Reject',
-                    style: 'destructive',
-                    onPress: async () => {
-                        // Show loading toast
-                        showToast('Processing rejection...', 'info');
-
-                        try {
-                            const success = await sanctionMaterialRequest(id, false);
-                            if (success) {
-                                setNotifications(prev =>
-                                    prev.map(n =>
-                                        n.id === id ? { ...n, approvalStatus: 'rejected' as const, isRead: true } : n
-                                    )
-                                );
-                                showToast('❌ Material request rejected', 'error');
-                            } else {
-                                showToast('❌ Failed to reject material request', 'error');
-                            }
-                        } catch (error) {
-                            console.error('Rejection error:', error);
-                            showToast('❌ Network error while rejecting request', 'error');
-                        }
-                    }
-                }
-            ]
-        );
-    };
-
-    const handleUndo = () => {
-        if (lastDeleted) {
-            // Restore notification at its original position
-            const { originalIndex, deletedAt, ...notification } = lastDeleted;
-
-            setNotifications(prev => {
-                const newNotifications = [...prev];
-                // Insert at the original index, but ensure it doesn't exceed array bounds
-                const insertIndex = Math.min(originalIndex, newNotifications.length);
-                newNotifications.splice(insertIndex, 0, notification);
-                return newNotifications;
-            });
-
-            setLastDeleted(null);
+    const fetchActivities = async (showLoadingState = true) => {
+        // Prevent duplicate calls
+        if (isLoadingRef.current) {
+            console.log('⏸️ Skipping fetch - already loading');
+            return;
         }
-        setToastVisible(false);
-    };
 
-    const handleToastHide = () => {
-        setToastVisible(false);
-        setLastDeleted(null);
-    };
-
-    const handleMarkAllAsRead = () => {
-        setNotifications(prev =>
-            prev.map(notification => ({ ...notification, isRead: true }))
-        );
-        showToast('All notifications marked as read', 'success');
-    };
-
-    const handleMenuAction = async (id: string, action: string) => {
-        const notification = notifications.find(n => n.id === id);
-        if (!notification) return;
-
-        if (action === 'mark_imported') {
-            // Open the material import modal
-            setSelectedNotificationForImport(notification);
-            setImportModalVisible(true);
+        // Debounce
+        const now = Date.now();
+        if (now - lastLoadTimeRef.current < DEBOUNCE_DELAY) {
+            console.log('⏸️ Skipping fetch - debounced');
+            return;
         }
-    };
-
-    const handleMaterialImport = async (apiPayload: any[]) => {
-        if (!selectedNotificationForImport) return;
-
-        showToast('Processing import...', 'info');
+        lastLoadTimeRef.current = now;
 
         try {
-            const success = await markMaterialAsImported(
-                apiPayload
-            );
-            
-            if (success) {
-                setNotifications(prev =>
-                    prev.map(n =>
-                        n.id === selectedNotificationForImport.id ? { ...n, approvalStatus: 'imported' as const, isRead: true } : n
-                    )
-                );
-                showToast('✅ Materials imported successfully', 'success');
-            } else {
-                showToast('❌ Failed to import materials', 'error');
+            isLoadingRef.current = true;
+            if (showLoadingState) {
+                setLoading(true);
             }
+            setError(null);
+
+            const clientId = await getClientId();
+            if (!clientId) {
+                throw new Error('Client ID not found');
+            }
+
+            // Fetch both activities in parallel
+            const [activityRes, materialActivityRes] = await Promise.all([
+                axios.get(`${domain}/api/activity?clientId=${clientId}&limit=50`).catch(() => ({ data: { activities: [] } })),
+                axios.get(`${domain}/api/materialActivity?clientId=${clientId}&limit=50`).catch(() => ({ data: [] })),
+            ]);
+
+            const activityData = activityRes.data as any;
+            const materialData = Array.isArray(materialActivityRes.data) ? materialActivityRes.data : [];
+
+            setActivities(activityData.activities || []);
+            setMaterialActivities(materialData);
         } catch (error) {
-            console.error('Import error:', error);
-            showToast('❌ Network error while importing materials', 'error');
+            console.error('Error fetching activities:', error);
+            setError('Failed to load activities');
+        } finally {
+            isLoadingRef.current = false;
+            setLoading(false);
         }
     };
 
-    const handleCloseImportModal = () => {
-        setImportModalVisible(false);
-        setSelectedNotificationForImport(null);
+    useEffect(() => {
+        fetchActivities();
+    }, []);
+
+    const onRefresh = async () => {
+        if (refreshing || isLoadingRef.current) {
+            return;
+        }
+
+        setRefreshing(true);
+        try {
+            await fetchActivities(false);
+        } finally {
+            setRefreshing(false);
+        }
     };
 
-    // Fetch material requests on component mount
-    useEffect(() => {
-        const fetchAllMaterialRequests = async () => {
-            setLoading(true);
-            try {
-                const allNotifications: Notification[] = [];
+    const getActivityIcon = (type: string, category: string) => {
+        if (category === 'project') return { name: 'folder', color: '#3B82F6' };
+        if (category === 'section') return { name: 'layers', color: '#8B5CF6' };
+        if (category === 'mini_section') return { name: 'grid', color: '#10B981' };
+        if (category === 'material') return { name: 'cube', color: '#F59E0B' };
+        if (category === 'staff') return { name: 'people', color: '#EF4444' };
+        return { name: 'information-circle', color: '#6B7280' };
+    };
 
-                // Get client ID once
-                const clientId = await getClientId();
+    const getMaterialActivityIcon = (activity: 'imported' | 'used') => {
+        return activity === 'imported'
+            ? { name: 'download', color: '#10B981' }
+            : { name: 'arrow-forward', color: '#EF4444' };
+    };
 
-                // Fetch material requests
-                try {
-                    const materialRequests = await fetchMaterialRequests(clientId);
+    const formatTimeAgo = (dateString: string) => {
+        const date = new Date(dateString);
+        const now = new Date();
+        const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-                    const materialNotifications = materialRequests.map(request => {
-                        const sectionName = getSectionName(request.sectionId);
-                        const projectName = getProjectName(request.projectId);
-                        return convertMaterialRequestToNotification(request, sectionName, projectName);
-                    });
+        if (seconds < 60) return 'Just now';
+        if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+        if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+        if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+        return date.toLocaleDateString();
+    };
 
-                    allNotifications.push(...materialNotifications);
-                } catch (error) {
-                    console.error('Error fetching material requests:', error);
-                }
+    const renderActivityItem = (activity: Activity) => {
+        const icon = getActivityIcon(activity.activityType, activity.category);
 
-                // Sort notifications by timestamp (newest first)
-                allNotifications.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        return (
+            <View key={activity._id} style={styles.activityItem}>
+                <View style={[styles.iconContainer, { backgroundColor: `${icon.color}15` }]}>
+                    <Ionicons name={icon.name as any} size={24} color={icon.color} />
+                </View>
+                <View style={styles.activityContent}>
+                    <Text style={styles.activityDescription}>{activity.description}</Text>
+                    {activity.message && (
+                        <Text style={styles.activityMessage}>{activity.message}</Text>
+                    )}
+                    <View style={styles.activityMeta}>
+                        <Text style={styles.activityUser}>{activity.user.fullName}</Text>
+                        <Text style={styles.activityDot}>•</Text>
+                        <Text style={styles.activityTime}>{formatTimeAgo(activity.createdAt)}</Text>
+                    </View>
+                </View>
+            </View>
+        );
+    };
 
-                setNotifications(allNotifications);
-            } catch (error) {
-                console.error('Error fetching notifications:', error);
-                showToast('Error loading notifications', 'error');
-                // Set empty array on error instead of dummy notifications
-                setNotifications([]);
-            } finally {
-                setLoading(false);
-            }
-        };
+    const renderMaterialActivityItem = (activity: MaterialActivity) => {
+        const icon = getMaterialActivityIcon(activity.activity);
+        const totalCost = activity.materials.reduce((sum, m) => sum + (m.cost || 0), 0);
+        const materialCount = activity.materials.length;
 
-        fetchAllMaterialRequests();
+        return (
+            <View key={activity._id} style={styles.activityItem}>
+                <View style={[styles.iconContainer, { backgroundColor: `${icon.color}15` }]}>
+                    <Ionicons name={icon.name as any} size={24} color={icon.color} />
+                </View>
+                <View style={styles.activityContent}>
+                    <Text style={styles.activityDescription}>
+                        {activity.activity === 'imported' ? 'Imported' : 'Used'} {materialCount} material{materialCount > 1 ? 's' : ''}
+                    </Text>
+                    <Text style={styles.activityCost}>₹{totalCost.toLocaleString('en-IN')}</Text>
+                    {activity.message && (
+                        <Text style={styles.activityMessage}>{activity.message}</Text>
+                    )}
+                    <View style={styles.activityMeta}>
+                        <Text style={styles.activityUser}>{activity.user.fullName}</Text>
+                        <Text style={styles.activityDot}>•</Text>
+                        <Text style={styles.activityTime}>{formatTimeAgo(activity.createdAt)}</Text>
+                    </View>
+                </View>
+            </View>
+        );
+    };
 
-        // Set up periodic refresh every 30 seconds
-        const refreshInterval = setInterval(() => {
-            fetchAllMaterialRequests();
-        }, 30000);
+    const getCombinedActivities = () => {
+        const combined: Array<{ type: 'activity' | 'material'; data: Activity | MaterialActivity; timestamp: string }> = [];
 
-        return () => clearInterval(refreshInterval);
-    }, []); // Empty dependency array since we want this to run once on mount
+        activities.forEach(a => {
+            combined.push({ type: 'activity', data: a, timestamp: a.createdAt });
+        });
 
+        materialActivities.forEach(m => {
+            combined.push({ type: 'material', data: m, timestamp: m.createdAt });
+        });
 
+        // Sort by timestamp descending
+        combined.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+        return combined;
+    };
+
+    const getFilteredActivities = () => {
+        if (activeTab === 'all') {
+            return getCombinedActivities();
+        } else if (activeTab === 'project') {
+            return activities.map(a => ({ type: 'activity' as const, data: a, timestamp: a.createdAt }));
+        } else {
+            return materialActivities.map(m => ({ type: 'material' as const, data: m, timestamp: m.createdAt }));
+        }
+    };
+
+    const filteredActivities = getFilteredActivities();
 
     return (
-        <GestureHandlerRootView style={styles.container}>
-            <SafeAreaView style={styles.container}>
-                <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <SafeAreaView style={styles.container}>
+            {/* Header */}
+            <View style={styles.header}>
+                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                    <Ionicons name="arrow-back" size={24} color="#1F2937" />
+                </TouchableOpacity>
+                <View style={styles.headerContent}>
+                    <Text style={styles.headerTitle}>Activity Feed</Text>
+                    <Text style={styles.headerSubtitle}>
+                        {filteredActivities.length} {filteredActivities.length === 1 ? 'activity' : 'activities'}
+                    </Text>
+                </View>
+                <TouchableOpacity onPress={onRefresh} style={styles.refreshButton}>
+                    <Ionicons
+                        name={refreshing ? "sync" : "refresh"}
+                        size={22}
+                        color="#3B82F6"
+                    />
+                </TouchableOpacity>
+            </View>
 
-                <NotificationHeader
-                    unreadCount={unreadCount}
-                    pendingApprovals={pendingApprovals}
-                    onBack={() => router.back()}
-                    onMarkAllAsRead={handleMarkAllAsRead}
-                />
-
-                <NotificationBanners
-                    hasNotifications={notifications.length > 0}
-                    pendingApprovals={pendingApprovals}
-                />
-
-                <ScrollView
-                    style={styles.scrollView}
-                    contentContainerStyle={styles.scrollContent}
-                    showsVerticalScrollIndicator={false}
-                    bounces={false}
-                    scrollEventThrottle={16}
-                    keyboardShouldPersistTaps="handled"
+            {/* Tabs */}
+            <View style={styles.tabsContainer}>
+                <TouchableOpacity
+                    style={[styles.tab, activeTab === 'all' && styles.tabActive]}
+                    onPress={() => setActiveTab('all')}
                 >
-                    {loading ? (
-                        <LoadingState />
-                    ) : notifications.length > 0 ? (
-                        notifications.map((notification) => (
-                            <SwipeableNotificationItem
-                                key={notification.id}
-                                notification={notification}
-                                onPress={handleNotificationPress}
-                                onDelete={handleDeleteNotification}
-                                onApprove={handleApprove}
-                                onReject={handleReject}
-                                onMenuAction={handleMenuAction}
-                            />
-                        ))
-                    ) : (
-                        <EmptyState />
-                    )}
-                </ScrollView>
+                    <Text style={[styles.tabText, activeTab === 'all' && styles.tabTextActive]}>
+                        All
+                    </Text>
+                    {activeTab === 'all' && <View style={styles.tabIndicator} />}
+                </TouchableOpacity>
 
-                <Toast
-                    visible={toastVisible}
-                    message={toastMessage}
-                    type={toastType}
-                    onUndo={lastDeleted ? handleUndo : undefined}
-                    onHide={handleToastHide}
-                />
+                <TouchableOpacity
+                    style={[styles.tab, activeTab === 'project' && styles.tabActive]}
+                    onPress={() => setActiveTab('project')}
+                >
+                    <Text style={[styles.tabText, activeTab === 'project' && styles.tabTextActive]}>
+                        Projects
+                    </Text>
+                    {activeTab === 'project' && <View style={styles.tabIndicator} />}
+                </TouchableOpacity>
 
-                <MaterialImportModal
-                    visible={importModalVisible}
-                    materials={selectedNotificationForImport?.materialRequest?.materials || []}
-                    sectionName={selectedNotificationForImport?.sectionName || ''}
-                    requestId={selectedNotificationForImport?.id || ''}
-                    onClose={handleCloseImportModal}
-                    onImport={handleMaterialImport}
-                />
-            </SafeAreaView>
-        </GestureHandlerRootView>
+                <TouchableOpacity
+                    style={[styles.tab, activeTab === 'material' && styles.tabActive]}
+                    onPress={() => setActiveTab('material')}
+                >
+                    <Text style={[styles.tabText, activeTab === 'material' && styles.tabTextActive]}>
+                        Materials
+                    </Text>
+                    {activeTab === 'material' && <View style={styles.tabIndicator} />}
+                </TouchableOpacity>
+            </View>
+
+            {/* Content */}
+            <ScrollView
+                style={styles.scrollView}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#3B82F6']}
+                        tintColor="#3B82F6"
+                    />
+                }
+            >
+                {loading ? (
+                    <View style={styles.centerContainer}>
+                        <ActivityIndicator size="large" color="#3B82F6" />
+                        <Text style={styles.loadingText}>Loading activities...</Text>
+                    </View>
+                ) : error ? (
+                    <View style={styles.centerContainer}>
+                        <Ionicons name="alert-circle-outline" size={64} color="#EF4444" />
+                        <Text style={styles.errorText}>{error}</Text>
+                        <TouchableOpacity style={styles.retryButton} onPress={() => fetchActivities()}>
+                            <Text style={styles.retryButtonText}>Retry</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : filteredActivities.length === 0 ? (
+                    <View style={styles.centerContainer}>
+                        <Ionicons name="notifications-off-outline" size={64} color="#CBD5E1" />
+                        <Text style={styles.emptyTitle}>No Activities Yet</Text>
+                        <Text style={styles.emptySubtitle}>
+                            Your project activities will appear here
+                        </Text>
+                    </View>
+                ) : (
+                    <View style={styles.activitiesList}>
+                        {filteredActivities.map((item, index) => (
+                            <React.Fragment key={`${item.type}-${item.data._id}`}>
+                                {item.type === 'activity'
+                                    ? renderActivityItem(item.data as Activity)
+                                    : renderMaterialActivityItem(item.data as MaterialActivity)
+                                }
+                            </React.Fragment>
+                        ))}
+                    </View>
+                )}
+            </ScrollView>
+        </SafeAreaView>
     );
 };
-
-export default NotificationScreen;
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: '#F8FAFC',
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 16,
         backgroundColor: '#FFFFFF',
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 3,
+    },
+    backButton: {
+        padding: 8,
+        marginRight: 12,
+    },
+    headerContent: {
+        flex: 1,
+    },
+    headerTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#1F2937',
+    },
+    headerSubtitle: {
+        fontSize: 13,
+        color: '#6B7280',
+        marginTop: 2,
+    },
+    refreshButton: {
+        padding: 8,
+    },
+    tabsContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    tab: {
+        flex: 1,
+        paddingVertical: 16,
+        alignItems: 'center',
+        position: 'relative',
+    },
+    tabActive: {
+        // Active state handled by indicator
+    },
+    tabText: {
+        fontSize: 15,
+        fontWeight: '500',
+        color: '#6B7280',
+    },
+    tabTextActive: {
+        color: '#3B82F6',
+        fontWeight: '600',
+    },
+    tabIndicator: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 3,
+        backgroundColor: '#3B82F6',
+        borderTopLeftRadius: 3,
+        borderTopRightRadius: 3,
     },
     scrollView: {
         flex: 1,
     },
-    scrollContent: {
-        paddingBottom: 120,
+    activitiesList: {
+        padding: 16,
+    },
+    activityItem: {
+        flexDirection: 'row',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
+    },
+    iconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    activityContent: {
+        flex: 1,
+    },
+    activityDescription: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#1F2937',
+        marginBottom: 4,
+    },
+    activityMessage: {
+        fontSize: 13,
+        color: '#6B7280',
+        marginBottom: 8,
+        lineHeight: 18,
+    },
+    activityCost: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#10B981',
+        marginBottom: 4,
+    },
+    activityMeta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    activityUser: {
+        fontSize: 12,
+        color: '#6B7280',
+        fontWeight: '500',
+    },
+    activityDot: {
+        fontSize: 12,
+        color: '#CBD5E1',
+        marginHorizontal: 6,
+    },
+    activityTime: {
+        fontSize: 12,
+        color: '#94A3B8',
+    },
+    centerContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 100,
+        paddingHorizontal: 40,
+    },
+    loadingText: {
+        marginTop: 16,
+        fontSize: 14,
+        color: '#6B7280',
+        fontWeight: '500',
+    },
+    errorText: {
+        marginTop: 16,
+        fontSize: 16,
+        color: '#EF4444',
+        fontWeight: '600',
+        textAlign: 'center',
+    },
+    retryButton: {
+        marginTop: 20,
+        backgroundColor: '#3B82F6',
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 8,
+    },
+    retryButtonText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    emptyTitle: {
+        marginTop: 16,
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1E293B',
+    },
+    emptySubtitle: {
+        marginTop: 8,
+        fontSize: 14,
+        color: '#64748B',
+        textAlign: 'center',
+        lineHeight: 20,
     },
 });
+
+export default NotificationPage;
