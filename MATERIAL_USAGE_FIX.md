@@ -1,229 +1,335 @@
-# Material Usage Issue - Fix Applied
+# Material Usage "Material Not Found" Error - Fix
 
-## Problem
+## Problem Analysis
 
-Users were getting "Material not available" error when trying to add materials to material usage, even though the materials were clearly available.
+When trying to add material usage from `app/details.tsx`, you're getting a "Material not found" error. This happens because:
+
+1. **Materials are imported globally** (without a `sectionId`)
+2. **Usage request includes a `sectionId`** (the current section)
+3. **API search logic is too strict** - it's looking for materials where BOTH conditions match:
+   - `_id` matches the requested material
+   - `sectionId` is empty OR matches the requested section
 
 ## Root Cause
 
-The issue was in the `MaterialUsageForm.tsx` component where it was selecting materials:
+The issue is in the API's material search logic. When checking if `sectionId` matches, the code might not be properly handling `null`, `undefined`, or empty string values.
+
+## Solution
+
+Update your API file with this corrected logic:
 
 ```typescript
-// BEFORE (WRONG):
-setSelectedMaterialId(material._id || material.id.toString());
-```
+// Find material in MaterialAvailable by _id
+// Accept materials that are:
+// 1. Global (no sectionId set)
+// 2. Scoped to the requested section
+const availIndex = (project.MaterialAvailable || []).findIndex((m: MaterialSubdoc) => {
+  try {
+    const sameId =
+      String((m as unknown as { _id: string | Types.ObjectId })._id) ===
+      String(materialId);
 
-This code had a fallback that would use `material.id.toString()` if `_id` was not available. However:
+    // Get the material's sectionId
+    const materialSectionId = (m as unknown as { sectionId?: string }).sectionId;
+    
+    // Accept if:
+    // - Material has no sectionId (global material)
+    // - Material's sectionId matches the requested sectionId
+    const sameSection =
+      !materialSectionId || // No sectionId = global material
+      materialSectionId === '' || // Empty string = global material
+      String(materialSectionId) === String(sectionId || "");
 
-- `material.id` is a numeric index (1, 2, 3, etc.)
-- `material._id` is the MongoDB ObjectId string (e.g., "507f1f77bcf86cd799439011")
+    console.log('Material search:', {
+      materialName: m.name,
+      materialId: (m as unknown as { _id: string | Types.ObjectId })._id,
+      materialSectionId: materialSectionId || '(none)',
+      requestedSectionId: sectionId,
+      sameId,
+      sameSection,
+      match: sameId && sameSection
+    });
 
-When the form passed `material.id.toString()` (like "1", "2", "3"), but the API and backend expected the MongoDB `_id`, the material lookup failed.
-
-## Solution Applied
-
-### 1. Fixed Material Selection (MaterialUsageForm.tsx)
-
-```typescript
-// AFTER (CORRECT):
-onPress={() => {
-    if (!material._id) {
-        alert('Error: Material ID not found. Please refresh and try again.');
-        return;
-    }
-    setSelectedMaterialId(material._id);
-}}
-```
-
-Now it:
-
-- Only uses `material._id` (no fallback)
-- Shows an error if `_id` is missing
-- Prevents invalid IDs from being passed
-
-### 2. Fixed Material Comparison
-
-```typescript
-// BEFORE:
-const isSelected =
-  selectedMaterialId === (material._id || material.id.toString());
-
-// AFTER:
-const isSelected = selectedMaterialId === material._id;
-```
-
-### 3. Added Better Debugging
-
-Enhanced the `handleAddMaterialUsage` function to:
-
-- Show detailed material ID information
-- List all available materials with their IDs
-- Clearly indicate which material matches
-- Return early with error toast if material not found
-
-### 4. Added Validation
-
-Added a check when materials are loaded to warn if any material is missing `_id`:
-
-```typescript
-if (!material._id) {
-  console.warn(
-    `⚠️ Material "${material.name}" is missing _id field!`,
-    material
-  );
-}
-```
-
-## How to Test
-
-### 1. Verify Materials Have IDs
-
-1. Open the app and navigate to a project
-2. Open browser console/React Native debugger
-3. Check the logs when materials load
-4. Look for: "Transformed Available (first item)"
-5. Verify each material has `_id` field
-
-### 2. Test Material Usage
-
-1. Click "Add Usage" button
-2. Select a mini-section
-3. Search and select a material
-4. Enter quantity
-5. Click "Record Usage"
-6. Should work without "Material not available" error
-
-### 3. Check Console Logs
-
-If it still fails, check console for:
-
-```
-ADD MATERIAL USAGE - DEBUG INFO
-Material ID received: [should be MongoDB ID]
-Material ID type: string
-Found material: [material name] or NOT FOUND
-```
-
-## Expected Behavior
-
-### Success Case
-
-```
-✓ Material found: {
-  name: "Cement",
-  _id: "507f1f77bcf86cd799439011",
-  quantity: 100,
-  unit: "bags"
-}
-```
-
-### Failure Case (if material missing \_id)
-
-```
-❌ Material not found in availableMaterials!
-Total available materials: 5
-
-All available materials:
-  1. Cement:
-     _id: "507f1f77bcf86cd799439011" (type: string)
-     id: 1 (type: number)
-     Match: ✓ YES
-```
-
-## Troubleshooting
-
-### If Error Still Occurs
-
-#### Check 1: Material Has \_id
-
-```javascript
-// In console, check:
-availableMaterials.forEach((m) => {
-  console.log(m.name, "has _id:", !!m._id, m._id);
+    return sameId && sameSection;
+  } catch (error) {
+    console.error('Error in material search:', error);
+    return false;
+  }
 });
 ```
 
-#### Check 2: API Response
+## Complete Fixed API Code
 
-The material API should return:
+Replace your entire POST handler in the material-usage API with this:
 
-```json
-{
-  "success": true,
-  "MaterialAvailable": [
-    {
-      "_id": "507f1f77bcf86cd799439011",
-      "name": "Cement",
-      "qnt": 100,
-      "unit": "bags",
-      "cost": 500
+```typescript
+export const POST = async (req: NextRequest | Request) => {
+  try {
+    await connect();
+    const body = await req.json();
+    const { projectId, materialId, qnt, miniSectionId, sectionId } = body;
+
+    console.log('\n========================================');
+    console.log('MATERIAL USAGE API - REQUEST RECEIVED');
+    console.log('========================================');
+    console.log('Request Body:', JSON.stringify(body, null, 2));
+    console.log('========================================\n');
+
+    // Validation
+    if (!projectId || !materialId || typeof qnt !== "number" || !sectionId) {
+      return NextResponse.json({
+        success: false,
+        error: "projectId, materialId, sectionId and numeric qnt are required",
+      }, { status: 400 });
     }
-  ]
-}
+
+    if (qnt <= 0) {
+      return NextResponse.json({
+        success: false,
+        error: "Quantity must be greater than 0",
+      }, { status: 400 });
+    }
+
+    // Find project document
+    const project = await Projects.findById(projectId);
+    if (!project) {
+      console.error("Project not found for ID:", projectId);
+      return NextResponse.json({
+        success: false,
+        error: "Project not found",
+      }, { status: 404 });
+    }
+
+    console.log('Project found:', project._id);
+    console.log('MaterialAvailable count:', project.MaterialAvailable?.length || 0);
+
+    // Find material in MaterialAvailable
+    const availIndex = (project.MaterialAvailable || []).findIndex((m: MaterialSubdoc) => {
+      try {
+        const sameId =
+          String((m as unknown as { _id: string | Types.ObjectId })._id) ===
+          String(materialId);
+
+        // Get the material's sectionId
+        const materialSectionId = (m as unknown as { sectionId?: string }).sectionId;
+        
+        // Accept if:
+        // - Material has no sectionId (global material)
+        // - Material's sectionId matches the requested sectionId
+        const sameSection =
+          !materialSectionId || // No sectionId = global material
+          materialSectionId === '' || // Empty string = global material
+          String(materialSectionId) === String(sectionId || "");
+
+        console.log('Checking material:', {
+          name: m.name,
+          _id: (m as unknown as { _id: string | Types.ObjectId })._id,
+          materialSectionId: materialSectionId || '(none)',
+          requestedSectionId: sectionId,
+          sameId,
+          sameSection,
+          match: sameId && sameSection
+        });
+
+        return sameId && sameSection;
+      } catch (error) {
+        console.error('Error in material search:', error);
+        return false;
+      }
+    });
+
+    if (availIndex == null || availIndex < 0) {
+      console.error('\n❌ MATERIAL NOT FOUND');
+      console.error('Searched for materialId:', materialId);
+      console.error('In sectionId:', sectionId);
+      console.error('\nAvailable materials:');
+      (project.MaterialAvailable || []).forEach((m: any, idx: number) => {
+        console.error(`  ${idx + 1}. ${m.name} (_id: ${m._id}, sectionId: ${m.sectionId || '(none)'})`);
+      });
+      
+      return NextResponse.json({
+        success: false,
+        error: "Material not found in MaterialAvailable. The material might be scoped to a different section or doesn't exist.",
+      }, { status: 404 });
+    }
+
+    const available = project.MaterialAvailable![availIndex] as MaterialSubdoc;
+    console.log('✓ Material found:', available.name, '- Available qty:', available.qnt);
+
+    const costOfUsedMaterial = Number(available.cost || 0);
+
+    // Check sufficient quantity
+    if (Number(available.qnt || 0) < qnt) {
+      return NextResponse.json({
+        success: false,
+        error: `Insufficient quantity available. Available: ${Number(available.qnt || 0)}, Requested: ${qnt}`,
+      }, { status: 400 });
+    }
+
+    // Prepare used material clone
+    const usedClone: MaterialSubdoc = {
+      name: available.name,
+      unit: available.unit,
+      specs: available.specs || {},
+      qnt: qnt,
+      cost: available.cost || 0,
+      sectionId: String(sectionId),
+      miniSectionId:
+        miniSectionId ||
+        (available as unknown as { miniSectionId?: string }).miniSectionId ||
+        undefined,
+    };
+
+    console.log('Creating used material entry:', usedClone);
+
+    // Update project using findByIdAndUpdate
+    const updatedProject = await Projects.findByIdAndUpdate(
+      projectId,
+      {
+        $inc: {
+          "MaterialAvailable.$[elem].qnt": -qnt,
+          spent: costOfUsedMaterial,
+        },
+        $push: {
+          MaterialUsed: usedClone,
+        },
+      },
+      {
+        arrayFilters: [{ "elem._id": new ObjectId(materialId) }],
+        new: true,
+        fields: {
+          MaterialAvailable: 1,
+          MaterialUsed: 1,
+          spent: 1,
+        },
+      }
+    );
+
+    if (!updatedProject) {
+      return NextResponse.json({
+        success: false,
+        error: "Failed to update project",
+      }, { status: 500 });
+    }
+
+    console.log('✓ Project updated successfully');
+
+    // Clean up: remove materials with 0 or negative quantity
+    await Projects.findByIdAndUpdate(
+      projectId,
+      {
+        $pull: {
+          MaterialAvailable: { qnt: { $lte: 0 } },
+        },
+      },
+      { new: true }
+    );
+
+    console.log('✓ Cleanup completed');
+    console.log('========================================\n');
+
+    return NextResponse.json({
+      success: true,
+      message: `Successfully added ${qnt} ${available.unit} of ${available.name} to used materials`,
+      data: {
+        projectId: updatedProject._id,
+        sectionId: sectionId,
+        miniSectionId: miniSectionId,
+        materialAvailable: updatedProject.MaterialAvailable,
+        materialUsed: updatedProject.MaterialUsed,
+        usedMaterial: usedClone,
+        spent: updatedProject.spent,
+      },
+    }, { status: 200 });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error("Error in add-material-usage:", msg);
+    return NextResponse.json({
+      success: false,
+      error: msg,
+    }, { status: 500 });
+  }
+};
 ```
 
-#### Check 3: Refresh Materials
+## Key Changes
 
-If materials were added before this fix:
+1. **Improved sectionId matching logic**:
+   - Explicitly checks for `null`, `undefined`, and empty string
+   - Treats all these cases as "global material"
 
-1. Pull down to refresh the page
-2. Or close and reopen the app
-3. This ensures materials are loaded with correct structure
+2. **Enhanced logging**:
+   - Logs each material being checked
+   - Shows why materials match or don't match
+   - Lists all available materials when not found
 
-### Common Issues
+3. **Better error messages**:
+   - Explains why material wasn't found
+   - Suggests possible causes
 
-#### Issue: Material \_id is undefined
+## Testing
 
-**Cause**: API not returning \_id field
-**Solution**: Check backend API to ensure it includes \_id in response
+After applying this fix:
 
-#### Issue: Material \_id is a number
+1. **Test with global materials** (no sectionId):
+   ```
+   Material: { _id: "abc123", name: "Cement", sectionId: undefined }
+   Request: { materialId: "abc123", sectionId: "section1" }
+   Result: ✅ Should work (global material)
+   ```
 
-**Cause**: Using numeric ID instead of MongoDB ObjectId
-**Solution**: Backend should use MongoDB ObjectId, not auto-increment ID
+2. **Test with section-scoped materials**:
+   ```
+   Material: { _id: "abc123", name: "Cement", sectionId: "section1" }
+   Request: { materialId: "abc123", sectionId: "section1" }
+   Result: ✅ Should work (matching section)
+   ```
 
-#### Issue: Material found but usage fails
+3. **Test with wrong section**:
+   ```
+   Material: { _id: "abc123", name: "Cement", sectionId: "section1" }
+   Request: { materialId: "abc123", sectionId: "section2" }
+   Result: ❌ Should fail (different section)
+   ```
 
-**Cause**: Different issue (API endpoint, permissions, etc.)
-**Solution**: Check API logs and network tab for actual error
+## Additional Recommendations
 
-## Files Modified
+1. **When importing materials**, consider whether they should be:
+   - **Global** (available to all sections) - don't set `sectionId`
+   - **Section-specific** (only for one section) - set `sectionId`
 
-1. **components/details/MaterialUsageForm.tsx**
+2. **Update the material import API** to allow specifying scope:
+   ```typescript
+   {
+     materialName: "Cement",
+     qnt: 100,
+     unit: "bags",
+     scope: "global" | "section",
+     sectionId: "section1" // only if scope is "section"
+   }
+   ```
 
-   - Fixed material selection to only use `_id`
-   - Added validation for missing `_id`
-   - Fixed comparison logic
+3. **Add a UI indicator** showing which materials are global vs section-specific
 
-2. **app/details.tsx**
-   - Enhanced debugging in `handleAddMaterialUsage`
-   - Added early return with error toast
-   - Added validation when transforming materials
+## Verification
 
-## Prevention
+After applying the fix, check the console logs when adding material usage. You should see:
 
-To prevent this issue in the future:
+```
+========================================
+MATERIAL USAGE API - REQUEST RECEIVED
+========================================
+Checking material: {
+  name: 'Cement',
+  _id: '...',
+  materialSectionId: '(none)',
+  requestedSectionId: 'section1',
+  sameId: true,
+  sameSection: true,
+  match: true
+}
+✓ Material found: Cement - Available qty: 100
+========================================
+```
 
-1. **Always use `_id` for MongoDB documents**
-
-   - Never use numeric `id` for database operations
-   - Only use `id` for UI display/indexing
-
-2. **Validate data structure**
-
-   - Check that API responses include `_id`
-   - Warn if `_id` is missing during transformation
-
-3. **Type safety**
-   - Use TypeScript interfaces that require `_id`
-   - Make `_id` a required field, not optional
-
-## Summary
-
-The fix ensures that:
-✅ Only MongoDB `_id` is used for material selection
-✅ Clear error messages if `_id` is missing
-✅ Better debugging to identify issues quickly
-✅ Validation to catch problems early
-
-The "Material not available" error should now be resolved!
+If you still see "Material not found", the logs will show exactly why each material didn't match.

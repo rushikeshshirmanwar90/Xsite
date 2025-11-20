@@ -4,6 +4,7 @@ import MaterialFormModal from '@/components/details/MaterialFormModel';
 import MaterialUsageForm from '@/components/details/MaterialUsageForm';
 import SectionManager from '@/components/details/SectionManager';
 import TabSelector from '@/components/details/TabSelector';
+import MaterialActivityNotifications from '@/components/notifications/MaterialActivityNotifications';
 import { predefinedSections } from '@/data/details';
 import { getSection } from '@/functions/details';
 import { domain } from '@/lib/domain';
@@ -46,6 +47,7 @@ const Details = () => {
     const [showAddSectionModal, setShowAddSectionModal] = useState(false);
     const [newSectionName, setNewSectionName] = useState('');
     const [newSectionDesc, setNewSectionDesc] = useState('');
+    const [showNotifications, setShowNotifications] = useState(false);
     const cardAnimations = useRef<Animated.Value[]>([]).current;
 
     // Performance optimization: Request cancellation and debouncing
@@ -821,13 +823,14 @@ const Details = () => {
             console.log('\n⚠️ IMPORTANT - API MATCHING LOGIC:');
             console.log('The API will look for a material where:');
             console.log('  1. _id matches:', materialId);
-            console.log('  2. AND (sectionId is empty OR sectionId matches:', sectionId, ')');
+            console.log('  2. AND (sectionId is empty/null/undefined OR sectionId matches:', sectionId, ')');
             console.log('\nMaterial sectionId:', selectedMaterial.sectionId || '(empty/undefined)');
             console.log('Request sectionId:', sectionId);
 
             if (selectedMaterial.sectionId && selectedMaterial.sectionId !== sectionId) {
                 console.log('⚠️ WARNING: Material has sectionId', selectedMaterial.sectionId, 'but request is for', sectionId);
                 console.log('This might cause "Material not found" error from API!');
+                console.log('💡 TIP: The material might be scoped to a different section.');
             }
         }
 
@@ -1255,6 +1258,25 @@ const Details = () => {
                 onShowSectionPrompt={() => { }}
                 hideSection={true}
             />
+            
+            {/* Notification Button */}
+            <View style={notificationStyles.notificationButtonContainer}>
+                <TouchableOpacity
+                    style={notificationStyles.notificationButton}
+                    onPress={() => setShowNotifications(true)}
+                    activeOpacity={0.7}
+                >
+                    <Ionicons name="notifications" size={20} color="#3B82F6" />
+                    <Text style={notificationStyles.notificationButtonText}>Activity Log</Text>
+                </TouchableOpacity>
+            </View>
+            
+            {/* Material Activity Notifications Modal */}
+            <MaterialActivityNotifications
+                visible={showNotifications}
+                onClose={() => setShowNotifications(false)}
+                projectId={projectId}
+            />
             <MaterialFormModal
                 visible={showMaterialForm}
                 onClose={() => setShowMaterialForm(false)}
@@ -1658,6 +1680,30 @@ const actionStyles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         color: '#DC2626',
+    },
+});
+
+const notificationStyles = StyleSheet.create({
+    notificationButtonContainer: {
+        paddingHorizontal: 16,
+        paddingTop: 8,
+    },
+    notificationButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#EFF6FF',
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 10,
+        gap: 8,
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+    },
+    notificationButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#3B82F6',
     },
 });
 
