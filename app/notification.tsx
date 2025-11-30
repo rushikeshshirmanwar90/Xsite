@@ -1,6 +1,7 @@
 import { getClientId } from '@/functions/clientId';
 import { domain } from '@/lib/domain';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -40,9 +41,13 @@ interface MaterialActivity {
         fullName: string;
     };
     projectId: string;
+    projectName?: string;
+    sectionName?: string;
+    miniSectionName?: string;
     materials: Array<{
         name: string;
         unit: string;
+        specs?: Record<string, any>;
         qnt: number;
         cost: number;
     }>;
@@ -66,6 +71,31 @@ const NotificationPage: React.FC = () => {
     const isLoadingRef = React.useRef(false);
     const lastLoadTimeRef = React.useRef<number>(0);
     const DEBOUNCE_DELAY = 500;
+    const [currentUser, setCurrentUser] = useState<{ userId: string; fullName: string } | null>(null);
+
+    // Get current user data from AsyncStorage
+    const getCurrentUser = async () => {
+        try {
+            const userDetailsString = await AsyncStorage.getItem("user");
+            if (userDetailsString) {
+                const userData = JSON.parse(userDetailsString);
+                const user = {
+                    userId: userData._id || userData.id || userData.clientId || 'unknown',
+                    fullName: userData.name || userData.username || 'Unknown User',
+                };
+                setCurrentUser(user);
+                return user;
+            }
+        } catch (error) {
+            console.error('Error getting user data:', error);
+        }
+        return null;
+    };
+
+    // Load current user on mount
+    useEffect(() => {
+        getCurrentUser();
+    }, []);
 
     const fetchActivities = async (showLoadingState = true) => {
         // Prevent duplicate calls
@@ -90,18 +120,69 @@ const NotificationPage: React.FC = () => {
             setError(null);
 
             const clientId = await getClientId();
+            console.log('\n========================================');
+            console.log('FETCHING ACTIVITIES');
+            console.log('========================================');
+            console.log('Client ID:', clientId);
+
             if (!clientId) {
                 throw new Error('Client ID not found');
             }
 
-            // Fetch both activities in parallel
+            console.log('API URLs:');
+            console.log('  - Activity:', `${domain}/api/activity?clientId=${clientId}&limit=50`);
+            console.log('  - Material Activity:', `${domain}/api/materialActivity?clientId=${clientId}&limit=50`);
+
+            // Fetch both activities in parallel with better error handling
             const [activityRes, materialActivityRes] = await Promise.all([
-                axios.get(`${domain}/api/activity?clientId=${clientId}&limit=50`).catch(() => ({ data: { activities: [] } })),
-                axios.get(`${domain}/api/materialActivity?clientId=${clientId}&limit=50`).catch(() => ({ data: [] })),
+                axios.get(`${domain}/api/activity?clientId=${clientId}&limit=50`)
+                    .catch((err) => {
+                        console.error('❌ Activity API Error:', err?.response?.data || err.message);
+                        return { data: { activities: [] } };
+                    }),
+                axios.get(`${domain}/api/materialActivity?clientId=${clientId}&limit=50`)
+                    .catch((err) => {
+                        console.error('❌ Material Activity API Error:', err?.response?.data || err.message);
+                        return { data: [] };
+                    }),
             ]);
 
+            console.log('\n--- API RESPONSES ---');
+            console.log('Activity Response:', JSON.stringify(activityRes.data, null, 2));
+            console.log('Material Activity Response:', JSON.stringify(materialActivityRes.data, null, 2));
+
             const activityData = activityRes.data as any;
-            const materialData = Array.isArray(materialActivityRes.data) ? materialActivityRes.data : [];
+            const materialDataRaw = materialActivityRes.data;
+
+            // Handle different response formats
+            let materialData: MaterialActivity[] = [];
+            if (Array.isArray(materialDataRaw)) {
+                materialData = materialDataRaw;
+            } else if (materialDataRaw && typeof materialDataRaw === 'object') {
+                // Check if it's wrapped in a property
+                materialData = materialDataRaw.materialActivities ||
+                    materialDataRaw.activities ||
+                    materialDataRaw.data ||
+                    [];
+            }
+
+            console.log('\n--- EXTRACTED DATA ---');
+            console.log('Activities count:', activityData.activities?.length || 0);
+            console.log('Material Activities count:', materialData.length);
+
+            // Debug user data in activities
+            if (materialData.length > 0) {
+                console.log('\n--- SAMPLE MATERIAL ACTIVITY ---');
+                console.log('First material activity:', JSON.stringify(materialData[0], null, 2));
+                console.log('User in first activity:', materialData[0].user);
+            }
+
+            if (activityData.activities?.length > 0) {
+                console.log('\n--- SAMPLE PROJECT ACTIVITY ---');
+                console.log('First project activity:', JSON.stringify(activityData.activities[0], null, 2));
+                console.log('User in first activity:', activityData.activities[0].user);
+            }
+            console.log('========================================\n');
 
             setActivities(activityData.activities || []);
             setMaterialActivities(materialData);
@@ -161,6 +242,11 @@ const NotificationPage: React.FC = () => {
     const renderActivityItem = (activity: Activity) => {
         const icon = getActivityIcon(activity.activityType, activity.category);
 
+        // Use activity user or fallback to current user
+        const displayUser = activity.user?.fullName && activity.user.fullName !== 'Unknown User'
+            ? activity.user
+            : currentUser || { userId: 'unknown', fullName: 'Unknown User' };
+
         return (
             <View key={activity._id} style={styles.activityItem}>
                 <View style={[styles.iconContainer, { backgroundColor: `${icon.color}15` }]}>
@@ -172,7 +258,7 @@ const NotificationPage: React.FC = () => {
                         <Text style={styles.activityMessage}>{activity.message}</Text>
                     )}
                     <View style={styles.activityMeta}>
-                        <Text style={styles.activityUser}>{activity.user.fullName}</Text>
+                        <Text style={styles.activityUser}>{displayUser.fullName}</Text>
                         <Text style={styles.activityDot}>•</Text>
                         <Text style={styles.activityTime}>{formatTimeAgo(activity.createdAt)}</Text>
                     </View>
@@ -181,28 +267,153 @@ const NotificationPage: React.FC = () => {
         );
     };
 
+    const getMaterialIcon = (materialName: string) => {
+        const materialMap: { [key: string]: { icon: string; color: string } } = {
+            'cement': { icon: 'cube-outline', color: '#8B5CF6' },
+            'brick': { icon: 'square-outline', color: '#EF4444' },
+            'steel': { icon: 'barbell-outline', color: '#6B7280' },
+            'sand': { icon: 'layers-outline', color: '#F59E0B' },
+            'gravel': { icon: 'diamond-outline', color: '#10B981' },
+            'concrete': { icon: 'cube', color: '#3B82F6' },
+            'wood': { icon: 'leaf-outline', color: '#84CC16' },
+            'paint': { icon: 'color-palette-outline', color: '#EC4899' },
+            'tile': { icon: 'grid-outline', color: '#06B6D4' },
+            'pipe': { icon: 'ellipse-outline', color: '#8B5CF6' },
+        };
+
+        const lowerName = materialName.toLowerCase();
+        for (const [key, value] of Object.entries(materialMap)) {
+            if (lowerName.includes(key)) {
+                return value;
+            }
+        }
+        return { icon: 'cube-outline', color: '#6B7280' };
+    };
+
     const renderMaterialActivityItem = (activity: MaterialActivity) => {
         const icon = getMaterialActivityIcon(activity.activity);
         const totalCost = activity.materials.reduce((sum, m) => sum + (m.cost || 0), 0);
         const materialCount = activity.materials.length;
+        const isImported = activity.activity === 'imported';
+
+        // Use activity user or fallback to current user
+        const displayUser = activity.user?.fullName && activity.user.fullName !== 'Unknown User'
+            ? activity.user
+            : currentUser || { userId: 'unknown', fullName: 'Unknown User' };
 
         return (
-            <View key={activity._id} style={styles.activityItem}>
-                <View style={[styles.iconContainer, { backgroundColor: `${icon.color}15` }]}>
-                    <Ionicons name={icon.name as any} size={24} color={icon.color} />
-                </View>
-                <View style={styles.activityContent}>
-                    <Text style={styles.activityDescription}>
-                        {activity.activity === 'imported' ? 'Imported' : 'Used'} {materialCount} material{materialCount > 1 ? 's' : ''}
+            <View key={activity._id} style={styles.materialActivityCard}>
+                {/* Header with activity type badge */}
+                <View style={styles.materialActivityHeader}>
+                    <View style={[
+                        styles.activityBadge,
+                        { backgroundColor: isImported ? '#ECFDF5' : '#FEF2F2' }
+                    ]}>
+                        <Ionicons
+                            name={icon.name as any}
+                            size={16}
+                            color={icon.color}
+                        />
+                        <Text style={[
+                            styles.activityBadgeText,
+                            { color: icon.color }
+                        ]}>
+                            {isImported ? 'Imported' : 'Used'}
+                        </Text>
+                    </View>
+                    <Text style={styles.materialActivityTime}>
+                        {formatTimeAgo(activity.createdAt)}
                     </Text>
-                    <Text style={styles.activityCost}>₹{totalCost.toLocaleString('en-IN')}</Text>
-                    {activity.message && (
-                        <Text style={styles.activityMessage}>{activity.message}</Text>
-                    )}
-                    <View style={styles.activityMeta}>
-                        <Text style={styles.activityUser}>{activity.user.fullName}</Text>
-                        <Text style={styles.activityDot}>•</Text>
-                        <Text style={styles.activityTime}>{formatTimeAgo(activity.createdAt)}</Text>
+                </View>
+
+                {/* Project/Section Info */}
+                {(activity.projectName || activity.sectionName) && (
+                    <View style={styles.projectInfo}>
+                        {activity.projectName && (
+                            <View style={styles.projectInfoItem}>
+                                <Ionicons name="folder-outline" size={14} color="#64748B" />
+                                <Text style={styles.projectInfoText}>{activity.projectName}</Text>
+                            </View>
+                        )}
+                        {activity.sectionName && (
+                            <View style={styles.projectInfoItem}>
+                                <Ionicons name="layers-outline" size={14} color="#64748B" />
+                                <Text style={styles.projectInfoText}>{activity.sectionName}</Text>
+                            </View>
+                        )}
+                        {activity.miniSectionName && (
+                            <View style={styles.projectInfoItem}>
+                                <Ionicons name="grid-outline" size={14} color="#64748B" />
+                                <Text style={styles.projectInfoText}>{activity.miniSectionName}</Text>
+                            </View>
+                        )}
+                    </View>
+                )}
+
+                {/* Materials List */}
+                <View style={styles.materialsList}>
+                    {activity.materials.map((material, index) => {
+                        const matIcon = getMaterialIcon(material.name);
+                        return (
+                            <View key={index} style={styles.materialItem}>
+                                <View style={[
+                                    styles.materialIconSmall,
+                                    { backgroundColor: `${matIcon.color}15` }
+                                ]}>
+                                    <Ionicons
+                                        name={matIcon.icon as any}
+                                        size={18}
+                                        color={matIcon.color}
+                                    />
+                                </View>
+                                <View style={styles.materialDetails}>
+                                    <Text style={styles.materialName}>{material.name}</Text>
+                                    <Text style={styles.materialQuantity}>
+                                        {material.qnt} {material.unit}
+                                        {material.cost > 0 && (
+                                            <Text style={styles.materialCost}>
+                                                {' '}• ₹{material.cost.toLocaleString('en-IN')}
+                                            </Text>
+                                        )}
+                                    </Text>
+                                </View>
+                            </View>
+                        );
+                    })}
+                </View>
+
+                {/* Total Cost */}
+                {totalCost > 0 && (
+                    <View style={styles.totalCostContainer}>
+                        <Text style={styles.totalCostLabel}>Total Cost</Text>
+                        <Text style={styles.totalCostValue}>
+                            ₹{totalCost.toLocaleString('en-IN')}
+                        </Text>
+                    </View>
+                )}
+
+                {/* Message */}
+                {activity.message && (
+                    <View style={styles.messageContainer}>
+                        <Ionicons name="chatbox-outline" size={14} color="#64748B" />
+                        <Text style={styles.messageText}>{activity.message}</Text>
+                    </View>
+                )}
+
+                {/* Footer with user info */}
+                <View style={styles.materialActivityFooter}>
+                    <View style={styles.userInfo}>
+                        <View style={styles.userAvatar}>
+                            <Text style={styles.userAvatarText}>
+                                {displayUser.fullName.charAt(0).toUpperCase()}
+                            </Text>
+                        </View>
+                        <Text style={styles.userName}>{displayUser.fullName}</Text>
+                    </View>
+                    <View style={styles.materialCountBadge}>
+                        <Text style={styles.materialCountText}>
+                            {materialCount} item{materialCount > 1 ? 's' : ''}
+                        </Text>
                     </View>
                 </View>
             </View>
@@ -257,6 +468,23 @@ const NotificationPage: React.FC = () => {
                         size={22}
                         color="#3B82F6"
                     />
+                </TouchableOpacity>
+                <TouchableOpacity
+                    onPress={() => {
+                        console.log('\n========================================');
+                        console.log('DEBUG INFO');
+                        console.log('========================================');
+                        console.log('Activities:', activities.length);
+                        console.log('Material Activities:', materialActivities.length);
+                        console.log('Active Tab:', activeTab);
+                        console.log('Filtered Activities:', filteredActivities.length);
+                        console.log('Loading:', loading);
+                        console.log('Error:', error);
+                        console.log('========================================\n');
+                    }}
+                    style={styles.refreshButton}
+                >
+                    <Ionicons name="bug" size={22} color="#F59E0B" />
                 </TouchableOpacity>
             </View>
 
@@ -483,6 +711,186 @@ const styles = StyleSheet.create({
     activityTime: {
         fontSize: 12,
         color: '#94A3B8',
+    },
+    // Material Activity Card Styles
+    materialActivityCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 3,
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
+    },
+    materialActivityHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    activityBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+        gap: 6,
+    },
+    activityBadgeText: {
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    materialActivityTime: {
+        fontSize: 12,
+        color: '#94A3B8',
+        fontWeight: '500',
+    },
+    projectInfo: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginBottom: 12,
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    projectInfoItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#F8FAFC',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    projectInfoText: {
+        fontSize: 12,
+        color: '#64748B',
+        fontWeight: '500',
+    },
+    materialsList: {
+        gap: 10,
+        marginBottom: 12,
+    },
+    materialItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        padding: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    materialIconSmall: {
+        width: 40,
+        height: 40,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    materialDetails: {
+        flex: 1,
+    },
+    materialName: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#1E293B',
+        marginBottom: 2,
+    },
+    materialQuantity: {
+        fontSize: 13,
+        color: '#64748B',
+        fontWeight: '500',
+    },
+    materialCost: {
+        fontSize: 13,
+        color: '#10B981',
+        fontWeight: '600',
+    },
+    totalCostContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#F0FDF4',
+        padding: 12,
+        borderRadius: 10,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#BBF7D0',
+    },
+    totalCostLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#166534',
+    },
+    totalCostValue: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#15803D',
+    },
+    messageContainer: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 8,
+        backgroundColor: '#F8FAFC',
+        padding: 10,
+        borderRadius: 8,
+        marginBottom: 12,
+        borderLeftWidth: 3,
+        borderLeftColor: '#3B82F6',
+    },
+    messageText: {
+        flex: 1,
+        fontSize: 13,
+        color: '#475569',
+        lineHeight: 18,
+    },
+    materialActivityFooter: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+    },
+    userInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    userAvatar: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#3B82F6',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    userAvatarText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#FFFFFF',
+    },
+    userName: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#334155',
+    },
+    materialCountBadge: {
+        backgroundColor: '#F1F5F9',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 6,
+    },
+    materialCountText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#64748B',
     },
     centerContainer: {
         flex: 1,

@@ -308,6 +308,13 @@ const Details = () => {
                     console.warn(`⚠️ Material "${material.name}" is missing _id field!`, material);
                 }
 
+                // Log material sectionId for debugging
+                console.log(`📦 Material: ${material.name}`);
+                console.log(`   _id: ${material._id}`);
+                console.log(`   sectionId: ${material.sectionId || 'NONE'}`);
+                console.log(`   Current page sectionId: ${sectionId}`);
+                console.log(`   Match: ${!material.sectionId || material.sectionId === sectionId ? '✅' : '❌'}`);
+
                 return {
                     id: index + 1,
                     _id: material._id,
@@ -318,7 +325,8 @@ const Details = () => {
                     date: new Date().toLocaleDateString(),
                     icon,
                     color,
-                    specs: material.specs || {}
+                    specs: material.specs || {},
+                    sectionId: material.sectionId // Include sectionId in transformed material
                 };
             });
 
@@ -892,6 +900,22 @@ const Details = () => {
                         'used',
                         `Used in ${sectionName} - Mini Section ID: ${miniSectionId}`
                     );
+
+                    // Also log to general activity
+                    const { logMaterialUsed } = require('@/utils/activityLogger');
+                    const miniSection = miniSections.find(s => s._id === miniSectionId);
+                    await logMaterialUsed(
+                        projectId,
+                        projectName,
+                        sectionId,
+                        sectionName,
+                        miniSectionId,
+                        miniSection?.name || 'Unknown Section',
+                        selectedMaterial.name,
+                        quantity,
+                        selectedMaterial.unit,
+                        selectedMaterial.price
+                    );
                 }
 
                 // Refresh materials from API to get the latest data
@@ -961,6 +985,7 @@ const Details = () => {
         }
 
         const { addSection } = require('@/functions/details');
+        const { logMiniSectionCreated } = require('@/utils/activityLogger');
 
         const sectionData = {
             name: newSectionName.trim(),
@@ -991,6 +1016,16 @@ const Details = () => {
 
             if (res && res.success) {
                 toast.success("Section added successfully");
+
+                // Log activity
+                await logMiniSectionCreated(
+                    projectId,
+                    projectName,
+                    sectionId,
+                    sectionName,
+                    res.section?._id || 'unknown',
+                    newSectionName.trim()
+                );
 
                 // Refetch sections after adding a new one
                 const sections = await getSection(sectionId);
@@ -1258,7 +1293,7 @@ const Details = () => {
                 onShowSectionPrompt={() => { }}
                 hideSection={true}
             />
-            
+
             {/* Notification Button */}
             <View style={notificationStyles.notificationButtonContainer}>
                 <TouchableOpacity
@@ -1270,7 +1305,7 @@ const Details = () => {
                     <Text style={notificationStyles.notificationButtonText}>Activity Log</Text>
                 </TouchableOpacity>
             </View>
-            
+
             {/* Material Activity Notifications Modal */}
             <MaterialActivityNotifications
                 visible={showNotifications}
@@ -1289,7 +1324,14 @@ const Details = () => {
                 visible={showUsageForm}
                 onClose={() => setShowUsageForm(false)}
                 onSubmit={handleAddMaterialUsage}
-                availableMaterials={availableMaterials}
+                availableMaterials={availableMaterials.filter(m => {
+                    // Show materials that have no sectionId (global) OR match current sectionId
+                    const isAvailable = !m.sectionId || m.sectionId === sectionId;
+                    if (!isAvailable) {
+                        console.log(`🚫 Filtering out material: ${m.name} (sectionId: ${m.sectionId}, current: ${sectionId})`);
+                    }
+                    return isAvailable;
+                })}
                 miniSections={miniSections}
             />
 

@@ -1,67 +1,9 @@
-// utils/activityLogger.ts
 import { domain } from "@/lib/domain";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 
-interface UserData {
-  userId: string;
-  fullName: string;
-  email?: string;
-}
-
-interface ActivityLogParams {
-  projectId?: string;
-  projectName?: string;
-  sectionId?: string;
-  sectionName?: string;
-  miniSectionId?: string;
-  miniSectionName?: string;
-  activityType:
-    | "project_created"
-    | "project_updated"
-    | "project_deleted"
-    | "section_created"
-    | "section_updated"
-    | "section_deleted"
-    | "mini_section_created"
-    | "mini_section_updated"
-    | "mini_section_deleted"
-    | "material_imported"
-    | "material_used"
-    | "material_updated"
-    | "material_deleted"
-    | "staff_assigned"
-    | "staff_removed"
-    | "other";
-  category:
-    | "project"
-    | "section"
-    | "mini_section"
-    | "material"
-    | "staff"
-    | "other";
-  action:
-    | "create"
-    | "update"
-    | "delete"
-    | "assign"
-    | "remove"
-    | "import"
-    | "use";
-  description: string;
-  message?: string;
-  changedData?: Array<{
-    field: string;
-    oldValue: any;
-    newValue: any;
-  }>;
-  metadata?: Record<string, any>;
-}
-
-/**
- * Get user data from AsyncStorage
- */
-const getUserData = async (): Promise<UserData> => {
+// Get user data from AsyncStorage
+const getUserData = async () => {
   try {
     const userDetailsString = await AsyncStorage.getItem("user");
     if (userDetailsString) {
@@ -81,10 +23,8 @@ const getUserData = async (): Promise<UserData> => {
   };
 };
 
-/**
- * Get client ID from AsyncStorage
- */
-const getClientId = async (): Promise<string> => {
+// Get client ID from AsyncStorage
+const getClientId = async () => {
   try {
     const userDetailsString = await AsyncStorage.getItem("user");
     if (userDetailsString) {
@@ -97,11 +37,63 @@ const getClientId = async (): Promise<string> => {
   return "";
 };
 
-/**
- * Log activity to the API
- * This is a non-blocking operation - errors won't affect the main flow
- */
-export const logActivity = async (params: ActivityLogParams): Promise<void> => {
+// Activity Types
+export type ActivityType =
+  | "project_created"
+  | "project_updated"
+  | "project_deleted"
+  | "section_created"
+  | "section_updated"
+  | "section_deleted"
+  | "mini_section_created"
+  | "mini_section_updated"
+  | "mini_section_deleted"
+  | "material_imported"
+  | "material_used"
+  | "material_updated"
+  | "material_deleted"
+  | "staff_assigned"
+  | "staff_removed"
+  | "other";
+
+export type ActivityCategory =
+  | "project"
+  | "section"
+  | "mini_section"
+  | "material"
+  | "staff"
+  | "other";
+export type ActivityAction =
+  | "create"
+  | "update"
+  | "delete"
+  | "assign"
+  | "remove"
+  | "import"
+  | "use";
+
+interface ActivityLogParams {
+  activityType: ActivityType;
+  category: ActivityCategory;
+  action: ActivityAction;
+  description: string;
+  projectId?: string;
+  projectName?: string;
+  sectionId?: string;
+  sectionName?: string;
+  miniSectionId?: string;
+  miniSectionName?: string;
+  message?: string;
+  changedData?: Array<{
+    field: string;
+    oldValue: any;
+    newValue: any;
+  }>;
+  metadata?: any;
+}
+
+// Main activity logging function
+export const logActivity = async (params: ActivityLogParams) => {
   try {
     const user = await getUserData();
     const clientId = await getClientId();
@@ -111,143 +103,153 @@ export const logActivity = async (params: ActivityLogParams): Promise<void> => {
       return;
     }
 
-    const payload = {
+    const activityPayload = {
       user,
       clientId,
-      ...params,
-    };
-
-    console.log("📝 Logging activity:", {
-      type: params.activityType,
+      projectId: params.projectId,
+      projectName: params.projectName,
+      sectionId: params.sectionId,
+      sectionName: params.sectionName,
+      miniSectionId: params.miniSectionId,
+      miniSectionName: params.miniSectionName,
+      activityType: params.activityType,
       category: params.category,
       action: params.action,
-    });
+      description: params.description,
+      message: params.message,
+      changedData: params.changedData,
+      metadata: params.metadata,
+    };
 
-    await axios.post(`${domain}/api/activity`, payload);
+    console.log("📝 Logging activity:", activityPayload);
 
+    await axios.post(`${domain}/api/activity`, activityPayload);
     console.log("✅ Activity logged successfully");
   } catch (error) {
     console.error("❌ Failed to log activity:", error);
-    // Don't throw - activity logging is not critical
+    // Don't throw error - activity logging is not critical
   }
 };
 
-/**
- * Helper functions for common activities
- */
+// ============================================
+// PROJECT ACTIVITIES
+// ============================================
 
-// Project Activities
-export const logProjectCreated = (
+export const logProjectCreated = async (
   projectId: string,
   projectName: string,
   metadata?: any
 ) => {
-  return logActivity({
-    projectId,
-    projectName,
+  await logActivity({
     activityType: "project_created",
     category: "project",
     action: "create",
-    description: `Created project: ${projectName}`,
+    description: `Created project "${projectName}"`,
+    projectId,
+    projectName,
     metadata,
   });
 };
 
-export const logProjectUpdated = (
+export const logProjectUpdated = async (
   projectId: string,
   projectName: string,
-  changedData: Array<{ field: string; oldValue: any; newValue: any }>
+  changedData?: Array<{ field: string; oldValue: any; newValue: any }>,
+  message?: string
 ) => {
-  return logActivity({
-    projectId,
-    projectName,
+  await logActivity({
     activityType: "project_updated",
     category: "project",
     action: "update",
-    description: `Updated project: ${projectName}`,
+    description: `Updated project "${projectName}"`,
+    projectId,
+    projectName,
     changedData,
+    message,
   });
 };
 
-export const logProjectDeleted = (
+export const logProjectDeleted = async (
   projectId: string,
-  projectName: string,
-  message?: string
+  projectName: string
 ) => {
-  return logActivity({
-    projectId,
-    projectName,
+  await logActivity({
     activityType: "project_deleted",
     category: "project",
     action: "delete",
-    description: `Deleted project: ${projectName}`,
-    message,
+    description: `Deleted project "${projectName}"`,
+    projectId,
+    projectName,
   });
 };
 
-// Section Activities
-export const logSectionCreated = (
+// ============================================
+// SECTION ACTIVITIES
+// ============================================
+
+export const logSectionCreated = async (
   projectId: string,
   projectName: string,
   sectionId: string,
-  sectionName: string,
-  sectionType: string
+  sectionName: string
 ) => {
-  return logActivity({
-    projectId,
-    projectName,
-    sectionId,
-    sectionName,
+  await logActivity({
     activityType: "section_created",
     category: "section",
     action: "create",
-    description: `Created ${sectionType} section: ${sectionName}`,
-    metadata: { sectionType },
-  });
-};
-
-export const logSectionUpdated = (
-  projectId: string,
-  projectName: string,
-  sectionId: string,
-  sectionName: string,
-  changedData: Array<{ field: string; oldValue: any; newValue: any }>
-) => {
-  return logActivity({
+    description: `Created section "${sectionName}" in project "${projectName}"`,
     projectId,
     projectName,
     sectionId,
     sectionName,
+  });
+};
+
+export const logSectionUpdated = async (
+  projectId: string,
+  projectName: string,
+  sectionId: string,
+  sectionName: string,
+  changedData?: Array<{ field: string; oldValue: any; newValue: any }>,
+  message?: string
+) => {
+  await logActivity({
     activityType: "section_updated",
     category: "section",
     action: "update",
-    description: `Updated section: ${sectionName}`,
-    changedData,
-  });
-};
-
-export const logSectionDeleted = (
-  projectId: string,
-  projectName: string,
-  sectionId: string,
-  sectionName: string,
-  message?: string
-) => {
-  return logActivity({
+    description: `Updated section "${sectionName}" in project "${projectName}"`,
     projectId,
     projectName,
     sectionId,
     sectionName,
-    activityType: "section_deleted",
-    category: "section",
-    action: "delete",
-    description: `Deleted section: ${sectionName}`,
+    changedData,
     message,
   });
 };
 
-// Mini-Section Activities
-export const logMiniSectionCreated = (
+export const logSectionDeleted = async (
+  projectId: string,
+  projectName: string,
+  sectionId: string,
+  sectionName: string
+) => {
+  await logActivity({
+    activityType: "section_deleted",
+    category: "section",
+    action: "delete",
+    description: `Deleted section "${sectionName}" from project "${projectName}"`,
+    projectId,
+    projectName,
+    sectionId,
+    sectionName,
+  });
+};
+
+// ============================================
+// MINI-SECTION ACTIVITIES
+// ============================================
+
+export const logMiniSectionCreated = async (
   projectId: string,
   projectName: string,
   sectionId: string,
@@ -255,145 +257,206 @@ export const logMiniSectionCreated = (
   miniSectionId: string,
   miniSectionName: string
 ) => {
-  return logActivity({
-    projectId,
-    projectName,
-    sectionId,
-    sectionName,
-    miniSectionId,
-    miniSectionName,
+  await logActivity({
     activityType: "mini_section_created",
     category: "mini_section",
     action: "create",
-    description: `Created mini-section: ${miniSectionName} in ${sectionName}`,
-  });
-};
-
-export const logMiniSectionUpdated = (
-  projectId: string,
-  projectName: string,
-  sectionId: string,
-  sectionName: string,
-  miniSectionId: string,
-  miniSectionName: string,
-  changedData: Array<{ field: string; oldValue: any; newValue: any }>
-) => {
-  return logActivity({
+    description: `Created mini-section "${miniSectionName}" in "${sectionName}"`,
     projectId,
     projectName,
     sectionId,
     sectionName,
     miniSectionId,
     miniSectionName,
+  });
+};
+
+export const logMiniSectionUpdated = async (
+  projectId: string,
+  projectName: string,
+  sectionId: string,
+  sectionName: string,
+  miniSectionId: string,
+  miniSectionName: string,
+  changedData?: Array<{ field: string; oldValue: any; newValue: any }>,
+  message?: string
+) => {
+  await logActivity({
     activityType: "mini_section_updated",
     category: "mini_section",
     action: "update",
-    description: `Updated mini-section: ${miniSectionName}`,
-    changedData,
-  });
-};
-
-export const logMiniSectionDeleted = (
-  projectId: string,
-  projectName: string,
-  sectionId: string,
-  sectionName: string,
-  miniSectionId: string,
-  miniSectionName: string,
-  message?: string
-) => {
-  return logActivity({
+    description: `Updated mini-section "${miniSectionName}" in "${sectionName}"`,
     projectId,
     projectName,
     sectionId,
     sectionName,
     miniSectionId,
     miniSectionName,
-    activityType: "mini_section_deleted",
-    category: "mini_section",
-    action: "delete",
-    description: `Deleted mini-section: ${miniSectionName}`,
+    changedData,
     message,
   });
 };
 
-// Material Activities
-export const logMaterialImported = (
+export const logMiniSectionDeleted = async (
+  projectId: string,
+  projectName: string,
+  sectionId: string,
+  sectionName: string,
+  miniSectionId: string,
+  miniSectionName: string
+) => {
+  await logActivity({
+    activityType: "mini_section_deleted",
+    category: "mini_section",
+    action: "delete",
+    description: `Deleted mini-section "${miniSectionName}" from "${sectionName}"`,
+    projectId,
+    projectName,
+    sectionId,
+    sectionName,
+    miniSectionId,
+    miniSectionName,
+  });
+};
+
+// ============================================
+// MATERIAL ACTIVITIES (Already exists but adding for completeness)
+// ============================================
+
+export const logMaterialImported = async (
   projectId: string,
   projectName: string,
   materialCount: number,
   totalCost: number,
   message?: string
 ) => {
-  return logActivity({
-    projectId,
-    projectName,
+  await logActivity({
     activityType: "material_imported",
     category: "material",
     action: "import",
-    description: `Imported ${materialCount} material(s) worth ₹${totalCost.toLocaleString(
-      "en-IN"
-    )}`,
+    description: `Imported ${materialCount} material${
+      materialCount > 1 ? "s" : ""
+    } (₹${totalCost.toLocaleString("en-IN")})`,
+    projectId,
+    projectName,
     message,
-    metadata: { materialCount, totalCost },
+    metadata: {
+      materialCount,
+      totalCost,
+    },
   });
 };
 
-export const logMaterialUsed = (
+export const logMaterialUsed = async (
   projectId: string,
   projectName: string,
   sectionId: string,
   sectionName: string,
   miniSectionId: string,
+  miniSectionName: string,
   materialName: string,
   quantity: number,
-  unit: string
+  unit: string,
+  cost?: number
 ) => {
-  return logActivity({
+  await logActivity({
+    activityType: "material_used",
+    category: "material",
+    action: "use",
+    description: `Used ${quantity} ${unit} of ${materialName} in "${miniSectionName}"`,
     projectId,
     projectName,
     sectionId,
     sectionName,
     miniSectionId,
-    activityType: "material_used",
-    category: "material",
-    action: "use",
-    description: `Used ${quantity} ${unit} of ${materialName} in ${sectionName}`,
-    metadata: { materialName, quantity, unit },
+    miniSectionName,
+    metadata: {
+      materialName,
+      quantity,
+      unit,
+      cost,
+    },
   });
 };
 
-// Staff Activities
-export const logStaffAssigned = (
+export const logMaterialUpdated = async (
+  projectId: string,
+  projectName: string,
+  materialName: string,
+  changedData?: Array<{ field: string; oldValue: any; newValue: any }>,
+  message?: string
+) => {
+  await logActivity({
+    activityType: "material_updated",
+    category: "material",
+    action: "update",
+    description: `Updated material "${materialName}"`,
+    projectId,
+    projectName,
+    changedData,
+    message,
+  });
+};
+
+export const logMaterialDeleted = async (
+  projectId: string,
+  projectName: string,
+  materialName: string
+) => {
+  await logActivity({
+    activityType: "material_deleted",
+    category: "material",
+    action: "delete",
+    description: `Deleted material "${materialName}"`,
+    projectId,
+    projectName,
+  });
+};
+
+// ============================================
+// STAFF ACTIVITIES
+// ============================================
+
+export const logStaffAssigned = async (
   projectId: string,
   projectName: string,
   staffName: string,
-  staffId: string
+  role?: string,
+  message?: string
 ) => {
-  return logActivity({
-    projectId,
-    projectName,
+  await logActivity({
     activityType: "staff_assigned",
     category: "staff",
     action: "assign",
-    description: `Assigned ${staffName} to project`,
-    metadata: { staffId, staffName },
+    description: `Assigned ${staffName}${
+      role ? ` as ${role}` : ""
+    } to project "${projectName}"`,
+    projectId,
+    projectName,
+    message,
+    metadata: {
+      staffName,
+      role,
+    },
   });
 };
 
-export const logStaffRemoved = (
+export const logStaffRemoved = async (
   projectId: string,
   projectName: string,
   staffName: string,
-  staffId: string
+  message?: string
 ) => {
-  return logActivity({
-    projectId,
-    projectName,
+  await logActivity({
     activityType: "staff_removed",
     category: "staff",
     action: "remove",
-    description: `Removed ${staffName} from project`,
-    metadata: { staffId, staffName },
+    description: `Removed ${staffName} from project "${projectName}"`,
+    projectId,
+    projectName,
+    message,
+    metadata: {
+      staffName,
+    },
   });
 };
