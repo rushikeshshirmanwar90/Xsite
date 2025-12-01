@@ -1,21 +1,118 @@
+import { Ionicons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
 import React from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
   ScrollView,
-  TouchableOpacity,
   StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
-import { mockBuildingSections, mockMaterials, mockProjects } from '@/data/analytics';
-import { Ionicons } from '@expo/vector-icons';
+
+// Types
+interface Project {
+  id: string;
+  name: string;
+}
+
+interface BuildingSection {
+  id: string;
+  name: string;
+  budgetAllocated: number;
+  budgetUsed: number;
+  progress: number;
+  color: string;
+  daysCompleted: number;
+  daysRequired: number;
+}
+
+interface MaterialItem {
+  id: string;
+  name: string;
+  category: string;
+  sectionId: string;
+  totalQuantity: number;
+  usedQuantity: number;
+  wastedQuantity: number;
+  unit: string;
+  unitCost: number;
+  totalCost: number;
+}
+
+// Mock Data
+const mockProjects: Project[] = [
+  { id: '1', name: 'Residential Complex A' },
+  { id: '2', name: 'Commercial Building B' },
+];
+
+const mockBuildingSections: BuildingSection[] = [
+  {
+    id: '1',
+    name: 'Foundation',
+    budgetAllocated: 500000,
+    budgetUsed: 350000,
+    progress: 70,
+    color: '#4CAF50',
+    daysCompleted: 14,
+    daysRequired: 20,
+  },
+  {
+    id: '2',
+    name: 'Ground Floor',
+    budgetAllocated: 800000,
+    budgetUsed: 400000,
+    progress: 50,
+    color: '#2196F3',
+    daysCompleted: 10,
+    daysRequired: 25,
+  },
+];
+
+const mockMaterials: MaterialItem[] = [
+  {
+    id: '1',
+    name: 'Concrete',
+    category: 'Structural',
+    sectionId: '1',
+    totalQuantity: 100,
+    usedQuantity: 70,
+    wastedQuantity: 5,
+    unit: 'm³',
+    unitCost: 5000,
+    totalCost: 500000,
+  },
+  {
+    id: '2',
+    name: 'Steel Rebar',
+    category: 'Structural',
+    sectionId: '1',
+    totalQuantity: 500,
+    usedQuantity: 350,
+    wastedQuantity: 20,
+    unit: 'kg',
+    unitCost: 65,
+    totalCost: 32500,
+  },
+  {
+    id: '3',
+    name: 'Bricks',
+    category: 'Masonry',
+    sectionId: '2',
+    totalQuantity: 2000,
+    usedQuantity: 1000,
+    wastedQuantity: 50,
+    unit: 'pcs',
+    unitCost: 8,
+    totalCost: 16000,
+  },
+];
 
 export default function BuildingSectionDetails() {
   const { projectId, sectionId } = useLocalSearchParams();
-  const project = mockProjects.find(p => p.id === projectId);
-  const section = mockBuildingSections.find(s => s.id === sectionId);
-  const materials = mockMaterials.filter(material => material.sectionId === sectionId);
+  const project = mockProjects.find((p) => p.id === projectId);
+  const section = mockBuildingSections.find((s) => s.id === sectionId);
+  const materials = mockMaterials.filter((material) => material.sectionId === sectionId);
 
   if (!project || !section) {
     return (

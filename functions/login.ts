@@ -90,3 +90,59 @@ export const login = async (email: string, password: string) => {
     };
   }
 };
+
+export const findUserType = async (email: string) => {
+  try {
+    const res = await axios.post(`${domain}/api/findUser`, {
+      email: email,
+    });
+
+    if (res.status === 200 || res.status === 201) {
+      const data = (res.data as any).isUser;
+      return { success: true, userType: data.userType };
+    } else {
+      return { success: false, userType: "" };
+    }
+  } catch (error: any) {
+    console.error("Failed to find user type:", error);
+    return { success: false, userType: "" };
+  }
+};
+
+export const forgetPassword = async (email: string, userType: string) => {
+  try {
+    const payload = {
+      email: email,
+      userType: userType,
+    };
+
+    console.log('\n========================================');
+    console.log('FORGET PASSWORD API CALL');
+    console.log('========================================');
+    console.log('API Endpoint:', `${domain}/api/forget-password`);
+    console.log('Payload:', JSON.stringify(payload, null, 2));
+    console.log('Email:', email);
+    console.log('UserType:', userType);
+    console.log('========================================\n');
+
+    const res = await axios.post(`${domain}/api/forget-password`, payload);
+
+    console.log('Forget Password Response Status:', res.status);
+    console.log('Forget Password Response Data:', JSON.stringify(res.data, null, 2));
+
+    if (res.status === 200) {
+      return { success: true, message: (res.data as any).message || "Password reset email sent" };
+    } else {
+      return { success: false, error: (res.data as any).message || "Failed to send reset email" };
+    }
+  } catch (error: any) {
+    console.error('\n❌ FORGET PASSWORD ERROR:');
+    console.error('Error Message:', error.message);
+    console.error('Error Response:', error.response?.data);
+    console.error('Error Status:', error.response?.status);
+    return {
+      success: false,
+      error: error.response?.data?.message || error.message || "An error occurred",
+    };
+  }
+};

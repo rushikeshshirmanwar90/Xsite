@@ -1,16 +1,14 @@
 import Loading from '@/components/Loading';
-import { addPassword, confirmMail, getUser, login, sendOtp } from '@/functions/login';
+import { addPassword, confirmMail, findUserType, forgetPassword, getUser, login, sendOtp } from '@/functions/login';
 import { generateOTP } from '@/lib/functions';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import Lottie from 'lottie-react-native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
-    Image,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -18,7 +16,7 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -27,6 +25,7 @@ type Step = 'email' | 'otp' | 'password';
 
 export default function LoginScreen() {
     const router = useRouter();
+    const scrollViewRef = useRef<ScrollView>(null);
 
     const [mountLoading, setMountLoading] = useState<boolean>(true);
     const [currentStep, setCurrentStep] = useState<Step>('email');
@@ -192,6 +191,51 @@ export default function LoginScreen() {
         }
     };
 
+    const handleForgetPassword = async () => {
+        setLoading(true);
+        try {
+            console.log('\n🔐 FORGET PASSWORD FLOW STARTED');
+            console.log('Email:', email);
+
+            // First, find the user type
+            console.log('Step 1: Finding user type...');
+            const userTypeResult = await findUserType(email);
+            
+            console.log('User Type Result:', userTypeResult);
+
+            if (!userTypeResult.success || !userTypeResult.userType) {
+                console.log('❌ User not found');
+                toast.error("User not found with this email");
+                return;
+            }
+
+            console.log('✅ User found with type:', userTypeResult.userType);
+            console.log('Step 2: Sending forget password request...');
+
+            // Then send forget password request
+            const result = await forgetPassword(email, userTypeResult.userType);
+            
+            console.log('Forget Password Result:', result);
+
+            if (result.success) {
+                console.log('✅ Password reset email sent successfully');
+                toast.success(result.message || "Password reset link sent to your email");
+                // Go back to email step
+                setCurrentStep('email');
+                setPassword('');
+                setOtp('');
+            } else {
+                console.log('❌ Failed to send password reset email');
+                toast.error(result.error || "Failed to send password reset email");
+            }
+        } catch (error) {
+            console.error('❌ Forget password error:', error);
+            toast.error("Failed to process forget password request");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const renderStep = () => {
         switch (currentStep) {
             case 'email':
@@ -212,6 +256,11 @@ export default function LoginScreen() {
                                 keyboardType="email-address"
                                 autoCapitalize="none"
                                 autoComplete="email"
+                                onFocus={() => {
+                                    setTimeout(() => {
+                                        scrollViewRef.current?.scrollToEnd({ animated: true });
+                                    }, 100);
+                                }}
                             />
                         </View>
                         <TouchableOpacity
@@ -252,6 +301,11 @@ export default function LoginScreen() {
                                 onChangeText={setOtp}
                                 keyboardType="number-pad"
                                 maxLength={6}
+                                onFocus={() => {
+                                    setTimeout(() => {
+                                        scrollViewRef.current?.scrollToEnd({ animated: true });
+                                    }, 100);
+                                }}
                             />
                         </View>
                         <TouchableOpacity
@@ -289,23 +343,74 @@ export default function LoginScreen() {
                     <>
                         <Text style={styles.welcomeText}>Almost Done</Text>
                         <Text style={styles.stepTitle}>{isVerified ? 'Enter' : 'Set'} Password</Text>
+                        
+                        {/* Show email */}
+                        <View style={styles.emailDisplayContainer}>
+                            <MaterialIcons name="email" size={16} color="#666" />
+                            <Text style={styles.emailDisplayText}>{email}</Text>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setPassword('');
+                                    setOtp('');
+                                    setCurrentStep('email');
+                                }}
+                                style={styles.changeEmailButton}
+                            >
+                                <Text style={styles.changeEmailText}>Change</Text>
+                            </TouchableOpacity>
+                        </View>
+
                         <Text style={styles.stepDescription}>
-                            Create a strong password for your account
+                            {isVerified ? 'Enter your password to continue' : 'Create a strong password for your account'}
                         </Text>
+                        
                         <View style={styles.inputContainer}>
                             <MaterialIcons name="lock" size={20} color="#666" style={styles.inputIcon} />
                             <TextInput
+                                key={`password-${showPassword}`}
                                 style={styles.input}
-                                placeholder="Enter password"
+                                placeholder="Enter password (min 8 characters)"
                                 value={password}
                                 onChangeText={setPassword}
                                 secureTextEntry={!showPassword}
                                 autoCapitalize="none"
+                                autoCorrect={false}
+                                textContentType="password"
+                                onFocus={() => {
+                                    setTimeout(() => {
+                                        scrollViewRef.current?.scrollToEnd({ animated: true });
+                                    }, 100);
+                                }}
                             />
-                            <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.visibilityIcon}>
-                                <Ionicons name={showPassword ? "eye-off" : "eye"} size={22} color="#666" />
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    const newValue = !showPassword;
+                                    console.log('👁️ Toggle password - showPassword:', showPassword, '→', newValue);
+                                    setShowPassword(newValue);
+                                }} 
+                                style={styles.visibilityIcon}
+                                activeOpacity={0.7}
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            >
+                                <Ionicons 
+                                    name={showPassword ? "eye-off" : "eye"} 
+                                    size={24} 
+                                    color="#3b82f6" 
+                                />
                             </TouchableOpacity>
                         </View>
+
+                        {/* Forget Password - Only show when user is verified (login mode) */}
+                        {isVerified && (
+                            <TouchableOpacity
+                                onPress={handleForgetPassword}
+                                style={styles.forgetPasswordButton}
+                                disabled={loading}
+                            >
+                                <Text style={styles.forgetPasswordText}>Forgot Password?</Text>
+                            </TouchableOpacity>
+                        )}
+
                         <TouchableOpacity
                             style={styles.button}
                             onPress={!isVerified ? handleSetPassword : handleLogin}
@@ -320,7 +425,7 @@ export default function LoginScreen() {
                                 {loading ? (
                                     <ActivityIndicator color="white" />
                                 ) : (
-                                    <Text style={styles.buttonText}>{isVerified ? 'Enter' : 'Set'}  Password</Text>
+                                    <Text style={styles.buttonText}>{isVerified ? 'Login' : 'Set Password'}</Text>
                                 )}
                             </LinearGradient>
                         </TouchableOpacity>
@@ -331,37 +436,24 @@ export default function LoginScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-
-            <ScrollView>
-                <StatusBar style="dark" />
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    style={styles.keyboardAvoidingView}
+            <StatusBar style="dark" />
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={styles.keyboardAvoidingView}
+            >
+                <ScrollView
+                    ref={scrollViewRef}
+                    contentContainerStyle={styles.scrollContent}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
                 >
                     <View style={styles.content}>
-                        <View style={styles.header}>
-                            {currentStep === 'email' ? (
-                                <Lottie
-                                    style={styles.illustration}
-                                    source={require('@/assets/onBoarding/screen-3.json')}
-                                    autoPlay
-                                    loop
-                                />
-                            ) : (
-                                <Image
-                                    source={require('@/assets/images/house.png')}
-                                    style={styles.illustrationImage}
-                                    resizeMode="contain"
-                                />
-                            )}
-                            <Text style={styles.headerTitle}>Exponentor</Text>
-                        </View>
                         <View style={styles.formContainer}>
                             {renderStep()}
                         </View>
                     </View>
-                </KeyboardAvoidingView>
-            </ScrollView>
+                </ScrollView>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 }
@@ -374,8 +466,11 @@ const styles = StyleSheet.create({
     keyboardAvoidingView: {
         flex: 1,
     },
+    scrollContent: {
+        flexGrow: 1,
+        justifyContent: 'center',
+    },
     content: {
-        flex: 1,
         padding: 24,
         justifyContent: 'center',
     },
@@ -451,6 +546,8 @@ const styles = StyleSheet.create({
     },
     visibilityIcon: {
         padding: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     input: {
         flex: 1,
@@ -502,5 +599,43 @@ const styles = StyleSheet.create({
     signupLink: {
         color: '#4f46e5',
         fontWeight: 'bold',
+    },
+    emailDisplayContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f0f9ff',
+        borderRadius: 8,
+        padding: 12,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#bfdbfe',
+    },
+    emailDisplayText: {
+        flex: 1,
+        marginLeft: 8,
+        fontSize: 14,
+        color: '#1e40af',
+        fontWeight: '500',
+    },
+    changeEmailButton: {
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        backgroundColor: '#3b82f6',
+        borderRadius: 6,
+    },
+    changeEmailText: {
+        color: '#ffffff',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    forgetPasswordButton: {
+        alignSelf: 'flex-end',
+        marginTop: -8,
+        marginBottom: 8,
+    },
+    forgetPasswordText: {
+        color: '#3b82f6',
+        fontSize: 14,
+        fontWeight: '600',
     },
 });

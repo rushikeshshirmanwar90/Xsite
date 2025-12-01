@@ -1062,7 +1062,7 @@ const Details = () => {
         console.log('availableMaterials.length:', availableMaterials.length);
         console.log('usedMaterials.length:', usedMaterials.length);
 
-        // FIXED: Use the correct array based on active tab
+        // Use the correct array based on active tab
         let materials = activeTab === 'imported' ? availableMaterials : usedMaterials;
 
         console.log('Selected materials array:', activeTab === 'imported' ? 'availableMaterials' : 'usedMaterials');
@@ -1070,8 +1070,12 @@ const Details = () => {
         console.log('Current sectionId:', sectionId);
         console.log('Selected mini-section:', selectedMiniSection);
 
-        // For "used" tab, only filter by selected mini-section if one is chosen
-        if (activeTab === 'used') {
+        // For "imported" tab: Show ALL materials (no filtering)
+        if (activeTab === 'imported') {
+            console.log('✓ Processing IMPORTED materials tab - showing ALL materials');
+        } 
+        // For "used" tab: Filter by current section AND optionally by mini-section
+        else if (activeTab === 'used') {
             console.log('✓ Processing USED materials tab...');
 
             // Log all materials for debugging
@@ -1082,8 +1086,19 @@ const Details = () => {
                 console.log('     miniSectionId:', m.miniSectionId);
             });
 
-            // Only filter by specific mini-section if one is selected
-            // Otherwise show ALL used materials (no section filtering)
+            // FIRST: Filter by current section (main section filter)
+            console.log('Filtering by current sectionId:', sectionId);
+            materials = materials.filter(m => {
+                // Match materials that belong to the current section
+                const matchesSection = m.sectionId === sectionId;
+                if (!matchesSection) {
+                    console.log(`  ❌ Filtered out: ${m.name} (sectionId: ${m.sectionId})`);
+                }
+                return matchesSection;
+            });
+            console.log('After section filtering:', materials.length, 'materials');
+
+            // SECOND: Filter by mini-section if one is selected
             if (selectedMiniSection && selectedMiniSection !== 'all-sections') {
                 console.log('Filtering by selected mini-section:', selectedMiniSection);
                 materials = materials.filter(m => {
@@ -1091,10 +1106,8 @@ const Details = () => {
                 });
                 console.log('After mini-section filtering:', materials.length, 'materials');
             } else {
-                console.log('✓ No mini-section filter - showing ALL used materials');
+                console.log('✓ No mini-section filter - showing all materials in current section');
             }
-        } else {
-            console.log('✓ Processing IMPORTED materials tab...');
         }
 
         console.log('Final materials count:', materials.length);
@@ -1294,17 +1307,28 @@ const Details = () => {
                 hideSection={true}
             />
 
-            {/* Notification Button */}
-            <View style={notificationStyles.notificationButtonContainer}>
-                <TouchableOpacity
-                    style={notificationStyles.notificationButton}
-                    onPress={() => setShowNotifications(true)}
-                    activeOpacity={0.7}
-                >
-                    <Ionicons name="notifications" size={20} color="#3B82F6" />
-                    <Text style={notificationStyles.notificationButtonText}>Activity Log</Text>
-                </TouchableOpacity>
-            </View>
+            {/* Action Buttons - Sticky at top, only visible in "imported" tab */}
+            {activeTab === 'imported' && (
+                <View style={actionStyles.stickyActionButtonsContainer}>
+                    <TouchableOpacity
+                        style={actionStyles.addMaterialButton}
+                        onPress={() => setShowMaterialForm(true)}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons name="add-circle-outline" size={20} color="#059669" />
+                        <Text style={actionStyles.addMaterialButtonText}>Add Material</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={actionStyles.addUsageButton}
+                        onPress={() => setShowUsageForm(true)}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons name="arrow-forward-circle-outline" size={20} color="#DC2626" />
+                        <Text style={actionStyles.addUsageButtonText}>Add Usage</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
 
             {/* Material Activity Notifications Modal */}
             <MaterialActivityNotifications
@@ -1342,28 +1366,17 @@ const Details = () => {
             >
                 <TabSelector activeTab={activeTab} onSelectTab={setActiveTab} />
 
-                {/* Action Buttons - Only visible in "imported" tab */}
-                {activeTab === 'imported' && (
-                    <View style={actionStyles.actionButtonsContainer}>
-                        <TouchableOpacity
-                            style={actionStyles.addMaterialButton}
-                            onPress={() => setShowMaterialForm(true)}
-                            activeOpacity={0.7}
-                        >
-                            <Ionicons name="add-circle-outline" size={20} color="#059669" />
-                            <Text style={actionStyles.addMaterialButtonText}>Add Material</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={actionStyles.addUsageButton}
-                            onPress={() => setShowUsageForm(true)}
-                            activeOpacity={0.7}
-                        >
-                            <Ionicons name="arrow-forward-circle-outline" size={20} color="#DC2626" />
-                            <Text style={actionStyles.addUsageButtonText}>Add Usage</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
+                {/* Notification Button - Inside scroll view */}
+                <View style={notificationStyles.notificationButtonContainer}>
+                    <TouchableOpacity
+                        style={notificationStyles.notificationButton}
+                        onPress={() => setShowNotifications(true)}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons name="notifications" size={20} color="#3B82F6" />
+                        <Text style={notificationStyles.notificationButtonText}>Activity Log</Text>
+                    </TouchableOpacity>
+                </View>
 
                 {/* Compact Filters - Only visible in "Used Materials" tab */}
                 {activeTab === 'used' && (
@@ -1679,15 +1692,21 @@ const Details = () => {
 };
 
 const actionStyles = StyleSheet.create({
-    actionButtonsContainer: {
+    stickyActionButtonsContainer: {
         flexDirection: 'row',
-        marginTop: 16,
-        marginBottom: 8,
         marginHorizontal: 16,
+        marginTop: 8,
+        marginBottom: 8,
         borderRadius: 12,
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: '#E5E7EB',
+        backgroundColor: '#FFFFFF',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
     },
     addMaterialButton: {
         flex: 1,
@@ -1728,7 +1747,8 @@ const actionStyles = StyleSheet.create({
 const notificationStyles = StyleSheet.create({
     notificationButtonContainer: {
         paddingHorizontal: 16,
-        paddingTop: 8,
+        paddingTop: 12,
+        paddingBottom: 8,
     },
     notificationButton: {
         flexDirection: 'row',
