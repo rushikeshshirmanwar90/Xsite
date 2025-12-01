@@ -57,10 +57,12 @@ interface MaterialActivity {
 }
 
 type TabType = 'all' | 'project' | 'material';
+type MaterialSubTab = 'imported' | 'used';
 
 const NotificationPage: React.FC = () => {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<TabType>('all');
+    const [materialSubTab, setMaterialSubTab] = useState<MaterialSubTab>('imported');
     const [activities, setActivities] = useState<Activity[]>([]);
     const [materialActivities, setMaterialActivities] = useState<MaterialActivity[]>([]);
     const [loading, setLoading] = useState(true);
@@ -79,10 +81,27 @@ const NotificationPage: React.FC = () => {
             const userDetailsString = await AsyncStorage.getItem("user");
             if (userDetailsString) {
                 const userData = JSON.parse(userDetailsString);
+
+                // Build full name from firstName and lastName
+                let fullName = 'Unknown User';
+                if (userData.firstName && userData.lastName) {
+                    fullName = `${userData.firstName} ${userData.lastName}`;
+                } else if (userData.firstName) {
+                    fullName = userData.firstName;
+                } else if (userData.lastName) {
+                    fullName = userData.lastName;
+                } else if (userData.name) {
+                    fullName = userData.name;
+                } else if (userData.username) {
+                    fullName = userData.username;
+                }
+
                 const user = {
                     userId: userData._id || userData.id || userData.clientId || 'unknown',
-                    fullName: userData.name || userData.username || 'Unknown User',
+                    fullName: fullName,
                 };
+
+                console.log('📝 Current User Loaded:', user);
                 setCurrentUser(user);
                 return user;
             }
@@ -242,7 +261,6 @@ const NotificationPage: React.FC = () => {
     const renderActivityItem = (activity: Activity) => {
         const icon = getActivityIcon(activity.activityType, activity.category);
 
-        // Use activity user or fallback to current user
         const displayUser = activity.user?.fullName && activity.user.fullName !== 'Unknown User'
             ? activity.user
             : currentUser || { userId: 'unknown', fullName: 'Unknown User' };
@@ -442,9 +460,13 @@ const NotificationPage: React.FC = () => {
             return getCombinedActivities();
         } else if (activeTab === 'project') {
             return activities.map(a => ({ type: 'activity' as const, data: a, timestamp: a.createdAt }));
-        } else {
-            return materialActivities.map(m => ({ type: 'material' as const, data: m, timestamp: m.createdAt }));
+        } else if (activeTab === 'material') {
+            // Filter materials based on sub-tab
+            return materialActivities
+                .filter(m => m.activity === materialSubTab)
+                .map(m => ({ type: 'material' as const, data: m, timestamp: m.createdAt }));
         }
+        return [];
     };
 
     const filteredActivities = getFilteredActivities();
@@ -488,7 +510,7 @@ const NotificationPage: React.FC = () => {
                 </TouchableOpacity>
             </View>
 
-            {/* Tabs */}
+            {/* Main Tabs */}
             <View style={styles.tabsContainer}>
                 <TouchableOpacity
                     style={[styles.tab, activeTab === 'all' && styles.tabActive]}
@@ -520,6 +542,39 @@ const NotificationPage: React.FC = () => {
                     {activeTab === 'material' && <View style={styles.tabIndicator} />}
                 </TouchableOpacity>
             </View>
+
+            {/* Material Sub-Tabs - Only show when Materials tab is active */}
+            {activeTab === 'material' && (
+                <View style={styles.subTabsContainer}>
+                    <TouchableOpacity
+                        style={[styles.subTab, materialSubTab === 'imported' && styles.subTabActive]}
+                        onPress={() => setMaterialSubTab('imported')}
+                    >
+                        <Ionicons
+                            name="download-outline"
+                            size={16}
+                            color={materialSubTab === 'imported' ? '#10B981' : '#64748B'}
+                        />
+                        <Text style={[styles.subTabText, materialSubTab === 'imported' && styles.subTabTextActive]}>
+                            Imported
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.subTab, materialSubTab === 'used' && styles.subTabActive]}
+                        onPress={() => setMaterialSubTab('used')}
+                    >
+                        <Ionicons
+                            name="arrow-forward-outline"
+                            size={16}
+                            color={materialSubTab === 'used' ? '#EF4444' : '#64748B'}
+                        />
+                        <Text style={[styles.subTabText, materialSubTab === 'used' && styles.subTabTextActive]}>
+                            Used
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            )}
 
             {/* Content */}
             <ScrollView
@@ -619,7 +674,7 @@ const styles = StyleSheet.create({
     },
     tab: {
         flex: 1,
-        paddingVertical: 16,
+        paddingVertical: 14,
         alignItems: 'center',
         position: 'relative',
     },
@@ -644,6 +699,44 @@ const styles = StyleSheet.create({
         backgroundColor: '#3B82F6',
         borderTopLeftRadius: 3,
         borderTopRightRadius: 3,
+    },
+    subTabsContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#F8FAFC',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        gap: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E2E8F0',
+    },
+    subTab: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 8,
+        gap: 6,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    subTabActive: {
+        backgroundColor: '#FFFFFF',
+        borderColor: '#3B82F6',
+        shadowColor: '#3B82F6',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    subTabText: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#64748B',
+    },
+    subTabTextActive: {
+        color: '#1E293B',
+        fontWeight: '600',
     },
     scrollView: {
         flex: 1,
