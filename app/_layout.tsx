@@ -7,7 +7,7 @@ import 'react-native-reanimated';
 import { Toaster } from "sonner-native";
 
 export const unstable_settings = {
-  initialRouteName: 'login',
+  initialRouteName: 'index',
 };
 
 // Define protected routes that require authentication
@@ -35,6 +35,9 @@ function RootLayoutNav() {
         } else if (isAuthenticated && segments[0] === 'login') {
           // User is authenticated but on login page
           router.replace('/(tabs)');
+        } else if (!isAuthenticated && segments[0] !== 'login' && segments[0] !== 'index') {
+          // User is not authenticated and not on login or index page
+          router.replace('/login');
         }
       } catch (error) {
         console.error('Navigation error:', error);
@@ -52,6 +55,7 @@ function RootLayoutNav() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="details" options={{ headerShown: false }} />
