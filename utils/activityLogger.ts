@@ -8,9 +8,24 @@ const getUserData = async () => {
     const userDetailsString = await AsyncStorage.getItem("user");
     if (userDetailsString) {
       const userData = JSON.parse(userDetailsString);
+
+      // Build full name from firstName and lastName, or fallback to name/username
+      let fullName = "Unknown User";
+      if (userData.firstName && userData.lastName) {
+        fullName = `${userData.firstName} ${userData.lastName}`;
+      } else if (userData.firstName) {
+        fullName = userData.firstName;
+      } else if (userData.lastName) {
+        fullName = userData.lastName;
+      } else if (userData.name) {
+        fullName = userData.name;
+      } else if (userData.username) {
+        fullName = userData.username;
+      }
+
       return {
         userId: userData._id || userData.id || userData.clientId || "unknown",
-        fullName: userData.name || userData.username || "Unknown User",
+        fullName: fullName,
         email: userData.email || undefined,
       };
     }

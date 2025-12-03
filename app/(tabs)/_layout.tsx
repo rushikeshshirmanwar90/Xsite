@@ -1,3 +1,4 @@
+import { hp, iconSize, isTablet, sp, wp } from '@/utils/responsive'
 import { Ionicons } from '@expo/vector-icons'
 import { Tabs } from 'expo-router'
 import React from 'react'
@@ -6,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 const TabLayout = () => {
   const insets = useSafeAreaInsets()
+  const tabBarHeight = isTablet() ? hp(70) : hp(60)
 
   return (
     <Tabs
@@ -16,9 +18,9 @@ const TabLayout = () => {
           backgroundColor: '#fff', // or your theme.bg
           borderTopWidth: 0,
           elevation: 0,
-          height: 60 + insets.bottom, // Add bottom safe area padding
+          height: tabBarHeight + insets.bottom, // Responsive height + safe area
           paddingBottom: insets.bottom, // Push content up from bottom
-          paddingTop: 8, // Add some top padding for better spacing
+          paddingTop: sp(8), // Responsive top padding
         },
       }}
     >
@@ -29,7 +31,7 @@ const TabLayout = () => {
           tabBarIcon: ({ focused }) => (
             <Ionicons
               name={focused ? "home" : "home-outline"}
-              size={25}
+              size={iconSize(25)}
               color={focused ? "black" : "gray"}
             />
           ),
@@ -43,7 +45,7 @@ const TabLayout = () => {
           tabBarIcon: ({ focused }) => (
             <Ionicons
               name={focused ? "pulse-outline" : "pulse-outline"}
-              size={27}
+              size={iconSize(27)}
               color={focused ? "black" : "gray"}
             />
           ),
@@ -58,10 +60,10 @@ const TabLayout = () => {
           tabBarIcon: ({ focused }) => (
             <View
               style={{
-                width: 38,
-                height: 38,
+                width: wp(38),
+                height: wp(38),
                 backgroundColor: focused ? "black" : "white",
-                borderRadius: 100,
+                borderRadius: wp(100),
                 justifyContent: "center",
                 alignItems: "center",
                 borderWidth: 2,
@@ -70,7 +72,7 @@ const TabLayout = () => {
             >
               <Ionicons
                 name="add"
-                size={30}
+                size={iconSize(30)}
                 color={focused ? "white" : "gray"}
               />
             </View>
@@ -85,7 +87,7 @@ const TabLayout = () => {
           tabBarIcon: ({ focused }) => (
             <Ionicons
               name={focused ? "people" : "people-outline"}
-              size={30}
+              size={iconSize(30)}
               color={focused ? "black" : "gray"}
             />
           ),
@@ -100,7 +102,7 @@ const TabLayout = () => {
           tabBarIcon: ({ focused }) => (
             <Ionicons
               name={focused ? "person-circle" : "person-circle-outline"}
-              size={30}
+              size={iconSize(30)}
               color={focused ? "black" : "gray"}
             />
           ),

@@ -62,9 +62,24 @@ const Details = () => {
             const userDetailsString = await AsyncStorage.getItem("user");
             if (userDetailsString) {
                 const userData = JSON.parse(userDetailsString);
+
+                // Build full name from firstName and lastName, or fallback to name/username
+                let fullName = 'Unknown User';
+                if (userData.firstName && userData.lastName) {
+                    fullName = `${userData.firstName} ${userData.lastName}`;
+                } else if (userData.firstName) {
+                    fullName = userData.firstName;
+                } else if (userData.lastName) {
+                    fullName = userData.lastName;
+                } else if (userData.name) {
+                    fullName = userData.name;
+                } else if (userData.username) {
+                    fullName = userData.username;
+                }
+
                 return {
                     userId: userData._id || userData.id || userData.clientId || 'unknown',
-                    fullName: userData.name || userData.username || 'Unknown User',
+                    fullName: fullName,
                 };
             }
         } catch (error) {
@@ -149,24 +164,29 @@ const Details = () => {
     };
 
     // Function to reload both available and used materials
-    const reloadProjectMaterials = async () => {
+    const reloadProjectMaterials = async (forceReload: boolean = false) => {
         if (!projectId) {
             return;
         }
 
-        // Prevent duplicate simultaneous calls
-        if (isLoadingRef.current) {
+        // Prevent duplicate simultaneous calls (unless force reload)
+        if (!forceReload && isLoadingRef.current) {
             console.log('⏸️ Skipping reload - already loading');
             return;
         }
 
-        // Debounce: Prevent rapid successive calls
-        const now = Date.now();
-        if (now - lastLoadTimeRef.current < DEBOUNCE_DELAY) {
-            console.log('⏸️ Skipping reload - too soon (debounced)');
-            return;
+        // Debounce: Prevent rapid successive calls (unless force reload)
+        if (!forceReload) {
+            const now = Date.now();
+            if (now - lastLoadTimeRef.current < DEBOUNCE_DELAY) {
+                console.log('⏸️ Skipping reload - too soon (debounced)');
+                return;
+            }
+            lastLoadTimeRef.current = now;
+        } else {
+            console.log('🔄 Force reload requested - bypassing debounce');
+            lastLoadTimeRef.current = Date.now();
         }
-        lastLoadTimeRef.current = now;
 
         // Cancel any pending requests
         if (abortControllerRef.current) {
@@ -376,8 +396,16 @@ const Details = () => {
             console.log('  - availableMaterials:', transformedAvailable.length);
             console.log('  - usedMaterials:', transformedUsed.length);
 
-            setAvailableMaterials(transformedAvailable);
-            setUsedMaterials(transformedUsed);
+            // Use functional updates to ensure we're working with latest state
+            setAvailableMaterials(() => {
+                console.log('📦 Setting availableMaterials state:', transformedAvailable.length);
+                return transformedAvailable;
+            });
+
+            setUsedMaterials(() => {
+                console.log('🔄 Setting usedMaterials state:', transformedUsed.length);
+                return transformedUsed;
+            });
 
             console.log('✅ State updated!\n');
 
@@ -923,13 +951,27 @@ const Details = () => {
                 console.log('REFRESHING MATERIALS AFTER USAGE ADD');
                 console.log('========================================\n');
 
-                await reloadProjectMaterials();
+                // Force refresh with a longer delay to ensure backend has processed
+                await new Promise(resolve => setTimeout(resolve, 500));
 
-                // Add a small delay to ensure state is updated before switching tabs
-                await new Promise(resolve => setTimeout(resolve, 200));
+                // Call reload with force refresh (bypasses debounce and loading check)
+                await reloadProjectMaterials(true);
+
+                // Wait for state to update - increased delay
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                console.log('✅ Materials refreshed after usage add');
+                console.log('Available materials count:', availableMaterials.length);
+                console.log('Used materials count:', usedMaterials.length);
 
                 // Switch to "used" tab to show the newly added usage
                 setActiveTab('used');
+
+                // Close the usage form
+                setShowUsageForm(false);
+
+                // Show success message with material count
+                toast.success(`Material usage recorded! Check the "Used Materials" tab.`);
             } else {
                 throw new Error(responseData.error || 'Failed to add material usage');
             }
@@ -1073,7 +1115,7 @@ const Details = () => {
         // For "imported" tab: Show ALL materials (no filtering)
         if (activeTab === 'imported') {
             console.log('✓ Processing IMPORTED materials tab - showing ALL materials');
-        } 
+        }
         // For "used" tab: Filter by current section AND optionally by mini-section
         else if (activeTab === 'used') {
             console.log('✓ Processing USED materials tab...');
@@ -1124,6 +1166,57 @@ const Details = () => {
         const materials = getCurrentData();
         const isUsedTab = activeTab === 'used';
         return groupMaterialsByName(materials, isUsedTab);
+    };
+
+    // Group materials by date for "Used Materials" tab
+    const getGroupedByDate = () => {
+        if (activeTab !== 'used') {
+            return null;
+        }
+
+        const materials = getCurrentData();
+        const groupedByDate: { [date: string]: Material[] } = {};
+
+        materials.forEach(material => {
+            // Use createdAt or addedAt for grouping
+            const dateStr = material.createdAt || material.addedAt || material.date;
+            const date = new Date(dateStr);
+            const dateKey = date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            if (!groupedByDate[dateKey]) {
+                groupedByDate[dateKey] = [];
+            }
+            groupedByDate[dateKey].push(material);
+        });
+
+        // Sort dates in descending order (newest first)
+        const sortedDates = Object.keys(groupedByDate).sort((a, b) => {
+            return new Date(b).getTime() - new Date(a).getTime();
+        });
+
+        return sortedDates.map(date => ({
+            date,
+            materials: groupMaterialsByName(groupedByDate[date], true)
+        }));
+    };
+
+    const formatDateHeader = (dateString: string) => {
+        const date = new Date(dateString);
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        const isToday = date.toDateString() === today.toDateString();
+        const isYesterday = date.toDateString() === yesterday.toDateString();
+
+        if (isToday) return 'Today';
+        if (isYesterday) return 'Yesterday';
+
+        return dateString;
     };
 
     // Calculate these values - they will update when dependencies change
@@ -1478,7 +1571,96 @@ const Details = () => {
                                 Please wait while we fetch your data...
                             </Text>
                         </View>
+                    ) : activeTab === 'used' ? (
+                        // Day-wise grouping for "Used Materials" tab
+                        (() => {
+                            const groupedByDate = getGroupedByDate();
+                            return groupedByDate && groupedByDate.length > 0 ? (
+                                groupedByDate.map((dateGroup, dateIndex) => (
+                                    <View key={dateGroup.date} style={dateGroupStyles.dateGroupContainer}>
+                                        {/* Date Header */}
+                                        <View style={dateGroupStyles.dateHeader}>
+                                            {/* Left: Material count */}
+                                            <View style={dateGroupStyles.dateHeaderLeft}>
+                                                <Ionicons name="cube-outline" size={16} color="#64748B" />
+                                                <Text style={dateGroupStyles.materialCountText}>
+                                                    {dateGroup.materials.length} {dateGroup.materials.length === 1 ? 'Material' : 'Materials'}
+                                                </Text>
+                                            </View>
+
+                                            {/* Right: Date */}
+                                            <View style={dateGroupStyles.dateHeaderRight}>
+                                                <Text style={dateGroupStyles.dateHeaderText}>
+                                                    {formatDateHeader(dateGroup.date)}
+                                                </Text>
+                                                <Ionicons name="calendar-outline" size={16} color="#64748B" />
+                                            </View>
+                                        </View>
+
+                                        {/* Materials for this date */}
+                                        {dateGroup.materials.map((material, index) => (
+                                            <MaterialCardEnhanced
+                                                key={`${dateGroup.date}-${material.name}-${material.unit}`}
+                                                material={material}
+                                                animation={cardAnimations[dateIndex * 10 + index] || new Animated.Value(1)}
+                                                activeTab={activeTab}
+                                                onAddUsage={handleAddUsage}
+                                                miniSections={miniSections}
+                                                showMiniSectionLabel={!selectedMiniSection}
+                                            />
+                                        ))}
+                                    </View>
+                                ))
+                            ) : (
+                                <View style={styles.noMaterialsContainer}>
+                                    {miniSections.length === 0 ? (
+                                        <>
+                                            <Ionicons name="layers-outline" size={64} color="#CBD5E1" />
+                                            <Text style={styles.noMaterialsTitle}>No Mini-Sections Found</Text>
+                                            <Text style={[styles.noMaterialsDescription, { marginBottom: 20 }]}>
+                                                Create mini-sections to organize and track material usage in different areas of your project.
+                                            </Text>
+                                            <TouchableOpacity
+                                                style={{
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    backgroundColor: '#3B82F6',
+                                                    paddingVertical: 12,
+                                                    paddingHorizontal: 24,
+                                                    borderRadius: 10,
+                                                    gap: 8,
+                                                    marginTop: 8,
+                                                    shadowColor: '#3B82F6',
+                                                    shadowOffset: { width: 0, height: 4 },
+                                                    shadowOpacity: 0.3,
+                                                    shadowRadius: 8,
+                                                    elevation: 4,
+                                                }}
+                                                onPress={() => {
+                                                    setShowAddSectionModal(true);
+                                                }}
+                                            >
+                                                <Ionicons name="add-circle" size={20} color="#FFFFFF" />
+                                                <Text style={{ fontSize: 15, fontWeight: '600', color: '#FFFFFF' }}>
+                                                    Add Section
+                                                </Text>
+                                            </TouchableOpacity>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Ionicons name="cube-outline" size={64} color="#CBD5E1" />
+                                            <Text style={styles.noMaterialsTitle}>No Materials Found</Text>
+                                            <Text style={styles.noMaterialsDescription}>
+                                                No used materials found for this section.
+                                            </Text>
+                                        </>
+                                    )}
+                                </View>
+                            );
+                        })()
                     ) : groupedMaterials.length > 0 ? (
+                        // Regular grouping for "Imported Materials" tab
                         groupedMaterials.map((material, index) => (
                             <MaterialCardEnhanced
                                 key={`${material.name}-${material.unit}`}
@@ -1487,7 +1669,7 @@ const Details = () => {
                                 activeTab={activeTab}
                                 onAddUsage={handleAddUsage}
                                 miniSections={miniSections}
-                                showMiniSectionLabel={activeTab === 'used' && !selectedMiniSection}
+                                showMiniSectionLabel={false}
                             />
                         ))
                     ) : (
@@ -1766,6 +1948,44 @@ const notificationStyles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         color: '#3B82F6',
+    },
+});
+
+const dateGroupStyles = StyleSheet.create({
+    dateGroupContainer: {
+        marginBottom: 20,
+    },
+    dateHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        marginBottom: 8,
+        backgroundColor: '#F8FAFC',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E2E8F0',
+        width: '100%',
+    },
+    dateHeaderLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    dateHeaderRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    materialCountText: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#64748B',
+    },
+    dateHeaderText: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#64748B',
     },
 });
 

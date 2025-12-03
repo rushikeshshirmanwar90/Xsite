@@ -171,7 +171,7 @@ const NotificationPage: React.FC = () => {
             console.log('Material Activity Response:', JSON.stringify(materialActivityRes.data, null, 2));
 
             const activityData = activityRes.data as any;
-            const materialDataRaw = materialActivityRes.data;
+            const materialDataRaw = materialActivityRes.data as any;
 
             // Handle different response formats
             let materialData: MaterialActivity[] = [];
@@ -179,10 +179,10 @@ const NotificationPage: React.FC = () => {
                 materialData = materialDataRaw;
             } else if (materialDataRaw && typeof materialDataRaw === 'object') {
                 // Check if it's wrapped in a property
-                materialData = materialDataRaw.materialActivities ||
+                materialData = (materialDataRaw.materialActivities ||
                     materialDataRaw.activities ||
                     materialDataRaw.data ||
-                    [];
+                    []) as MaterialActivity[];
             }
 
             console.log('\n--- EXTRACTED DATA ---');
@@ -471,6 +471,52 @@ const NotificationPage: React.FC = () => {
 
     const filteredActivities = getFilteredActivities();
 
+    // Group activities by date
+    const getGroupedByDate = () => {
+        const groupedByDate: { [date: string]: typeof filteredActivities } = {};
+
+        filteredActivities.forEach(activity => {
+            const date = new Date(activity.timestamp);
+            const dateKey = date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            if (!groupedByDate[dateKey]) {
+                groupedByDate[dateKey] = [];
+            }
+            groupedByDate[dateKey].push(activity);
+        });
+
+        // Sort dates in descending order (newest first)
+        const sortedDates = Object.keys(groupedByDate).sort((a, b) => {
+            return new Date(b).getTime() - new Date(a).getTime();
+        });
+
+        return sortedDates.map(date => ({
+            date,
+            activities: groupedByDate[date]
+        }));
+    };
+
+    const formatDateHeader = (dateString: string) => {
+        const date = new Date(dateString);
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        const isToday = date.toDateString() === today.toDateString();
+        const isYesterday = date.toDateString() === yesterday.toDateString();
+
+        if (isToday) return 'Today';
+        if (isYesterday) return 'Yesterday';
+
+        return dateString;
+    };
+
+    const groupedActivities = getGroupedByDate();
+
     return (
         <SafeAreaView style={styles.container}>
             {/* Header */}
@@ -611,13 +657,37 @@ const NotificationPage: React.FC = () => {
                     </View>
                 ) : (
                     <View style={styles.activitiesList}>
-                        {filteredActivities.map((item, index) => (
-                            <React.Fragment key={`${item.type}-${item.data._id}`}>
-                                {item.type === 'activity'
-                                    ? renderActivityItem(item.data as Activity)
-                                    : renderMaterialActivityItem(item.data as MaterialActivity)
-                                }
-                            </React.Fragment>
+                        {groupedActivities.map((dateGroup, dateIndex) => (
+                            <View key={dateGroup.date} style={styles.dateGroupContainer}>
+                                {/* Date Header */}
+                                <View style={styles.dateHeader}>
+                                    {/* Left: Activity count */}
+                                    <View style={styles.dateHeaderLeft}>
+                                        <Ionicons name="pulse-outline" size={16} color="#64748B" />
+                                        <Text style={styles.activityCountText}>
+                                            {dateGroup.activities.length} {dateGroup.activities.length === 1 ? 'Activity' : 'Activities'}
+                                        </Text>
+                                    </View>
+
+                                    {/* Right: Date */}
+                                    <View style={styles.dateHeaderRight}>
+                                        <Text style={styles.dateHeaderText}>
+                                            {formatDateHeader(dateGroup.date)}
+                                        </Text>
+                                        <Ionicons name="calendar-outline" size={16} color="#64748B" />
+                                    </View>
+                                </View>
+
+                                {/* Activities for this date */}
+                                {dateGroup.activities.map((item, index) => (
+                                    <React.Fragment key={`${dateGroup.date}-${item.type}-${item.data._id}`}>
+                                        {item.type === 'activity'
+                                            ? renderActivityItem(item.data as Activity)
+                                            : renderMaterialActivityItem(item.data as MaterialActivity)
+                                        }
+                                    </React.Fragment>
+                                ))}
+                            </View>
                         ))}
                     </View>
                 )}
@@ -1029,6 +1099,42 @@ const styles = StyleSheet.create({
         color: '#64748B',
         textAlign: 'center',
         lineHeight: 20,
+    },
+    // Date Group Styles
+    dateGroupContainer: {
+        marginBottom: 20,
+    },
+    dateHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        marginBottom: 8,
+        backgroundColor: '#F8FAFC',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E2E8F0',
+        width: '100%',
+    },
+    dateHeaderLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    dateHeaderRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    activityCountText: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#64748B',
+    },
+    dateHeaderText: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#64748B',
     },
 });
 

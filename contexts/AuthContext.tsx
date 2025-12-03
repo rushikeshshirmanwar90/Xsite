@@ -100,9 +100,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => subscription.remove();
   }, []);
 
-  // Set up periodic auth status checks
+  // Set up periodic auth status checks (less aggressive)
   useEffect(() => {
-    const checkAuthInterval = setInterval(checkAuthStatus, 1000); // Check every second
+    const checkAuthInterval = setInterval(checkAuthStatus, 30000); // Check every 30 seconds
     return () => clearInterval(checkAuthInterval);
   }, []);
 

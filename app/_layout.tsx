@@ -1,10 +1,10 @@
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import 'react-native-reanimated';
 import { Toaster } from "sonner-native";
-import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 
 export const unstable_settings = {
   initialRouteName: 'login',
@@ -21,22 +21,32 @@ function RootLayoutNav() {
 
   // Handle navigation based on auth status
   useEffect(() => {
+    // Don't do anything while loading
     if (isLoading) return;
 
-    const currentRoute = segments[0] || '';
-    const isProtectedRoute = PROTECTED_ROUTES.includes(currentRoute);
+    const inAuthGroup = segments[0] === '(tabs)' || segments[0] === 'details';
 
-    if (!isAuthenticated && isProtectedRoute) {
-      // Trying to access protected route without auth
-      router.replace('/login');
-    } else if (isAuthenticated && currentRoute === 'login') {
-      // Authenticated user on login page, redirect to home
-      router.replace('/(tabs)');
-    }
-  }, [isAuthenticated, segments, isLoading, router]);
+    // Use requestAnimationFrame to ensure navigation happens after render
+    const navigationFrame = requestAnimationFrame(() => {
+      try {
+        if (!isAuthenticated && inAuthGroup) {
+          // User is not authenticated but trying to access protected route
+          router.replace('/login');
+        } else if (isAuthenticated && segments[0] === 'login') {
+          // User is authenticated but on login page
+          router.replace('/(tabs)');
+        }
+      } catch (error) {
+        console.error('Navigation error:', error);
+      }
+    });
 
+    return () => cancelAnimationFrame(navigationFrame);
+  }, [isAuthenticated, segments, isLoading]);
+
+  // Show nothing while loading to prevent flash
   if (isLoading) {
-    return null; // or return a loading component
+    return null;
   }
 
   return (

@@ -39,18 +39,20 @@ export default function LoginScreen() {
     const [userType, setUserType] = useState('');
 
     useEffect(() => {
+        // Just check if we should show loading, don't navigate
+        // Let the root layout handle navigation based on auth state
         const checkLogin = async () => {
-            const res = await AsyncStorage.getItem("user")
-
-            if (res) {
-                router.replace({
-                    pathname: "/(tabs)"
-                })
+            try {
+                const res = await AsyncStorage.getItem("user")
+                // Always set loading to false, let AuthContext handle navigation
+                setMountLoading(false);
+            } catch (error) {
+                console.error('Error checking login:', error);
+                setMountLoading(false);
             }
-            setMountLoading(false);
         }
         checkLogin();
-    }, [router])
+    }, [])
 
     if (mountLoading) {
         return <Loading />
@@ -130,14 +132,14 @@ export default function LoginScreen() {
             if (res) {
                 const user = await getUser(email, userType);
                 console.log('User data retrieved:', user);
-                
+
                 // Store user data in AsyncStorage with 'user' key for consistency
                 const jsonUser = JSON.stringify(user);
                 await AsyncStorage.setItem('user', jsonUser);
-                
+
                 // Also store userType separately for reference
                 await AsyncStorage.setItem('userType', userType);
-                
+
                 toast.success('Password set successfully');
                 router.replace({
                     pathname: "/(tabs)"
@@ -164,18 +166,18 @@ export default function LoginScreen() {
         try {
             const result = await login(email, password);
             console.log('Login result:', result);
-            
+
             if (result.success) {
                 const user = await getUser(email, userType);
                 console.log('User data retrieved:', user);
-                
+
                 // Store user data in AsyncStorage with 'user' key for consistency
                 const jsonUser = JSON.stringify(user);
                 await AsyncStorage.setItem("user", jsonUser);
-                
+
                 // Also store userType separately for reference
                 await AsyncStorage.setItem('userType', userType);
-                
+
                 toast.success("User logged in successfully");
                 router.replace({
                     pathname: "/(tabs)",
@@ -200,7 +202,7 @@ export default function LoginScreen() {
             // First, find the user type
             console.log('Step 1: Finding user type...');
             const userTypeResult = await findUserType(email);
-            
+
             console.log('User Type Result:', userTypeResult);
 
             if (!userTypeResult.success || !userTypeResult.userType) {
@@ -214,7 +216,7 @@ export default function LoginScreen() {
 
             // Then send forget password request
             const result = await forgetPassword(email, userTypeResult.userType);
-            
+
             console.log('Forget Password Result:', result);
 
             if (result.success) {
@@ -343,7 +345,7 @@ export default function LoginScreen() {
                     <>
                         <Text style={styles.welcomeText}>Almost Done</Text>
                         <Text style={styles.stepTitle}>{isVerified ? 'Enter' : 'Set'} Password</Text>
-                        
+
                         {/* Show email */}
                         <View style={styles.emailDisplayContainer}>
                             <MaterialIcons name="email" size={16} color="#666" />
@@ -363,7 +365,7 @@ export default function LoginScreen() {
                         <Text style={styles.stepDescription}>
                             {isVerified ? 'Enter your password to continue' : 'Create a strong password for your account'}
                         </Text>
-                        
+
                         <View style={styles.inputContainer}>
                             <MaterialIcons name="lock" size={20} color="#666" style={styles.inputIcon} />
                             <TextInput
@@ -382,20 +384,20 @@ export default function LoginScreen() {
                                     }, 100);
                                 }}
                             />
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 onPress={() => {
                                     const newValue = !showPassword;
                                     console.log('👁️ Toggle password - showPassword:', showPassword, '→', newValue);
                                     setShowPassword(newValue);
-                                }} 
+                                }}
                                 style={styles.visibilityIcon}
                                 activeOpacity={0.7}
                                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                             >
-                                <Ionicons 
-                                    name={showPassword ? "eye-off" : "eye"} 
-                                    size={24} 
-                                    color="#3b82f6" 
+                                <Ionicons
+                                    name={showPassword ? "eye-off" : "eye"}
+                                    size={24}
+                                    color="#3b82f6"
                                 />
                             </TouchableOpacity>
                         </View>
