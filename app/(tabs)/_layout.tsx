@@ -2,8 +2,11 @@ import { Ionicons } from '@expo/vector-icons'
 import { Tabs } from 'expo-router'
 import React from 'react'
 import { View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 const TabLayout = () => {
+  const insets = useSafeAreaInsets()
+
   return (
     <Tabs
       screenOptions={{
@@ -13,7 +16,9 @@ const TabLayout = () => {
           backgroundColor: '#fff', // or your theme.bg
           borderTopWidth: 0,
           elevation: 0,
-          height: 48
+          height: 60 + insets.bottom, // Add bottom safe area padding
+          paddingBottom: insets.bottom, // Push content up from bottom
+          paddingTop: 8, // Add some top padding for better spacing
         },
       }}
     >
