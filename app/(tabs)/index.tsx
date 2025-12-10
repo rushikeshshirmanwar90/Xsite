@@ -2,6 +2,7 @@
 import ProjectCard from '@/components/ProjectCard';
 import { getClientId } from '@/functions/clientId';
 import { getProjectData } from '@/functions/project';
+import { isAdmin, useUser } from '@/hooks/useUser';
 import { domain } from '@/lib/domain';
 import { generateInitials } from '@/lib/functions';
 import { styles } from "@/style/adminHome";
@@ -32,6 +33,10 @@ const Index: React.FC = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [companyName, setCompanyName] = useState<string>('Company Name');
     const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+
+    // Get user role for access control
+    const { user } = useUser();
+    const userIsAdmin = isAdmin(user);
 
     // Performance optimization
     const isLoadingRef = React.useRef(false);
@@ -290,7 +295,11 @@ const Index: React.FC = () => {
                         ) : (
                             <View style={styles.centerContainer}>
                                 <Text style={styles.emptyText}>No projects found</Text>
-                                <Text style={styles.emptySubText}>Tap &quot;Add Project&quot; to create your first project</Text>
+                                <Text style={styles.emptySubText}>
+                                    {userIsAdmin
+                                        ? 'Tap "Add Project" to create your first project'
+                                        : 'No projects available. Contact your admin to add projects.'}
+                                </Text>
                             </View>
                         )}
                     </View>

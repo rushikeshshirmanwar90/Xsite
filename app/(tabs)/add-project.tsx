@@ -1,5 +1,6 @@
 import AddProjectModal from '@/components/AddProjectModel';
 import { getClientId } from '@/functions/clientId';
+import { isAdmin, useUser } from '@/hooks/useUser';
 import { domain } from '@/lib/domain';
 import { Project as BaseProject, ProjectSection } from '@/types/project';
 import { StaffMembers } from '@/types/staff';
@@ -19,8 +20,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-
-
 const ProjectScreen: React.FC = () => {
     const [addingProject, setAddingProject] = useState(false);
     const [clientId, setClientId] = useState('');
@@ -30,6 +29,10 @@ const ProjectScreen: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const router = useRouter();
+
+    // Get user role for access control
+    const { user, userType } = useUser();
+    const userIsAdmin = isAdmin(user);
 
     // Performance optimization
     const isLoadingRef = React.useRef(false);
@@ -118,13 +121,171 @@ const ProjectScreen: React.FC = () => {
                 clientId,
             };
 
+            console.log('📝 Creating project with payload:', payload);
+
             const res = await axios.post(`${domain}/api/project`, payload);
+
+            console.log('✅ Project created, response:', res.data);
+            console.log('✅ Response status:', res.status);
+
             if (res.status === 200 || res.status === 201) {
+                console.log('✅ Status check passed, proceeding...');
+
+                // Extract project ID from response
+                const createdProject = res.data as any;
+                console.log('📦 Created project data:', createdProject);
+
+                // The API returns { project: { _id: ... } } so we need to access project._id
+                const projectData = createdProject?.project || createdProject;
+                const projectId = projectData?._id || projectData?.id || projectData?.projectId || createdProject?._id;
+                const projectName = newProject.name;
+
+                console.log('📦 Extracted project data:', projectData);
+                console.log('📦 Extracted project ID:', projectId);
+
+                console.log('📝 Logging project creation activity...');
+                console.log('   - Project ID:', projectId);
+                console.log('   - Project Name:', projectName);
+                console.log('   - Has projectId?', !!projectId);
+
+                // Log the activity DIRECTLY with axios BEFORE UI updates
+                if (projectId) {
+                    console.log('✅ Project ID exists, proceeding with activity logging...');
+
+                    try {
+                        // Get user data from AsyncStorage
+                        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+                        const userString = await AsyncStorage.getItem('user');
+
+                        if (userString) {
+                            const userData = JSON.parse(userString);
+
+                            // Build user object
+                            const user = {
+                                userId: userData._id || userData.id || userData.clientId || 'unknown',
+                                fullName: `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || userData.name || userData.username || 'Unknown User',
+                                email: userData.email || undefined,
+                            };
+
+                            console.log('\n🔄 Calling Activity API directly with axios...');
+                            console.log('User:', user);
+                            console.log('Client ID:', clientId);
+                            console.log('Project ID:', projectId);
+                            console.log('Project Name:', projectName);
+
+                            // Build activity payload
+                            const activityPayload = {
+                                user,
+                                clientId,
+                                projectId,
+                                projectName,
+                                activityType: 'project_created',
+                                category: 'project',
+                                action: 'create',
+                                description: `Created project "${projectName}"`,
+                                date: new Date().toISOString(),
+                                metadata: {
+                                    address: newProject.address,
+                                    budget: newProject.budget,
+                                    description: newProject.description,
+                                },
+                            };
+
+                            console.log('\n📝 Activity Payload:');
+                            console.log(JSON.stringify(activityPayload, null, 2));
+                            console.log('\n🌐 Sending POST request to:', `${domain}/api/activity`);
+                            console.log('🌐 Domain value:', domain);
+                            console.log('🌐 Full URL:', `${domain}/api/activity`);
+                            console.log('🌐 Request will be sent NOW...');
+
+                            // DIRECT AXIOS CALL TO ACTIVITY API
+                            console.log('⏳ Making axios.post call...');
+                            const activityResponse = await axios.post(
+                                `${domain}/api/activity`,
+                                activityPayload
+                            );
+                            console.log('⏳ axios.post call completed!');
+
+                            console.log('\n✅ SUCCESS! Activity API Response:');
+                            console.log('Status:', activityResponse.status);
+                            console.log('Data:', JSON.stringify(activityResponse.data, null, 2));
+
+                            // Log staff assignments
+                            if (newProject.assignedStaff && newProject.assignedStaff.length > 0) {
+                                console.log('\n🔄 Logging staff assignments...');
+
+                                for (const staff of newProject.assignedStaff) {
+                                    try {
+                                        const staffPayload = {
+                                            user,
+                                            clientId,
+                                            projectId,
+                                            projectName,
+                                            activityType: 'staff_assigned',
+                                            category: 'staff',
+                                            action: 'assign',
+                                            description: `Assigned ${staff.fullName} to project "${projectName}"`,
+                                            message: 'Assigned during project creation',
+                                            date: new Date().toISOString(),
+                                            metadata: {
+                                                staffName: staff.fullName,
+                                            },
+                                        };
+
+                                        console.log(`\n📝 Logging staff: ${staff.fullName}`);
+
+                                        const staffResponse = await axios.post(
+                                            `${domain}/api/activity`,
+                                            staffPayload
+                                        );
+
+                                        console.log(`✅ Staff assignment logged: ${staff.fullName}`, staffResponse.status);
+                                    } catch (staffError: any) {
+                                        console.error(`❌ Error logging staff ${staff.fullName}:`, staffError?.response?.data || staffError.message);
+                                    }
+                                }
+                            }
+                        } else {
+                            console.warn('⚠️ No user data in AsyncStorage, skipping activity log');
+                        }
+                    } catch (activityError: any) {
+                        console.error('\n========================================');
+                        console.error('❌ ACTIVITY LOGGING FAILED');
+                        console.error('========================================');
+                        console.error('Error Type:', activityError?.name);
+                        console.error('Error Message:', activityError?.message);
+                        console.error('Error Stack:', activityError?.stack);
+
+                        if (activityError?.response) {
+                            console.error('\n📡 Server Response:');
+                            console.error('  Status:', activityError.response.status);
+                            console.error('  Status Text:', activityError.response.statusText);
+                            console.error('  Data:', JSON.stringify(activityError.response.data, null, 2));
+                            console.error('  Headers:', activityError.response.headers);
+                        } else if (activityError?.request) {
+                            console.error('\n📡 Network Error:');
+                            console.error('  Request was made but no response received');
+                            console.error('  Request:', activityError.request);
+                        } else {
+                            console.error('\n⚠️ Unknown Error:', activityError);
+                        }
+                        console.error('========================================\n');
+                        // Don't fail the whole operation if activity logging fails
+                    }
+                } else {
+                    console.warn('⚠️ Project ID not found in response, skipping activity log');
+                    console.warn('⚠️ Response data:', JSON.stringify(createdProject, null, 2));
+                    console.warn('⚠️ Checked fields: _id, id, projectId');
+                }
+
+                // Now update UI after activity logging is complete
+                console.log('🔄 Refreshing projects list...');
+                await fetchProjectsData(false);
+                console.log('✅ Projects list refreshed');
+
+                // Close modal and show success message
                 setShowAddModal(false);
                 Alert.alert('Success', 'Project added successfully!');
-
-                // Refresh the projects list to ensure we have the latest data with _id
-                await fetchProjectsData(false);
             } else {
                 console.error('Failed to add project: Unexpected response status');
                 Alert.alert('Error', 'Failed to add project. Please try again.');
@@ -159,23 +320,37 @@ const ProjectScreen: React.FC = () => {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
-                <View>
+                <View style={styles.titleSection}>
                     <Text style={styles.headerTitle}>Manage All sites Projects</Text>
+                    <Text style={styles.headerSubtitle}>
+                        {projects.length} project{projects.length !== 1 ? 's' : ''}
+                    </Text>
                 </View>
-                <TouchableOpacity
-                    style={styles.addButton}
-                    onPress={() => setShowAddModal(true)}
-                >
-                    <LinearGradient
-                        colors={['#3B82F6', '#8B5CF6']}
-                        style={styles.addButtonGradient}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
+
+                {userIsAdmin && (
+                    <TouchableOpacity
+                        style={styles.addButton}
+                        onPress={() => setShowAddModal(true)}
+                        activeOpacity={0.8}
                     >
-                        <Ionicons name="add" size={20} color="white" />
-                        <Text style={styles.addButtonText}>Add New Project</Text>
-                    </LinearGradient>
-                </TouchableOpacity>
+                        <LinearGradient
+                            colors={['#3B82F6', '#8B5CF6']}
+                            style={styles.addButtonGradient}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                        >
+                            <Ionicons name="add-circle" size={22} color="white" />
+                            <Text style={styles.addButtonText}>Add New Project</Text>
+                        </LinearGradient>
+                    </TouchableOpacity>
+                )}
+
+                {!userIsAdmin && (
+                    <View style={styles.viewOnlyBanner}>
+                        <Ionicons name="lock-closed-outline" size={16} color="#64748B" />
+                        <Text style={styles.viewOnlyText}>View Only - Contact admin to add projects</Text>
+                    </View>
+                )}
             </View>
 
             <ScrollView
@@ -203,7 +378,11 @@ const ProjectScreen: React.FC = () => {
                     <View style={styles.centered}>
                         <Ionicons name="folder-open-outline" size={64} color="#CBD5E1" />
                         <Text style={styles.emptyTitle}>No projects found</Text>
-                        <Text style={styles.emptySubtitle}>Tap "Add New Project" to get started</Text>
+                        <Text style={styles.emptySubtitle}>
+                            {userIsAdmin
+                                ? 'Tap "Add New Project" to get started'
+                                : 'No projects available. Contact your admin to add projects.'}
+                        </Text>
                     </View>
                 ) : (
                     projects.map((project) => (
@@ -238,39 +417,70 @@ const ProjectScreen: React.FC = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f8fafc',
+        backgroundColor: '#F8FAFC',
     },
     header: {
-        padding: 16,
-        backgroundColor: '#ffffff',
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 16,
+        paddingTop: 16,
+        paddingBottom: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#e2e8f0',
+        borderBottomColor: '#E2E8F0',
+    },
+    titleSection: {
+        marginBottom: 16,
+        gap: 4,
     },
     headerTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#1e293b',
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#1E293B',
+        letterSpacing: -0.5,
     },
     headerSubtitle: {
         fontSize: 14,
-        color: '#64748b',
-        marginTop: 4,
+        color: '#64748B',
+        fontWeight: '500',
     },
     addButton: {
-        marginTop: 16,
+        borderRadius: 12,
+        overflow: 'hidden',
+        shadowColor: '#3B82F6',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
     },
     addButtonGradient: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderRadius: 8,
+        paddingVertical: 14,
+        paddingHorizontal: 20,
+        gap: 10,
     },
     addButtonText: {
-        color: 'white',
+        color: '#FFFFFF',
+        fontWeight: '600',
+        fontSize: 15,
+        letterSpacing: 0.3,
+    },
+    viewOnlyBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        gap: 8,
+    },
+    viewOnlyText: {
+        fontSize: 13,
         fontWeight: '500',
-        marginLeft: 8,
+        color: '#64748B',
     },
     scrollView: {
         flex: 1,

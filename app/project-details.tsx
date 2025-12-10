@@ -1,16 +1,16 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  StatusBar,
-} from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
 import BarChart from '@/components/BarChart';
 import { mockBuildingSections, mockProjects } from '@/data/analytics';
 import { Ionicons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
+import React from 'react';
+import {
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 export default function ProjectDetails() {
   const { id } = useLocalSearchParams();
@@ -39,7 +39,7 @@ export default function ProjectDetails() {
     if (section) {
       router.push({
         pathname: '/details',
-        params: { 
+        params: {
           projectId: project.id,
           sectionId: section.id,
           sectionName: section.name

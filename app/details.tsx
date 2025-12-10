@@ -54,7 +54,10 @@ const Details = () => {
     const abortControllerRef = useRef<AbortController | null>(null);
     const isLoadingRef = useRef(false);
     const lastLoadTimeRef = useRef<number>(0);
+    const isMountedRef = useRef(true);
     const DEBOUNCE_DELAY = 500; // 500ms debounce
+    const MAX_CONSOLE_LOGS = 10; // Limit console logs
+    let consoleLogCount = 0;
 
     // Helper function to get user data
     const getUserData = async () => {
@@ -120,6 +123,7 @@ const Details = () => {
                 return;
             }
 
+            // Create activity payload with date
             const activityPayload = {
                 clientId,
                 projectId,
@@ -127,12 +131,22 @@ const Details = () => {
                 message,
                 activity,
                 user,
+                date: new Date().toISOString(), // Add ISO date string as required by API
             };
 
-            console.log('Logging material activity:', activityPayload);
+            if (__DEV__) {
+                console.log('Logging material activity:', {
+                    activity,
+                    materialsCount: materials.length,
+                    user: user.fullName,
+                });
+            }
 
             await axios.post(`${domain}/api/materialActivity`, activityPayload);
-            console.log('✅ Material activity logged successfully');
+
+            if (__DEV__) {
+                console.log('✅ Material activity logged successfully');
+            }
         } catch (error) {
             console.error('Failed to log material activity:', error);
             // Don't throw error - activity logging is not critical
@@ -397,17 +411,11 @@ const Details = () => {
             console.log('  - usedMaterials:', transformedUsed.length);
 
             // Use functional updates to ensure we're working with latest state
-            setAvailableMaterials(() => {
-                console.log('📦 Setting availableMaterials state:', transformedAvailable.length);
-                return transformedAvailable;
-            });
-
-            setUsedMaterials(() => {
-                console.log('🔄 Setting usedMaterials state:', transformedUsed.length);
-                return transformedUsed;
-            });
-
-            console.log('✅ State updated!\n');
+            // Only update if component is still mounted
+            if (isMountedRef.current) {
+                setAvailableMaterials(() => transformedAvailable);
+                setUsedMaterials(() => transformedUsed);
+            }
 
             // Reinitialize animations
             const totalMaterials = Math.max(transformedAvailable.length, transformedUsed.length);
@@ -651,42 +659,44 @@ const Details = () => {
 
     // Load project materials on mount
     useEffect(() => {
+        isMountedRef.current = true;
         loadProjectMaterials();
 
         // Cleanup: Cancel any pending requests when component unmounts
         return () => {
+            isMountedRef.current = false;
             if (abortControllerRef.current) {
                 abortControllerRef.current.abort();
-                console.log('🧹 Cleanup: Cancelled pending requests');
             }
+            // Clear animations to prevent memory leaks
+            cardAnimations.forEach(anim => {
+                anim.stopAnimation();
+            });
         };
     }, [projectId, materialAvailableParam, materialUsedParam]);
 
-    // Debug: Log when usedMaterials state changes
+    // Debug: Log when usedMaterials state changes (limited logging)
     useEffect(() => {
-        console.log('\n🔄 usedMaterials STATE CHANGED');
-        console.log('New count:', usedMaterials.length);
-        usedMaterials.forEach((m, idx) => {
-            console.log(`  ${idx + 1}. ${m.name} - Qty: ${m.quantity} ${m.unit} (sectionId: ${m.sectionId}, miniSectionId: ${m.miniSectionId})`);
-        });
-        console.log('');
+        if (__DEV__ && consoleLogCount < MAX_CONSOLE_LOGS) {
+            console.log('🔄 usedMaterials:', usedMaterials.length);
+            consoleLogCount++;
+        }
     }, [usedMaterials]);
 
-    // Debug: Log when availableMaterials state changes
+    // Debug: Log when availableMaterials state changes (limited logging)
     useEffect(() => {
-        console.log('\n📦 availableMaterials STATE CHANGED');
-        console.log('New count:', availableMaterials.length);
-        availableMaterials.forEach((m, idx) => {
-            console.log(`  ${idx + 1}. ${m.name} - Qty: ${m.quantity} ${m.unit}`);
-        });
-        console.log('');
+        if (__DEV__ && consoleLogCount < MAX_CONSOLE_LOGS) {
+            console.log('📦 availableMaterials:', availableMaterials.length);
+            consoleLogCount++;
+        }
     }, [availableMaterials]);
 
-    // Debug: Log when activeTab changes
+    // Debug: Log when activeTab changes (limited logging)
     useEffect(() => {
-        console.log('\n🔀 ACTIVE TAB CHANGED TO:', activeTab);
-        console.log('Available materials count:', availableMaterials.length);
-        console.log('Used materials count:', usedMaterials.length);
+        if (__DEV__ && consoleLogCount < MAX_CONSOLE_LOGS) {
+            console.log('🔀 Tab:', activeTab);
+            consoleLogCount++;
+        }
     }, [activeTab]);
 
     // Fetch mini-sections for the section selector
@@ -709,96 +719,86 @@ const Details = () => {
 
     // FIXED: Group materials by name and unit - CORRECTED LOGIC
     const groupMaterialsByName = (materials: Material[], isUsedTab: boolean = false) => {
-        console.log('\n========================================');
-        console.log('GROUPING MATERIALS');
-        console.log('========================================');
-        console.log('Input materials count:', materials.length);
-        console.log('Is Used Tab:', isUsedTab);
-        console.log('Materials to group:');
-        materials.forEach((m, idx) => {
-            console.log(`  ${idx + 1}. ${m.name} - Qty: ${m.quantity} ${m.unit}`);
-        });
-        console.log('========================================\n');
-
-        const grouped: { [key: string]: any } = {};
-
-        materials.forEach((material, index) => {
-            const key = `${material.name}-${material.unit}`;
-
-            if (!grouped[key]) {
-                grouped[key] = {
-                    name: material.name,
-                    unit: material.unit,
-                    icon: material.icon,
-                    color: material.color,
-                    date: material.date,
-                    variants: [],
-                    totalQuantity: 0,
-                    totalCost: 0,
-                    totalUsed: 0,
-                    totalImported: 0,
-                    miniSectionId: material.miniSectionId,
-                };
+        try {
+            if (__DEV__ && consoleLogCount < MAX_CONSOLE_LOGS) {
+                console.log('Grouping', materials.length, 'materials');
+                consoleLogCount++;
             }
 
-            const variantId = (material as any)._id || material.id.toString();
+            const grouped: { [key: string]: any } = {};
 
-            grouped[key].variants.push({
-                _id: variantId,
-                specs: material.specs || {},
-                quantity: material.quantity,
-                cost: material.price,
-                miniSectionId: material.miniSectionId,
+            materials.forEach((material, index) => {
+                const key = `${material.name}-${material.unit}`;
+
+                if (!grouped[key]) {
+                    grouped[key] = {
+                        name: material.name,
+                        unit: material.unit,
+                        icon: material.icon,
+                        color: material.color,
+                        date: material.date,
+                        variants: [],
+                        totalQuantity: 0,
+                        totalCost: 0,
+                        totalUsed: 0,
+                        totalImported: 0,
+                        miniSectionId: material.miniSectionId,
+                    };
+                }
+
+                const variantId = (material as any)._id || material.id.toString();
+
+                grouped[key].variants.push({
+                    _id: variantId,
+                    specs: material.specs || {},
+                    quantity: material.quantity,
+                    cost: material.price,
+                    miniSectionId: material.miniSectionId,
+                });
+
+                grouped[key].totalQuantity += material.quantity;
+                grouped[key].totalCost += material.price;
             });
 
-            grouped[key].totalQuantity += material.quantity;
-            grouped[key].totalCost += material.price;
-        });
+            // FIXED: Correct calculation logic for both tabs
+            Object.keys(grouped).forEach((key) => {
+                if (isUsedTab) {
+                    // In "used" tab: totalQuantity IS the used amount (don't change it)
+                    const usedQuantity = grouped[key].totalQuantity;
 
-        // FIXED: Correct calculation logic for both tabs
-        Object.keys(grouped).forEach((key) => {
-            if (isUsedTab) {
-                // In "used" tab: totalQuantity IS the used amount (don't change it)
-                const usedQuantity = grouped[key].totalQuantity;
+                    // Find available quantity for stats only
+                    const availableQuantity = availableMaterials
+                        .filter(m => `${m.name}-${m.unit}` === key)
+                        .reduce((sum, m) => sum + m.quantity, 0);
 
-                // Find available quantity for stats only
-                const availableQuantity = availableMaterials
-                    .filter(m => `${m.name}-${m.unit}` === key)
-                    .reduce((sum, m) => sum + m.quantity, 0);
+                    grouped[key].totalUsed = usedQuantity;
+                    grouped[key].totalImported = availableQuantity + usedQuantity;
+                    // Keep totalQuantity as used quantity for display
 
-                grouped[key].totalUsed = usedQuantity;
-                grouped[key].totalImported = availableQuantity + usedQuantity;
-                // Keep totalQuantity as used quantity for display
+                    console.log(`Used Tab - ${key}: Used=${usedQuantity}, Available=${availableQuantity}, Total=${grouped[key].totalImported}`);
+                } else {
+                    // In "imported" tab: totalQuantity is available amount
+                    const availableQuantity = grouped[key].totalQuantity;
 
-                console.log(`Used Tab - ${key}: Used=${usedQuantity}, Available=${availableQuantity}, Total=${grouped[key].totalImported}`);
-            } else {
-                // In "imported" tab: totalQuantity is available amount
-                const availableQuantity = grouped[key].totalQuantity;
+                    // Calculate used quantity for stats
+                    const usedQuantity = usedMaterials
+                        .filter(m => `${m.name}-${m.unit}` === key)
+                        .reduce((sum, m) => sum + m.quantity, 0);
 
-                // Calculate used quantity for stats
-                const usedQuantity = usedMaterials
-                    .filter(m => `${m.name}-${m.unit}` === key)
-                    .reduce((sum, m) => sum + m.quantity, 0);
+                    grouped[key].totalUsed = usedQuantity;
+                    grouped[key].totalImported = availableQuantity + usedQuantity;
+                    // Keep totalQuantity as available quantity for display
 
-                grouped[key].totalUsed = usedQuantity;
-                grouped[key].totalImported = availableQuantity + usedQuantity;
-                // Keep totalQuantity as available quantity for display
+                    console.log(`Imported Tab - ${key}: Available=${availableQuantity}, Used=${usedQuantity}, Total=${grouped[key].totalImported}`);
+                }
+            });
 
-                console.log(`Imported Tab - ${key}: Available=${availableQuantity}, Used=${usedQuantity}, Total=${grouped[key].totalImported}`);
-            }
-        });
-
-        const result = Object.values(grouped);
-        console.log('\n========================================');
-        console.log('GROUPED RESULT');
-        console.log('========================================');
-        console.log('Grouped materials count:', result.length);
-        result.forEach((g: any, idx) => {
-            console.log(`  ${idx + 1}. ${g.name} - Display Qty: ${g.totalQuantity} ${g.unit} (Used: ${g.totalUsed}, Total: ${g.totalImported})`);
-        });
-        console.log('========================================\n');
-
-        return result;
+            const result = Object.values(grouped);
+            return result;
+        } catch (error) {
+            console.error('Error grouping materials:', error);
+            return [];
+        }
     };
     // Handle adding material usage from the form
     const handleAddMaterialUsage = async (
@@ -914,35 +914,51 @@ const Details = () => {
 
                 // Log material activity for used materials
                 if (selectedMaterial) {
+                    // Find the mini-section name
+                    const miniSection = miniSections.find(s => s._id === miniSectionId);
+                    const miniSectionName = miniSection?.name || 'Unknown Section';
+
+                    // Calculate per-unit cost and cost for quantity used
+                    const perUnitCost = selectedMaterial.price / selectedMaterial.quantity;
+                    const costForQuantityUsed = perUnitCost * quantity;
+
+                    console.log('💰 COST CALCULATION:');
+                    console.log('  - Total imported cost:', selectedMaterial.price);
+                    console.log('  - Total imported quantity:', selectedMaterial.quantity);
+                    console.log('  - Per-unit cost:', perUnitCost);
+                    console.log('  - Quantity used:', quantity);
+                    console.log('  - Cost for quantity used:', costForQuantityUsed);
+
                     const usedMaterialLog = [{
                         name: selectedMaterial.name,
                         unit: selectedMaterial.unit,
                         specs: selectedMaterial.specs || {},
                         qnt: quantity,
-                        cost: selectedMaterial.price || 0,
+                        cost: costForQuantityUsed, // Use calculated cost for quantity used
                         addedAt: new Date(),
                     }];
 
                     await logMaterialActivity(
                         usedMaterialLog,
                         'used',
-                        `Used in ${sectionName} - Mini Section ID: ${miniSectionId}`
+                        `Used in ${projectName} - ${miniSectionName}`
                     );
 
                     // Also log to general activity
                     const { logMaterialUsed } = require('@/utils/activityLogger');
-                    const miniSection = miniSections.find(s => s._id === miniSectionId);
                     await logMaterialUsed(
                         projectId,
                         projectName,
                         sectionId,
                         sectionName,
                         miniSectionId,
-                        miniSection?.name || 'Unknown Section',
+                        miniSectionName,
                         selectedMaterial.name,
                         quantity,
                         selectedMaterial.unit,
-                        selectedMaterial.price
+                        {
+                            cost: costForQuantityUsed // Use calculated cost for quantity used
+                        }
                     );
                 }
 
@@ -964,14 +980,17 @@ const Details = () => {
                 console.log('Available materials count:', availableMaterials.length);
                 console.log('Used materials count:', usedMaterials.length);
 
-                // Switch to "used" tab to show the newly added usage
-                setActiveTab('used');
+                // Only update UI if component is still mounted
+                if (isMountedRef.current) {
+                    // Switch to "used" tab to show the newly added usage
+                    setActiveTab('used');
 
-                // Close the usage form
-                setShowUsageForm(false);
+                    // Close the usage form
+                    setShowUsageForm(false);
 
-                // Show success message with material count
-                toast.success(`Material usage recorded! Check the "Used Materials" tab.`);
+                    // Show success message with material count
+                    toast.success(`Material usage recorded! Check the "Used Materials" tab.`);
+                }
             } else {
                 throw new Error(responseData.error || 'Failed to add material usage');
             }
@@ -1178,24 +1197,38 @@ const Details = () => {
         const groupedByDate: { [date: string]: Material[] } = {};
 
         materials.forEach(material => {
-            // Use createdAt or addedAt for grouping
-            const dateStr = material.createdAt || material.addedAt || material.date;
-            const date = new Date(dateStr);
-            const dateKey = date.toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
+            try {
+                // Use createdAt or addedAt for grouping
+                const dateStr = material.createdAt || material.addedAt || material.date;
+                const date = new Date(dateStr);
 
-            if (!groupedByDate[dateKey]) {
-                groupedByDate[dateKey] = [];
+                // Check if date is valid
+                if (isNaN(date.getTime())) {
+                    console.warn('Invalid date for material:', material.name, dateStr);
+                    // Use a fallback date key
+                    const dateKey = 'unknown-date';
+                    if (!groupedByDate[dateKey]) {
+                        groupedByDate[dateKey] = [];
+                    }
+                    groupedByDate[dateKey].push(material);
+                    return;
+                }
+
+                // Use ISO date string (YYYY-MM-DD) as key for proper sorting
+                const dateKey = date.toISOString().split('T')[0]; // "2025-12-07"
+
+                if (!groupedByDate[dateKey]) {
+                    groupedByDate[dateKey] = [];
+                }
+                groupedByDate[dateKey].push(material);
+            } catch (error) {
+                console.error('Error processing material date:', material.name, error);
             }
-            groupedByDate[dateKey].push(material);
         });
 
         // Sort dates in descending order (newest first)
         const sortedDates = Object.keys(groupedByDate).sort((a, b) => {
-            return new Date(b).getTime() - new Date(a).getTime();
+            return b.localeCompare(a); // ISO dates can be sorted alphabetically
         });
 
         return sortedDates.map(date => ({
@@ -1205,18 +1238,43 @@ const Details = () => {
     };
 
     const formatDateHeader = (dateString: string) => {
-        const date = new Date(dateString);
-        const today = new Date();
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
+        try {
+            // Handle unknown date
+            if (dateString === 'unknown-date') {
+                return 'Unknown Date';
+            }
 
-        const isToday = date.toDateString() === today.toDateString();
-        const isYesterday = date.toDateString() === yesterday.toDateString();
+            // dateString is in ISO format: "2025-12-07"
+            const date = new Date(dateString + 'T00:00:00'); // Add time to avoid timezone issues
 
-        if (isToday) return 'Today';
-        if (isYesterday) return 'Yesterday';
+            // Check if date is valid
+            if (isNaN(date.getTime())) {
+                console.warn('Invalid date string in header:', dateString);
+                return 'Unknown Date';
+            }
 
-        return dateString;
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+
+            // Compare dates (ignore time)
+            const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+            const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const yesterdayOnly = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+
+            if (dateOnly.getTime() === todayOnly.getTime()) return 'Today';
+            if (dateOnly.getTime() === yesterdayOnly.getTime()) return 'Yesterday';
+
+            // Format as "December 7, 2025"
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        } catch (error) {
+            console.error('Error formatting date header:', dateString, error);
+            return 'Unknown Date';
+        }
     };
 
     // Calculate these values - they will update when dependencies change
@@ -1224,31 +1282,11 @@ const Details = () => {
     const groupedMaterials = getGroupedData();
     const totalCost = filteredMaterials.reduce((sum, material) => sum + material.price, 0);
 
-    // Log the final data being displayed - ENHANCED DEBUGGING
-    console.log('\n========================================');
-    console.log('RENDER DATA - DETAILED');
-    console.log('========================================');
-    console.log('Active Tab:', activeTab);
-    console.log('Available Materials State Count:', availableMaterials.length);
-    console.log('Used Materials State Count:', usedMaterials.length);
-    console.log('\nAvailable Materials in State:');
-    availableMaterials.forEach((m, idx) => {
-        console.log(`  ${idx + 1}. ${m.name} - Qty: ${m.quantity} ${m.unit} (_id: ${m._id})`);
-    });
-    console.log('\nUsed Materials in State:');
-    usedMaterials.forEach((m, idx) => {
-        console.log(`  ${idx + 1}. ${m.name} - Qty: ${m.quantity} ${m.unit} (_id: ${m._id}, miniSectionId: ${m.miniSectionId})`);
-    });
-    console.log('\nFiltered Materials (what getCurrentData returned):', filteredMaterials.length);
-    filteredMaterials.forEach((m, idx) => {
-        console.log(`  ${idx + 1}. ${m.name} - Qty: ${m.quantity} ${m.unit}`);
-    });
-    console.log('\nGrouped Materials (what will be displayed):', groupedMaterials.length);
-    groupedMaterials.forEach((g: any, idx) => {
-        console.log(`  ${idx + 1}. ${g.name} - totalQuantity: ${g.totalQuantity} ${g.unit}`);
-        console.log(`      totalUsed: ${g.totalUsed}, totalImported: ${g.totalImported}`);
-    });
-    console.log('========================================\n');
+    // Minimal logging for debugging (only in development)
+    if (__DEV__ && consoleLogCount < MAX_CONSOLE_LOGS) {
+        console.log(`Render: ${activeTab} tab, ${groupedMaterials.length} groups`);
+        consoleLogCount++;
+    }
 
     const formatPrice = (price: number) => `₹${price.toLocaleString('en-IN')}`;
     const getSectionName = (sectionId: string | undefined) => {
@@ -1400,7 +1438,7 @@ const Details = () => {
                 hideSection={true}
             />
 
-            {/* Action Buttons - Sticky at top, only visible in "imported" tab */}
+            {/* Action Buttons - Sticky at top, visible to everyone in "imported" tab */}
             {activeTab === 'imported' && (
                 <View style={actionStyles.stickyActionButtonsContainer}>
                     <TouchableOpacity
@@ -1674,7 +1712,7 @@ const Details = () => {
                         ))
                     ) : (
                         <View style={styles.noMaterialsContainer}>
-                            {activeTab === 'used' && miniSections.length === 0 ? (
+                            {miniSections.length === 0 ? (
                                 <>
                                     <Ionicons name="layers-outline" size={64} color="#CBD5E1" />
                                     <Text style={styles.noMaterialsTitle}>No Mini-Sections Found</Text>

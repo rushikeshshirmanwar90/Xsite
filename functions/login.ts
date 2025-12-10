@@ -78,7 +78,10 @@ export const login = async (email: string, password: string) => {
     if (res.status === 200) {
       return { success: true };
     } else {
-      return { success: false, error: (res.data as any).message || "Login failed" };
+      return {
+        success: false,
+        error: (res.data as any).message || "Login failed",
+      };
     }
   } catch (error: any) {
     console.log("Failed to login");
@@ -116,33 +119,43 @@ export const forgetPassword = async (email: string, userType: string) => {
       userType: userType,
     };
 
-    console.log('\n========================================');
-    console.log('FORGET PASSWORD API CALL');
-    console.log('========================================');
-    console.log('API Endpoint:', `${domain}/api/forget-password`);
-    console.log('Payload:', JSON.stringify(payload, null, 2));
-    console.log('Email:', email);
-    console.log('UserType:', userType);
-    console.log('========================================\n');
+    console.log("\n========================================");
+    console.log("FORGET PASSWORD API CALL");
+    console.log("========================================");
+    console.log("API Endpoint:", `${domain}/api/forget-password`);
+    console.log("Payload:", JSON.stringify(payload, null, 2));
+    console.log("Email:", email);
+    console.log("UserType:", userType);
+    console.log("========================================\n");
 
     const res = await axios.post(`${domain}/api/forget-password`, payload);
 
-    console.log('Forget Password Response Status:', res.status);
-    console.log('Forget Password Response Data:', JSON.stringify(res.data, null, 2));
+    console.log("Forget Password Response Status:", res.status);
+    console.log(
+      "Forget Password Response Data:",
+      JSON.stringify(res.data, null, 2)
+    );
 
     if (res.status === 200) {
-      return { success: true, message: (res.data as any).message || "Password reset email sent" };
+      return {
+        success: true,
+        message: (res.data as any).message || "Password reset email sent",
+      };
     } else {
-      return { success: false, error: (res.data as any).message || "Failed to send reset email" };
+      return {
+        success: false,
+        error: (res.data as any).message || "Failed to send reset email",
+      };
     }
   } catch (error: any) {
-    console.error('\n❌ FORGET PASSWORD ERROR:');
-    console.error('Error Message:', error.message);
-    console.error('Error Response:', error.response?.data);
-    console.error('Error Status:', error.response?.status);
+    console.error("\n❌ FORGET PASSWORD ERROR:");
+    console.error("Error Message:", error.message);
+    console.error("Error Response:", error.response?.data);
+    console.error("Error Status:", error.response?.status);
     return {
       success: false,
-      error: error.response?.data?.message || error.message || "An error occurred",
+      error:
+        error.response?.data?.message || error.message || "An error occurred",
     };
   }
 };

@@ -77,7 +77,7 @@ const AnalyticsDashboard: React.FC = () => {
       budgetUsed: total,
       available,
       used,
-      description: `Available: ${formatCurrency(available)} | Used: ${formatCurrency(used)}`,
+      description: `📦 Available: ${formatCurrency(available)}  •  🔨 Used: ${formatCurrency(used)}`,
       status: 'active' as const,
     };
   });

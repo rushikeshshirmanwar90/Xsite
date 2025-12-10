@@ -71,12 +71,26 @@ const CompanyProfile: React.FC = () => {
                 const data = JSON.parse(userDetailsString);
                 const clientId = data.clientId || '';
 
+                // Build full name from firstName and lastName
+                let fullName = 'User';
+                if (data.firstName && data.lastName) {
+                    fullName = `${data.firstName} ${data.lastName}`;
+                } else if (data.firstName) {
+                    fullName = data.firstName;
+                } else if (data.lastName) {
+                    fullName = data.lastName;
+                } else if (data.name) {
+                    fullName = data.name;
+                } else if (data.username) {
+                    fullName = data.username;
+                }
+
                 setUserData({
-                    name: data.name || data.username || 'User',
+                    name: fullName,
                     email: data.email || '',
                     clientId: clientId,
-                    phone: data.phone || '',
-                    company: data.company || 'Construction Company',
+                    phone: data.phone || data.phoneNumber || '',
+                    company: data.company || data.companyName || 'Construction Company',
                 });
 
                 // Fetch client details if clientId exists
@@ -196,12 +210,14 @@ const CompanyProfile: React.FC = () => {
         return `₹${amount.toLocaleString('en-IN')}`;
     };
 
-    const menuItems = [
+    const settingsItems = [
         { icon: 'person-outline', label: 'Edit Profile', action: () => Alert.alert('Coming Soon', 'Profile editing will be available soon') },
-        { icon: 'notifications-outline', label: 'Notifications', action: () => Alert.alert('Coming Soon', 'Notification settings coming soon') },
-        { icon: 'settings-outline', label: 'Settings', action: () => Alert.alert('Coming Soon', 'Settings coming soon') },
-        { icon: 'help-circle-outline', label: 'Help & Support', action: () => Alert.alert('Help', 'Contact support at support@example.com') },
-        { icon: 'information-circle-outline', label: 'About', action: () => Alert.alert('About', 'Construction Manager v1.0.0') },
+    ];
+
+    const activityItems = [
+        { icon: 'cube-outline', label: 'Material Activities', action: () => Alert.alert('Coming Soon', 'Material activity history coming soon') },
+        { icon: 'hammer-outline', label: 'Project Activities', action: () => Alert.alert('Coming Soon', 'Project activity history coming soon') },
+        { icon: 'people-outline', label: 'Staff Activities', action: () => Alert.alert('Coming Soon', 'Staff activity history coming soon') },
     ];
 
     return (
@@ -443,16 +459,42 @@ const CompanyProfile: React.FC = () => {
                     </View>
                 </View>
 
-                {/* Menu Items */}
+                {/* Settings */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Settings</Text>
                     <View style={styles.menuCard}>
-                        {menuItems.map((item, index) => (
+                        {settingsItems.map((item, index) => (
                             <TouchableOpacity
                                 key={index}
                                 style={[
                                     styles.menuItem,
-                                    index !== menuItems.length - 1 && styles.menuItemBorder
+                                    index !== settingsItems.length - 1 && styles.menuItemBorder
+                                ]}
+                                onPress={item.action}
+                                activeOpacity={0.7}
+                            >
+                                <View style={styles.menuItemLeft}>
+                                    <View style={styles.menuIconContainer}>
+                                        <Ionicons name={item.icon as any} size={22} color="#64748B" />
+                                    </View>
+                                    <Text style={styles.menuItemText}>{item.label}</Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+
+                {/* My Activity */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>My Activity</Text>
+                    <View style={styles.menuCard}>
+                        {activityItems.map((item, index) => (
+                            <TouchableOpacity
+                                key={index}
+                                style={[
+                                    styles.menuItem,
+                                    index !== activityItems.length - 1 && styles.menuItemBorder
                                 ]}
                                 onPress={item.action}
                                 activeOpacity={0.7}

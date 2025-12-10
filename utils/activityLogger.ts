@@ -63,10 +63,6 @@ export type ActivityType =
   | "mini_section_created"
   | "mini_section_updated"
   | "mini_section_deleted"
-  | "material_imported"
-  | "material_used"
-  | "material_updated"
-  | "material_deleted"
   | "staff_assigned"
   | "staff_removed"
   | "other";
@@ -109,15 +105,39 @@ interface ActivityLogParams {
 
 // Main activity logging function
 export const logActivity = async (params: ActivityLogParams) => {
+  console.log("\n========================================");
+  console.log("🚀 ACTIVITY LOGGING STARTED");
+  console.log("========================================");
+  console.log("Activity Type:", params.activityType);
+  console.log("Category:", params.category);
+  console.log("Action:", params.action);
+  console.log("Description:", params.description);
+  console.log("Project ID:", params.projectId);
+  console.log("Project Name:", params.projectName);
+
   try {
+    console.log("\n🔍 Step 1: Getting user data from AsyncStorage...");
     const user = await getUserData();
+    console.log("✅ User data retrieved:");
+    console.log("   - User ID:", user.userId);
+    console.log("   - Full Name:", user.fullName);
+    console.log("   - Email:", user.email || "(not provided)");
+
+    console.log("\n🔍 Step 2: Getting client ID from AsyncStorage...");
     const clientId = await getClientId();
+    console.log("✅ Client ID retrieved:", clientId || "(EMPTY!)");
 
     if (!clientId) {
-      console.warn("Client ID not found, skipping activity log");
+      console.error("\n❌ CRITICAL: Client ID is empty!");
+      console.error("Activity logging cannot proceed without clientId");
+      console.error(
+        "Please ensure user is logged in and clientId is stored in AsyncStorage"
+      );
+      console.warn("⚠️ Skipping activity log due to missing clientId");
       return;
     }
 
+    console.log("\n🔨 Step 3: Building activity payload...");
     const activityPayload = {
       user,
       clientId,
@@ -134,14 +154,57 @@ export const logActivity = async (params: ActivityLogParams) => {
       message: params.message,
       changedData: params.changedData,
       metadata: params.metadata,
+      date: new Date().toISOString(),
     };
 
-    console.log("📝 Logging activity:", activityPayload);
+    console.log("✅ Activity payload built successfully");
+    console.log("\n📝 Payload details:");
+    console.log(JSON.stringify(activityPayload, null, 2));
 
-    await axios.post(`${domain}/api/activity`, activityPayload);
-    console.log("✅ Activity logged successfully");
-  } catch (error) {
-    console.error("❌ Failed to log activity:", error);
+    console.log("\n🌐 Step 4: Sending POST request to Activity API...");
+    console.log("API Endpoint:", `${domain}/api/activity`);
+
+    const response = await axios.post(
+      `${domain}/api/activity`,
+      activityPayload
+    );
+
+    console.log("\n✅ SUCCESS! Activity logged to API");
+    console.log("Response Status:", response.status);
+    console.log("Response Data:", JSON.stringify(response.data, null, 2));
+    console.log("========================================");
+    console.log("🏁 ACTIVITY LOGGING COMPLETED");
+    console.log("========================================\n");
+  } catch (error: any) {
+    console.error("\n========================================");
+    console.error("❌ ACTIVITY LOGGING FAILED");
+    console.error("========================================");
+    console.error("Error Type:", error?.name);
+    console.error("Error Message:", error?.message);
+
+    if (error?.response) {
+      console.error("\n📡 API Response Error:");
+      console.error("   Status:", error.response.status);
+      console.error("   Status Text:", error.response.statusText);
+      console.error(
+        "   Error Data:",
+        JSON.stringify(error.response.data, null, 2)
+      );
+    } else if (error?.request) {
+      console.error("\n📡 Network Error:");
+      console.error("   No response received from server");
+      console.error("   Request was made but no response");
+    } else {
+      console.error("\n⚠️ Unknown Error:", error);
+    }
+
+    console.error("\n💡 Troubleshooting Tips:");
+    console.error("   1. Check if Activity API endpoint exists");
+    console.error("   2. Verify MongoDB connection");
+    console.error("   3. Check Activity model schema");
+    console.error("   4. Verify network connectivity");
+    console.error("========================================\n");
+
     // Don't throw error - activity logging is not critical
   }
 };
@@ -155,15 +218,27 @@ export const logProjectCreated = async (
   projectName: string,
   metadata?: any
 ) => {
-  await logActivity({
-    activityType: "project_created",
-    category: "project",
-    action: "create",
-    description: `Created project "${projectName}"`,
+  console.log("🎯 logProjectCreated called with:", {
     projectId,
     projectName,
     metadata,
   });
+
+  try {
+    await logActivity({
+      activityType: "project_created",
+      category: "project",
+      action: "create",
+      description: `Created project "${projectName}"`,
+      projectId,
+      projectName,
+      metadata,
+    });
+    console.log("🎯 logProjectCreated completed");
+  } catch (error) {
+    console.error("🎯 logProjectCreated error:", error);
+    // Don't throw - activity logging should not break the main flow
+  }
 };
 
 export const logProjectUpdated = async (
@@ -335,7 +410,7 @@ export const logMiniSectionDeleted = async (
 };
 
 // ============================================
-// MATERIAL ACTIVITIES (Already exists but adding for completeness)
+// MATERIAL ACTIVITIES
 // ============================================
 
 export const logMaterialImported = async (
@@ -346,12 +421,12 @@ export const logMaterialImported = async (
   message?: string
 ) => {
   await logActivity({
-    activityType: "material_imported",
+    activityType: "other",
     category: "material",
     action: "import",
     description: `Imported ${materialCount} material${
       materialCount > 1 ? "s" : ""
-    } (₹${totalCost.toLocaleString("en-IN")})`,
+    } to project "${projectName}"`,
     projectId,
     projectName,
     message,
@@ -372,13 +447,13 @@ export const logMaterialUsed = async (
   materialName: string,
   quantity: number,
   unit: string,
-  cost?: number
+  metadata?: any
 ) => {
   await logActivity({
-    activityType: "material_used",
+    activityType: "other",
     category: "material",
     action: "use",
-    description: `Used ${quantity} ${unit} of ${materialName} in "${miniSectionName}"`,
+    description: `Used ${quantity} ${unit} of ${materialName} in mini-section "${miniSectionName}"`,
     projectId,
     projectName,
     sectionId,
@@ -389,42 +464,8 @@ export const logMaterialUsed = async (
       materialName,
       quantity,
       unit,
-      cost,
+      ...metadata,
     },
-  });
-};
-
-export const logMaterialUpdated = async (
-  projectId: string,
-  projectName: string,
-  materialName: string,
-  changedData?: Array<{ field: string; oldValue: any; newValue: any }>,
-  message?: string
-) => {
-  await logActivity({
-    activityType: "material_updated",
-    category: "material",
-    action: "update",
-    description: `Updated material "${materialName}"`,
-    projectId,
-    projectName,
-    changedData,
-    message,
-  });
-};
-
-export const logMaterialDeleted = async (
-  projectId: string,
-  projectName: string,
-  materialName: string
-) => {
-  await logActivity({
-    activityType: "material_deleted",
-    category: "material",
-    action: "delete",
-    description: `Deleted material "${materialName}"`,
-    projectId,
-    projectName,
   });
 };
 

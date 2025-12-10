@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export interface LegendItem {
     key: string;
@@ -91,9 +91,11 @@ const PieChartLegend: React.FC<PieChartLegendProps> = ({
                             </Text>
                         </View>
                         {showDescription && item.description && (
-                            <Text style={styles.itemDescription} numberOfLines={2}>
-                                {item.description}
-                            </Text>
+                            <View style={styles.descriptionContainer}>
+                                <Text style={styles.itemDescription} numberOfLines={2}>
+                                    {item.description}
+                                </Text>
+                            </View>
                         )}
                     </View>
                 </TouchableOpacity>
@@ -177,10 +179,17 @@ const styles = StyleSheet.create({
         color: '#7F8C8D',
         fontWeight: '400',
     },
+    descriptionContainer: {
+        marginTop: 4,
+        paddingTop: 6,
+        borderTopWidth: 1,
+        borderTopColor: '#ECF0F1',
+    },
     itemDescription: {
-        fontSize: 12,
-        color: '#7F8C8D',
-        lineHeight: 16,
+        fontSize: 13,
+        color: '#2C3E50',
+        lineHeight: 18,
+        fontWeight: '600',
     },
     moreText: {
         fontSize: 12,

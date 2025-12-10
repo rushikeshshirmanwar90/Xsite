@@ -180,12 +180,11 @@ const ManageProject = () => {
                                 toast.success('Section deleted successfully!');
 
                                 // Log activity
-                                logSectionDeleted(
+                                await logSectionDeleted(
                                     id as string,
                                     name as string,
                                     sectionId,
-                                    section.name,
-                                    'Section deleted by user'
+                                    section.name
                                 );
 
                                 // Remove the section from the list immediately (optimistic update)
@@ -332,7 +331,7 @@ const ManageProject = () => {
                 toast.success('Section updated successfully!');
 
                 // Log activity
-                logSectionUpdated(
+                await logSectionUpdated(
                     id as string,
                     name as string,
                     sectionId,
@@ -465,13 +464,11 @@ const ManageProject = () => {
                 console.log('Adding formatted section to list:', formattedSection);
 
                 // Log activity
-                const sectionTypeName = type === 'building' ? 'Building' : (type === 'rowhouse' ? 'Row House' : 'Other Section');
-                logSectionCreated(
+                await logSectionCreated(
                     id as string,
                     name as string,
                     formattedSection._id || formattedSection.sectionId,
-                    title,
-                    sectionTypeName
+                    title
                 );
 
                 // Add the new section to the existing sections

@@ -5,6 +5,7 @@ import StaffHeader from '@/components/staff/StaffHeader';
 import StaffList from '@/components/staff/StaffList';
 import { getClientId } from '@/functions/clientId';
 import { addStaff } from '@/functions/staff';
+import { isAdmin, useUser } from '@/hooks/useUser';
 import { domain } from '@/lib/domain';
 import { Staff } from '@/types/staff';
 import axios from 'axios';
@@ -22,6 +23,10 @@ const StaffManagement: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [clientId, setClientId] = useState('');
     const [loading, setLoading] = useState(true);
+
+    // Get user role for access control
+    const { user } = useUser();
+    const userIsAdmin = isAdmin(user);
 
     // !! fetching clientId
     useEffect(() => {
@@ -53,6 +58,12 @@ const StaffManagement: React.FC = () => {
     }, []); // Empty dependency array to run only once
 
     const handleAddStaff = async (newStaff: Staff) => {
+        // Check if user is admin
+        if (!userIsAdmin) {
+            toast.error('Only admins can add staff members');
+            return;
+        }
+
         if (!clientId) {
             toast.error('Client ID not found');
             return;
@@ -120,6 +131,7 @@ const StaffManagement: React.FC = () => {
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
                 onAddPress={() => setShowAddModal(true)}
+                isAdmin={userIsAdmin}
             />
 
             {loading ? (

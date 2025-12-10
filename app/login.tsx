@@ -1,4 +1,5 @@
 import Loading from '@/components/Loading';
+import { useAuth } from '@/contexts/AuthContext';
 import { addPassword, confirmMail, findUserType, forgetPassword, getUser, login, sendOtp } from '@/functions/login';
 import { generateOTP } from '@/lib/functions';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -25,6 +26,7 @@ type Step = 'email' | 'otp' | 'password';
 
 export default function LoginScreen() {
     const router = useRouter();
+    const { checkAuthStatus } = useAuth();
     const scrollViewRef = useRef<ScrollView>(null);
 
     const [mountLoading, setMountLoading] = useState<boolean>(true);
@@ -37,6 +39,7 @@ export default function LoginScreen() {
     const [showPassword, setShowPassword] = useState(false);
     const [isVerified, setIsVerified] = useState(false);
     const [userType, setUserType] = useState('');
+    const [isNavigating, setIsNavigating] = useState(false);
 
     useEffect(() => {
         // Just check if we should show loading, don't navigate
@@ -44,6 +47,10 @@ export default function LoginScreen() {
         const checkLogin = async () => {
             try {
                 const res = await AsyncStorage.getItem("user")
+                if (res) {
+                    // User is already logged in, let AuthContext handle navigation
+                    console.log('User already logged in, waiting for AuthContext...');
+                }
                 // Always set loading to false, let AuthContext handle navigation
                 setMountLoading(false);
             } catch (error) {
@@ -141,16 +148,27 @@ export default function LoginScreen() {
                 await AsyncStorage.setItem('userType', userType);
 
                 toast.success('Password set successfully');
-                router.replace({
-                    pathname: "/(tabs)"
-                });
+
+                // Show navigating state
+                setIsNavigating(true);
+                setLoading(false);
+
+                // Trigger auth context to update
+                await checkAuthStatus();
+
+                // Navigate after a brief moment
+                setTimeout(() => {
+                    router.replace({
+                        pathname: "/(tabs)"
+                    });
+                }, 300);
             } else {
                 toast.error("Something went wrong, please try again later");
+                setLoading(false);
             }
         } catch (error) {
             console.error('Password setup error:', error);
             toast.error('Failed to set password');
-        } finally {
             setLoading(false);
         }
     };
@@ -179,16 +197,27 @@ export default function LoginScreen() {
                 await AsyncStorage.setItem('userType', userType);
 
                 toast.success("User logged in successfully");
-                router.replace({
-                    pathname: "/(tabs)",
-                });
+
+                // Show navigating state
+                setIsNavigating(true);
+                setLoading(false);
+
+                // Trigger auth context to update
+                await checkAuthStatus();
+
+                // Navigate after a brief moment
+                setTimeout(() => {
+                    router.replace({
+                        pathname: "/(tabs)",
+                    });
+                }, 300);
             } else {
                 toast.error(result.error || "Invalid email or password");
+                setLoading(false);
             }
         } catch (error) {
             console.error('Login error:', error);
             toast.error("Failed to login due to an unexpected error");
-        } finally {
             setLoading(false);
         }
     };
@@ -456,6 +485,16 @@ export default function LoginScreen() {
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
+
+            {/* Navigating Overlay */}
+            {isNavigating && (
+                <View style={styles.navigatingOverlay}>
+                    <View style={styles.navigatingContainer}>
+                        <ActivityIndicator size="large" color="#3b82f6" />
+                        <Text style={styles.navigatingText}>Redirecting...</Text>
+                    </View>
+                </View>
+            )}
         </SafeAreaView>
     );
 }
@@ -639,5 +678,33 @@ const styles = StyleSheet.create({
         color: '#3b82f6',
         fontSize: 14,
         fontWeight: '600',
+    },
+    navigatingOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1000,
+    },
+    navigatingContainer: {
+        backgroundColor: '#ffffff',
+        borderRadius: 16,
+        padding: 32,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 8,
+    },
+    navigatingText: {
+        marginTop: 16,
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#3b82f6',
     },
 });

@@ -38,6 +38,7 @@ interface MaterialActivity {
     materials: Material[];
     message?: string;
     activity: 'imported' | 'used';
+    date?: string; // Material activities use 'date' field
     createdAt: string;
     updatedAt: string;
 }
@@ -62,7 +63,7 @@ const MaterialActivityNotifications: React.FC<MaterialActivityNotificationsProps
 
     const fetchActivities = async (isRefreshing = false) => {
         if (!isRefreshing) setLoading(true);
-        
+
         try {
             // Get clientId from storage if not provided
             let finalClientId = clientId;
@@ -87,7 +88,7 @@ const MaterialActivityNotifications: React.FC<MaterialActivityNotificationsProps
 
             const response = await axios.get(`${domain}/api/materialActivity?${params.toString()}`);
             const responseData = response.data as { success: boolean; data?: MaterialActivity[]; message?: string };
-            
+
             if (responseData.success) {
                 setActivities(responseData.data || []);
             } else {
@@ -122,23 +123,45 @@ const MaterialActivityNotifications: React.FC<MaterialActivityNotificationsProps
     };
 
     const formatDate = (dateString: string) => {
-        const date = new Date(dateString);
-        const now = new Date();
-        const diffMs = now.getTime() - date.getTime();
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMs / 3600000);
-        const diffDays = Math.floor(diffMs / 86400000);
+        try {
+            // Handle empty or invalid date strings
+            if (!dateString) {
+                return 'Recently';
+            }
 
-        if (diffMins < 1) return 'Just now';
-        if (diffMins < 60) return `${diffMins}m ago`;
-        if (diffHours < 24) return `${diffHours}h ago`;
-        if (diffDays < 7) return `${diffDays}d ago`;
-        
-        return date.toLocaleDateString('en-US', { 
-            month: 'short', 
-            day: 'numeric',
-            year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
-        });
+            const date = new Date(dateString);
+
+            // Check if date is valid
+            if (isNaN(date.getTime())) {
+                console.warn('Invalid date string:', dateString);
+                return 'Recently';
+            }
+
+            const now = new Date();
+            const diffMs = now.getTime() - date.getTime();
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+
+            // Handle future dates
+            if (diffMs < 0) {
+                return 'Just now';
+            }
+
+            if (diffMins < 1) return 'Just now';
+            if (diffMins < 60) return `${diffMins}m ago`;
+            if (diffHours < 24) return `${diffHours}h ago`;
+            if (diffDays < 7) return `${diffDays}d ago`;
+
+            return date.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+            });
+        } catch (error) {
+            console.error('Error formatting date:', dateString, error);
+            return 'Recently';
+        }
     };
 
     const renderActivityItem = ({ item }: { item: MaterialActivity }) => {
@@ -151,17 +174,19 @@ const MaterialActivityNotifications: React.FC<MaterialActivityNotificationsProps
                 {/* Header */}
                 <View style={styles.activityHeader}>
                     <View style={[styles.activityIconBadge, { backgroundColor: activityColor + '20' }]}>
-                        <Ionicons 
-                            name={getActivityIcon(item.activity)} 
-                            size={24} 
-                            color={activityColor} 
+                        <Ionicons
+                            name={getActivityIcon(item.activity)}
+                            size={24}
+                            color={activityColor}
                         />
                     </View>
                     <View style={styles.activityHeaderText}>
                         <Text style={styles.activityTitle}>
                             Material {item.activity === 'imported' ? 'Imported' : 'Used'}
                         </Text>
-                        <Text style={styles.activityTime}>{formatDate(item.createdAt)}</Text>
+                        <Text style={styles.activityTime}>
+                            {formatDate(item.date || item.createdAt)}
+                        </Text>
                     </View>
                 </View>
 
@@ -252,10 +277,10 @@ const MaterialActivityNotifications: React.FC<MaterialActivityNotificationsProps
                             style={[styles.filterTab, filter === 'imported' && styles.filterTabActive]}
                             onPress={() => setFilter('imported')}
                         >
-                            <Ionicons 
-                                name="arrow-down-circle" 
-                                size={16} 
-                                color={filter === 'imported' ? '#10B981' : '#64748B'} 
+                            <Ionicons
+                                name="arrow-down-circle"
+                                size={16}
+                                color={filter === 'imported' ? '#10B981' : '#64748B'}
                             />
                             <Text style={[styles.filterTabText, filter === 'imported' && styles.filterTabTextActive]}>
                                 Imported
@@ -265,10 +290,10 @@ const MaterialActivityNotifications: React.FC<MaterialActivityNotificationsProps
                             style={[styles.filterTab, filter === 'used' && styles.filterTabActive]}
                             onPress={() => setFilter('used')}
                         >
-                            <Ionicons 
-                                name="arrow-forward-circle" 
-                                size={16} 
-                                color={filter === 'used' ? '#EF4444' : '#64748B'} 
+                            <Ionicons
+                                name="arrow-forward-circle"
+                                size={16}
+                                color={filter === 'used' ? '#EF4444' : '#64748B'}
                             />
                             <Text style={[styles.filterTabText, filter === 'used' && styles.filterTabTextActive]}>
                                 Used
