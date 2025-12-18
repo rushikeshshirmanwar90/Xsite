@@ -1,17 +1,17 @@
 import React, { useRef, useState } from 'react';
 import {
-    Alert,
-    Animated,
-    Dimensions,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    StyleSheet,
-    Text,
-    TextStyle,
-    TouchableOpacity,
-    View,
-    ViewStyle
+  Alert,
+  Animated,
+  Dimensions,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TextStyle,
+  TouchableOpacity,
+  View,
+  ViewStyle
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -123,8 +123,8 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       return;
     }
 
-    // Calculate total cost
-    const totalCost = quantity * costPerUnit;
+    // Store per-unit cost, not total cost
+    // This is important for correct calculations when using materials later
 
     if (editingMaterialIndex !== null) {
       const updatedMaterials = [...addedMaterials];
@@ -133,12 +133,12 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
         name: formData.name,
         unit: formData.unit,
         quantity,
-        cost: totalCost, // Store total cost
+        cost: costPerUnit, // Store per-unit cost
         specs: formData.specs,
       };
       setAddedMaterials(updatedMaterials);
       setEditingMaterialIndex(null);
-      
+
       // Show toast for update
       toast.success('Material updated successfully');
     } else {
@@ -147,15 +147,15 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
         name: formData.name,
         unit: formData.unit,
         quantity,
-        cost: totalCost, // Store total cost
+        cost: costPerUnit, // Store per-unit cost
         specs: formData.specs,
         date: new Date().toLocaleDateString('en-IN'),
       };
       setAddedMaterials([...addedMaterials, newEntry]);
-      
+
       // Show toast for new material
       toast.success(`✓ ${formData.name} added to list`);
-      
+
       // Scroll to top to show the added material
       setTimeout(() => {
         scrollViewRef.current?.scrollTo({ y: 0, animated: true });
@@ -173,8 +173,8 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     }));
 
     // Calculate per-unit cost from total cost
-    const costPerUnit = materialToEdit.quantity > 0 
-      ? (materialToEdit.cost || 0) / materialToEdit.quantity 
+    const costPerUnit = materialToEdit.quantity > 0
+      ? (materialToEdit.cost || 0) / materialToEdit.quantity
       : 0;
 
     setFormData({
@@ -333,9 +333,9 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   const specFields = getSpecFields();
 
   return (
-    <Modal 
-      visible={visible} 
-      animationType="slide" 
+    <Modal
+      visible={visible}
+      animationType="slide"
       onRequestClose={() => handleClose(false)}
       presentationStyle="fullScreen"
     >

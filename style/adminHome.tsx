@@ -640,4 +640,87 @@ export const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 8,
     },
+
+    // Pagination Styles
+    paginationContainer: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 16,
+        marginTop: 16,
+        marginBottom: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    paginationInfo: {
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    paginationText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1F2937',
+        marginBottom: 4,
+    },
+    paginationSubText: {
+        fontSize: 13,
+        color: '#6B7280',
+    },
+    paginationButtons: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    paginationButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#3B82F6',
+        backgroundColor: '#FFFFFF',
+    },
+    paginationButtonDisabled: {
+        borderColor: '#E5E7EB',
+        backgroundColor: '#F9FAFB',
+    },
+    paginationButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#3B82F6',
+        marginHorizontal: 4,
+    },
+    paginationButtonTextDisabled: {
+        color: '#CBD5E1',
+    },
+    pageNumbers: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    pageNumberButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F9FAFB',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    pageNumberButtonActive: {
+        backgroundColor: '#3B82F6',
+        borderColor: '#3B82F6',
+    },
+    pageNumberText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#6B7280',
+    },
+    pageNumberTextActive: {
+        color: '#FFFFFF',
+    },
 })

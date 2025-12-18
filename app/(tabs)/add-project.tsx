@@ -63,11 +63,28 @@ const ProjectScreen: React.FC = () => {
 
             const clientId = await getClientId();
             setClientId(clientId);
+
+            console.log('📝 Fetching projects for clientId:', clientId);
             const res = await axios.get(`${domain}/api/project?clientId=${clientId}`);
-            setProjects(Array.isArray(res.data) ? res.data : []);
+
+            console.log('📦 API Response:', JSON.stringify(res.data, null, 2));
+
+            // ✅ FIXED: Handle new response structure
+            const responseData = res.data as any;
+            if (responseData.success && responseData.data) {
+                // Extract projects from nested structure
+                const projectsArray = responseData.data.projects || [];
+                console.log('✅ Projects extracted:', projectsArray.length);
+                setProjects(Array.isArray(projectsArray) ? projectsArray : []);
+            } else {
+                // Fallback for old response format
+                console.log('⚠️ Using fallback response parsing');
+                setProjects(Array.isArray(res.data) ? res.data : []);
+            }
         } catch (error) {
-            console.error('Error fetching projects:', error);
+            console.error('❌ Error fetching projects:', error);
             Alert.alert('Error', 'Failed to load projects');
+            setProjects([]); // Set empty array on error
         } finally {
             isLoadingRef.current = false;
             setLoading(false);

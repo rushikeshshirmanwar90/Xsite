@@ -34,6 +34,14 @@ const Index: React.FC = () => {
     const [companyName, setCompanyName] = useState<string>('Company Name');
     const [companyLogo, setCompanyLogo] = useState<string | null>(null);
 
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalProjects, setTotalProjects] = useState(0);
+    const [hasNextPage, setHasNextPage] = useState(false);
+    const [hasPrevPage, setHasPrevPage] = useState(false);
+    const [itemsPerPage] = useState(10);
+
     // Get user role for access control
     const { user } = useUser();
     const userIsAdmin = isAdmin(user);
@@ -43,8 +51,8 @@ const Index: React.FC = () => {
     const lastLoadTimeRef = React.useRef<number>(0);
     const DEBOUNCE_DELAY = 500;
 
-    // Fetch project data function
-    const fetchProjectData = async (showLoadingState = true) => {
+    // Fetch project data function with pagination
+    const fetchProjectData = async (page: number = currentPage, showLoadingState = true) => {
         // Prevent duplicate calls
         if (isLoadingRef.current) {
             console.log('⏸️ Skipping fetch - already loading');
@@ -70,8 +78,15 @@ const Index: React.FC = () => {
             setClientId(clientId);
 
             if (clientId) {
-                const projectData = await getProjectData(clientId);
+                const { projects: projectData, meta } = await getProjectData(clientId, page, itemsPerPage);
                 setProjects(Array.isArray(projectData) ? projectData : []);
+
+                // Update pagination state
+                setCurrentPage(meta.page);
+                setTotalPages(meta.totalPages);
+                setTotalProjects(meta.total);
+                setHasNextPage(meta.hasNextPage);
+                setHasPrevPage(meta.hasPrevPage);
             }
         } catch (error) {
             console.error('Failed to fetch projects:', error);
@@ -88,17 +103,36 @@ const Index: React.FC = () => {
             try {
                 const clientId = await getClientId();
                 if (clientId) {
+                    console.log('📝 Fetching client data for:', clientId);
                     const response = await axios.get(`${domain}/api/client?id=${clientId}`);
                     const responseData = response.data as any;
 
-                    if (responseData && responseData.clientData) {
+                    console.log('📦 Client API Response:', JSON.stringify(responseData, null, 2));
+
+                    // Handle new response structure: { success, message, data }
+                    if (responseData.success && responseData.data) {
+                        const client = responseData.data;
+                        setCompanyName(client.companyName || client.name || 'Company Name');
+                        setCompanyLogo(client.logo || null);
+                        console.log('✅ Client data loaded:', client.companyName || client.name);
+                    }
+                    // Fallback for old response structure: { clientData }
+                    else if (responseData.clientData) {
                         const client = responseData.clientData;
                         setCompanyName(client.companyName || client.name || 'Company Name');
                         setCompanyLogo(client.logo || null);
+                        console.log('✅ Client data loaded (legacy):', client.companyName || client.name);
+                    } else {
+                        console.warn('⚠️ Unexpected client response structure:', responseData);
                     }
                 }
-            } catch (error) {
-                console.error('Error fetching client data:', error);
+            } catch (error: unknown) {
+                console.error('❌ Error fetching client data:', error);
+                if (error && typeof error === 'object' && 'response' in error) {
+                    const axiosError = error as { response?: { data?: unknown; status?: number } };
+                    console.error('Response:', axiosError.response?.data);
+                    console.error('Status:', axiosError.response?.status);
+                }
             }
         };
 
@@ -107,7 +141,7 @@ const Index: React.FC = () => {
 
     // Initial data fetch
     useEffect(() => {
-        fetchProjectData();
+        fetchProjectData(1);
     }, []);
 
     // Pull to refresh handler
@@ -119,9 +153,34 @@ const Index: React.FC = () => {
 
         setRefreshing(true);
         try {
-            await fetchProjectData(false); // Don't show loading state during refresh
+            setCurrentPage(1); // Reset to first page on refresh
+            await fetchProjectData(1, false); // Don't show loading state during refresh
         } finally {
             setRefreshing(false);
+        }
+    };
+
+    // Pagination handlers
+    const handleNextPage = () => {
+        if (hasNextPage && !loading) {
+            const nextPage = currentPage + 1;
+            setCurrentPage(nextPage);
+            fetchProjectData(nextPage);
+        }
+    };
+
+    const handlePrevPage = () => {
+        if (hasPrevPage && !loading) {
+            const prevPage = currentPage - 1;
+            setCurrentPage(prevPage);
+            fetchProjectData(prevPage);
+        }
+    };
+
+    const handleGoToPage = (page: number) => {
+        if (page >= 1 && page <= totalPages && page !== currentPage && !loading) {
+            setCurrentPage(page);
+            fetchProjectData(page);
         }
     };
 
@@ -283,15 +342,110 @@ const Index: React.FC = () => {
                 ) : (
                     <View style={{ marginBottom: 24 }} >
                         {projects && projects.length > 0 ? (
-                            projects.map((project, index) => (
-                                <View key={index} style={{ marginBottom: 10 }}  >
-                                    <ProjectCard
-                                        key={project._id}
-                                        project={project}
-                                        onViewDetails={handleViewDetails}
-                                    />
-                                </View>
-                            ))
+                            <>
+                                {projects.map((project, index) => (
+                                    <View key={index} style={{ marginBottom: 10 }}  >
+                                        <ProjectCard
+                                            key={project._id}
+                                            project={project}
+                                            onViewDetails={handleViewDetails}
+                                        />
+                                    </View>
+                                ))}
+
+                                {/* Pagination Controls */}
+                                {totalPages > 1 && (
+                                    <View style={styles.paginationContainer}>
+                                        <View style={styles.paginationInfo}>
+                                            <Text style={styles.paginationText}>
+                                                Page {currentPage} of {totalPages}
+                                            </Text>
+                                            <Text style={styles.paginationSubText}>
+                                                Total: {totalProjects} project{totalProjects !== 1 ? 's' : ''}
+                                            </Text>
+                                        </View>
+
+                                        <View style={styles.paginationButtons}>
+                                            <TouchableOpacity
+                                                style={[
+                                                    styles.paginationButton,
+                                                    (!hasPrevPage || loading) && styles.paginationButtonDisabled
+                                                ]}
+                                                onPress={handlePrevPage}
+                                                disabled={!hasPrevPage || loading}
+                                            >
+                                                <Ionicons
+                                                    name="chevron-back"
+                                                    size={20}
+                                                    color={(!hasPrevPage || loading) ? '#CBD5E1' : '#3B82F6'}
+                                                />
+                                                <Text style={[
+                                                    styles.paginationButtonText,
+                                                    (!hasPrevPage || loading) && styles.paginationButtonTextDisabled
+                                                ]}>
+                                                    Previous
+                                                </Text>
+                                            </TouchableOpacity>
+
+                                            {/* Page Numbers */}
+                                            <View style={styles.pageNumbers}>
+                                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                                    let pageNum;
+                                                    if (totalPages <= 5) {
+                                                        pageNum = i + 1;
+                                                    } else if (currentPage <= 3) {
+                                                        pageNum = i + 1;
+                                                    } else if (currentPage >= totalPages - 2) {
+                                                        pageNum = totalPages - 4 + i;
+                                                    } else {
+                                                        pageNum = currentPage - 2 + i;
+                                                    }
+
+                                                    return (
+                                                        <TouchableOpacity
+                                                            key={pageNum}
+                                                            style={[
+                                                                styles.pageNumberButton,
+                                                                currentPage === pageNum && styles.pageNumberButtonActive
+                                                            ]}
+                                                            onPress={() => handleGoToPage(pageNum)}
+                                                            disabled={loading}
+                                                        >
+                                                            <Text style={[
+                                                                styles.pageNumberText,
+                                                                currentPage === pageNum && styles.pageNumberTextActive
+                                                            ]}>
+                                                                {pageNum}
+                                                            </Text>
+                                                        </TouchableOpacity>
+                                                    );
+                                                })}
+                                            </View>
+
+                                            <TouchableOpacity
+                                                style={[
+                                                    styles.paginationButton,
+                                                    (!hasNextPage || loading) && styles.paginationButtonDisabled
+                                                ]}
+                                                onPress={handleNextPage}
+                                                disabled={!hasNextPage || loading}
+                                            >
+                                                <Text style={[
+                                                    styles.paginationButtonText,
+                                                    (!hasNextPage || loading) && styles.paginationButtonTextDisabled
+                                                ]}>
+                                                    Next
+                                                </Text>
+                                                <Ionicons
+                                                    name="chevron-forward"
+                                                    size={20}
+                                                    color={(!hasNextPage || loading) ? '#CBD5E1' : '#3B82F6'}
+                                                />
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                )}
+                            </>
                         ) : (
                             <View style={styles.centerContainer}>
                                 <Text style={styles.emptyText}>No projects found</Text>

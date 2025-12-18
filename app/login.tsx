@@ -140,12 +140,38 @@ export default function LoginScreen() {
                 const user = await getUser(email, userType);
                 console.log('User data retrieved:', user);
 
-                // Store user data in AsyncStorage with 'user' key for consistency
+                // ✅ Ensure _id is accessible and stored properly
+                if (user && user._id) {
+                    // Convert ObjectId to string if needed
+                    if (typeof user._id === 'object') {
+                        user._id = user._id.toString();
+                    }
+                    
+                    // ✅ FIX: Don't override clientId with _id! 
+                    // The API already returns the correct clientId
+                    // user.clientId should be the client/company ID, not the user's own ID
+                    if (user.clientId && typeof user.clientId === 'object') {
+                        user.clientId = user.clientId.toString();
+                    }
+                    
+                    console.log('✅ User ID (_id):', user._id);
+                    console.log('✅ Client ID (clientId):', user.clientId);
+                    console.log('✅ These should be DIFFERENT values!');
+                }
+
+                // ✅ Clear any existing data before storing new data
+                console.log('🧹 Clearing existing data before login...');
+                await AsyncStorage.clear();
+                
+                // Store fresh user data in AsyncStorage
                 const jsonUser = JSON.stringify(user);
+                console.log('💾 Storing fresh user data:', jsonUser);
                 await AsyncStorage.setItem('user', jsonUser);
 
                 // Also store userType separately for reference
                 await AsyncStorage.setItem('userType', userType);
+                
+                console.log('✅ Fresh login data stored successfully');
 
                 toast.success('Password set successfully');
 
@@ -189,12 +215,38 @@ export default function LoginScreen() {
                 const user = await getUser(email, userType);
                 console.log('User data retrieved:', user);
 
-                // Store user data in AsyncStorage with 'user' key for consistency
+                // ✅ Ensure _id is accessible and stored properly
+                if (user && user._id) {
+                    // Convert ObjectId to string if needed
+                    if (typeof user._id === 'object') {
+                        user._id = user._id.toString();
+                    }
+                    
+                    // ✅ FIX: Don't override clientId with _id! 
+                    // The API already returns the correct clientId
+                    // user.clientId should be the client/company ID, not the user's own ID
+                    if (user.clientId && typeof user.clientId === 'object') {
+                        user.clientId = user.clientId.toString();
+                    }
+                    
+                    console.log('✅ User ID (_id):', user._id);
+                    console.log('✅ Client ID (clientId):', user.clientId);
+                    console.log('✅ These should be DIFFERENT values!');
+                }
+
+                // ✅ Clear any existing data before storing new data
+                console.log('🧹 Clearing existing data before login...');
+                await AsyncStorage.clear();
+                
+                // Store fresh user data in AsyncStorage
                 const jsonUser = JSON.stringify(user);
+                console.log('💾 Storing fresh user data:', jsonUser);
                 await AsyncStorage.setItem("user", jsonUser);
 
                 // Also store userType separately for reference
                 await AsyncStorage.setItem('userType', userType);
+                
+                console.log('✅ Fresh login data stored successfully');
 
                 toast.success("User logged in successfully");
 

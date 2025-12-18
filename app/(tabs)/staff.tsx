@@ -9,6 +9,7 @@ import { isAdmin, useUser } from '@/hooks/useUser';
 import { domain } from '@/lib/domain';
 import { Staff } from '@/types/staff';
 import axios from 'axios';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
     StatusBar,
@@ -27,6 +28,9 @@ const StaffManagement: React.FC = () => {
     // Get user role for access control
     const { user } = useUser();
     const userIsAdmin = isAdmin(user);
+    
+    // Router for navigation
+    const router = useRouter();
 
     // !! fetching clientId
     useEffect(() => {
@@ -107,9 +111,16 @@ const StaffManagement: React.FC = () => {
     };
 
     const handleStaffPress = (staff: Staff) => {
-        // Handle staff card press - could navigate to detail view
+        // Navigate to staff detail page with staff data
         console.log('Staff selected:', `${staff.firstName} ${staff.lastName}`);
-        // You can implement navigation to staff detail screen here
+        
+        // Navigate to staff detail screen with staff data as params
+        router.push({
+            pathname: '/staff-detail',
+            params: {
+                staff: JSON.stringify(staff)
+            }
+        });
     };
 
     const filteredStaff = staffList.filter(staff => {

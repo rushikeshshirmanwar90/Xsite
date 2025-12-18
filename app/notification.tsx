@@ -153,9 +153,16 @@ const NotificationPage: React.FC = () => {
         getCurrentUser();
     }, []);
 
-    const fetchActivities = async (showLoadingState = true) => {
+    // State for date-based pagination
+    const [dateGroups, setDateGroups] = useState<Array<{date: string, activities: any[], count: number}>>([]);
+    const [hasMoreDates, setHasMoreDates] = useState(false);
+    const [nextDate, setNextDate] = useState<string | null>(null);
+    const [loadingMore, setLoadingMore] = useState(false);
+
+    const fetchActivities = async (showLoadingState = true, loadMore = false) => {
         console.log('🚀 fetchActivities CALLED');
         console.log('   - showLoadingState:', showLoadingState);
+        console.log('   - loadMore:', loadMore);
         console.log('   - isLoadingRef.current:', isLoadingRef.current);
 
         // Prevent duplicate calls
@@ -169,7 +176,7 @@ const NotificationPage: React.FC = () => {
         const timeSinceLastLoad = now - lastLoadTimeRef.current;
         console.log('   - Time since last load:', timeSinceLastLoad, 'ms');
 
-        if (timeSinceLastLoad < DEBOUNCE_DELAY && lastLoadTimeRef.current > 0) {
+        if (timeSinceLastLoad < DEBOUNCE_DELAY && lastLoadTimeRef.current > 0 && !loadMore) {
             console.log('⏸️ Skipping fetch - debounced');
             return;
         }
@@ -179,36 +186,62 @@ const NotificationPage: React.FC = () => {
 
         try {
             isLoadingRef.current = true;
-            if (showLoadingState) {
+            if (showLoadingState && !loadMore) {
                 setLoading(true);
+            }
+            if (loadMore) {
+                setLoadingMore(true);
             }
             setError(null);
 
             const clientId = await getClientId();
             console.log('\n========================================');
-            console.log('FETCHING ACTIVITIES');
+            console.log('FETCHING ACTIVITIES WITH DATE PAGINATION');
             console.log('========================================');
             console.log('Client ID:', clientId);
+            console.log('Load More:', loadMore);
+            console.log('Next Date:', nextDate);
 
             if (!clientId) {
                 throw new Error('Client ID not found');
             }
 
+            // Build API URLs with date-based pagination
+            const activityParams = new URLSearchParams({
+                clientId,
+                paginationMode: 'date',
+                dateLimit: '10'
+            });
+            
+            const materialParams = new URLSearchParams({
+                clientId,
+                paginationMode: 'date',
+                dateLimit: '10'
+            });
+
+            // If loading more, add beforeDate parameter
+            if (loadMore && nextDate) {
+                activityParams.append('beforeDate', nextDate);
+                materialParams.append('beforeDate', nextDate);
+            }
+
             console.log('API URLs:');
-            console.log('  - Activity:', `${domain}/api/activity?clientId=${clientId}&limit=50`);
-            console.log('  - Material Activity:', `${domain}/api/materialActivity?clientId=${clientId}&limit=50`);
+            console.log('  - Activity:', `${domain}/api/activity?${activityParams.toString()}`);
+            console.log('  - Material Activity:', `${domain}/api/materialActivity?${materialParams.toString()}`);
 
             // Fetch both activities in parallel with better error handling
             const [activityRes, materialActivityRes] = await Promise.all([
-                axios.get(`${domain}/api/activity?clientId=${clientId}&limit=50`)
+                axios.get(`${domain}/api/activity?${activityParams.toString()}`)
                     .catch((err) => {
                         console.error('❌ Activity API Error:', err?.response?.data || err.message);
-                        return { data: { activities: [] } };
+                        // Return structure that matches successful response
+                        return { data: { success: true, data: { dateGroups: [], hasMoreDates: false, nextDate: null } } };
                     }),
-                axios.get(`${domain}/api/materialActivity?clientId=${clientId}&limit=50`)
+                axios.get(`${domain}/api/materialActivity?${materialParams.toString()}`)
                     .catch((err) => {
                         console.error('❌ Material Activity API Error:', err?.response?.data || err.message);
-                        return { data: [] };
+                        // Return structure that matches successful response
+                        return { data: { success: true, data: { dateGroups: [], hasMoreDates: false, nextDate: null } } };
                     }),
             ]);
 
@@ -217,91 +250,176 @@ const NotificationPage: React.FC = () => {
             console.log('Material Activity Response:', JSON.stringify(materialActivityRes.data, null, 2));
 
             const activityData = activityRes.data as any;
-            const materialDataRaw = materialActivityRes.data as any;
+            const materialData = materialActivityRes.data as any;
 
-            // Handle different response formats for Activity API
-            let activities: Activity[] = [];
-            if (Array.isArray(activityData)) {
-                // If response is directly an array
-                activities = activityData;
-            } else if (activityData && typeof activityData === 'object') {
-                // Check if it's wrapped in a property
-                activities = (activityData.activities ||
-                    activityData.data ||
-                    activityData.activity ||
-                    []) as Activity[];
-            }
+            // Extract date groups from both APIs - handle nested data structure
+            const activityDateGroups = activityData.data?.dateGroups || activityData.dateGroups || [];
+            const materialDateGroups = materialData.data?.dateGroups || materialData.dateGroups || [];
 
-            // Handle different response formats for Material Activity API
-            let materialData: MaterialActivity[] = [];
-            if (Array.isArray(materialDataRaw)) {
-                materialData = materialDataRaw;
-            } else if (materialDataRaw && typeof materialDataRaw === 'object') {
-                // Check if it's wrapped in a property
-                materialData = (materialDataRaw.materialActivities ||
-                    materialDataRaw.activities ||
-                    materialDataRaw.data ||
-                    []) as MaterialActivity[];
-            }
+            console.log('\n--- EXTRACTED DATE GROUPS ---');
+            console.log('Activity Date Groups:', activityDateGroups.length);
+            console.log('Material Date Groups:', materialDateGroups.length);
 
-            console.log('\n--- EXTRACTED DATA ---');
-            console.log('Activities count:', activities.length);
-            console.log('Material Activities count:', materialData.length);
+            // If no date groups found, try fallback to traditional pagination
+            if (activityDateGroups.length === 0 && materialDateGroups.length === 0 && !loadMore) {
+                console.log('⚠️ No date groups found, falling back to traditional pagination...');
+                
+                // Try traditional pagination as fallback
+                const [fallbackActivityRes, fallbackMaterialRes] = await Promise.all([
+                    axios.get(`${domain}/api/activity?clientId=${clientId}&limit=50`)
+                        .catch((err) => {
+                            console.error('❌ Fallback Activity API Error:', err?.response?.data || err.message);
+                            return { data: { activities: [] } };
+                        }),
+                    axios.get(`${domain}/api/materialActivity?clientId=${clientId}&limit=50`)
+                        .catch((err) => {
+                            console.error('❌ Fallback Material API Error:', err?.response?.data || err.message);
+                            return { data: [] };
+                        }),
+                ]);
 
-            // Debug user data in activities
-            if (materialData.length > 0) {
-                console.log('\n--- SAMPLE MATERIAL ACTIVITY ---');
-                console.log('First material activity:', JSON.stringify(materialData[0], null, 2));
-                console.log('User in first activity:', materialData[0].user);
-                console.log('\n🔍 DATE FIELD ANALYSIS:');
-                console.log('   - date field:', materialData[0].date);
-                console.log('   - date type:', typeof materialData[0].date);
-                console.log('   - createdAt field:', materialData[0].createdAt);
-                console.log('   - createdAt type:', typeof materialData[0].createdAt);
+                console.log('📦 Fallback API responses received');
+                
+                // Process fallback responses
+                const fallbackActivityData = fallbackActivityRes.data as any;
+                const fallbackMaterialDataRaw = fallbackMaterialRes.data as any;
 
-                // Test if date is valid
-                if (materialData[0].date) {
-                    const testDate = new Date(materialData[0].date);
-                    console.log('   - date is valid?', !isNaN(testDate.getTime()));
-                    console.log('   - parsed date:', testDate.toISOString());
+                // Handle different response formats for Activity API
+                let activities: Activity[] = [];
+                if (Array.isArray(fallbackActivityData)) {
+                    activities = fallbackActivityData;
+                } else if (fallbackActivityData && typeof fallbackActivityData === 'object') {
+                    activities = (fallbackActivityData.activities ||
+                        fallbackActivityData.data ||
+                        fallbackActivityData.activity ||
+                        []) as Activity[];
                 }
-                if (materialData[0].createdAt) {
-                    const testDate = new Date(materialData[0].createdAt);
-                    console.log('   - createdAt is valid?', !isNaN(testDate.getTime()));
-                    console.log('   - parsed createdAt:', testDate.toISOString());
+
+                // Handle different response formats for Material Activity API
+                let materialData: MaterialActivity[] = [];
+                if (Array.isArray(fallbackMaterialDataRaw)) {
+                    materialData = fallbackMaterialDataRaw;
+                } else if (fallbackMaterialDataRaw && typeof fallbackMaterialDataRaw === 'object') {
+                    materialData = (fallbackMaterialDataRaw.materialActivities ||
+                        fallbackMaterialDataRaw.activities ||
+                        fallbackMaterialDataRaw.data ||
+                        []) as MaterialActivity[];
                 }
+
+                console.log('📊 Fallback data extracted:');
+                console.log('   - Activities:', activities.length);
+                console.log('   - Materials:', materialData.length);
+
+                // Set legacy state for backward compatibility
+                setActivitiesRaw(activities || []);
+                setMaterialActivities(materialData || []);
+                
+                // Clear date groups since we're using traditional mode
+                setDateGroups([]);
+                setHasMoreDates(false);
+                setNextDate(null);
+
+                console.log('✅ Fallback to traditional pagination completed');
+                return; // Exit early, let the existing logic handle the display
             }
 
-            if (activities.length > 0) {
-                console.log('\n--- SAMPLE PROJECT ACTIVITY ---');
-                console.log('First project activity:', JSON.stringify(activities[0], null, 2));
-                console.log('User in first activity:', activities[0].user);
+            // Merge and sort date groups
+            const allDateGroups: { [date: string]: any[] } = {};
+
+            // Add activity date groups
+            activityDateGroups.forEach((group: any) => {
+                if (!allDateGroups[group.date]) {
+                    allDateGroups[group.date] = [];
+                }
+                group.activities.forEach((activity: any) => {
+                    allDateGroups[group.date].push({ type: 'activity', data: activity, timestamp: activity.createdAt });
+                });
+            });
+
+            // Add material date groups
+            materialDateGroups.forEach((group: any) => {
+                if (!allDateGroups[group.date]) {
+                    allDateGroups[group.date] = [];
+                }
+                group.activities.forEach((material: any) => {
+                    const timestamp = material.date || material.createdAt || new Date().toISOString();
+                    allDateGroups[group.date].push({ type: 'material', data: material, timestamp });
+                });
+            });
+
+            // Convert to sorted array
+            const sortedDates = Object.keys(allDateGroups).sort((a, b) => b.localeCompare(a));
+            const newDateGroups = sortedDates.map(date => ({
+                date,
+                activities: allDateGroups[date].sort((a, b) => 
+                    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                ),
+                count: allDateGroups[date].length
+            }));
+
+            // Update state
+            if (loadMore) {
+                // Append new date groups
+                setDateGroups(prev => [...prev, ...newDateGroups]);
             } else {
-                console.warn('⚠️ NO ACTIVITIES FOUND!');
-                console.warn('Raw response structure:', Object.keys(activityData));
-                console.warn('Full response:', JSON.stringify(activityData, null, 2));
+                // Replace date groups
+                setDateGroups(newDateGroups);
+                
+                // Also update legacy state for backward compatibility
+                const allActivities: Activity[] = [];
+                const allMaterials: MaterialActivity[] = [];
+                
+                activityDateGroups.forEach((group: any) => {
+                    allActivities.push(...group.activities);
+                });
+                
+                materialDateGroups.forEach((group: any) => {
+                    allMaterials.push(...group.activities);
+                });
+                
+                setActivitiesRaw(allActivities);
+                setMaterialActivities(allMaterials);
             }
-            console.log('========================================\n');
 
-            console.log('🔧 SETTING STATE:');
-            console.log('   - About to call setActivities with:', activities);
-            console.log('   - Is array?', Array.isArray(activities));
-            console.log('   - Length:', activities.length);
+            // Update pagination state - handle nested data structure
+            const hasMoreFromActivity = activityData.data?.hasMoreDates || activityData.hasMoreDates || false;
+            const hasMoreFromMaterial = materialData.data?.hasMoreDates || materialData.hasMoreDates || false;
+            const nextFromActivity = activityData.data?.nextDate || activityData.nextDate;
+            const nextFromMaterial = materialData.data?.nextDate || materialData.nextDate;
 
-            // Ensure we always set arrays, never undefined
-            setActivitiesRaw(activities || []);
-            setMaterialActivities(materialData || []);
+            setHasMoreDates(hasMoreFromActivity || hasMoreFromMaterial);
+            
+            // Use the earliest next date
+            let earliestNextDate = null;
+            if (nextFromActivity && nextFromMaterial) {
+                earliestNextDate = nextFromActivity < nextFromMaterial ? nextFromActivity : nextFromMaterial;
+            } else if (nextFromActivity) {
+                earliestNextDate = nextFromActivity;
+            } else if (nextFromMaterial) {
+                earliestNextDate = nextFromMaterial;
+            }
+            setNextDate(earliestNextDate);
 
-            console.log('✅ State set successfully');
+            console.log('✅ Date-based pagination state updated');
+            console.log('   - Date Groups:', newDateGroups.length);
+            console.log('   - Has More:', hasMoreFromActivity || hasMoreFromMaterial);
+            console.log('   - Next Date:', earliestNextDate);
+
         } catch (error) {
             console.error('Error fetching activities:', error);
             setError('Failed to load activities');
             // Ensure arrays are initialized even on error
-            setActivitiesRaw([]);
-            setMaterialActivities([]);
+            if (!loadMore) {
+                setActivitiesRaw([]);
+                setMaterialActivities([]);
+                setDateGroups([]);
+                setHasMoreDates(false);
+                setNextDate(null);
+            }
         } finally {
             isLoadingRef.current = false;
             setLoading(false);
+            setLoadingMore(false);
         }
     };
 
@@ -657,6 +775,34 @@ const NotificationPage: React.FC = () => {
 
     // Group activities by date
     const getGroupedByDate = () => {
+        // Use the new date groups from API if available
+        if (dateGroups.length > 0) {
+            return dateGroups.map(group => {
+                // Filter activities based on active tab
+                let filteredGroupActivities = group.activities;
+                
+                if (activeTab === 'project') {
+                    // Only show regular activities (not material activities)
+                    filteredGroupActivities = group.activities.filter(item => item.type === 'activity');
+                } else if (activeTab === 'material') {
+                    // Only show material activities that match the sub-tab
+                    filteredGroupActivities = group.activities.filter(item => 
+                        item.type === 'material' && 
+                        (item.data as MaterialActivity).activity === materialSubTab
+                    );
+                } else {
+                    // 'all' tab - show everything
+                    filteredGroupActivities = group.activities;
+                }
+                
+                return {
+                    date: group.date,
+                    activities: filteredGroupActivities
+                };
+            }).filter(group => group.activities.length > 0); // Remove empty date groups
+        }
+
+        // Fallback to client-side grouping for backward compatibility
         const groupedByDate: { [date: string]: typeof filteredActivities } = {};
 
         filteredActivities.forEach(activity => {
@@ -762,8 +908,31 @@ const NotificationPage: React.FC = () => {
     console.log('- Filtered Activities length:', filteredActivities.length);
     console.log('- Grouped Activities length:', groupedActivities.length);
     console.log('- Active Tab:', activeTab);
+    console.log('- Material Sub Tab:', materialSubTab);
+    console.log('- Date Groups (raw):', dateGroups.length);
     console.log('- Should show empty state?', !loading && !error && filteredActivities.length === 0);
     console.log('- Should show activities?', !loading && !error && filteredActivities.length > 0);
+    
+    // Debug tab filtering
+    if (dateGroups.length > 0) {
+        console.log('🔍 TAB FILTERING DEBUG:');
+        dateGroups.forEach((group, index) => {
+            const totalInGroup = group.activities.length;
+            const activityCount = group.activities.filter(item => item.type === 'activity').length;
+            const materialImportedCount = group.activities.filter(item => 
+                item.type === 'material' && (item.data as MaterialActivity).activity === 'imported'
+            ).length;
+            const materialUsedCount = group.activities.filter(item => 
+                item.type === 'material' && (item.data as MaterialActivity).activity === 'used'
+            ).length;
+            
+            console.log(`   Date ${group.date}:`);
+            console.log(`     - Total: ${totalInGroup}`);
+            console.log(`     - Activities: ${activityCount}`);
+            console.log(`     - Materials (imported): ${materialImportedCount}`);
+            console.log(`     - Materials (used): ${materialUsedCount}`);
+        });
+    }
 
     return (
         <SafeAreaView style={styles.container}>
@@ -775,7 +944,10 @@ const NotificationPage: React.FC = () => {
                 <View style={styles.headerContent}>
                     <Text style={styles.headerTitle}>Activity Feed</Text>
                     <Text style={styles.headerSubtitle}>
-                        {filteredActivities.length} {filteredActivities.length === 1 ? 'activity' : 'activities'}
+                        {groupedActivities.length > 0 
+                            ? `${groupedActivities.reduce((sum, group) => sum + group.activities.length, 0)} activities in ${groupedActivities.length} dates`
+                            : `${filteredActivities.length} ${filteredActivities.length === 1 ? 'activity' : 'activities'}`
+                        }
                     </Text>
                 </View>
                 <TouchableOpacity onPress={onRefresh} style={styles.refreshButton}>
@@ -788,28 +960,51 @@ const NotificationPage: React.FC = () => {
                 <TouchableOpacity
                     onPress={async () => {
                         console.log('\n========================================');
-                        console.log('DEBUG INFO');
+                        console.log('ENHANCED DEBUG INFO');
                         console.log('========================================');
-                        console.log('Activities:', activities.length);
-                        console.log('Material Activities:', materialActivities.length);
-                        console.log('Active Tab:', activeTab);
-                        console.log('Filtered Activities:', filteredActivities.length);
-                        console.log('Loading:', loading);
-                        console.log('Error:', error);
+                        console.log('Current State:');
+                        console.log('   - Activities (legacy):', activities.length);
+                        console.log('   - Material Activities (legacy):', materialActivities.length);
+                        console.log('   - Date Groups (new):', dateGroups.length);
+                        console.log('   - Has More Dates:', hasMoreDates);
+                        console.log('   - Next Date:', nextDate);
+                        console.log('   - Active Tab:', activeTab);
+                        console.log('   - Filtered Activities:', filteredActivities.length);
+                        console.log('   - Loading:', loading);
+                        console.log('   - Loading More:', loadingMore);
+                        console.log('   - Error:', error);
 
-                        // Test direct API call
-                        console.log('\n🧪 TESTING DIRECT API CALL...');
+                        // Test both API modes
+                        console.log('\n🧪 TESTING API CALLS...');
                         try {
                             const clientId = await getClientId();
-                            const testRes = await axios.get(`${domain}/api/activity?clientId=${clientId}&limit=5`);
-                            console.log('✅ Direct API Response:', JSON.stringify(testRes.data, null, 2));
-                            console.log('Response type:', typeof testRes.data);
-                            console.log('Is array?', Array.isArray(testRes.data));
-                            if (typeof testRes.data === 'object' && testRes.data !== null && !Array.isArray(testRes.data)) {
-                                console.log('Object keys:', Object.keys(testRes.data));
-                            }
+                            console.log('Client ID:', clientId);
+
+                            // Test traditional pagination
+                            console.log('\n1. Testing Traditional Pagination:');
+                            const traditionalRes = await axios.get(`${domain}/api/activity?clientId=${clientId}&paginationMode=traditional&limit=5`);
+                            const traditionalData = traditionalRes.data as any;
+                            console.log('   ✅ Traditional Response Structure:', Object.keys(traditionalData));
+                            console.log('   ✅ Traditional Activities:', traditionalData.data?.activities?.length || 0);
+
+                            // Test date-based pagination
+                            console.log('\n2. Testing Date-Based Pagination:');
+                            const dateRes = await axios.get(`${domain}/api/activity?clientId=${clientId}&paginationMode=date&dateLimit=3`);
+                            const dateData = dateRes.data as any;
+                            console.log('   ✅ Date Response Structure:', Object.keys(dateData));
+                            console.log('   ✅ Date Groups:', dateData.data?.dateGroups?.length || 0);
+                            console.log('   ✅ Total Activities:', dateData.data?.totalActivities || 0);
+
+                            // Test material activity
+                            console.log('\n3. Testing Material Activity:');
+                            const materialRes = await axios.get(`${domain}/api/materialActivity?clientId=${clientId}&paginationMode=date&dateLimit=3`);
+                            const materialData = materialRes.data as any;
+                            console.log('   ✅ Material Response Structure:', Object.keys(materialData));
+                            console.log('   ✅ Material Date Groups:', materialData.data?.dateGroups?.length || 0);
+
                         } catch (err: any) {
-                            console.error('❌ Direct API Error:', err?.response?.data || err.message);
+                            console.error('❌ API Test Error:', err?.response?.data || err.message);
+                            console.error('❌ Error Status:', err?.response?.status);
                         }
 
                         console.log('========================================\n');
@@ -925,12 +1120,51 @@ const NotificationPage: React.FC = () => {
                         <View style={styles.centerContainer}>
                             <Ionicons name="alert-circle-outline" size={64} color="#EF4444" />
                             <Text style={styles.errorText}>{error}</Text>
-                            <TouchableOpacity style={styles.retryButton} onPress={() => fetchActivities()}>
-                                <Text style={styles.retryButtonText}>Retry</Text>
-                            </TouchableOpacity>
+                            <Text style={styles.errorHint}>
+                                This could be due to network issues or server problems.{'\n'}
+                                Try refreshing or check your connection.
+                            </Text>
+                            <View style={styles.errorActions}>
+                                <TouchableOpacity style={styles.retryButton} onPress={() => fetchActivities()}>
+                                    <Ionicons name="refresh" size={16} color="#FFFFFF" />
+                                    <Text style={styles.retryButtonText}>Retry</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity 
+                                    style={[styles.retryButton, styles.debugButton]} 
+                                    onPress={async () => {
+                                        // Force traditional pagination as fallback
+                                        try {
+                                            const clientId = await getClientId();
+                                            const [activityRes, materialRes] = await Promise.all([
+                                                axios.get(`${domain}/api/activity?clientId=${clientId}&limit=50`),
+                                                axios.get(`${domain}/api/materialActivity?clientId=${clientId}&limit=50`)
+                                            ]);
+                                            
+                                            console.log('🔧 Force traditional mode results:');
+                                            console.log('   - Activity response:', activityRes.data);
+                                            console.log('   - Material response:', materialRes.data);
+                                            
+                                            // Process and set data manually
+                                            const activities = activityRes.data.data?.activities || activityRes.data.activities || [];
+                                            const materials = materialRes.data.data?.activities || materialRes.data || [];
+                                            
+                                            setActivitiesRaw(activities);
+                                            setMaterialActivities(materials);
+                                            setDateGroups([]);
+                                            setError(null);
+                                            
+                                        } catch (err: any) {
+                                            console.error('🔧 Force traditional mode failed:', err.message);
+                                        }
+                                    }}
+                                >
+                                    <Ionicons name="build" size={16} color="#FFFFFF" />
+                                    <Text style={styles.retryButtonText}>Force Load</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
                     </>
-                ) : filteredActivities.length === 0 ? (
+                ) : groupedActivities.length === 0 || groupedActivities.reduce((sum, group) => sum + group.activities.length, 0) === 0 ? (
                     <>
                         {console.log('📭 Rendering: EMPTY STATE')}
                         <View style={styles.centerContainer}>
@@ -952,6 +1186,8 @@ const NotificationPage: React.FC = () => {
                                         Raw Activities: {activities.length}{'\n'}
                                         Material Activities: {materialActivities.length}{'\n'}
                                         Active Tab: {activeTab}{'\n'}
+                                        Material Sub Tab: {materialSubTab}{'\n'}
+                                        Filtered Groups: {groupedActivities.length}{'\n'}
                                         Tap the bug icon (🐛) for more details
                                     </Text>
                                 </View>
@@ -1015,6 +1251,33 @@ const NotificationPage: React.FC = () => {
                                     </View>
                                 );
                             })}
+                            
+                            {/* Load More Button */}
+                            {hasMoreDates && (
+                                <View style={styles.loadMoreContainer}>
+                                    <TouchableOpacity
+                                        style={[styles.loadMoreButton, loadingMore && styles.loadMoreButtonDisabled]}
+                                        onPress={() => fetchActivities(false, true)}
+                                        disabled={loadingMore}
+                                        activeOpacity={0.7}
+                                    >
+                                        {loadingMore ? (
+                                            <>
+                                                <ActivityIndicator size="small" color="#FFFFFF" />
+                                                <Text style={styles.loadMoreText}>Loading...</Text>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Ionicons name="chevron-down" size={20} color="#FFFFFF" />
+                                                <Text style={styles.loadMoreText}>Load More Activities</Text>
+                                            </>
+                                        )}
+                                    </TouchableOpacity>
+                                    <Text style={styles.loadMoreHint}>
+                                        Showing activities by date • Load more to see older activities
+                                    </Text>
+                                </View>
+                            )}
                         </Animated.View>
                     </>
                 )}
@@ -1509,6 +1772,21 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
     },
+    errorHint: {
+        marginTop: 12,
+        fontSize: 14,
+        color: '#6B7280',
+        textAlign: 'center',
+        lineHeight: 20,
+    },
+    errorActions: {
+        flexDirection: 'row',
+        gap: 12,
+        marginTop: 20,
+    },
+    debugButton: {
+        backgroundColor: '#F59E0B',
+    },
     emptyStateGradient: {
         padding: 40,
         borderRadius: 24,
@@ -1688,6 +1966,44 @@ const styles = StyleSheet.create({
     activityTimeNew: {
         fontSize: 12,
         color: '#9CA3AF',
+    },
+    // Load More Button Styles
+    loadMoreContainer: {
+        alignItems: 'center',
+        paddingVertical: 24,
+        paddingHorizontal: 16,
+    },
+    loadMoreButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#3B82F6',
+        paddingHorizontal: 24,
+        paddingVertical: 14,
+        borderRadius: 12,
+        gap: 8,
+        shadowColor: '#3B82F6',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
+        minWidth: 200,
+        justifyContent: 'center',
+    },
+    loadMoreButtonDisabled: {
+        backgroundColor: '#9CA3AF',
+        shadowColor: '#9CA3AF',
+    },
+    loadMoreText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    loadMoreHint: {
+        marginTop: 12,
+        fontSize: 13,
+        color: '#64748B',
+        textAlign: 'center',
+        lineHeight: 18,
     },
 });
 

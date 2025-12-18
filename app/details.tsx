@@ -291,13 +291,8 @@ const Details = () => {
                 console.log('Full response data:', JSON.stringify(usedData, null, 2));
 
                 if (usedData.success) {
-                    // Check multiple possible field names for used materials
-                    materialUsed = usedData.MaterialUsed ||
-                        usedData.materialUsed ||
-                        usedData.usedMaterials ||
-                        usedData.data?.MaterialUsed ||
-                        usedData.data?.materialUsed ||
-                        [];
+                    // ✅ FIXED: API now consistently returns MaterialUsed field
+                    materialUsed = usedData.MaterialUsed || [];
 
                     console.log('✓ MaterialUsed extracted:', materialUsed.length, 'items');
                     if (materialUsed.length > 0) {
@@ -872,6 +867,16 @@ const Details = () => {
 
         console.log('API Payload:', JSON.stringify(apiPayload, null, 2));
         console.log('API Endpoint:', `${domain}/api/material-usage`);
+        
+        // Enhanced payload logging
+        console.log('\n🔍 DETAILED PAYLOAD BREAKDOWN:');
+        console.log('  - projectId:', apiPayload.projectId, '(type:', typeof apiPayload.projectId, ')');
+        console.log('  - sectionId:', apiPayload.sectionId, '(type:', typeof apiPayload.sectionId, ')');
+        console.log('  - miniSectionId:', apiPayload.miniSectionId, '(type:', typeof apiPayload.miniSectionId, ')');
+        console.log('  - materialId:', apiPayload.materialId, '(type:', typeof apiPayload.materialId, ')');
+        console.log('  - qnt:', apiPayload.qnt, '(type:', typeof apiPayload.qnt, ')');
+        console.log('  - timestamp:', new Date().toISOString());
+        
         console.log('\n📝 API BEHAVIOR NOTE:');
         console.log('The API searches for material in MaterialAvailable where:');
         console.log('  - material._id === materialId (', materialId, ')');
@@ -1280,7 +1285,7 @@ const Details = () => {
     // Calculate these values - they will update when dependencies change
     const filteredMaterials = getCurrentData();
     const groupedMaterials = getGroupedData();
-    const totalCost = filteredMaterials.reduce((sum, material) => sum + material.price, 0);
+    const totalCost = filteredMaterials.reduce((sum, material) => sum + (material.price * material.quantity), 0);
 
     // Minimal logging for debugging (only in development)
     if (__DEV__ && consoleLogCount < MAX_CONSOLE_LOGS) {

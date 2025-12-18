@@ -3,13 +3,36 @@ import { domain } from "../lib/domain";
 
 export const getUser = async (email: string, userType: string) => {
   try {
-    const res = await axios.get(`${domain}/api/${userType}?email=${email}`);
+    console.log("🌐 Fetching user data...");
+    console.log("   Email:", email);
+    console.log("   UserType:", userType);
+
+    // ✅ FIX: Use correct endpoint based on userType
+    // For clients, use /api/clients (plural) which supports email query
+    const endpoint =
+      userType === "clients"
+        ? `${domain}/api/clients?email=${email}`
+        : `${domain}/api/${userType}?email=${email}`;
+
+    console.log("   URL:", endpoint);
+
+    const res = await axios.get(endpoint);
+
+    console.log("📦 API Response Status:", res.status);
+    console.log("📦 API Response Data:", JSON.stringify(res.data, null, 2));
+
     if (res.status === 200) {
-      return (res.data as any).data;
+      const userData = (res.data as any).data;
+      console.log("✅ Extracted user data:", JSON.stringify(userData, null, 2));
+      console.log("✅ User data keys:", Object.keys(userData || {}));
+      console.log("✅ Has _id?", !!userData?._id);
+      console.log("✅ _id value:", userData?._id);
+      console.log("✅ _id type:", typeof userData?._id);
+      return userData;
     }
     return null;
   } catch (error) {
-    console.error("Failed to fetch user:", error);
+    console.error("❌ Failed to fetch user:", error);
     return null;
   }
 };
@@ -34,14 +57,30 @@ export const confirmMail = async (email: string) => {
 };
 
 export const sendOtp = async (email: string, OTP: number) => {
-  const res = await axios.post(`${domain}/api/otp`, {
-    email: email,
-    OTP: OTP,
-  });
+  try {
+    console.log("📧 Sending OTP email...");
+    console.log("   Email:", email);
+    console.log("   OTP:", OTP);
+    console.log("   URL:", `${domain}/api/otp`);
 
-  if (res.status === 200) {
-    return true;
-  } else {
+    const res = await axios.post(`${domain}/api/otp`, {
+      email: email,
+      OTP: OTP,
+    });
+
+    console.log("✅ OTP email sent successfully");
+    console.log("   Status:", res.status);
+    console.log("   Response:", res.data);
+
+    if (res.status === 200) {
+      return true;
+    } else {
+      return false;
+    }
+  } catch (error: any) {
+    console.error("❌ Failed to send OTP email:", error);
+    console.error("   Error response:", error.response?.data);
+    console.error("   Error status:", error.response?.status);
     return false;
   }
 };

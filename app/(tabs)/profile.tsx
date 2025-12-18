@@ -6,9 +6,12 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
     Alert,
+    RefreshControl,
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -48,6 +51,7 @@ interface ProjectStats {
 
 const CompanyProfile: React.FC = () => {
     const { logout } = useAuth();
+    const router = useRouter();
     const [userData, setUserData] = useState<UserData>({});
     const [clientData, setClientData] = useState<ClientData>({});
     const [stats, setStats] = useState<ProjectStats>({
@@ -58,18 +62,53 @@ const CompanyProfile: React.FC = () => {
     });
     const [loading, setLoading] = useState(true);
     const [loadingClient, setLoadingClient] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
-    useEffect(() => {
-        fetchUserData();
-        fetchStats();
-    }, []);
+    // Force refresh data every time the screen is focused (after login/logout)
+    useFocusEffect(
+        React.useCallback(() => {
+            console.log('🔄 Profile page focused - refreshing all data...');
+            
+            // Clear local state first to ensure fresh data
+            setUserData({});
+            setClientData({});
+            setStats({
+                totalProjects: 0,
+                activeProjects: 0,
+                totalMaterials: 0,
+                totalSpent: 0,
+            });
+            setLoading(true);
+            setLoadingClient(true);
+            
+            // Refetch everything fresh
+            fetchUserData();
+            fetchStats();
+        }, [])
+    );
 
     const fetchUserData = async () => {
         try {
             const userDetailsString = await AsyncStorage.getItem("user");
+            console.log('🔍 Profile page - raw user data:', userDetailsString);
+            
             if (userDetailsString) {
                 const data = JSON.parse(userDetailsString);
-                const clientId = data.clientId || '';
+                console.log('🔍 Profile page - parsed data keys:', Object.keys(data || {}));
+                console.log('🔍 Profile page - has _id?', !!data?._id);
+                console.log('🔍 Profile page - has clientId?', !!data?.clientId);
+                // ✅ FIX: Use clientId field, NOT _id field
+                // _id = user's own ID, clientId = the client/company they belong to
+                let clientId = data.clientId || '';
+                
+                // Handle ObjectId objects (convert to string)
+                if (typeof clientId === 'object' && clientId !== null) {
+                    clientId = clientId.toString();
+                }
+                
+                console.log('🔍 Profile page - User ID (_id):', data._id);
+                console.log('🔍 Profile page - Client ID (clientId):', clientId);
+                console.log('🔍 Profile page - These should be DIFFERENT!');
 
                 // Build full name from firstName and lastName
                 let fullName = 'User';
@@ -94,9 +133,12 @@ const CompanyProfile: React.FC = () => {
                 });
 
                 // Fetch client details if clientId exists
-                if (clientId) {
+                if (clientId && clientId.trim() !== '') {
+                    console.log('🔍 Valid clientId found, fetching client data...');
                     await fetchClientData(clientId);
                 } else {
+                    console.warn('⚠️ No valid clientId found in user data');
+                    console.warn('⚠️ User data structure:', data);
                     setLoadingClient(false);
                 }
             }
@@ -109,26 +151,44 @@ const CompanyProfile: React.FC = () => {
     const fetchClientData = async (clientId: string) => {
         try {
             setLoadingClient(true);
-            const response = await axios.get(`${domain}/api/client?id=${clientId}`);
+            console.log('🔍 Fetching client data for ID:', clientId);
+            console.log('🔍 API URL:', `${domain}/api/clients?id=${clientId}`);
+            
+            // ✅ FIX: Use correct endpoint /api/clients (plural) and correct response structure
+            const response = await axios.get(`${domain}/api/clients?id=${clientId}`);
 
+            console.log('🔍 Client API response:', response.data);
             const responseData = response.data as any;
-            if (responseData && responseData.clientData) {
-                const client = responseData.clientData;
+            
+            // ✅ FIX: API returns data in responseData.data, not responseData.clientData
+            if (responseData && responseData.success && responseData.data) {
+                const client = responseData.data;
                 setClientData({
                     _id: client._id,
                     name: client.name,
                     email: client.email,
-                    phone: client.phone,
+                    phone: client.phoneNumber, // ✅ FIX: Use phoneNumber from Client model
                     address: client.address,
                     city: client.city,
                     state: client.state,
-                    country: client.country,
-                    companyName: client.companyName,
-                    gstNumber: client.gstNumber,
+                    country: client.country, // Note: country might not exist in Client model
+                    companyName: client.name, // ✅ FIX: Use name as company name
+                    gstNumber: client.gstNumber, // This field might not exist in Client model
                 });
+                console.log('✅ Client data set successfully:', client);
+            } else {
+                console.warn('⚠️ No client data found in API response');
+                console.warn('⚠️ Response structure:', responseData);
             }
-        } catch (error) {
-            console.error('Error fetching client data:', error);
+        } catch (error: any) {
+            console.error('❌ Error fetching client data:', error);
+            console.error('❌ Error response:', error.response?.data);
+            console.error('❌ Error status:', error.response?.status);
+            
+            // If client not found, that's okay - just log it
+            if (error.response?.status === 404) {
+                console.warn('⚠️ Client not found in database - this might be normal');
+            }
         } finally {
             setLoadingClient(false);
         }
@@ -137,6 +197,10 @@ const CompanyProfile: React.FC = () => {
     const fetchStats = async () => {
         try {
             const clientId = await getClientId();
+            console.log('🔍 Profile page - getClientId() returned:', clientId);
+            console.log('🔍 Profile page - userData.clientId is:', userData.clientId);
+            console.log('🔍 Profile page - IDs match?', clientId === userData.clientId);
+            
             if (!clientId) return;
 
             // Fetch projects
@@ -210,21 +274,88 @@ const CompanyProfile: React.FC = () => {
         return `₹${amount.toLocaleString('en-IN')}`;
     };
 
-    const settingsItems = [
-        { icon: 'person-outline', label: 'Edit Profile', action: () => Alert.alert('Coming Soon', 'Profile editing will be available soon') },
-    ];
+    const onRefresh = async () => {
+        console.log('🔄 Manual refresh triggered...');
+        setRefreshing(true);
+        
+        // Clear all local state
+        setUserData({});
+        setClientData({});
+        setStats({
+            totalProjects: 0,
+            activeProjects: 0,
+            totalMaterials: 0,
+            totalSpent: 0,
+        });
+        
+        // Refetch everything
+        await Promise.all([
+            fetchUserData(),
+            fetchStats()
+        ]);
+        
+        setRefreshing(false);
+        console.log('✅ Manual refresh completed');
+    };
 
-    const activityItems = [
-        { icon: 'cube-outline', label: 'Material Activities', action: () => Alert.alert('Coming Soon', 'Material activity history coming soon') },
-        { icon: 'hammer-outline', label: 'Project Activities', action: () => Alert.alert('Coming Soon', 'Project activity history coming soon') },
-        { icon: 'people-outline', label: 'Staff Activities', action: () => Alert.alert('Coming Soon', 'Staff activity history coming soon') },
-    ];
+    const clearStorageDebug = async () => {
+        Alert.alert(
+            'Clear Storage',
+            'This will clear all stored data. Are you sure?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Clear',
+                    style: 'destructive',
+                    onPress: async () => {
+                        console.log('🧹 Manual storage clear...');
+                        await AsyncStorage.clear();
+                        console.log('✅ Storage cleared manually');
+                        onRefresh(); // Refresh the page
+                    }
+                }
+            ]
+        );
+    };
+
+    const testClientFetch = async () => {
+        const clientId = await getClientId();
+        Alert.alert(
+            'Debug Client Fetch',
+            `Client ID: ${clientId}\n\nCheck console for detailed logs.`,
+            [
+                { text: 'OK' },
+                {
+                    text: 'Retry Fetch',
+                    onPress: () => {
+                        if (clientId) {
+                            fetchClientData(clientId);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+
+
+
 
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="light-content" backgroundColor="#3B82F6" />
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView 
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#3B82F6']}
+                        tintColor="#3B82F6"
+                    />
+                }
+            >
                 {/* Header with Gradient */}
                 <LinearGradient
                     colors={['#3B82F6', '#2563EB']}
@@ -459,56 +590,39 @@ const CompanyProfile: React.FC = () => {
                     </View>
                 </View>
 
-                {/* Settings */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Settings</Text>
-                    <View style={styles.menuCard}>
-                        {settingsItems.map((item, index) => (
-                            <TouchableOpacity
-                                key={index}
-                                style={[
-                                    styles.menuItem,
-                                    index !== settingsItems.length - 1 && styles.menuItemBorder
-                                ]}
-                                onPress={item.action}
-                                activeOpacity={0.7}
-                            >
-                                <View style={styles.menuItemLeft}>
-                                    <View style={styles.menuIconContainer}>
-                                        <Ionicons name={item.icon as any} size={22} color="#64748B" />
-                                    </View>
-                                    <Text style={styles.menuItemText}>{item.label}</Text>
-                                </View>
-                                <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </View>
 
-                {/* My Activity */}
+
+                {/* My Activities */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>My Activity</Text>
-                    <View style={styles.menuCard}>
-                        {activityItems.map((item, index) => (
-                            <TouchableOpacity
-                                key={index}
-                                style={[
-                                    styles.menuItem,
-                                    index !== activityItems.length - 1 && styles.menuItemBorder
-                                ]}
-                                onPress={item.action}
-                                activeOpacity={0.7}
-                            >
-                                <View style={styles.menuItemLeft}>
-                                    <View style={styles.menuIconContainer}>
-                                        <Ionicons name={item.icon as any} size={22} color="#64748B" />
-                                    </View>
-                                    <Text style={styles.menuItemText}>{item.label}</Text>
-                                </View>
-                                <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
-                            </TouchableOpacity>
-                        ))}
-                    </View>
+                    <Text style={styles.sectionTitle}>My Activities</Text>
+                    <TouchableOpacity
+                        style={styles.activityButton}
+                        onPress={async () => {
+                            // Get user data to pass to activity page
+                            const userDetailsString = await AsyncStorage.getItem("user");
+                            if (userDetailsString) {
+                                const userData = JSON.parse(userDetailsString);
+                                router.push({
+                                    pathname: '/my-activities',
+                                    params: {
+                                        user: JSON.stringify(userData)
+                                    }
+                                });
+                            }
+                        }}
+                        activeOpacity={0.7}
+                    >
+                        <View style={styles.activityButtonLeft}>
+                            <View style={styles.activityButtonIcon}>
+                                <Ionicons name="time-outline" size={22} color="#3B82F6" />
+                            </View>
+                            <View style={styles.activityButtonContent}>
+                                <Text style={styles.activityButtonTitle}>View My Activities</Text>
+                                <Text style={styles.activityButtonSubtitle}>See your complete activity history</Text>
+                            </View>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
+                    </TouchableOpacity>
                 </View>
 
                 {/* Logout Button */}
@@ -769,6 +883,49 @@ const styles = StyleSheet.create({
     footerVersion: {
         fontSize: 12,
         color: '#CBD5E1',
+    },
+    // Activity button styles
+    activityButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
+    },
+    activityButtonLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    activityButtonIcon: {
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: '#EFF6FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    activityButtonContent: {
+        flex: 1,
+    },
+    activityButtonTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1E293B',
+        marginBottom: 2,
+    },
+    activityButtonSubtitle: {
+        fontSize: 13,
+        color: '#64748B',
     },
 });
 

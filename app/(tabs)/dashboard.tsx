@@ -84,6 +84,42 @@ const AnalyticsDashboard: React.FC = () => {
 
   // Filter only projects with budget used > 0
   const activeProjects = transformedProjectData.filter(p => p.budgetUsed > 0);
+  
+  // Debug logging
+  console.log('Dashboard - Raw projects state:', projects.length);
+  console.log('Dashboard - Transformed project data:', transformedProjectData.length);
+  console.log('Dashboard - Active projects (with budget > 0):', activeProjects.length);
+  
+  console.log('\n🔍 DASHBOARD DEBUG - Raw Projects:');
+  projects.forEach((project, index) => {
+    console.log(`  ${index + 1}. ${project.name || 'Unnamed'}`);
+    console.log(`     - _id: ${project._id}`);
+    console.log(`     - MaterialAvailable: ${project.MaterialAvailable?.length || 0} items`);
+    console.log(`     - MaterialUsed: ${project.MaterialUsed?.length || 0} items`);
+    if (project.MaterialAvailable?.length > 0) {
+      console.log(`     - Available items:`, project.MaterialAvailable.map(m => `${m.name}: ₹${m.cost || 0}`));
+    }
+    if (project.MaterialUsed?.length > 0) {
+      console.log(`     - Used items:`, project.MaterialUsed.map(m => `${m.name}: ₹${m.cost || 0}`));
+    }
+  });
+  
+  console.log('\n🔍 DASHBOARD DEBUG - Transformed Projects:');
+  transformedProjectData.forEach((project, index) => {
+    console.log(`  ${index + 1}. ${project.name} - Budget: ₹${project.budgetUsed}, Available: ₹${project.available}, Used: ₹${project.used}`);
+  });
+  
+  console.log('\n🔍 DASHBOARD DEBUG - Active Projects:');
+  activeProjects.forEach((project, index) => {
+    console.log(`  ${index + 1}. ${project.name} - Budget: ₹${project.budgetUsed}`);
+  });
+  
+  console.log(`\n🔍 DASHBOARD DEBUG - Render Decision:`);
+  console.log(`  - Loading: ${loading}`);
+  console.log(`  - Error: ${error}`);
+  console.log(`  - Projects length: ${projects.length}`);
+  console.log(`  - Active projects length: ${activeProjects.length}`);
+  console.log(`  - Will show: ${loading ? 'LOADING' : error ? 'ERROR' : activeProjects.length === 0 ? 'NO MATERIAL DATA' : 'PIE CHART'}`);
 
   // Transform project data using utility function
   const pieData = transformProjectDataToPieSlices(activeProjects, colors);
@@ -129,9 +165,35 @@ const AnalyticsDashboard: React.FC = () => {
       }
 
       const projectData = await getProjectData(clientId);
-      const projectsArray = Array.isArray(projectData) ? projectData : [];
+      
+      // Handle the correct response structure from getProjectData
+      let projectsArray: Project[] = [];
+      if (projectData && typeof projectData === 'object' && 'projects' in projectData) {
+        // New structure: { projects: [...], meta: {...} }
+        projectsArray = Array.isArray(projectData.projects) ? projectData.projects : [];
+      } else if (Array.isArray(projectData)) {
+        // Fallback: direct array
+        projectsArray = projectData;
+      }
 
       console.log('Dashboard - Fetched projects:', projectsArray.length);
+      console.log('Dashboard - Project data structure:', typeof projectData);
+      console.log('Dashboard - First project sample:', projectsArray[0] ? Object.keys(projectsArray[0]) : 'No projects');
+      
+      // Debug material data
+      if (projectsArray.length > 0) {
+        projectsArray.forEach((project, index) => {
+          const availableCost = (project.MaterialAvailable || []).reduce((sum, m) => sum + (m.cost || 0), 0);
+          const usedCost = (project.MaterialUsed || []).reduce((sum, m) => sum + (m.cost || 0), 0);
+          const totalCost = availableCost + usedCost;
+          
+          console.log(`Dashboard - Project ${index + 1} (${project.name}):`);
+          console.log(`  - Available materials: ${project.MaterialAvailable?.length || 0} items, cost: ${availableCost}`);
+          console.log(`  - Used materials: ${project.MaterialUsed?.length || 0} items, cost: ${usedCost}`);
+          console.log(`  - Total cost: ${totalCost}`);
+        });
+      }
+      
       setProjects(projectsArray);
     } catch (err: any) {
       console.error('Failed to fetch projects:', err);
@@ -224,17 +286,41 @@ const AnalyticsDashboard: React.FC = () => {
               <Text style={styles.projectSubtitle}>Financial Overview</Text>
             </View>
           </View>
-          <TouchableOpacity
-            style={[styles.refreshButton, (refreshing || loading) && { opacity: 0.5 }]}
-            onPress={onRefresh}
-            disabled={refreshing || loading}
-          >
-            <Ionicons
-              name={refreshing ? "sync" : "refresh"}
-              size={22}
-              color={(refreshing || loading) ? "#94A3B8" : "#3B82F6"}
-            />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity
+              style={[styles.refreshButton, (refreshing || loading) && { opacity: 0.5 }]}
+              onPress={onRefresh}
+              disabled={refreshing || loading}
+            >
+              <Ionicons
+                name={refreshing ? "sync" : "refresh"}
+                size={22}
+                color={(refreshing || loading) ? "#94A3B8" : "#3B82F6"}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.refreshButton, { backgroundColor: '#FEF3C7' }]}
+              onPress={async () => {
+                console.log('\n🐛 MANUAL DEBUG TRIGGER');
+                console.log('========================');
+                try {
+                  const clientId = await getClientId();
+                  console.log('🔍 Client ID:', clientId);
+                  
+                  if (clientId) {
+                    console.log('🔍 Calling fetchProjects...');
+                    await fetchProjects(true);
+                  } else {
+                    console.log('❌ No client ID found!');
+                  }
+                } catch (err) {
+                  console.log('❌ Debug error:', err);
+                }
+              }}
+            >
+              <Ionicons name="bug" size={22} color="#F59E0B" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Stats Section */}
@@ -290,6 +376,40 @@ const AnalyticsDashboard: React.FC = () => {
             <Text style={styles.emptySubtitle}>
               Import materials to your projects to see budget analytics
             </Text>
+            <View style={{ marginTop: 20, padding: 15, backgroundColor: '#FEF3C7', borderRadius: 10 }}>
+              <Text style={{ fontSize: 12, color: '#92400E', textAlign: 'center' }}>
+                Debug Info:{'\n'}
+                Projects: {projects.length}{'\n'}
+                Transformed: {transformedProjectData.length}{'\n'}
+                Active: {activeProjects.length}{'\n'}
+                Loading: {loading ? 'Yes' : 'No'}{'\n'}
+                Error: {error || 'None'}{'\n'}
+                Tap the bug icon (🐛) to force refresh
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={{
+                marginTop: 15,
+                backgroundColor: '#3B82F6',
+                paddingHorizontal: 20,
+                paddingVertical: 10,
+                borderRadius: 8,
+              }}
+              onPress={async () => {
+                console.log('🔧 FORCE REFRESH TRIGGERED');
+                setError(null);
+                setLoading(true);
+                try {
+                  await fetchProjects(true);
+                } catch (err) {
+                  console.log('🔧 Force refresh error:', err);
+                }
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '600' }}>
+                Force Refresh
+              </Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <Animated.View style={[styles.card, { opacity: fadeAnim }]}>

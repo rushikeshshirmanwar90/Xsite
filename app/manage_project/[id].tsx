@@ -72,9 +72,21 @@ const ManageProject = () => {
             console.log('API URL:', `${domain}/api/project/${projectId}`);
 
             const res = await axios.get(`${domain}/api/project/${projectId}`);
-            const projectData = res.data as any;
+            const responseData = res.data as any;
 
-            console.log('Project data received:', projectData);
+            console.log('Project data received:', responseData);
+
+            // ✅ FIXED: Handle new response structure for single project
+            let projectData: any = null;
+            if (responseData.success && responseData.data) {
+                // New format: { success: true, data: { project } }
+                projectData = responseData.data;
+                console.log('✅ Using new response format');
+            } else {
+                // Fallback for old format
+                projectData = responseData;
+                console.log('⚠️ Using fallback response format');
+            }
 
             if (projectData && projectData.section) {
                 console.log('Sections found:', projectData.section.length);

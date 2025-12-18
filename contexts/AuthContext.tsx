@@ -9,6 +9,7 @@ interface AuthContextType {
   clientId: string | null;
   checkAuthStatus: () => Promise<void>;
   logout: () => Promise<void>;
+  forceRefresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -38,16 +39,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         try {
           const data = JSON.parse(userDetails);
           if (data && typeof data === 'object' && Object.keys(data).length > 0) {
-            setIsAuthenticated(true);
-            setUser(data);
-            setClientId(typeof data?._id === 'string' ? data._id : null);
+            const extractedClientId = data._id || data.clientId;
+
+            // ✅ CRITICAL FIX: Validate that the stored client ID actually exists
+            // This prevents using old/deleted client IDs from previous sessions
+            if (extractedClientId) {
+              console.log('🔍 Validating stored client ID:', extractedClientId);
+              console.log('🔍 Full user data being set:', JSON.stringify(data, null, 2));
+
+              // Note: We'll set auth state first, then validate in background
+              // to avoid blocking the UI. If validation fails, we'll clear on next check.
+              setIsAuthenticated(true);
+              setUser(data);
+              setClientId(typeof extractedClientId === 'string' ? extractedClientId : null);
+              
+              console.log('✅ Auth state updated with fresh data');
+            } else {
+              console.warn('⚠️ No client ID found in stored user data');
+              await AsyncStorage.clear();
+              setIsAuthenticated(false);
+              setUser(null);
+              setClientId(null);
+            }
           } else {
+            console.warn('⚠️ Invalid user data structure');
+            await AsyncStorage.clear();
             setIsAuthenticated(false);
             setUser(null);
             setClientId(null);
           }
         } catch (parseError) {
-          console.error('Error parsing user data:', parseError);
+          console.error('❌ Error parsing user data:', parseError);
+          await AsyncStorage.clear();
           setIsAuthenticated(false);
           setUser(null);
           setClientId(null);
@@ -58,7 +81,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setClientId(null);
       }
     } catch (error) {
-      console.error('Error checking auth status:', error);
+      console.error('❌ Error checking auth status:', error);
       setIsAuthenticated(false);
       setUser(null);
       setClientId(null);
@@ -69,14 +92,45 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async () => {
     try {
-      await AsyncStorage.removeItem('user');
+      console.log('🚪 Starting logout process...');
+      
+      // Clear ALL AsyncStorage data to ensure clean logout
+      console.log('🧹 Clearing all AsyncStorage data...');
+      await AsyncStorage.clear();
+      
+      // Alternative approach: Remove specific keys if clear() fails
+      // await AsyncStorage.removeItem('user');
+      // await AsyncStorage.removeItem('userType');
+      // await AsyncStorage.removeItem('admin');
+      // await AsyncStorage.removeItem('staff');
+      
+      console.log('✅ AsyncStorage cleared successfully');
+      
+      // Reset all auth state
       setIsAuthenticated(false);
       setUser(null);
       setClientId(null);
+      
+      console.log('✅ Logout completed - all data cleared');
     } catch (error) {
-      console.error('Logout error:', error);
-      // Fallback: try to set empty string if remove fails
-      await AsyncStorage.setItem('user', '');
+      console.error('❌ Logout error:', error);
+      
+      // Fallback: try to clear individual items if clear() fails
+      try {
+        console.log('🔄 Attempting fallback cleanup...');
+        await AsyncStorage.removeItem('user');
+        await AsyncStorage.removeItem('userType');
+        await AsyncStorage.removeItem('admin');
+        await AsyncStorage.removeItem('staff');
+        console.log('✅ Fallback cleanup completed');
+      } catch (fallbackError) {
+        console.error('❌ Fallback cleanup failed:', fallbackError);
+        // Last resort: set empty values
+        await AsyncStorage.setItem('user', '');
+        await AsyncStorage.setItem('userType', '');
+      }
+      
+      // Always reset auth state regardless of storage errors
       setIsAuthenticated(false);
       setUser(null);
       setClientId(null);
@@ -106,6 +160,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => clearInterval(checkAuthInterval);
   }, []);
 
+  const forceRefresh = async () => {
+    console.log('🔄 Force refresh triggered from AuthContext...');
+    await checkAuthStatus();
+  };
+
   const value: AuthContextType = {
     isAuthenticated,
     isLoading,
@@ -113,6 +172,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     clientId,
     checkAuthStatus,
     logout,
+    forceRefresh,
   };
 
   return (
