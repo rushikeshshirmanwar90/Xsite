@@ -44,8 +44,6 @@ interface ClientData {
 
 interface ProjectStats {
     totalProjects: number;
-    activeProjects: number;
-    totalMaterials: number;
     totalSpent: number;
 }
 
@@ -56,8 +54,6 @@ const CompanyProfile: React.FC = () => {
     const [clientData, setClientData] = useState<ClientData>({});
     const [stats, setStats] = useState<ProjectStats>({
         totalProjects: 0,
-        activeProjects: 0,
-        totalMaterials: 0,
         totalSpent: 0,
     });
     const [loading, setLoading] = useState(true);
@@ -74,8 +70,6 @@ const CompanyProfile: React.FC = () => {
             setClientData({});
             setStats({
                 totalProjects: 0,
-                activeProjects: 0,
-                totalMaterials: 0,
                 totalSpent: 0,
             });
             setLoading(true);
@@ -201,40 +195,80 @@ const CompanyProfile: React.FC = () => {
             console.log('🔍 Profile page - userData.clientId is:', userData.clientId);
             console.log('🔍 Profile page - IDs match?', clientId === userData.clientId);
             
-            if (!clientId) return;
+            if (!clientId) {
+                console.warn('⚠️ No clientId found, cannot fetch stats');
+                return;
+            }
 
-            // Fetch projects
-            const projects = await getProjectData(clientId);
-            const projectsArray = Array.isArray(projects) ? projects : [];
+            // ✅ FIX: Properly destructure the response from getProjectData
+            console.log('📊 Fetching project data for stats calculation...');
+            const projectData = await getProjectData(clientId);
+            console.log('📊 Raw project data response:', projectData);
+            
+            // Handle both old and new response formats
+            let projectsArray = [];
+            if (projectData && typeof projectData === 'object') {
+                if (Array.isArray(projectData)) {
+                    // Old format: direct array
+                    projectsArray = projectData;
+                } else if (projectData.projects && Array.isArray(projectData.projects)) {
+                    // New format: {projects, meta}
+                    projectsArray = projectData.projects;
+                } else {
+                    console.warn('⚠️ Unexpected project data format:', projectData);
+                    projectsArray = [];
+                }
+            }
+            
+            console.log('📊 Projects array for stats:', projectsArray.length, 'projects');
 
-            // Calculate stats
-            let totalMaterials = 0;
+            // Calculate stats from real data only
             let totalSpent = 0;
-            let activeProjects = 0;
 
-            projectsArray.forEach((project: any) => {
+            projectsArray.forEach((project: any, index: number) => {
+                console.log(`📊 Processing project ${index + 1}:`, project.name || project.title || 'Unnamed');
+                
+                // ✅ DIRECT CALCULATION: Always calculate from all material costs
                 const availableMaterials = project.MaterialAvailable || [];
                 const usedMaterials = project.MaterialUsed || [];
-
-                totalMaterials += availableMaterials.length + usedMaterials.length;
-
-                const availableCost = availableMaterials.reduce((sum: number, m: any) => sum + (m.cost || 0), 0);
-                const usedCost = usedMaterials.reduce((sum: number, m: any) => sum + (m.cost || 0), 0);
-                totalSpent += availableCost + usedCost;
-
-                if (availableMaterials.length > 0 || usedMaterials.length > 0) {
-                    activeProjects++;
-                }
+                
+                console.log(`  - Materials: ${availableMaterials.length} available, ${usedMaterials.length} used`);
+                
+                // Calculate total cost from all materials (available + used)
+                const availableValue = availableMaterials.reduce((sum: number, m: any) => {
+                    const cost = (m.cost || 0) * (m.qnt || 0);
+                    console.log(`    Available: ${m.name || 'Unnamed'} - ${m.qnt || 0} × ₹${m.cost || 0} = ₹${cost}`);
+                    return sum + cost;
+                }, 0);
+                
+                const usedValue = usedMaterials.reduce((sum: number, m: any) => {
+                    const cost = (m.cost || 0) * (m.qnt || 0);
+                    console.log(`    Used: ${m.name || 'Unnamed'} - ${m.qnt || 0} × ₹${m.cost || 0} = ₹${cost}`);
+                    return sum + cost;
+                }, 0);
+                
+                const projectSpent = availableValue + usedValue;
+                console.log(`  - Total project cost: ₹${projectSpent} (available: ₹${availableValue} + used: ₹${usedValue})`);
+                console.log(`  - Project.spent field: ₹${project.spent || 0} (ignored - using material calculation)`)
+                
+                totalSpent += projectSpent;
             });
+
+            console.log('📊 Final stats calculated:');
+            console.log(`  - Total Projects: ${projectsArray.length}`);
+            console.log(`  - Total Spent: ₹${totalSpent}`);
 
             setStats({
                 totalProjects: projectsArray.length,
-                activeProjects,
-                totalMaterials,
                 totalSpent,
             });
         } catch (error) {
-            console.error('Error fetching stats:', error);
+            console.error('❌ Error fetching stats:', error);
+            // Set empty stats on error
+            setStats({
+                totalProjects: 0,
+                totalSpent: 0,
+            });
         } finally {
             setLoading(false);
         }
@@ -283,8 +317,6 @@ const CompanyProfile: React.FC = () => {
         setClientData({});
         setStats({
             totalProjects: 0,
-            activeProjects: 0,
-            totalMaterials: 0,
             totalSpent: 0,
         });
         
@@ -393,29 +425,14 @@ const CompanyProfile: React.FC = () => {
                             <Text style={styles.statLabel}>Total Projects</Text>
                         </View>
 
-                        <View style={[styles.statCard, styles.statCardSuccess]}>
-                            <View style={styles.statIconContainer}>
-                                <Ionicons name="checkmark-circle" size={24} color="#10B981" />
-                            </View>
-                            <Text style={styles.statValue}>
-                                {loading ? '...' : stats.activeProjects}
-                            </Text>
-                            <Text style={styles.statLabel}>Active Projects</Text>
-                        </View>
-                    </View>
-
-                    <View style={styles.statsRow}>
-                        <View style={[styles.statCard, styles.statCardWarning]}>
-                            <View style={styles.statIconContainer}>
-                                <Ionicons name="cube" size={24} color="#F59E0B" />
-                            </View>
-                            <Text style={styles.statValue}>
-                                {loading ? '...' : stats.totalMaterials}
-                            </Text>
-                            <Text style={styles.statLabel}>Materials</Text>
-                        </View>
-
-                        <View style={[styles.statCard, styles.statCardDanger]}>
+                        <TouchableOpacity 
+                            style={[styles.statCard, styles.statCardDanger]}
+                            onPress={() => {
+                                console.log('📊 Navigating to dashboard from total spent card');
+                                router.push('/dashboard');
+                            }}
+                            activeOpacity={0.7}
+                        >
                             <View style={styles.statIconContainer}>
                                 <Ionicons name="cash" size={24} color="#EF4444" />
                             </View>
@@ -423,7 +440,10 @@ const CompanyProfile: React.FC = () => {
                                 {loading ? '...' : formatCurrency(stats.totalSpent)}
                             </Text>
                             <Text style={styles.statLabel}>Total Spent</Text>
-                        </View>
+                            <View style={styles.cardClickIndicator}>
+                                <Ionicons name="chevron-forward" size={16} color="#EF4444" />
+                            </View>
+                        </TouchableOpacity>
                     </View>
                 </View>
 
@@ -738,6 +758,12 @@ const styles = StyleSheet.create({
     },
     statCardDanger: {
         borderColor: '#FEE2E2',
+    },
+    cardClickIndicator: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        opacity: 0.6,
     },
     statIconContainer: {
         marginBottom: 8,

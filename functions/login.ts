@@ -90,20 +90,40 @@ export const addPassword = async (
   password: string,
   userType: string
 ) => {
-  const res = await axios.post(`${domain}/api/password`, {
-    email: email,
-    password: password,
-    userType: userType,
-  });
+  try {
+    console.log('🔐 ADD PASSWORD API CALL');
+    console.log('📧 Email:', email);
+    console.log('👤 User Type:', userType);
+    console.log('🔑 Password length:', password.length);
 
-  console.log(userType);
-  console.log(email);
-  console.log(password);
+    const res = await axios.post(`${domain}/api/password`, {
+      email: email,
+      password: password,
+      userType: userType,
+    });
 
-  if (res.status === 200) {
-    return true;
-  } else {
-    return false;
+    console.log('✅ Password API Response Status:', res.status);
+    console.log('✅ Password API Response Data:', res.data);
+
+    if (res.status === 200) {
+      return { success: true, message: res.data.message || 'Password set successfully' };
+    } else {
+      return { success: false, error: res.data.message || 'Failed to set password' };
+    }
+  } catch (error: any) {
+    console.error('❌ Add Password Error:', error);
+    
+    if (error.response) {
+      console.error('❌ Error Status:', error.response.status);
+      console.error('❌ Error Data:', error.response.data);
+      
+      return { 
+        success: false, 
+        error: error.response.data.message || error.response.data.error || 'Failed to set password'
+      };
+    }
+    
+    return { success: false, error: 'Network error occurred' };
   }
 };
 

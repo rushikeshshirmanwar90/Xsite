@@ -11,10 +11,12 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
     Alert,
+    Modal,
     RefreshControl,
     ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View
 } from 'react-native';
@@ -29,6 +31,15 @@ const ProjectScreen: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const router = useRouter();
+    
+    // Edit project state
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [editingProject, setEditingProject] = useState<BaseProject | null>(null);
+    const [editProjectName, setEditProjectName] = useState('');
+    const [editProjectAddress, setEditProjectAddress] = useState('');
+    const [editProjectBudget, setEditProjectBudget] = useState('');
+    const [editProjectDescription, setEditProjectDescription] = useState('');
+    const [updatingProject, setUpdatingProject] = useState(false);
 
     // Get user role for access control
     const { user, userType } = useUser();
@@ -133,9 +144,25 @@ const ProjectScreen: React.FC = () => {
         try {
             setAddingProject(true);
             const clientId = await getClientId();
+            
+            // Get user data from AsyncStorage for activity logging
+            const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+            const userString = await AsyncStorage.getItem('user');
+            let userInfo = null;
+            
+            if (userString) {
+                const userData = JSON.parse(userString);
+                userInfo = {
+                    userId: userData._id || userData.id || userData.clientId || 'unknown',
+                    fullName: `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || userData.name || userData.username || 'Unknown User',
+                    email: userData.email || undefined,
+                };
+            }
+            
             const payload = {
                 ...newProject,
                 clientId,
+                user: userInfo, // Include user info for activity logging
             };
 
             console.log('📝 Creating project with payload:', payload);
@@ -334,6 +361,139 @@ const ProjectScreen: React.FC = () => {
         });
     };
 
+    // Handle edit project
+    const handleEditProject = (project: BaseProject) => {
+        if (!userIsAdmin) {
+            Alert.alert('Access Denied', 'Only admins can edit projects');
+            return;
+        }
+
+        setEditingProject(project);
+        setEditProjectName(project.name);
+        setEditProjectAddress(project.address);
+        setEditProjectBudget(project.budget?.toString() || '');
+        setEditProjectDescription(project.description || '');
+        setShowEditModal(true);
+    };
+
+    // Handle update project
+    const handleUpdateProject = async () => {
+        if (!editingProject || !userIsAdmin) {
+            Alert.alert('Error', 'Invalid project or insufficient permissions');
+            return;
+        }
+
+        if (!editProjectName.trim()) {
+            Alert.alert('Error', 'Project name is required');
+            return;
+        }
+
+        if (!editProjectAddress.trim()) {
+            Alert.alert('Error', 'Project address is required');
+            return;
+        }
+
+        if (!editProjectBudget.trim() || isNaN(Number(editProjectBudget))) {
+            Alert.alert('Error', 'Valid budget is required');
+            return;
+        }
+
+        setUpdatingProject(true);
+        try {
+            const clientId = await getClientId();
+            
+            // Get user data from AsyncStorage for activity logging
+            const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+            const userString = await AsyncStorage.getItem('user');
+            let userInfo = null;
+            
+            if (userString) {
+                const userData = JSON.parse(userString);
+                userInfo = {
+                    userId: userData._id || userData.id || userData.clientId || 'unknown',
+                    fullName: `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || userData.name || userData.username || 'Unknown User',
+                    email: userData.email || undefined,
+                };
+            }
+            
+            const updatePayload = {
+                name: editProjectName.trim(),
+                address: editProjectAddress.trim(),
+                budget: Number(editProjectBudget),
+                description: editProjectDescription.trim(),
+                clientId,
+                user: userInfo // Include user info for activity logging
+            };
+
+            console.log('📝 Updating project:', editingProject._id, updatePayload);
+
+            const response = await axios.put(
+                `${domain}/api/project/${editingProject._id}`,
+                updatePayload
+            );
+
+            console.log('✅ Project updated:', response.data);
+
+            if (response.status === 200) {
+                Alert.alert('Success', 'Project updated successfully');
+                setShowEditModal(false);
+                await fetchProjectsData(false); // Refresh the list
+            } else {
+                throw new Error('Failed to update project');
+            }
+        } catch (error: any) {
+            console.error('❌ Error updating project:', error);
+            Alert.alert('Error', error?.response?.data?.message || 'Failed to update project');
+        } finally {
+            setUpdatingProject(false);
+        }
+    };
+
+    // Handle delete project
+    const handleDeleteProject = (project: BaseProject) => {
+        if (!userIsAdmin) {
+            Alert.alert('Access Denied', 'Only admins can delete projects');
+            return;
+        }
+
+        Alert.alert(
+            'Delete Project',
+            `Are you sure you want to delete "${project.name}"?\n\nThis action cannot be undone and will remove all associated data including materials, sections, and activities.`,
+            [
+                {
+                    text: 'Cancel',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: () => confirmDeleteProject(project),
+                },
+            ]
+        );
+    };
+
+    // Confirm delete project
+    const confirmDeleteProject = async (project: BaseProject) => {
+        try {
+            console.log('🗑️ Deleting project:', project._id);
+
+            const response = await axios.delete(`${domain}/api/project/${project._id}`);
+
+            console.log('✅ Project deleted:', response.data);
+
+            if (response.status === 200) {
+                Alert.alert('Success', 'Project deleted successfully');
+                await fetchProjectsData(false); // Refresh the list
+            } else {
+                throw new Error('Failed to delete project');
+            }
+        } catch (error: any) {
+            console.error('❌ Error deleting project:', error);
+            Alert.alert('Error', error?.response?.data?.message || 'Failed to delete project');
+        }
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
@@ -410,12 +570,33 @@ const ProjectScreen: React.FC = () => {
                                     {project.address}
                                 </Text>
                             </View>
-                            <TouchableOpacity
-                                style={styles.detailsButton}
-                                onPress={() => project._id && handleAddDetails(project._id, project.name, project.section)}
-                            >
-                                <Text style={styles.detailsButtonText}>Add Details</Text>
-                            </TouchableOpacity>
+                            
+                            <View style={styles.projectActions}>
+                                {/* Admin Controls */}
+                                {userIsAdmin && (
+                                    <View style={styles.adminActions}>
+                                        <TouchableOpacity
+                                            style={styles.editButton}
+                                            onPress={() => handleEditProject(project)}
+                                        >
+                                            <Ionicons name="create-outline" size={18} color="#059669" />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={styles.deleteButton}
+                                            onPress={() => handleDeleteProject(project)}
+                                        >
+                                            <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+                                
+                                <TouchableOpacity
+                                    style={styles.detailsButton}
+                                    onPress={() => project._id && handleAddDetails(project._id, project.name, project.section)}
+                                >
+                                    <Text style={styles.detailsButtonText}>Add Details</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
                     ))
                 )}
@@ -427,6 +608,99 @@ const ProjectScreen: React.FC = () => {
                 onAdd={handleAddProject}
                 staffMembers={staffMembers}
             />
+
+            {/* Edit Project Modal */}
+            <Modal
+                visible={showEditModal}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setShowEditModal(false)}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalHeader}>
+                        <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                            <Ionicons name="close" size={24} color="#374151" />
+                        </TouchableOpacity>
+                        <Text style={styles.modalTitle}>Edit Project</Text>
+                        <View style={{ width: 24 }} />
+                    </View>
+
+                    <ScrollView style={styles.modalContent}>
+                        {/* Project Name */}
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Project Name *</Text>
+                            <TextInput
+                                style={styles.textInput}
+                                value={editProjectName}
+                                onChangeText={setEditProjectName}
+                                placeholder="Enter project name"
+                                placeholderTextColor="#9CA3AF"
+                            />
+                        </View>
+
+                        {/* Address */}
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Address *</Text>
+                            <TextInput
+                                style={styles.textInput}
+                                value={editProjectAddress}
+                                onChangeText={setEditProjectAddress}
+                                placeholder="Enter project address"
+                                placeholderTextColor="#9CA3AF"
+                                multiline
+                                numberOfLines={2}
+                            />
+                        </View>
+
+                        {/* Budget */}
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Budget *</Text>
+                            <TextInput
+                                style={styles.textInput}
+                                value={editProjectBudget}
+                                onChangeText={setEditProjectBudget}
+                                placeholder="Enter project budget"
+                                placeholderTextColor="#9CA3AF"
+                                keyboardType="numeric"
+                            />
+                        </View>
+
+                        {/* Description */}
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Description</Text>
+                            <TextInput
+                                style={[styles.textInput, styles.textArea]}
+                                value={editProjectDescription}
+                                onChangeText={setEditProjectDescription}
+                                placeholder="Enter project description"
+                                placeholderTextColor="#9CA3AF"
+                                multiline
+                                numberOfLines={4}
+                            />
+                        </View>
+                    </ScrollView>
+
+                    {/* Modal Footer */}
+                    <View style={styles.modalFooter}>
+                        <TouchableOpacity
+                            style={styles.cancelButton}
+                            onPress={() => setShowEditModal(false)}
+                            disabled={updatingProject}
+                        >
+                            <Text style={styles.cancelButtonText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.saveButton, updatingProject && styles.saveButtonDisabled]}
+                            onPress={handleUpdateProject}
+                            disabled={updatingProject}
+                        >
+                            <Text style={styles.saveButtonText}>
+                                {updatingProject ? 'Updating...' : 'Update Project'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -555,6 +829,35 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#64748b',
     },
+    projectActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    adminActions: {
+        flexDirection: 'row',
+        gap: 6,
+    },
+    editButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#F0FDF4',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#BBF7D0',
+    },
+    deleteButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#FEF2F2',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#FECACA',
+    },
     detailsButton: {
         backgroundColor: '#e0f2fe',
         paddingVertical: 8,
@@ -565,6 +868,89 @@ const styles = StyleSheet.create({
         color: '#0369a1',
         fontWeight: '500',
         fontSize: 14,
+    },
+    // Modal Styles
+    modalContainer: {
+        flex: 1,
+        backgroundColor: '#FFFFFF',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E5E7EB',
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#1F2937',
+    },
+    modalContent: {
+        flex: 1,
+        padding: 16,
+    },
+    inputGroup: {
+        marginBottom: 20,
+    },
+    inputLabel: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#374151',
+        marginBottom: 8,
+    },
+    textInput: {
+        borderWidth: 1,
+        borderColor: '#D1D5DB',
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+        fontSize: 16,
+        color: '#1F2937',
+        backgroundColor: '#FFFFFF',
+    },
+    textArea: {
+        minHeight: 100,
+        textAlignVertical: 'top',
+    },
+    modalFooter: {
+        flexDirection: 'row',
+        paddingHorizontal: 16,
+        paddingVertical: 16,
+        borderTopWidth: 1,
+        borderTopColor: '#E5E7EB',
+        gap: 12,
+    },
+    cancelButton: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 8,
+        backgroundColor: '#F3F4F6',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    cancelButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#6B7280',
+    },
+    saveButton: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 8,
+        backgroundColor: '#3B82F6',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    saveButtonDisabled: {
+        backgroundColor: '#9CA3AF',
+    },
+    saveButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#FFFFFF',
     },
 });
 

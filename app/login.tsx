@@ -114,29 +114,66 @@ export default function LoginScreen() {
         try {
             if (Number(otp) === generatedOTP) {
                 toast.success('OTP verified successfully');
+                // ✅ Only proceed to password step if OTP is correct
+                setCurrentStep('password');
             } else {
-                toast.error("invalid OTP")
+                toast.error("Invalid OTP");
+                // ✅ Stay on OTP step if OTP is wrong
+                // Don't change the step, let user try again
             }
-            setCurrentStep('password');
         } catch (error) {
             toast.error('Invalid OTP');
+            // ✅ Stay on OTP step if there's an error
         } finally {
             setLoading(false);
         }
     };
 
     const handleSetPassword = async () => {
-        if (!password.trim() || password.length < 8) {
+        // ✅ Enhanced password validation to match backend requirements
+        if (!password.trim()) {
+            toast.error('Password is required');
+            return;
+        }
+
+        if (password.length < 8) {
             toast.error('Password must be at least 8 characters long');
+            return;
+        }
+
+        // Check for uppercase letter
+        if (!/[A-Z]/.test(password)) {
+            toast.error('Password must contain at least one uppercase letter');
+            return;
+        }
+
+        // Check for lowercase letter
+        if (!/[a-z]/.test(password)) {
+            toast.error('Password must contain at least one lowercase letter');
+            return;
+        }
+
+        // Check for number
+        if (!/\d/.test(password)) {
+            toast.error('Password must contain at least one number');
+            return;
+        }
+
+        // Check for special character
+        if (!/[@$!%*?&]/.test(password)) {
+            toast.error('Password must contain at least one special character (@$!%*?&)');
             return;
         }
 
         setLoading(true);
         try {
             console.log('Setting password for user type:', userType);
+            console.log('Password validation passed, calling API...');
 
             const res = await addPassword(email, password, userType);
-            if (res) {
+            console.log('addPassword result:', res);
+            
+            if (res.success) {
                 const user = await getUser(email, userType);
                 console.log('User data retrieved:', user);
 
@@ -189,7 +226,8 @@ export default function LoginScreen() {
                     });
                 }, 300);
             } else {
-                toast.error("Something went wrong, please try again later");
+                console.error('❌ Password setup failed:', res.error);
+                toast.error(res.error || "Failed to set password. Please try again.");
                 setLoading(false);
             }
         } catch (error) {
@@ -200,7 +238,12 @@ export default function LoginScreen() {
     };
 
     const handleLogin = async () => {
-        if (!password.trim() || password.length < 8) {
+        if (!password.trim()) {
+            toast.error("Password is required");
+            return;
+        }
+
+        if (password.length < 8) {
             toast.error("Password must be at least 8 characters long");
             return;
         }
@@ -444,7 +487,10 @@ export default function LoginScreen() {
                         </View>
 
                         <Text style={styles.stepDescription}>
-                            {isVerified ? 'Enter your password to continue' : 'Create a strong password for your account'}
+                            {isVerified 
+                                ? 'Enter your password to continue' 
+                                : 'Create a strong password: 8+ characters with uppercase, lowercase, number, and special character (@$!%*?&)'
+                            }
                         </Text>
 
                         <View style={styles.inputContainer}>
@@ -452,7 +498,7 @@ export default function LoginScreen() {
                             <TextInput
                                 key={`password-${showPassword}`}
                                 style={styles.input}
-                                placeholder="Enter password (min 8 characters)"
+                                placeholder="Password (8+ chars, A-z, 0-9, @$!%*?&)"
                                 value={password}
                                 onChangeText={setPassword}
                                 secureTextEntry={!showPassword}

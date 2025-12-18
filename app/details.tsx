@@ -712,7 +712,7 @@ const Details = () => {
         fetchMiniSections();
     }, [sectionId]);
 
-    // FIXED: Group materials by name and unit - CORRECTED LOGIC
+    // ✅ UPDATED: Group materials by name, unit, AND specifications for separate cards
     const groupMaterialsByName = (materials: Material[], isUsedTab: boolean = false) => {
         try {
             if (__DEV__ && consoleLogCount < MAX_CONSOLE_LOGS) {
@@ -722,8 +722,26 @@ const Details = () => {
 
             const grouped: { [key: string]: any } = {};
 
+            // Debug raw materials input
+            if (__DEV__) {
+                console.log('🔍 RAW MATERIALS INPUT TO GROUPING:');
+                materials.forEach((material, index) => {
+                    console.log(`   Material ${index + 1}:`, {
+                        name: material.name,
+                        quantity: material.quantity,
+                        price: material.price,
+                        unit: material.unit,
+                        quantityType: typeof material.quantity,
+                        priceType: typeof material.price,
+                        specs: material.specs
+                    });
+                });
+            }
+
             materials.forEach((material, index) => {
-                const key = `${material.name}-${material.unit}`;
+                // ✅ NEW: Include specs in the grouping key to create separate cards for different specifications
+                const specsKey = material.specs ? JSON.stringify(material.specs) : 'no-specs';
+                const key = `${material.name}-${material.unit}-${specsKey}`;
 
                 if (!grouped[key]) {
                     grouped[key] = {
@@ -732,6 +750,7 @@ const Details = () => {
                         icon: material.icon,
                         color: material.color,
                         date: material.date,
+                        specs: material.specs || {}, // ✅ NEW: Store specs for display
                         variants: [],
                         totalQuantity: 0,
                         totalCost: 0,
@@ -751,24 +770,56 @@ const Details = () => {
                     miniSectionId: material.miniSectionId,
                 });
 
+                // Debug logging for grouping
+                if (__DEV__) {
+                    console.log('🔍 GROUPING DEBUG:', {
+                        materialName: material.name,
+                        materialQuantity: material.quantity,
+                        materialPrice: material.price,
+                        materialPriceType: typeof material.price,
+                        groupKey: key,
+                        beforeQuantity: grouped[key].totalQuantity,
+                        beforeCost: grouped[key].totalCost
+                    });
+                }
+
                 grouped[key].totalQuantity += material.quantity;
                 grouped[key].totalCost += material.price;
+
+                // Debug logging after addition
+                if (__DEV__) {
+                    console.log('🔍 AFTER ADDITION:', {
+                        materialName: material.name,
+                        afterQuantity: grouped[key].totalQuantity,
+                        afterCost: grouped[key].totalCost,
+                        expectedPerUnit: grouped[key].totalQuantity > 0 ? (grouped[key].totalCost / grouped[key].totalQuantity) : 0
+                    });
+                }
             });
 
             // FIXED: Correct calculation logic for both tabs
             Object.keys(grouped).forEach((key) => {
+                // Store original totals for cost calculation
+                const originalTotalQuantity = grouped[key].totalQuantity;
+                const originalTotalCost = grouped[key].totalCost;
+                
                 if (isUsedTab) {
                     // In "used" tab: totalQuantity IS the used amount (don't change it)
                     const usedQuantity = grouped[key].totalQuantity;
 
                     // Find available quantity for stats only
                     const availableQuantity = availableMaterials
-                        .filter(m => `${m.name}-${m.unit}` === key)
+                        .filter(m => {
+                            const mSpecsKey = m.specs ? JSON.stringify(m.specs) : 'no-specs';
+                            const mKey = `${m.name}-${m.unit}-${mSpecsKey}`;
+                            return mKey === key;
+                        })
                         .reduce((sum, m) => sum + m.quantity, 0);
 
                     grouped[key].totalUsed = usedQuantity;
                     grouped[key].totalImported = availableQuantity + usedQuantity;
                     // Keep totalQuantity as used quantity for display
+                    // Keep totalCost as is (it represents cost of used materials)
 
                     console.log(`Used Tab - ${key}: Used=${usedQuantity}, Available=${availableQuantity}, Total=${grouped[key].totalImported}`);
                 } else {
@@ -777,18 +828,50 @@ const Details = () => {
 
                     // Calculate used quantity for stats
                     const usedQuantity = usedMaterials
-                        .filter(m => `${m.name}-${m.unit}` === key)
+                        .filter(m => {
+                            const mSpecsKey = m.specs ? JSON.stringify(m.specs) : 'no-specs';
+                            const mKey = `${m.name}-${m.unit}-${mSpecsKey}`;
+                            return mKey === key;
+                        })
                         .reduce((sum, m) => sum + m.quantity, 0);
 
                     grouped[key].totalUsed = usedQuantity;
                     grouped[key].totalImported = availableQuantity + usedQuantity;
                     // Keep totalQuantity as available quantity for display
+                    // Keep totalCost as is (it represents cost of available materials)
 
                     console.log(`Imported Tab - ${key}: Available=${availableQuantity}, Used=${usedQuantity}, Total=${grouped[key].totalImported}`);
+                }
+                
+                // Debug cost consistency
+                if (__DEV__) {
+                    const perUnit = grouped[key].totalQuantity > 0 ? (grouped[key].totalCost / grouped[key].totalQuantity) : 0;
+                    console.log(`💰 COST CONSISTENCY CHECK - ${key}:`, {
+                        tab: isUsedTab ? 'used' : 'imported',
+                        displayQuantity: grouped[key].totalQuantity,
+                        displayCost: grouped[key].totalCost,
+                        calculatedPerUnit: perUnit.toFixed(2),
+                        originalQuantity: originalTotalQuantity,
+                        originalCost: originalTotalCost
+                    });
                 }
             });
 
             const result = Object.values(grouped);
+            
+            // Debug final grouped results
+            if (__DEV__) {
+                console.log('🎯 FINAL GROUPED RESULTS:');
+                result.forEach((group: any, index: number) => {
+                    const perUnit = group.totalQuantity > 0 ? (group.totalCost / group.totalQuantity) : 0;
+                    console.log(`   Group ${index + 1}: ${group.name}`);
+                    console.log(`     totalQuantity: ${group.totalQuantity} (${typeof group.totalQuantity})`);
+                    console.log(`     totalCost: ${group.totalCost} (${typeof group.totalCost})`);
+                    console.log(`     calculated per unit: ₹${perUnit.toFixed(2)}/${group.unit}`);
+                    console.log(`     variants count: ${group.variants.length}`);
+                });
+            }
+            
             return result;
         } catch (error) {
             console.error('Error grouping materials:', error);
@@ -1643,7 +1726,7 @@ const Details = () => {
                                         {/* Materials for this date */}
                                         {dateGroup.materials.map((material, index) => (
                                             <MaterialCardEnhanced
-                                                key={`${dateGroup.date}-${material.name}-${material.unit}`}
+                                                key={`${dateGroup.date}-${material.name}-${material.unit}-${JSON.stringify(material.specs || {})}`}
                                                 material={material}
                                                 animation={cardAnimations[dateIndex * 10 + index] || new Animated.Value(1)}
                                                 activeTab={activeTab}
@@ -1706,7 +1789,7 @@ const Details = () => {
                         // Regular grouping for "Imported Materials" tab
                         groupedMaterials.map((material, index) => (
                             <MaterialCardEnhanced
-                                key={`${material.name}-${material.unit}`}
+                                key={`${material.name}-${material.unit}-${JSON.stringify(material.specs || {})}`}
                                 material={material}
                                 animation={cardAnimations[index] || new Animated.Value(1)}
                                 activeTab={activeTab}

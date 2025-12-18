@@ -138,6 +138,51 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
             material.unit.toLowerCase().includes(query);
     });
 
+    // Function to get differing specifications for materials with same name
+    const getDifferingSpecs = (material: Material) => {
+        // Find all materials with the same name and unit
+        const sameMaterials = filteredMaterials.filter(m => 
+            m.name === material.name && m.unit === material.unit
+        );
+        
+        // If only one material with this name, no need to show specs
+        if (sameMaterials.length <= 1) {
+            return null;
+        }
+        
+        // Get all unique spec keys across all materials with same name
+        const allSpecKeys = new Set<string>();
+        sameMaterials.forEach(m => {
+            if (m.specs) {
+                Object.keys(m.specs).forEach(key => allSpecKeys.add(key));
+            }
+        });
+        
+        // Find specs that differ between materials
+        const differingSpecs: Record<string, any> = {};
+        
+        Array.from(allSpecKeys).forEach(specKey => {
+            const values = sameMaterials.map(m => m.specs?.[specKey]).filter(v => v !== undefined);
+            const uniqueValues = [...new Set(values)];
+            
+            // If there are different values for this spec key, it's a differing spec
+            if (uniqueValues.length > 1) {
+                differingSpecs[specKey] = material.specs?.[specKey];
+            }
+        });
+        
+        return Object.keys(differingSpecs).length > 0 ? differingSpecs : null;
+    };
+
+    // Function to format differing specs for display
+    const formatDifferingSpecs = (specs: Record<string, any> | null) => {
+        if (!specs || Object.keys(specs).length === 0) return '';
+        
+        return Object.entries(specs)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join(', ');
+    };
+
     const selectedMaterial = availableMaterials.find(m => m._id === selectedMaterialId);
 
     return (
@@ -263,7 +308,22 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                                         <Ionicons name={material.icon} size={20} color={material.color} />
                                                     </View>
                                                     <View style={styles.materialItemInfo}>
-                                                        <Text style={styles.materialItemName}>{material.name}</Text>
+                                                        <View style={styles.materialNameRow}>
+                                                            <Text style={styles.materialItemName}>{material.name}</Text>
+                                                            {(() => {
+                                                                const differingSpecs = getDifferingSpecs(material);
+                                                                if (differingSpecs) {
+                                                                    return (
+                                                                        <View style={styles.specsBadgeInline}>
+                                                                            <Text style={styles.specsBadgeText}>
+                                                                                {formatDifferingSpecs(differingSpecs)}
+                                                                            </Text>
+                                                                        </View>
+                                                                    );
+                                                                }
+                                                                return null;
+                                                            })()}
+                                                        </View>
                                                         <Text style={styles.materialItemQuantity}>
                                                             {material.quantity} {material.unit} available
                                                         </Text>
@@ -517,11 +577,30 @@ const styles = StyleSheet.create({
     materialItemInfo: {
         flex: 1,
     },
+    materialNameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        marginBottom: 2,
+        gap: 8,
+    },
     materialItemName: {
         fontSize: 15,
         fontWeight: '600',
         color: '#1E293B',
-        marginBottom: 2,
+    },
+    specsBadgeInline: {
+        backgroundColor: '#FEF3C7',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: '#F59E0B',
+    },
+    specsBadgeText: {
+        fontSize: 10,
+        color: '#92400E',
+        fontWeight: '600',
     },
     materialItemQuantity: {
         fontSize: 13,

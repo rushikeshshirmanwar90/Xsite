@@ -12,6 +12,7 @@ import {
 
 interface StaffHeaderProps {
     staffCount: number;
+    adminCount: number;
     searchQuery: string;
     onSearchChange: (query: string) => void;
     onAddPress: () => void;
@@ -20,6 +21,7 @@ interface StaffHeaderProps {
 
 const StaffHeader: React.FC<StaffHeaderProps> = ({
     staffCount,
+    adminCount,
     searchQuery,
     onSearchChange,
     onAddPress,
@@ -30,10 +32,22 @@ const StaffHeader: React.FC<StaffHeaderProps> = ({
             {/* Title Section */}
             <View style={styles.titleSection}>
                 <View style={styles.titleContainer}>
-                    <Text style={styles.headerTitle}>Staff Management</Text>
-                    <Text style={styles.headerSubtitle}>
-                        {staffCount} staff member{staffCount !== 1 ? 's' : ''}
-                    </Text>
+                    <Text style={styles.headerTitle}>Team Management</Text>
+                    <View style={styles.countsContainer}>
+                        <View style={styles.countItem}>
+                            <Ionicons name="people" size={16} color="#3B82F6" />
+                            <Text style={styles.countText}>
+                                {staffCount} Staff
+                            </Text>
+                        </View>
+                        <View style={styles.countSeparator} />
+                        <View style={styles.countItem}>
+                            <Ionicons name="shield-checkmark" size={16} color="#F59E0B" />
+                            <Text style={styles.countText}>
+                                {adminCount} Admin{adminCount !== 1 ? 's' : ''}
+                            </Text>
+                        </View>
+                    </View>
                 </View>
             </View>
 
@@ -100,7 +114,27 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     titleContainer: {
-        gap: 4,
+        gap: 8,
+    },
+    countsContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    countItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    countText: {
+        fontSize: 14,
+        color: '#64748B',
+        fontWeight: '500',
+    },
+    countSeparator: {
+        width: 1,
+        height: 16,
+        backgroundColor: '#E2E8F0',
     },
     headerTitle: {
         fontSize: 20,

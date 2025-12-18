@@ -16,6 +16,7 @@ interface GroupedMaterial {
     icon: any;
     color: string;
     date: string;
+    specs?: Record<string, any>; // ✅ NEW: Specifications for this material variant
     variants: MaterialVariant[];
     totalQuantity: number;
     totalCost: number;
@@ -169,7 +170,9 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 <Ionicons name={material.icon} size={24} color={material.color} />
                             </View>
                             <View style={styles.materialTitleInfo}>
-                                <Text style={styles.materialNameText}>{material.name}</Text>
+                                <View style={styles.materialNameRow}>
+                                    <Text style={styles.materialNameText}>{material.name}</Text>
+                                </View>
                                 {showMiniSectionLabel && material.miniSectionId && (
                                     <View style={styles.miniSectionBadge}>
                                         <Ionicons name="location" size={12} color="#3B82F6" />
@@ -251,14 +254,65 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                             </View>
                         )}
 
-                        {/* Cost Information */}
-                        <View style={styles.costRow}>
-                            <Text style={styles.costLabel}>Total Cost:</Text>
-                            <Text style={styles.costValue}>
-                                ₹{material.totalCost.toLocaleString('en-IN')}
-                            </Text>
+                        {/* Cost Information - Compact */}
+                        <View style={styles.costSectionCompact}>
+                            <View style={styles.costRowCompact}>
+                                <Text style={styles.costLabelCompact}>Per Unit:</Text>
+                                <Text style={styles.costValueCompact}>
+                                    ₹{(() => {
+                                        // FIXED: material.totalCost is actually the per unit cost
+                                        const perUnitCost = Number(material.totalCost) || 0;
+                                        
+                                        // Debug logging
+                                        if (__DEV__) {
+                                            console.log('🐛 COST DEBUG (FIXED):', {
+                                                materialName: material.name,
+                                                totalCostField: material.totalCost,
+                                                interpretedAsPerUnit: perUnitCost,
+                                                totalQuantity: material.totalQuantity,
+                                                totalImported: material.totalImported,
+                                                calculatedTotal: perUnitCost * (material.totalImported || material.totalQuantity)
+                                            });
+                                        }
+                                        
+                                        return perUnitCost.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+                                    })()}/{material.unit}
+                                </Text>
+                            </View>
+                            <View style={styles.costDivider} />
+                            <View style={styles.costRowCompact}>
+                                <Text style={styles.costLabelCompact}>Total:</Text>
+                                <Text style={styles.costValueCompact}>
+                                    ₹{(() => {
+                                        // FIXED: Calculate total cost = per unit cost × total imported quantity
+                                        const perUnitCost = Number(material.totalCost) || 0;
+                                        const totalImported = Number(material.totalImported) || Number(material.totalQuantity) || 0;
+                                        const totalCost = perUnitCost * totalImported;
+                                        
+                                        return totalCost.toLocaleString('en-IN');
+                                    })()}
+                                </Text>
+                            </View>
                         </View>
                     </View>
+
+                    {/* Specifications Section - Below cost */}
+                    {material.specs && Object.keys(material.specs).length > 0 && (
+                        <View style={styles.specsSection}>
+                            <View style={styles.specsSectionHeader}>
+                                <Ionicons name="information-circle-outline" size={16} color="#6B7280" />
+                                <Text style={styles.specsSectionTitle}>Specifications</Text>
+                            </View>
+                            <View style={styles.specsContainer}>
+                                {Object.entries(material.specs).map(([key, value], index) => (
+                                    <View key={index} style={styles.specItem}>
+                                        <Text style={styles.specKey}>{key}:</Text>
+                                        <Text style={styles.specValue}>{value}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        </View>
+                    )}
 
 
                 </View>
@@ -446,11 +500,30 @@ const styles = StyleSheet.create({
     materialTitleInfo: {
         flex: 1,
     },
+    materialNameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        marginBottom: 2,
+    },
     materialNameText: {
         fontSize: 18,
         fontWeight: '600',
         color: '#1F2937',
-        marginBottom: 2,
+        marginRight: 8,
+    },
+    specsBadge: {
+        backgroundColor: '#FEF3C7',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#F59E0B',
+    },
+    specsText: {
+        fontSize: 11,
+        color: '#92400E',
+        fontWeight: '600',
     },
     miniSectionBadge: {
         flexDirection: 'row',
@@ -540,11 +613,16 @@ const styles = StyleSheet.create({
         color: '#6B7280',
         textAlign: 'right',
     },
+    costSection: {
+        backgroundColor: '#F8FAFC',
+        padding: 12,
+        borderRadius: 8,
+        gap: 8,
+    },
     costRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 4,
     },
     costLabel: {
         fontSize: 13,
@@ -555,6 +633,76 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#1F2937',
+    },
+    // Compact cost section styles
+    costSectionCompact: {
+        flexDirection: 'row',
+        backgroundColor: '#F8FAFC',
+        padding: 8,
+        borderRadius: 6,
+        alignItems: 'center',
+    },
+    costRowCompact: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    costDivider: {
+        width: 1,
+        height: 24,
+        backgroundColor: '#E5E7EB',
+        marginHorizontal: 8,
+    },
+    costLabelCompact: {
+        fontSize: 11,
+        color: '#6B7280',
+        fontWeight: '500',
+        marginBottom: 2,
+    },
+    costValueCompact: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#1F2937',
+    },
+    // Specifications section styles
+    specsSection: {
+        marginTop: 12,
+        backgroundColor: '#FEFEFE',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        padding: 12,
+    },
+    specsSectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+        gap: 6,
+    },
+    specsSectionTitle: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#374151',
+    },
+    specsContainer: {
+        gap: 6,
+    },
+    specItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    specKey: {
+        fontSize: 12,
+        color: '#6B7280',
+        fontWeight: '500',
+        textTransform: 'capitalize',
+        minWidth: 60,
+    },
+    specValue: {
+        fontSize: 12,
+        color: '#1F2937',
+        fontWeight: '600',
+        flex: 1,
     },
     addUsageButton: {
         flexDirection: 'row',

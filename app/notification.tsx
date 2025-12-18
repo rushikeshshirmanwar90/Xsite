@@ -563,7 +563,7 @@ const NotificationPage: React.FC = () => {
 
     const renderMaterialActivityItem = (activity: MaterialActivity) => {
         const icon = getMaterialActivityIcon(activity.activity);
-        const totalCost = activity.materials.reduce((sum, m) => sum + (m.cost || 0), 0);
+        const totalCost = activity.materials.reduce((sum, m) => sum + ((m.cost || 0) * (m.qnt || 0)), 0);
         const materialCount = activity.materials.length;
         const isImported = activity.activity === 'imported';
 

@@ -34,15 +34,21 @@ const AnalyticsDashboard: React.FC = () => {
   const lastLoadTimeRef = React.useRef<number>(0);
   const DEBOUNCE_DELAY = 500;
 
-  // Calculate total material value (both available and used)
+  // Calculate total material value (only purchased materials, not double-counting used ones)
   const calculateTotalMaterialValue = (project: Project): number => {
+    // ✅ FIXED: Only count available materials as actual spending
+    // Used materials are just transfers from available, not new spending
     const availableTotal = (project.MaterialAvailable || []).reduce(
       (sum, m) => sum + (m.cost || 0), 0
     );
-    const usedTotal = (project.MaterialUsed || []).reduce(
-      (sum, m) => sum + (m.cost || 0), 0
-    );
-    return availableTotal + usedTotal;
+    
+    // ✅ OPTION 1: Use project.spent field (if it tracks actual spending correctly)
+    // return project.spent || availableTotal;
+    
+    // ✅ OPTION 2: Use only available materials (since used materials were already counted when available)
+    return availableTotal;
+    
+    // ❌ OLD LOGIC: return availableTotal + usedTotal; // This double-counts!
   };
 
   // Calculate available (not yet allocated) materials
@@ -69,15 +75,21 @@ const AnalyticsDashboard: React.FC = () => {
   const transformedProjectData = projects.map(project => {
     const available = calculateAvailableMaterials(project);
     const used = calculateUsedMaterials(project);
-    const total = available + used;
+    
+    // ✅ FIXED: Use project.spent for actual money spent, not available + used
+    const actualSpent = project.spent || 0;
+    
+    // ✅ For display purposes, show available and used values separately
+    const totalMaterialValue = available + used; // This is for information only
 
     return {
       _id: project._id || '',
       name: project.name,
-      budgetUsed: total,
+      budgetUsed: actualSpent, // ✅ Use actual spending, not material values
       available,
       used,
-      description: `📦 Available: ${formatCurrency(available)}  •  🔨 Used: ${formatCurrency(used)}`,
+      totalMaterialValue, // For information
+      description: `💰 Spent: ${formatCurrency(actualSpent)} • 📦 Available: ${formatCurrency(available)} • 🔨 Used: ${formatCurrency(used)}`,
       status: 'active' as const,
     };
   });

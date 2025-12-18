@@ -41,8 +41,14 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
           
           {activeTab === 'imported' ? (
             <View style={styles.priceContainer}>
-              <Text style={styles.priceLabel}>Price:</Text>
-              <Text style={styles.priceValue}>{formatPrice(material.price)}</Text>
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>Per Unit:</Text>
+                <Text style={styles.priceValue}>{formatPrice(material.price)}/{material.unit}</Text>
+              </View>
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>Total:</Text>
+                <Text style={styles.priceValue}>{formatPrice(material.price * material.quantity)}</Text>
+              </View>
             </View>
           ) : (
             <View style={styles.usageContainer}>
@@ -107,13 +113,18 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   priceContainer: {
+    marginTop: 2,
+  },
+  priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 2,
   },
   priceLabel: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#64748B',
     marginRight: 4,
+    minWidth: 50,
   },
   priceValue: {
     fontSize: 14,
