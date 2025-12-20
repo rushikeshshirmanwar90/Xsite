@@ -336,6 +336,8 @@ export default function LoginScreen() {
             }
 
             console.log('✅ User found with type:', userTypeResult.userType);
+            setUserType(userTypeResult.userType);
+            
             console.log('Step 2: Sending forget password request...');
 
             // Then send forget password request
@@ -344,15 +346,28 @@ export default function LoginScreen() {
             console.log('Forget Password Result:', result);
 
             if (result.success) {
-                console.log('✅ Password reset email sent successfully');
-                toast.success(result.message || "Password reset link sent to your email");
-                // Go back to email step
-                setCurrentStep('email');
-                setPassword('');
-                setOtp('');
+                console.log('✅ Password reset successful');
+                toast.success("Password reset successful. Please verify with OTP to set new password.");
+                
+                // Generate and send OTP for verification
+                const OTP = generateOTP();
+                setGeneratedOTP(OTP);
+                const sendMail = await sendOtp(email, OTP);
+                
+                if (sendMail) {
+                    toast.success('OTP sent to your email');
+                    // Set isVerified to false so user goes through password setup flow
+                    setIsVerified(false);
+                    // Go to OTP step
+                    setCurrentStep('otp');
+                    setPassword('');
+                    setOtp('');
+                } else {
+                    toast.error("Failed to send OTP. Please try again.");
+                }
             } else {
-                console.log('❌ Failed to send password reset email');
-                toast.error(result.error || "Failed to send password reset email");
+                console.log('❌ Failed to reset password');
+                toast.error(result.error || "Failed to reset password");
             }
         } catch (error) {
             console.error('❌ Forget password error:', error);
