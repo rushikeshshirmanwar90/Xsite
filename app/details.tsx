@@ -1586,7 +1586,7 @@ const Details = () => {
                 <TabSelector activeTab={activeTab} onSelectTab={setActiveTab} />
 
                 {/* Notification Button - Inside scroll view */}
-                <View style={notificationStyles.notificationButtonContainer}>
+                {/* <View style={notificationStyles.notificationButtonContainer}>
                     <TouchableOpacity
                         style={notificationStyles.notificationButton}
                         onPress={() => setShowNotifications(true)}
@@ -1595,7 +1595,7 @@ const Details = () => {
                         <Ionicons name="notifications" size={20} color="#3B82F6" />
                         <Text style={notificationStyles.notificationButtonText}>Activity Log</Text>
                     </TouchableOpacity>
-                </View>
+                </View> */}
 
                 {/* Compact Filters - Only visible in "Used Materials" tab */}
                 {activeTab === 'used' && (

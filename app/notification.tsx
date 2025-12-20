@@ -79,18 +79,30 @@ const NotificationPage: React.FC = () => {
         console.log('   - Type:', typeof activitiesRaw);
         console.log('   - Is array?', Array.isArray(activitiesRaw));
 
+        // If activitiesRaw is already an array, return it
+        if (Array.isArray(activitiesRaw)) {
+            return activitiesRaw;
+        }
+
         // If activitiesRaw is the API response object (has 'activities' property), extract it
-        if (activitiesRaw && typeof activitiesRaw === 'object' && !Array.isArray(activitiesRaw)) {
+        if (activitiesRaw && typeof activitiesRaw === 'object') {
             const anyActivities = activitiesRaw as any;
+            
+            // Try different possible response structures
+            if (anyActivities.data?.activities && Array.isArray(anyActivities.data.activities)) {
+                console.log('   ⚠️ WARNING: State contains nested API response, extracting activities array');
+                return anyActivities.data.activities as Activity[];
+            }
+            
             if (anyActivities.activities && Array.isArray(anyActivities.activities)) {
                 console.log('   ⚠️ WARNING: State contains API response object, extracting activities array');
                 return anyActivities.activities as Activity[];
             }
-        }
-
-        // If it's already an array, return it
-        if (Array.isArray(activitiesRaw)) {
-            return activitiesRaw;
+            
+            if (anyActivities.data && Array.isArray(anyActivities.data)) {
+                console.log('   ⚠️ WARNING: State contains data array, extracting it');
+                return anyActivities.data as Activity[];
+            }
         }
 
         // Fallback to empty array
@@ -229,32 +241,56 @@ const NotificationPage: React.FC = () => {
             console.log('  - Activity:', `${domain}/api/activity?${activityParams.toString()}`);
             console.log('  - Material Activity:', `${domain}/api/materialActivity?${materialParams.toString()}`);
 
-            // Fetch both activities in parallel with better error handling
+            // Fetch both activities in parallel with enhanced error handling
             const [activityRes, materialActivityRes] = await Promise.all([
                 axios.get(`${domain}/api/activity?${activityParams.toString()}`)
                     .catch((err) => {
                         console.error('❌ Activity API Error:', err?.response?.data || err.message);
-                        // Return structure that matches successful response
-                        return { data: { success: true, data: { dateGroups: [], hasMoreDates: false, nextDate: null } } };
+                        console.error('❌ Activity API Status:', err?.response?.status);
+                        // Return structure that matches successful response but indicates failure
+                        return { 
+                            data: { 
+                                success: false, 
+                                error: err?.response?.data?.message || err.message,
+                                data: { dateGroups: [], hasMoreDates: false, nextDate: null } 
+                            } 
+                        };
                     }),
                 axios.get(`${domain}/api/materialActivity?${materialParams.toString()}`)
                     .catch((err) => {
                         console.error('❌ Material Activity API Error:', err?.response?.data || err.message);
-                        // Return structure that matches successful response
-                        return { data: { success: true, data: { dateGroups: [], hasMoreDates: false, nextDate: null } } };
+                        console.error('❌ Material Activity API Status:', err?.response?.status);
+                        // Return structure that matches successful response but indicates failure
+                        return { 
+                            data: { 
+                                success: false, 
+                                error: err?.response?.data?.message || err.message,
+                                data: { dateGroups: [], hasMoreDates: false, nextDate: null } 
+                            } 
+                        };
                     }),
             ]);
 
             console.log('\n--- API RESPONSES ---');
-            console.log('Activity Response:', JSON.stringify(activityRes.data, null, 2));
-            console.log('Material Activity Response:', JSON.stringify(materialActivityRes.data, null, 2));
+            console.log('Activity Response Success:', activityRes.data.success !== false);
+            console.log('Material Activity Response Success:', materialActivityRes.data.success !== false);
+            
+            // Check if both APIs failed
+            if (activityRes.data.success === false && materialActivityRes.data.success === false) {
+                console.error('❌ Both APIs failed, throwing error');
+                throw new Error(`API Error - Activity: ${activityRes.data.error}, Material: ${materialActivityRes.data.error}`);
+            }
 
             const activityData = activityRes.data as any;
             const materialData = materialActivityRes.data as any;
 
-            // Extract date groups from both APIs - handle nested data structure
-            const activityDateGroups = activityData.data?.dateGroups || activityData.dateGroups || [];
-            const materialDateGroups = materialData.data?.dateGroups || materialData.dateGroups || [];
+            // Extract date groups from both APIs - handle nested data structure and API failures
+            const activityDateGroups = (activityData.success !== false) 
+                ? (activityData.data?.dateGroups || activityData.dateGroups || [])
+                : [];
+            const materialDateGroups = (materialData.success !== false)
+                ? (materialData.data?.dateGroups || materialData.dateGroups || [])
+                : [];
 
             console.log('\n--- EXTRACTED DATE GROUPS ---');
             console.log('Activity Date Groups:', activityDateGroups.length);
@@ -289,9 +325,9 @@ const NotificationPage: React.FC = () => {
                 if (Array.isArray(fallbackActivityData)) {
                     activities = fallbackActivityData;
                 } else if (fallbackActivityData && typeof fallbackActivityData === 'object') {
-                    activities = (fallbackActivityData.activities ||
+                    activities = (fallbackActivityData.data?.activities ||
+                        fallbackActivityData.activities ||
                         fallbackActivityData.data ||
-                        fallbackActivityData.activity ||
                         []) as Activity[];
                 }
 
@@ -300,7 +336,8 @@ const NotificationPage: React.FC = () => {
                 if (Array.isArray(fallbackMaterialDataRaw)) {
                     materialData = fallbackMaterialDataRaw;
                 } else if (fallbackMaterialDataRaw && typeof fallbackMaterialDataRaw === 'object') {
-                    materialData = (fallbackMaterialDataRaw.materialActivities ||
+                    materialData = (fallbackMaterialDataRaw.data?.activities ||
+                        fallbackMaterialDataRaw.materialActivities ||
                         fallbackMaterialDataRaw.activities ||
                         fallbackMaterialDataRaw.data ||
                         []) as MaterialActivity[];

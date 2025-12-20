@@ -257,26 +257,36 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                         {/* Cost Information - Compact */}
                         <View style={styles.costSectionCompact}>
                             <View style={styles.costRowCompact}>
-                                <Text style={styles.costLabelCompact}>Per Unit:</Text>
+                                <Text style={styles.costLabelCompact}>
+                                    {activeTab === 'used' ? 'Total Used Cost:' : 'Per Unit:'}
+                                </Text>
                                 <Text style={styles.costValueCompact}>
                                     ₹{(() => {
                                         // FIXED: material.totalCost is actually the per unit cost
                                         const perUnitCost = Number(material.totalCost) || 0;
                                         
+                                        // For used materials, show total used cost (per unit × quantity used)
+                                        // For imported materials, show per unit cost
+                                        const displayCost = activeTab === 'used' 
+                                            ? perUnitCost * material.totalQuantity  // Total cost for used quantity
+                                            : perUnitCost;  // Per unit cost for imported
+                                        
                                         // Debug logging
                                         if (__DEV__) {
                                             console.log('🐛 COST DEBUG (FIXED):', {
                                                 materialName: material.name,
+                                                activeTab,
                                                 totalCostField: material.totalCost,
                                                 interpretedAsPerUnit: perUnitCost,
                                                 totalQuantity: material.totalQuantity,
                                                 totalImported: material.totalImported,
+                                                displayCost,
                                                 calculatedTotal: perUnitCost * (material.totalImported || material.totalQuantity)
                                             });
                                         }
                                         
-                                        return perUnitCost.toLocaleString('en-IN', { maximumFractionDigits: 2 });
-                                    })()}/{material.unit}
+                                        return displayCost.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+                                    })()}{activeTab === 'imported' ? `/${material.unit}` : ''}
                                 </Text>
                             </View>
                             <View style={styles.costDivider} />
