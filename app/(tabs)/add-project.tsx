@@ -39,6 +39,7 @@ const ProjectScreen: React.FC = () => {
     const [editProjectAddress, setEditProjectAddress] = useState('');
     const [editProjectBudget, setEditProjectBudget] = useState('');
     const [editProjectDescription, setEditProjectDescription] = useState('');
+    const [editAssignedStaff, setEditAssignedStaff] = useState<StaffMembers[]>([]);
     const [updatingProject, setUpdatingProject] = useState(false);
 
     // Get user role for access control
@@ -373,6 +374,8 @@ const ProjectScreen: React.FC = () => {
         setEditProjectAddress(project.address);
         setEditProjectBudget(project.budget?.toString() || '');
         setEditProjectDescription(project.description || '');
+        // Set currently assigned staff
+        setEditAssignedStaff(project.assignedStaff || []);
         setShowEditModal(true);
     };
 
@@ -421,6 +424,7 @@ const ProjectScreen: React.FC = () => {
                 address: editProjectAddress.trim(),
                 budget: Number(editProjectBudget),
                 description: editProjectDescription.trim(),
+                assignedStaff: editAssignedStaff,
                 clientId,
                 user: userInfo // Include user info for activity logging
             };
@@ -435,6 +439,119 @@ const ProjectScreen: React.FC = () => {
             console.log('✅ Project updated:', response.data);
 
             if (response.status === 200) {
+                // Log staff assignment changes
+                const originalStaff = editingProject.assignedStaff || [];
+                const newStaff = editAssignedStaff;
+                
+                // Find newly assigned staff
+                const addedStaff = newStaff.filter(staff => 
+                    !originalStaff.some(original => original._id === staff._id)
+                );
+                
+                // Find removed staff
+                const removedStaff = originalStaff.filter(staff => 
+                    !newStaff.some(newStaffMember => newStaffMember._id === staff._id)
+                );
+
+                console.log(`📊 Staff changes detected:`);
+                console.log(`   - Added: ${addedStaff.length} staff members`);
+                console.log(`   - Removed: ${removedStaff.length} staff members`);
+
+                // Validate required data before logging activities
+                if (!clientId) {
+                    console.error('❌ Cannot log activities: clientId is missing');
+                } else if (!userInfo) {
+                    console.error('❌ Cannot log activities: userInfo is missing');
+                } else {
+                    // Log staff assignments
+                    for (const staff of addedStaff) {
+                        try {
+                            console.log(`🔄 Logging staff assignment for: ${staff.fullName}`);
+                            console.log(`   - Client ID: ${clientId}`);
+                            console.log(`   - Project ID: ${editingProject._id}`);
+                            console.log(`   - User Info:`, userInfo);
+
+                            const staffPayload = {
+                                user: userInfo,
+                                clientId,
+                                projectId: editingProject._id,
+                                projectName: editProjectName,
+                                activityType: 'staff_assigned',
+                                category: 'staff',
+                                action: 'assign',
+                                description: `Assigned ${staff.fullName} to project "${editProjectName}"`,
+                                message: 'Assigned during project update',
+                                date: new Date().toISOString(),
+                                metadata: {
+                                    staffName: staff.fullName,
+                                },
+                            };
+
+                            console.log(`📝 Staff assignment payload:`, JSON.stringify(staffPayload, null, 2));
+
+                            const response = await axios.post(`${domain}/api/activity`, staffPayload);
+                            console.log(`✅ Staff assignment logged successfully: ${staff.fullName}`, response.status);
+                        } catch (error: any) {
+                            console.error(`❌ Error logging staff assignment for ${staff.fullName}:`, error);
+                            console.error(`❌ Error details:`, {
+                                message: error.message,
+                                status: error?.response?.status,
+                                statusText: error?.response?.statusText,
+                                data: error?.response?.data,
+                                url: error?.config?.url,
+                                method: error?.config?.method,
+                            });
+                            
+                            // Don't fail the entire operation if activity logging fails
+                            console.warn(`⚠️ Continuing despite activity logging failure for ${staff.fullName}`);
+                        }
+                    }
+
+                    // Log staff removals
+                    for (const staff of removedStaff) {
+                        try {
+                            console.log(`🔄 Logging staff removal for: ${staff.fullName}`);
+                            console.log(`   - Client ID: ${clientId}`);
+                            console.log(`   - Project ID: ${editingProject._id}`);
+                            console.log(`   - User Info:`, userInfo);
+
+                            const staffPayload = {
+                                user: userInfo,
+                                clientId,
+                                projectId: editingProject._id,
+                                projectName: editProjectName,
+                                activityType: 'staff_unassigned',
+                                category: 'staff',
+                                action: 'unassign',
+                                description: `Removed ${staff.fullName} from project "${editProjectName}"`,
+                                message: 'Removed during project update',
+                                date: new Date().toISOString(),
+                                metadata: {
+                                    staffName: staff.fullName,
+                                },
+                            };
+
+                            console.log(`📝 Staff removal payload:`, JSON.stringify(staffPayload, null, 2));
+
+                            const response = await axios.post(`${domain}/api/activity`, staffPayload);
+                            console.log(`✅ Staff removal logged successfully: ${staff.fullName}`, response.status);
+                        } catch (error: any) {
+                            console.error(`❌ Error logging staff removal for ${staff.fullName}:`, error);
+                            console.error(`❌ Error details:`, {
+                                message: error.message,
+                                status: error?.response?.status,
+                                statusText: error?.response?.statusText,
+                                data: error?.response?.data,
+                                url: error?.config?.url,
+                                method: error?.config?.method,
+                            });
+                            
+                            // Don't fail the entire operation if activity logging fails
+                            console.warn(`⚠️ Continuing despite activity logging failure for ${staff.fullName}`);
+                        }
+                    }
+                }
+
                 Alert.alert('Success', 'Project updated successfully');
                 setShowEditModal(false);
                 await fetchProjectsData(false); // Refresh the list
@@ -492,6 +609,23 @@ const ProjectScreen: React.FC = () => {
             console.error('❌ Error deleting project:', error);
             Alert.alert('Error', error?.response?.data?.message || 'Failed to delete project');
         }
+    };
+
+    // Staff selection functions for edit modal
+    const handleEditStaffSelection = (staff: StaffMembers) => {
+        const isSelected = editAssignedStaff.some(member => member._id === staff._id);
+
+        if (isSelected) {
+            // Remove staff member
+            setEditAssignedStaff(editAssignedStaff.filter(member => member._id !== staff._id));
+        } else {
+            // Add staff member
+            setEditAssignedStaff([...editAssignedStaff, staff]);
+        }
+    };
+
+    const isEditStaffSelected = (staff: StaffMembers) => {
+        return editAssignedStaff.some(member => member._id === staff._id);
     };
 
     return (
@@ -677,6 +811,57 @@ const ProjectScreen: React.FC = () => {
                                 multiline
                                 numberOfLines={4}
                             />
+                        </View>
+
+                        {/* Staff Assignment */}
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Assign Staff</Text>
+                            <View style={styles.staffContainer}>
+                                {staffMembers.map((staff: StaffMembers) => (
+                                    <TouchableOpacity
+                                        key={staff._id}
+                                        style={styles.staffItem}
+                                        onPress={() => handleEditStaffSelection(staff)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <View style={styles.staffItemContent}>
+                                            <View style={[
+                                                styles.checkbox,
+                                                isEditStaffSelected(staff) && styles.checkboxSelected
+                                            ]}>
+                                                {isEditStaffSelected(staff) && (
+                                                    <Ionicons name="checkmark" size={18} color="#fff" />
+                                                )}
+                                            </View>
+                                            <View style={styles.staffInfo}>
+                                                <Text style={styles.staffName}>
+                                                    {staff.fullName}
+                                                </Text>
+                                                <Text style={styles.staffStatus}>
+                                                    {isEditStaffSelected(staff) ? 'Assigned' : 'Available'}
+                                                </Text>
+                                            </View>
+                                            <View style={[
+                                                styles.selectionIndicator,
+                                                isEditStaffSelected(staff) && styles.selectionIndicatorSelected
+                                            ]}>
+                                                <Ionicons
+                                                    name={isEditStaffSelected(staff) ? "checkmark-circle" : "ellipse-outline"}
+                                                    size={24}
+                                                    color={isEditStaffSelected(staff) ? "#10B981" : "#D1D5DB"}
+                                                />
+                                            </View>
+                                        </View>
+                                    </TouchableOpacity>
+                                ))}
+                                {staffMembers.length === 0 && (
+                                    <View style={styles.noStaffContainer}>
+                                        <Ionicons name="people-outline" size={32} color="#9CA3AF" />
+                                        <Text style={styles.noStaffText}>No staff members available</Text>
+                                        <Text style={styles.noStaffSubText}>Please add staff members first</Text>
+                                    </View>
+                                )}
+                            </View>
                         </View>
                     </ScrollView>
 
@@ -951,6 +1136,81 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#FFFFFF',
+    },
+    // Staff Assignment Styles
+    staffContainer: {
+        gap: 8,
+    },
+    staffItem: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        overflow: 'hidden',
+    },
+    staffItemContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+        gap: 12,
+    },
+    checkbox: {
+        width: 24,
+        height: 24,
+        borderRadius: 6,
+        borderWidth: 2,
+        borderColor: '#D1D5DB',
+        backgroundColor: '#FFFFFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    checkboxSelected: {
+        backgroundColor: '#10B981',
+        borderColor: '#10B981',
+    },
+    staffInfo: {
+        flex: 1,
+        gap: 2,
+    },
+    staffName: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1F2937',
+    },
+    staffStatus: {
+        fontSize: 14,
+        color: '#6B7280',
+        fontWeight: '500',
+    },
+    selectionIndicator: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    selectionIndicatorSelected: {
+        // Additional styling if needed
+    },
+    noStaffContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 32,
+        paddingHorizontal: 16,
+        backgroundColor: '#F9FAFB',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        borderStyle: 'dashed',
+    },
+    noStaffText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#6B7280',
+        marginTop: 12,
+    },
+    noStaffSubText: {
+        fontSize: 14,
+        color: '#9CA3AF',
+        marginTop: 4,
+        textAlign: 'center',
     },
 });
 

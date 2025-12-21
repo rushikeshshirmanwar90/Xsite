@@ -878,11 +878,10 @@ const Details = () => {
             return [];
         }
     };
-    // Handle adding material usage from the form
+    // Handle adding material usage from the form (batch version)
     const handleAddMaterialUsage = async (
         miniSectionId: string,
-        materialId: string,
-        quantity: number
+        materialUsages: Array<{ materialId: string; quantity: number }>
     ) => {
         // Prevent duplicate submissions
         if (isLoadingRef.current) {
@@ -890,169 +889,147 @@ const Details = () => {
             return;
         }
 
+        // Get user data and clientId for activity logging
+        const user = await getUserData();
+        const { getClientId } = require('@/functions/clientId');
+        const clientId = await getClientId();
+
+        if (!user || !clientId) {
+            toast.error('Unable to get user information. Please try logging in again.');
+            console.error('❌ Missing user data or clientId:', { user, clientId });
+            return;
+        }
+
+        console.log('\n========================================');
+        console.log('🎯 ADD BATCH MATERIAL USAGE - COMPREHENSIVE DEBUG');
+        console.log('========================================');
+        console.log('📊 INPUT PARAMETERS:');
+        console.log('  - Project ID:', projectId, '(type:', typeof projectId, ')');
+        console.log('  - Section ID:', sectionId, '(type:', typeof sectionId, ')');
+        console.log('  - Mini Section ID:', miniSectionId, '(type:', typeof miniSectionId, ')');
+        console.log('  - Client ID:', clientId, '(type:', typeof clientId, ')');
+        console.log('  - Number of materials:', materialUsages.length);
+        console.log('  - User:', JSON.stringify(user, null, 2));
+
+        console.log('\n📦 AVAILABLE MATERIALS CONTEXT:');
+        console.log('  - Total available materials:', availableMaterials.length);
+        availableMaterials.slice(0, 3).forEach((m, idx) => {
+            console.log(`    ${idx + 1}. ${m.name} (_id: ${m._id}, qty: ${m.quantity})`);
+        });
+
+        console.log('\n🎯 MATERIAL USAGES TO PROCESS:');
+        materialUsages.forEach((usage, index) => {
+            const selectedMaterial = availableMaterials.find(m => m._id === usage.materialId);
+            console.log(`  ${index + 1}. Material Usage:`);
+            console.log(`     - Material ID: "${usage.materialId}" (type: ${typeof usage.materialId})`);
+            console.log(`     - Quantity: ${usage.quantity} (type: ${typeof usage.quantity})`);
+            
+            if (selectedMaterial) {
+                console.log(`     - Material Name: ${selectedMaterial.name}`);
+                console.log(`     - Available Quantity: ${selectedMaterial.quantity} ${selectedMaterial.unit}`);
+                console.log(`     - Unit Cost: ${selectedMaterial.price || 0}`);
+                console.log(`     - Section ID: ${selectedMaterial.sectionId || 'none'}`);
+                console.log(`     ✅ Material found in available materials`);
+            } else {
+                console.log(`     ❌ Material NOT FOUND in available materials!`);
+                console.log(`     🔍 Searching in available materials by ID...`);
+                const foundById = availableMaterials.find(m => String(m._id) === String(usage.materialId));
+                const foundByIdLoose = availableMaterials.find(m => m.id === parseInt(usage.materialId));
+                console.log(`     - Found by string comparison: ${!!foundById}`);
+                console.log(`     - Found by ID number: ${!!foundByIdLoose}`);
+            }
+        });
+
+        // Create the API payload
         const apiPayload = {
             projectId: projectId,
             sectionId: sectionId,
             miniSectionId: miniSectionId,
-            materialId: materialId,
-            qnt: quantity
+            materialUsages: materialUsages,
+            clientId: clientId,
+            user: user
         };
 
-        console.log('\n========================================');
-        console.log('ADD MATERIAL USAGE - DEBUG INFO');
-        console.log('========================================');
-        console.log('Material ID received:', materialId);
-        console.log('Material ID type:', typeof materialId);
-        console.log('Material ID length:', materialId?.length);
-        console.log('Section ID being sent:', sectionId);
-        console.log('Mini Section ID being sent:', miniSectionId);
-
-        const selectedMaterial = availableMaterials.find(m => m._id === materialId);
-        console.log('Found material:', selectedMaterial ? selectedMaterial.name : 'NOT FOUND');
-
-        if (!selectedMaterial) {
-            console.log('❌ Material not found in availableMaterials!');
-            console.log('Total available materials:', availableMaterials.length);
-            console.log('\nSearching for material with ID:', materialId);
-            console.log('\nAll available materials:');
-            availableMaterials.forEach((m, idx) => {
-                console.log(`  ${idx + 1}. ${m.name}:`);
-                console.log(`     _id: "${m._id}" (type: ${typeof m._id})`);
-                console.log(`     id: ${m.id} (type: ${typeof m.id})`);
-                console.log(`     sectionId: "${m.sectionId}" (type: ${typeof m.sectionId})`);
-                console.log(`     Match: ${m._id === materialId ? '✓ YES' : '✗ NO'}`);
-            });
-
-            toast.error('Material not found. Please refresh the page and try again.');
-            return;
-        } else {
-            console.log('✓ Material found:', {
-                name: selectedMaterial.name,
-                _id: selectedMaterial._id,
-                quantity: selectedMaterial.quantity,
-                unit: selectedMaterial.unit,
-                sectionId: selectedMaterial.sectionId
-            });
-
-            console.log('\n⚠️ IMPORTANT - API MATCHING LOGIC:');
-            console.log('The API will look for a material where:');
-            console.log('  1. _id matches:', materialId);
-            console.log('  2. AND (sectionId is empty/null/undefined OR sectionId matches:', sectionId, ')');
-            console.log('\nMaterial sectionId:', selectedMaterial.sectionId || '(empty/undefined)');
-            console.log('Request sectionId:', sectionId);
-
-            if (selectedMaterial.sectionId && selectedMaterial.sectionId !== sectionId) {
-                console.log('⚠️ WARNING: Material has sectionId', selectedMaterial.sectionId, 'but request is for', sectionId);
-                console.log('This might cause "Material not found" error from API!');
-                console.log('💡 TIP: The material might be scoped to a different section.');
-            }
-        }
-
-        console.log('API Payload:', JSON.stringify(apiPayload, null, 2));
-        console.log('API Endpoint:', `${domain}/api/material-usage`);
-        
-        // Enhanced payload logging
-        console.log('\n🔍 DETAILED PAYLOAD BREAKDOWN:');
-        console.log('  - projectId:', apiPayload.projectId, '(type:', typeof apiPayload.projectId, ')');
-        console.log('  - sectionId:', apiPayload.sectionId, '(type:', typeof apiPayload.sectionId, ')');
-        console.log('  - miniSectionId:', apiPayload.miniSectionId, '(type:', typeof apiPayload.miniSectionId, ')');
-        console.log('  - materialId:', apiPayload.materialId, '(type:', typeof apiPayload.materialId, ')');
-        console.log('  - qnt:', apiPayload.qnt, '(type:', typeof apiPayload.qnt, ')');
-        console.log('  - timestamp:', new Date().toISOString());
-        
-        console.log('\n📝 API BEHAVIOR NOTE:');
-        console.log('The API searches for material in MaterialAvailable where:');
-        console.log('  - material._id === materialId (', materialId, ')');
-        console.log('  - AND (material.sectionId is empty OR material.sectionId === sectionId)');
-        console.log('\nIf material has a different sectionId, API will return:');
-        console.log('  "Material not found in MaterialAvailable"');
+        console.log('\n📤 API PAYLOAD:');
+        console.log(JSON.stringify(apiPayload, null, 2));
+        console.log('\n🌐 API ENDPOINT:', `${domain}/api/material-usage-batch`);
         console.log('========================================\n');
 
         let loadingToast: any = null;
         try {
             isLoadingRef.current = true;
-            loadingToast = toast.loading('Adding material usage...');
+            loadingToast = toast.loading(`Adding ${materialUsages.length} material usages...`);
 
-            console.log('\n🚀 SENDING API REQUEST...');
-            console.log('URL:', `${domain}/api/material-usage`);
-            console.log('Method: POST');
-            console.log('Payload:', JSON.stringify(apiPayload, null, 2));
-            console.log('Payload Details:');
-            console.log('  - projectId:', apiPayload.projectId, '(type:', typeof apiPayload.projectId, ')');
-            console.log('  - sectionId:', apiPayload.sectionId, '(type:', typeof apiPayload.sectionId, ')');
-            console.log('  - miniSectionId:', apiPayload.miniSectionId, '(type:', typeof apiPayload.miniSectionId, ')');
-            console.log('  - materialId:', apiPayload.materialId, '(type:', typeof apiPayload.materialId, ')');
-            console.log('  - qnt:', apiPayload.qnt, '(type:', typeof apiPayload.qnt, ')');
+            console.log('\n🚀 SENDING BATCH API REQUEST...');
+            console.log('========================================');
+            console.log('📡 REQUEST DETAILS:');
+            console.log('  - URL:', `${domain}/api/material-usage-batch`);
+            console.log('  - Method: POST');
+            console.log('  - Domain:', domain);
+            console.log('  - Full URL:', `${domain}/api/material-usage-batch`);
+            console.log('  - Timeout: 30 seconds');
+            console.log('========================================');
 
-            const response = await axios.post(`${domain}/api/material-usage`, apiPayload);
+            // Add request headers for debugging
+            const requestConfig = {
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                timeout: 30000, // 30 second timeout
+            };
+
+            console.log('📋 Request config:', JSON.stringify(requestConfig, null, 2));
+            console.log('\n⏳ Making API call...');
+
+            const response = await axios.post(`${domain}/api/material-usage-batch`, apiPayload, requestConfig);
             const responseData = response.data as any;
 
             console.log('\n========================================');
-            console.log('✅ API RESPONSE - SUCCESS');
+            console.log('✅ BATCH API RESPONSE - SUCCESS');
             console.log('========================================');
-            console.log('Status:', response.status);
-            console.log('Response Data:', JSON.stringify(responseData, null, 2));
-            console.log('Success:', responseData.success);
-            console.log('Message:', responseData.message);
+            console.log('📊 RESPONSE DETAILS:');
+            console.log('  - Status Code:', response.status);
+            console.log('  - Success:', responseData.success);
+            console.log('  - Message:', responseData.message);
+            
+            if (responseData.data) {
+                console.log('  - Materials processed:', responseData.data.usedMaterials?.length || 0);
+                console.log('  - Total cost:', responseData.data.totalCostOfUsedMaterials || 0);
+                console.log('  - Remaining available:', responseData.data.materialAvailable?.length || 0);
+                console.log('  - Total used materials:', responseData.data.materialUsed?.length || 0);
+            }
+            
+            console.log('\n📋 FULL RESPONSE DATA:');
+            console.log(JSON.stringify(responseData, null, 2));
             console.log('========================================\n');
 
             if (responseData.success) {
                 toast.dismiss(loadingToast);
-                toast.success(responseData.message || 'Material usage added successfully');
+                toast.success(responseData.message || `${materialUsages.length} material usages added successfully`);
 
                 // Log material activity for used materials
-                if (selectedMaterial) {
+                if (responseData.data?.usedMaterials) {
                     // Find the mini-section name
                     const miniSection = miniSections.find(s => s._id === miniSectionId);
                     const miniSectionName = miniSection?.name || 'Unknown Section';
 
-                    // Calculate per-unit cost and cost for quantity used
-                    const perUnitCost = selectedMaterial.price / selectedMaterial.quantity;
-                    const costForQuantityUsed = perUnitCost * quantity;
-
-                    console.log('💰 COST CALCULATION:');
-                    console.log('  - Total imported cost:', selectedMaterial.price);
-                    console.log('  - Total imported quantity:', selectedMaterial.quantity);
-                    console.log('  - Per-unit cost:', perUnitCost);
-                    console.log('  - Quantity used:', quantity);
-                    console.log('  - Cost for quantity used:', costForQuantityUsed);
-
-                    const usedMaterialLog = [{
-                        name: selectedMaterial.name,
-                        unit: selectedMaterial.unit,
-                        specs: selectedMaterial.specs || {},
-                        qnt: quantity,
-                        cost: costForQuantityUsed, // Use calculated cost for quantity used
+                    const usedMaterialsLog = responseData.data.usedMaterials.map((usedMaterial: any) => ({
+                        name: usedMaterial.name,
+                        unit: usedMaterial.unit,
+                        specs: usedMaterial.specs || {},
+                        qnt: usedMaterial.qnt,
+                        cost: usedMaterial.cost,
                         addedAt: new Date(),
-                    }];
+                    }));
 
-                    await logMaterialActivity(
-                        usedMaterialLog,
-                        'used',
-                        `Used in ${projectName} - ${miniSectionName}`
-                    );
-
-                    // Also log to general activity
-                    const { logMaterialUsed } = require('@/utils/activityLogger');
-                    await logMaterialUsed(
-                        projectId,
-                        projectName,
-                        sectionId,
-                        sectionName,
-                        miniSectionId,
-                        miniSectionName,
-                        selectedMaterial.name,
-                        quantity,
-                        selectedMaterial.unit,
-                        {
-                            cost: costForQuantityUsed // Use calculated cost for quantity used
-                        }
-                    );
+                    // ✅ ACTIVITY LOGGING REMOVED - The batch API already handles MaterialActivity logging
+                    // This prevents duplicate notifications in the activity feed
+                    console.log('✅ Material usage logged by batch API - no additional logging needed');
                 }
 
                 // Refresh materials from API to get the latest data
                 console.log('\n========================================');
-                console.log('REFRESHING MATERIALS AFTER USAGE ADD');
+                console.log('REFRESHING MATERIALS AFTER BATCH USAGE ADD');
                 console.log('========================================\n');
 
                 // Force refresh with a longer delay to ensure backend has processed
@@ -1064,7 +1041,7 @@ const Details = () => {
                 // Wait for state to update - increased delay
                 await new Promise(resolve => setTimeout(resolve, 500));
 
-                console.log('✅ Materials refreshed after usage add');
+                console.log('✅ Materials refreshed after batch usage add');
                 console.log('Available materials count:', availableMaterials.length);
                 console.log('Used materials count:', usedMaterials.length);
 
@@ -1077,10 +1054,10 @@ const Details = () => {
                     setShowUsageForm(false);
 
                     // Show success message with material count
-                    toast.success(`Material usage recorded! Check the "Used Materials" tab.`);
+                    toast.success(`${materialUsages.length} material usages recorded! Check the "Used Materials" tab.`);
                 }
             } else {
-                throw new Error(responseData.error || 'Failed to add material usage');
+                throw new Error(responseData.error || 'Failed to add material usages');
             }
         } catch (error: any) {
             if (loadingToast) {
@@ -1088,27 +1065,115 @@ const Details = () => {
             }
 
             console.log('\n========================================');
-            console.log('❌ API RESPONSE - ERROR');
+            console.log('❌ BATCH API RESPONSE - ERROR');
             console.log('========================================');
-            console.log('Error Object:', error);
-            console.log('Error Name:', error?.name);
-            console.log('Error Message:', error?.message);
-            console.log('Error Code:', error?.code);
-            console.log('\n--- Response Details ---');
-            console.log('Status:', error?.response?.status);
-            console.log('Status Text:', error?.response?.statusText);
-            console.log('Response Headers:', error?.response?.headers);
-            console.log('Response Data:', JSON.stringify(error?.response?.data, null, 2));
-            console.log('\n--- Request Details ---');
-            console.log('Request URL:', error?.config?.url);
-            console.log('Request Method:', error?.config?.method);
-            console.log('Request Data:', error?.config?.data);
+            console.log('🚨 ERROR DETAILS:');
+            console.log('  - Error Type:', error?.name || 'Unknown');
+            console.log('  - Error Message:', error?.message || 'No message');
+            console.log('  - Error Code:', error?.code || 'No code');
+            
+            if (error?.response) {
+                console.log('\n📡 HTTP RESPONSE ERROR:');
+                console.log('  - Status Code:', error.response.status);
+                console.log('  - Status Text:', error.response.statusText);
+                console.log('  - Response Data:', JSON.stringify(error.response.data, null, 2));
+                console.log('  - Response Headers:', JSON.stringify(error.response.headers, null, 2));
+            } else if (error?.request) {
+                console.log('\n📡 REQUEST ERROR (No Response):');
+                console.log('  - Request was made but no response received');
+                console.log('  - Request details:', error.request);
+            } else {
+                console.log('\n🔧 SETUP ERROR:');
+                console.log('  - Error setting up request');
+            }
+            
+            if (error?.config) {
+                console.log('\n📋 REQUEST CONFIG:');
+                console.log('  - URL:', error.config.url);
+                console.log('  - Method:', error.config.method);
+                console.log('  - Headers:', JSON.stringify(error.config.headers, null, 2));
+                console.log('  - Data:', error.config.data);
+                console.log('  - Timeout:', error.config.timeout);
+            }
+            
+            console.log('\n🔍 FULL ERROR OBJECT:');
+            console.log(JSON.stringify(error, null, 2));
             console.log('========================================\n');
+
+            // If batch API fails with 405, try fallback to single material API
+            if (error?.response?.status === 405) {
+                console.log('🔄 Batch API returned 405, trying fallback to single material API...');
+                
+                try {
+                    loadingToast = toast.loading('Retrying with alternative method...');
+                    
+                    // Process materials one by one using the original API
+                    let successCount = 0;
+                    let failCount = 0;
+                    
+                    for (const usage of materialUsages) {
+                        try {
+                            const singleApiPayload = {
+                                projectId: projectId,
+                                sectionId: sectionId,
+                                miniSectionId: miniSectionId,
+                                materialId: usage.materialId,
+                                qnt: usage.quantity
+                            };
+                            
+                            console.log(`Processing material ${usage.materialId} with single API...`);
+                            const singleResponse = await axios.post(`${domain}/api/material-usage`, singleApiPayload);
+                            
+                            if (singleResponse.data.success) {
+                                successCount++;
+                                console.log(`✅ Material ${usage.materialId} processed successfully`);
+                            } else {
+                                failCount++;
+                                console.log(`❌ Material ${usage.materialId} failed:`, singleResponse.data.error);
+                            }
+                        } catch (singleError: any) {
+                            failCount++;
+                            console.log(`❌ Material ${usage.materialId} failed:`, singleError?.response?.data?.error || singleError.message);
+                        }
+                    }
+                    
+                    toast.dismiss(loadingToast);
+                    
+                    if (successCount > 0) {
+                        toast.success(`${successCount} material usages recorded successfully!`);
+                        
+                        // Refresh materials and update UI
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        await reloadProjectMaterials(true);
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        
+                        if (isMountedRef.current) {
+                            setActiveTab('used');
+                            setShowUsageForm(false);
+                        }
+                        
+                        if (failCount > 0) {
+                            toast.error(`${failCount} materials failed to process`);
+                        }
+                        
+                        return; // Exit successfully
+                    } else {
+                        throw new Error('All materials failed to process');
+                    }
+                } catch (fallbackError: any) {
+                    if (loadingToast) {
+                        toast.dismiss(loadingToast);
+                    }
+                    console.log('❌ Fallback also failed:', fallbackError);
+                    toast.error('Failed to process materials with both methods');
+                    return;
+                }
+            }
 
             const errorMessage = error?.response?.data?.error ||
                 error?.response?.data?.message ||
                 error?.message ||
-                'Failed to add material usage';
+                'Failed to add material usages';
 
             console.log('🔴 Showing error toast:', errorMessage);
             toast.error(errorMessage);

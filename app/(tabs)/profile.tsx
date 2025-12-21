@@ -228,35 +228,22 @@ const CompanyProfile: React.FC = () => {
             projectsArray.forEach((project: any, index: number) => {
                 console.log(`📊 Processing project ${index + 1}:`, project.name || project.title || 'Unnamed');
                 
-                // ✅ DIRECT CALCULATION: Always calculate from all material costs
+                // ✅ CORRECT CALCULATION: Use project.spent field directly
+                const projectSpent = Number(project.spent) || 0;
+                console.log(`  - Project spent field: ₹${projectSpent}`);
+                
+                // Add to total
+                totalSpent += projectSpent;
+                
+                // Debug: Also show material counts for reference
                 const availableMaterials = project.MaterialAvailable || [];
                 const usedMaterials = project.MaterialUsed || [];
-                
                 console.log(`  - Materials: ${availableMaterials.length} available, ${usedMaterials.length} used`);
-                
-                // Calculate total cost from all materials (available + used)
-                const availableValue = availableMaterials.reduce((sum: number, m: any) => {
-                    const cost = (m.cost || 0) * (m.qnt || 0);
-                    console.log(`    Available: ${m.name || 'Unnamed'} - ${m.qnt || 0} × ₹${m.cost || 0} = ₹${cost}`);
-                    return sum + cost;
-                }, 0);
-                
-                const usedValue = usedMaterials.reduce((sum: number, m: any) => {
-                    const cost = (m.cost || 0) * (m.qnt || 0);
-                    console.log(`    Used: ${m.name || 'Unnamed'} - ${m.qnt || 0} × ₹${m.cost || 0} = ₹${cost}`);
-                    return sum + cost;
-                }, 0);
-                
-                const projectSpent = availableValue + usedValue;
-                console.log(`  - Total project cost: ₹${projectSpent} (available: ₹${availableValue} + used: ₹${usedValue})`);
-                console.log(`  - Project.spent field: ₹${project.spent || 0} (ignored - using material calculation)`)
-                
-                totalSpent += projectSpent;
             });
 
             console.log('📊 Final stats calculated:');
             console.log(`  - Total Projects: ${projectsArray.length}`);
-            console.log(`  - Total Spent: ₹${totalSpent}`);
+            console.log(`  - Total Spent: ₹${totalSpent} (sum of project.spent fields)`);
 
             setStats({
                 totalProjects: projectsArray.length,
@@ -475,18 +462,6 @@ const CompanyProfile: React.FC = () => {
                                     </View>
                                 )}
 
-                                {clientData.name && (
-                                    <View style={styles.infoRow}>
-                                        <View style={styles.infoIconContainer}>
-                                            <Ionicons name="person-outline" size={20} color="#64748B" />
-                                        </View>
-                                        <View style={styles.infoContent}>
-                                            <Text style={styles.infoLabel}>Contact Person</Text>
-                                            <Text style={styles.infoValue}>{clientData.name}</Text>
-                                        </View>
-                                    </View>
-                                )}
-
                                 {clientData.email && (
                                     <View style={styles.infoRow}>
                                         <View style={styles.infoIconContainer}>
@@ -540,7 +515,7 @@ const CompanyProfile: React.FC = () => {
                                     </View>
                                 )}
 
-                                {!clientData.name && !clientData.email && !clientData.phone && (
+                                {!clientData.email && !clientData.phone && (
                                     <View style={styles.infoRow}>
                                         <View style={styles.infoIconContainer}>
                                             <Ionicons name="alert-circle-outline" size={20} color="#F59E0B" />

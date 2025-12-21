@@ -24,10 +24,15 @@ interface Material {
     sectionId?: string;
 }
 
+interface MaterialUsage {
+    materialId: string;
+    quantity: number;
+}
+
 interface MaterialUsageFormProps {
     visible: boolean;
     onClose: () => void;
-    onSubmit: (miniSectionId: string, materialId: string, quantity: number) => void;
+    onSubmit: (miniSectionId: string, materialUsages: MaterialUsage[]) => void;
     availableMaterials: Material[];
     miniSections: Array<{ _id: string; name: string }>;
 }
@@ -40,9 +45,9 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
     miniSections
 }) => {
     const [selectedMiniSectionId, setSelectedMiniSectionId] = useState<string>('');
-    const [selectedMaterialId, setSelectedMaterialId] = useState<string>('');
-    const [quantity, setQuantity] = useState<string>('');
+    const [selectedMaterials, setSelectedMaterials] = useState<{ [materialId: string]: string }>({});
     const [searchQuery, setSearchQuery] = useState<string>('');
+    const [currentStep, setCurrentStep] = useState<'selection' | 'quantity'>('selection');
 
     // Log when form opens and materials are passed
     useEffect(() => {
@@ -72,61 +77,70 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
             alert('Please select a mini-section');
             return;
         }
-        if (!selectedMaterialId) {
-            alert('Please select a material');
-            return;
-        }
-        if (!quantity || parseFloat(quantity) <= 0) {
-            alert('Please enter a valid quantity');
-            return;
-        }
 
-        // Check if quantity exceeds available amount
-        if (selectedMaterial && parseFloat(quantity) > selectedMaterial.quantity) {
-            alert(`Quantity exceeds available amount!\n\nYou entered: ${parseFloat(quantity)} ${selectedMaterial.unit}\nAvailable: ${selectedMaterial.quantity} ${selectedMaterial.unit}`);
+        const materialUsages: MaterialUsage[] = [];
+        let hasErrors = false;
+
+        // Validate all selected materials
+        Object.entries(selectedMaterials).forEach(([materialId, quantity]) => {
+            const material = availableMaterials.find(m => m._id === materialId);
+            const quantityNum = parseFloat(quantity);
+
+            if (!quantity || quantity.trim() === '' || quantityNum <= 0) {
+                alert(`Please enter a valid quantity for ${material?.name || 'selected material'}`);
+                hasErrors = true;
+                return;
+            }
+
+            if (material && quantityNum > material.quantity) {
+                alert(`Quantity exceeds available amount for ${material.name}!\n\nYou entered: ${quantityNum} ${material.unit}\nAvailable: ${material.quantity} ${material.unit}`);
+                hasErrors = true;
+                return;
+            }
+
+            materialUsages.push({
+                materialId,
+                quantity: quantityNum
+            });
+        });
+
+        if (hasErrors) return;
+
+        if (materialUsages.length === 0) {
+            alert('Please select at least one material and enter quantities');
             return;
         }
 
         console.log('\n========================================');
-        console.log('📋 MATERIAL USAGE FORM - SUBMISSION');
+        console.log('📋 MATERIAL USAGE FORM - BATCH SUBMISSION');
         console.log('========================================');
         console.log('Form Values:');
         console.log('  - Selected Mini-Section ID:', selectedMiniSectionId, '(type:', typeof selectedMiniSectionId, ')');
-        console.log('  - Selected Material ID:', selectedMaterialId, '(type:', typeof selectedMaterialId, ')');
-        console.log('  - Quantity:', parseFloat(quantity), '(type:', typeof parseFloat(quantity), ')');
-        console.log('\n--- Selected Material Full Details ---');
-        if (selectedMaterial) {
-            console.log('  - Name:', selectedMaterial.name);
-            console.log('  - _id:', selectedMaterial._id, '(type:', typeof selectedMaterial._id, ')');
-            console.log('  - id:', selectedMaterial.id, '(type:', typeof selectedMaterial.id, ')');
-            console.log('  - Quantity Available:', selectedMaterial.quantity, selectedMaterial.unit);
-            console.log('  - Price:', selectedMaterial.price);
-            console.log('  - Full Object:', JSON.stringify(selectedMaterial, null, 2));
-        } else {
-            console.log('  ⚠️ Selected material object is NULL/UNDEFINED!');
-        }
-        console.log('\n--- All Available Materials ---');
-        console.log('Total:', availableMaterials.length);
-        availableMaterials.forEach((m, idx) => {
-            console.log(`  ${idx + 1}. ${m.name} - _id: "${m._id}" | id: ${m.id}`);
+        console.log('  - Number of materials:', materialUsages.length);
+        console.log('\n--- Material Usages ---');
+        materialUsages.forEach((usage, index) => {
+            const material = availableMaterials.find(m => m._id === usage.materialId);
+            console.log(`  ${index + 1}. ${material?.name || 'Unknown'}:`);
+            console.log(`     Material ID: ${usage.materialId}`);
+            console.log(`     Quantity: ${usage.quantity} ${material?.unit || ''}`);
+            console.log(`     Available: ${material?.quantity || 0} ${material?.unit || ''}`);
         });
         console.log('========================================');
         console.log('🚀 Calling onSubmit with:', {
             miniSectionId: selectedMiniSectionId,
-            materialId: selectedMaterialId,
-            quantity: parseFloat(quantity)
+            materialUsages: materialUsages
         });
         console.log('========================================\n');
 
-        onSubmit(selectedMiniSectionId, selectedMaterialId, parseFloat(quantity));
+        onSubmit(selectedMiniSectionId, materialUsages);
         handleClose();
     };
 
     const handleClose = () => {
         setSelectedMiniSectionId('');
-        setSelectedMaterialId('');
-        setQuantity('');
+        setSelectedMaterials({});
         setSearchQuery('');
+        setCurrentStep('selection');
         onClose();
     };
 
@@ -183,7 +197,60 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
             .join(', ');
     };
 
-    const selectedMaterial = availableMaterials.find(m => m._id === selectedMaterialId);
+    // Helper functions for material selection
+    const toggleMaterialSelection = (materialId: string) => {
+        setSelectedMaterials(prev => {
+            const newSelection = { ...prev };
+            if (newSelection[materialId]) {
+                delete newSelection[materialId];
+            } else {
+                newSelection[materialId] = '';
+            }
+            return newSelection;
+        });
+    };
+
+    const updateMaterialQuantity = (materialId: string, quantity: string) => {
+        setSelectedMaterials(prev => ({
+            ...prev,
+            [materialId]: quantity
+        }));
+    };
+
+    const isMaterialSelected = (materialId: string) => {
+        return materialId in selectedMaterials;
+    };
+
+    const getSelectedMaterialsCount = () => {
+        return Object.keys(selectedMaterials).length;
+    };
+
+    const canProceedToQuantity = () => {
+        return selectedMiniSectionId && getSelectedMaterialsCount() > 0;
+    };
+
+    const canSubmitForm = () => {
+        if (!selectedMiniSectionId || getSelectedMaterialsCount() === 0) {
+            return false;
+        }
+        
+        // Check if all selected materials have valid quantities
+        return Object.entries(selectedMaterials).every(([materialId, quantity]) => {
+            const material = availableMaterials.find(m => m._id === materialId);
+            const quantityNum = parseFloat(quantity);
+            return quantity && quantity.trim() !== '' && quantityNum > 0 && (!material || quantityNum <= material.quantity);
+        });
+    };
+
+    const handleNextStep = () => {
+        if (canProceedToQuantity()) {
+            setCurrentStep('quantity');
+        }
+    };
+
+    const handlePreviousStep = () => {
+        setCurrentStep('selection');
+    };
 
     return (
         <Modal
@@ -202,7 +269,12 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                             </View>
                             <View>
                                 <Text style={styles.title}>Record Material Usage</Text>
-                                <Text style={styles.subtitle}>Track materials used in your project</Text>
+                                <Text style={styles.subtitle}>
+                                    {currentStep === 'selection' 
+                                        ? 'Step 1: Select materials and location' 
+                                        : 'Step 2: Enter quantities'
+                                    }
+                                </Text>
                             </View>
                         </View>
                         <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
@@ -210,212 +282,385 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                         </TouchableOpacity>
                     </View>
 
-                    <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false}>
-                        {/* Mini-Section Selector */}
-                        <View style={styles.fieldContainer}>
-                            <View style={styles.labelWithHelper}>
-                                <Text style={styles.label}>
-                                    Where is this material being used? <Text style={styles.required}>*</Text>
-                                </Text>
-                                <Text style={styles.labelHelper}>Select the work area or mini-section</Text>
+                    {/* Step Indicator */}
+                    <View style={styles.stepIndicator}>
+                        <View style={styles.stepContainer}>
+                            <View style={[
+                                styles.stepCircle, 
+                                currentStep === 'selection' ? styles.stepCircleActive : styles.stepCircleCompleted
+                            ]}>
+                                <Text style={[
+                                    styles.stepNumber,
+                                    currentStep === 'selection' ? styles.stepNumberActive : styles.stepNumberCompleted
+                                ]}>1</Text>
                             </View>
-                            {miniSections.length > 0 ? (
-                                <View style={styles.sectionList}>
-                                    {miniSections.map((section) => {
-                                        const isSelected = selectedMiniSectionId === section._id;
-                                        return (
-                                            <TouchableOpacity
-                                                key={section._id}
-                                                style={[
-                                                    styles.sectionItem,
-                                                    isSelected && styles.sectionItemSelected
-                                                ]}
-                                                onPress={() => setSelectedMiniSectionId(section._id)}
-                                            >
-                                                <View style={styles.sectionItemLeft}>
-                                                    <View style={styles.sectionIconBadge}>
-                                                        <Ionicons name="layers" size={18} color="#3B82F6" />
-                                                    </View>
-                                                    <Text style={styles.sectionItemName}>{section.name}</Text>
-                                                </View>
-                                                {isSelected && (
-                                                    <Ionicons name="checkmark-circle" size={22} color="#3B82F6" />
-                                                )}
-                                            </TouchableOpacity>
-                                        );
-                                    })}
-                                </View>
-                            ) : (
-                                <View style={styles.noSectionsWarning}>
-                                    <Ionicons name="alert-circle" size={20} color="#F59E0B" />
-                                    <Text style={styles.helperText}>
-                                        No mini-sections available. Please create one first.
-                                    </Text>
-                                </View>
-                            )}
+                            <Text style={[
+                                styles.stepLabel,
+                                currentStep === 'selection' ? styles.stepLabelActive : styles.stepLabelCompleted
+                            ]}>Select Materials</Text>
                         </View>
-
-                        {/* Search & Select Material */}
-                        <View style={styles.fieldContainer}>
-                            <View style={styles.labelWithHelper}>
-                                <Text style={styles.label}>
-                                    Which material are you using? <Text style={styles.required}>*</Text>
-                                </Text>
-                                <Text style={styles.labelHelper}>Search and select from available materials</Text>
+                        
+                        <View style={[
+                            styles.stepConnector,
+                            currentStep === 'quantity' ? styles.stepConnectorActive : styles.stepConnectorInactive
+                        ]} />
+                        
+                        <View style={styles.stepContainer}>
+                            <View style={[
+                                styles.stepCircle,
+                                currentStep === 'quantity' ? styles.stepCircleActive : styles.stepCircleInactive
+                            ]}>
+                                <Text style={[
+                                    styles.stepNumber,
+                                    currentStep === 'quantity' ? styles.stepNumberActive : styles.stepNumberInactive
+                                ]}>2</Text>
                             </View>
-                            <View style={styles.searchContainer}>
-                                <Ionicons name="search" size={20} color="#94A3B8" style={styles.searchIcon} />
-                                <TextInput
-                                    style={styles.searchInput}
-                                    value={searchQuery}
-                                    onChangeText={setSearchQuery}
-                                    placeholder="Search by name or unit..."
-                                    placeholderTextColor="#94A3B8"
-                                />
-                                {searchQuery.length > 0 && (
-                                    <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
-                                        <Ionicons name="close-circle" size={20} color="#94A3B8" />
-                                    </TouchableOpacity>
-                                )}
-                            </View>
+                            <Text style={[
+                                styles.stepLabel,
+                                currentStep === 'quantity' ? styles.stepLabelActive : styles.stepLabelInactive
+                            ]}>Enter Quantities</Text>
+                        </View>
+                    </View>
 
-                            {/* Material List */}
-                            <ScrollView
-                                style={styles.materialList}
-                                nestedScrollEnabled={true}
-                                showsVerticalScrollIndicator={true}
-                            >
-                                {filteredMaterials.length > 0 ? (
-                                    filteredMaterials.map((material) => {
-                                        const isSelected = selectedMaterialId === material._id;
-                                        return (
-                                            <TouchableOpacity
-                                                key={material._id || material.id}
-                                                style={[
-                                                    styles.materialItem,
-                                                    isSelected && styles.materialItemSelected
-                                                ]}
-                                                onPress={() => {
-                                                    if (!material._id) {
-                                                        alert('Error: Material ID not found. Please refresh and try again.');
-                                                        return;
-                                                    }
-                                                    setSelectedMaterialId(material._id);
-                                                }}
-                                            >
-                                                <View style={styles.materialItemLeft}>
-                                                    <View style={[styles.materialIconBadge, { backgroundColor: material.color + '20' }]}>
-                                                        <Ionicons name={material.icon} size={20} color={material.color} />
-                                                    </View>
-                                                    <View style={styles.materialItemInfo}>
-                                                        <View style={styles.materialNameRow}>
-                                                            <Text style={styles.materialItemName}>{material.name}</Text>
-                                                            {(() => {
-                                                                const differingSpecs = getDifferingSpecs(material);
-                                                                if (differingSpecs) {
-                                                                    return (
-                                                                        <View style={styles.specsBadgeInline}>
-                                                                            <Text style={styles.specsBadgeText}>
-                                                                                {formatDifferingSpecs(differingSpecs)}
-                                                                            </Text>
-                                                                        </View>
-                                                                    );
-                                                                }
-                                                                return null;
-                                                            })()}
+                    <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false}>
+                        {currentStep === 'selection' ? (
+                            // STEP 1: MATERIAL SELECTION
+                            <>
+                                {/* Mini-Section Selector */}
+                                <View style={styles.fieldContainer}>
+                                    <View style={styles.labelWithHelper}>
+                                        <Text style={styles.label}>
+                                            Where is this material being used? <Text style={styles.required}>*</Text>
+                                        </Text>
+                                        <Text style={styles.labelHelper}>Select the work area or mini-section</Text>
+                                    </View>
+                                    {miniSections.length > 0 ? (
+                                        <View style={styles.sectionList}>
+                                            {miniSections.map((section) => {
+                                                const isSelected = selectedMiniSectionId === section._id;
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={section._id}
+                                                        style={[
+                                                            styles.sectionItem,
+                                                            isSelected && styles.sectionItemSelected
+                                                        ]}
+                                                        onPress={() => setSelectedMiniSectionId(section._id)}
+                                                    >
+                                                        <View style={styles.sectionItemLeft}>
+                                                            <View style={styles.sectionIconBadge}>
+                                                                <Ionicons name="layers" size={18} color="#3B82F6" />
+                                                            </View>
+                                                            <Text style={styles.sectionItemName}>{section.name}</Text>
                                                         </View>
-                                                        <Text style={styles.materialItemQuantity}>
-                                                            {material.quantity} {material.unit} available
-                                                        </Text>
-                                                    </View>
-                                                </View>
-                                                {isSelected && (
-                                                    <Ionicons name="checkmark-circle" size={24} color="#3B82F6" />
-                                                )}
-                                            </TouchableOpacity>
-                                        );
-                                    })
-                                ) : (
-                                    <View style={styles.emptyState}>
-                                        <Ionicons name="search-outline" size={48} color="#CBD5E1" />
-                                        <Text style={styles.emptyStateText}>
-                                            {searchQuery ? 'No materials match your search' : 'No materials available'}
+                                                        {isSelected && (
+                                                            <Ionicons name="checkmark-circle" size={22} color="#3B82F6" />
+                                                        )}
+                                                    </TouchableOpacity>
+                                                );
+                                            })}
+                                        </View>
+                                    ) : (
+                                        <View style={styles.noSectionsWarning}>
+                                            <Ionicons name="alert-circle" size={20} color="#F59E0B" />
+                                            <Text style={styles.helperText}>
+                                                No mini-sections available. Please create one first.
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+
+                                {/* Material Selection */}
+                                <View style={styles.fieldContainer}>
+                                    <View style={styles.labelWithHelper}>
+                                        <Text style={styles.label}>
+                                            Which materials are you using? <Text style={styles.required}>*</Text>
+                                        </Text>
+                                        <Text style={styles.labelHelper}>
+                                            Search and select materials
+                                            {getSelectedMaterialsCount() > 0 && ` (${getSelectedMaterialsCount()} selected)`}
                                         </Text>
                                     </View>
-                                )}
-                            </ScrollView>
-                        </View>
+                                    <View style={styles.searchContainer}>
+                                        <Ionicons name="search" size={20} color="#94A3B8" style={styles.searchIcon} />
+                                        <TextInput
+                                            style={styles.searchInput}
+                                            value={searchQuery}
+                                            onChangeText={setSearchQuery}
+                                            placeholder="Search by name or unit..."
+                                            placeholderTextColor="#94A3B8"
+                                        />
+                                        {searchQuery.length > 0 && (
+                                            <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
+                                                <Ionicons name="close-circle" size={20} color="#94A3B8" />
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
 
-                        {/* Material Details */}
-                        {selectedMaterial && (
-                            <View style={styles.materialDetails}>
-                                <View style={styles.detailRow}>
-                                    <Text style={styles.detailLabel}>Available:</Text>
-                                    <Text style={styles.detailValue}>
-                                        {selectedMaterial.quantity} {selectedMaterial.unit}
-                                    </Text>
+                                    {/* Material List - Selection Only */}
+                                    <ScrollView
+                                        style={styles.materialList}
+                                        nestedScrollEnabled={true}
+                                        showsVerticalScrollIndicator={true}
+                                    >
+                                        {filteredMaterials.length > 0 ? (
+                                            filteredMaterials.map((material) => {
+                                                const isSelected = isMaterialSelected(material._id!);
+                                                
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={material._id || material.id}
+                                                        style={[
+                                                            styles.materialItem,
+                                                            isSelected && styles.materialItemSelected
+                                                        ]}
+                                                        onPress={() => {
+                                                            if (!material._id) {
+                                                                alert('Error: Material ID not found. Please refresh and try again.');
+                                                                return;
+                                                            }
+                                                            toggleMaterialSelection(material._id);
+                                                        }}
+                                                    >
+                                                        <View style={styles.materialItemLeft}>
+                                                            <View style={[styles.materialIconBadge, { backgroundColor: material.color + '20' }]}>
+                                                                <Ionicons name={material.icon} size={20} color={material.color} />
+                                                            </View>
+                                                            <View style={styles.materialItemInfo}>
+                                                                <View style={styles.materialNameRow}>
+                                                                    <Text style={styles.materialItemName}>{material.name}</Text>
+                                                                    {(() => {
+                                                                        const differingSpecs = getDifferingSpecs(material);
+                                                                        if (differingSpecs) {
+                                                                            return (
+                                                                                <View style={styles.specsBadgeInline}>
+                                                                                    <Text style={styles.specsBadgeText}>
+                                                                                        {formatDifferingSpecs(differingSpecs)}
+                                                                                    </Text>
+                                                                                </View>
+                                                                            );
+                                                                        }
+                                                                        return null;
+                                                                    })()}
+                                                                </View>
+                                                                <Text style={styles.materialItemQuantity}>
+                                                                    {material.quantity} {material.unit} available
+                                                                </Text>
+                                                            </View>
+                                                        </View>
+                                                        
+                                                        {/* Selection Checkbox */}
+                                                        <View style={styles.checkboxContainer}>
+                                                            <Ionicons 
+                                                                name={isSelected ? "checkmark-circle" : "ellipse-outline"} 
+                                                                size={24} 
+                                                                color={isSelected ? "#3B82F6" : "#CBD5E1"} 
+                                                            />
+                                                        </View>
+                                                    </TouchableOpacity>
+                                                );
+                                            })
+                                        ) : (
+                                            <View style={styles.emptyState}>
+                                                <Ionicons name="search-outline" size={48} color="#CBD5E1" />
+                                                <Text style={styles.emptyStateText}>
+                                                    {searchQuery ? 'No materials match your search' : 'No materials available'}
+                                                </Text>
+                                            </View>
+                                        )}
+                                    </ScrollView>
                                 </View>
-                                {Object.keys(selectedMaterial.specs || {}).length > 0 && (
-                                    <View style={styles.specsContainer}>
-                                        <Text style={styles.specsTitle}>Specifications:</Text>
-                                        {Object.entries(selectedMaterial.specs || {}).map(([key, value]) => (
-                                            <Text key={key} style={styles.specItem}>
-                                                • {key}: {String(value)}
-                                            </Text>
-                                        ))}
+
+                                {/* Selected Materials Preview */}
+                                {getSelectedMaterialsCount() > 0 && (
+                                    <View style={styles.selectionPreview}>
+                                        <Text style={styles.previewTitle}>
+                                            Selected Materials ({getSelectedMaterialsCount()})
+                                        </Text>
+                                        <View style={styles.previewList}>
+                                            {Object.keys(selectedMaterials).map((materialId) => {
+                                                const material = availableMaterials.find(m => m._id === materialId);
+                                                if (!material) return null;
+                                                
+                                                return (
+                                                    <View key={materialId} style={styles.previewItem}>
+                                                        <View style={[styles.previewIconBadge, { backgroundColor: material.color + '20' }]}>
+                                                            <Ionicons name={material.icon} size={14} color={material.color} />
+                                                        </View>
+                                                        <Text style={styles.previewItemName}>{material.name}</Text>
+                                                        <Text style={styles.previewItemUnit}>({material.unit})</Text>
+                                                    </View>
+                                                );
+                                            })}
+                                        </View>
                                     </View>
                                 )}
-                            </View>
-                        )}
+                            </>
+                        ) : (
+                            // STEP 2: QUANTITY INPUT
+                            <>
+                                {/* Selected Section Info */}
+                                <View style={styles.sectionInfo}>
+                                    <View style={styles.sectionInfoHeader}>
+                                        <Ionicons name="layers" size={20} color="#3B82F6" />
+                                        <Text style={styles.sectionInfoTitle}>Using materials in:</Text>
+                                    </View>
+                                    <Text style={styles.sectionInfoName}>
+                                        {miniSections.find(s => s._id === selectedMiniSectionId)?.name || 'Unknown Section'}
+                                    </Text>
+                                </View>
 
-                        {/* Quantity Input */}
-                        <View style={styles.fieldContainer}>
-                            <View style={styles.labelWithHelper}>
-                                <Text style={styles.label}>
-                                    How much are you using? <Text style={styles.required}>*</Text>
-                                </Text>
-                                <Text style={styles.labelHelper}>
-                                    {selectedMaterial
-                                        ? `Enter quantity in ${selectedMaterial.unit} (Available: ${selectedMaterial.quantity})`
-                                        : 'Enter the quantity you want to use'
-                                    }
-                                </Text>
-                            </View>
-                            <TextInput
-                                style={styles.input}
-                                value={quantity}
-                                onChangeText={setQuantity}
-                                placeholder={selectedMaterial ? `Max: ${selectedMaterial.quantity}` : "Enter quantity"}
-                                keyboardType="numeric"
-                                placeholderTextColor="#94A3B8"
-                            />
-                            {selectedMaterial && parseFloat(quantity) > selectedMaterial.quantity && (
-                                <Text style={styles.errorText}>
-                                    ⚠️ Quantity exceeds available amount
-                                </Text>
-                            )}
-                        </View>
+                                {/* Quantity Input Section */}
+                                <View style={styles.fieldContainer}>
+                                    <View style={styles.labelWithHelper}>
+                                        <Text style={styles.label}>
+                                            Enter quantities for each material <Text style={styles.required}>*</Text>
+                                        </Text>
+                                        <Text style={styles.labelHelper}>
+                                            Specify how much of each material you're using
+                                        </Text>
+                                    </View>
+
+                                    {/* Progress indicator */}
+                                    <View style={styles.quantityProgress}>
+                                        <View style={styles.quantityProgressHeader}>
+                                            <Text style={styles.quantityProgressText}>
+                                                Progress: {Object.values(selectedMaterials).filter(q => q && parseFloat(q) > 0).length} of {getSelectedMaterialsCount()} materials
+                                            </Text>
+                                            <View style={styles.quantityProgressBar}>
+                                                <View 
+                                                    style={[
+                                                        styles.quantityProgressFill,
+                                                        { 
+                                                            width: `${(Object.values(selectedMaterials).filter(q => q && parseFloat(q) > 0).length / getSelectedMaterialsCount()) * 100}%` 
+                                                        }
+                                                    ]} 
+                                                />
+                                            </View>
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.quantitySection}>
+                                        {Object.keys(selectedMaterials).map((materialId) => {
+                                            const material = availableMaterials.find(m => m._id === materialId);
+                                            if (!material) return null;
+                                            
+                                            const currentQuantity = selectedMaterials[materialId] || '';
+                                            const quantityNum = parseFloat(currentQuantity);
+                                            // Only show error if user has interacted with the field (not empty by default)
+                                            const hasError = currentQuantity !== '' && (quantityNum <= 0 || quantityNum > material.quantity);
+                                            
+                                            return (
+                                                <View key={materialId} style={styles.quantityCard}>
+                                                    <View style={styles.quantityCardHeader}>
+                                                        <View style={styles.quantityCardLeft}>
+                                                            <View style={[styles.quantityIconBadge, { backgroundColor: material.color + '20' }]}>
+                                                                <Ionicons name={material.icon} size={20} color={material.color} />
+                                                            </View>
+                                                            <View style={styles.quantityCardInfo}>
+                                                                <Text style={styles.quantityCardName}>{material.name}</Text>
+                                                                <Text style={styles.quantityCardAvailable}>
+                                                                    {material.quantity} {material.unit} available
+                                                                </Text>
+                                                            </View>
+                                                        </View>
+                                                    </View>
+                                                    
+                                                    <View style={styles.quantityInputSection}>
+                                                        <Text style={styles.quantityInputLabel}>Quantity to use:</Text>
+                                                        <View style={styles.quantityInputWrapper}>
+                                                            <TextInput
+                                                                style={[
+                                                                    styles.quantityInputLarge,
+                                                                    hasError && styles.quantityInputError
+                                                                ]}
+                                                                value={currentQuantity}
+                                                                onChangeText={(text) => updateMaterialQuantity(materialId, text)}
+                                                                placeholder={`Enter quantity (Max: ${material.quantity})`}
+                                                                keyboardType="numeric"
+                                                                placeholderTextColor="#94A3B8"
+                                                            />
+                                                            <Text style={styles.quantityUnitLarge}>{material.unit}</Text>
+                                                        </View>
+                                                        
+                                                        {hasError && (
+                                                            <View style={styles.quantityError}>
+                                                                <Ionicons name="warning" size={16} color="#EF4444" />
+                                                                <Text style={styles.quantityErrorText}>
+                                                                    {quantityNum <= 0 
+                                                                        ? 'Please enter a valid quantity'
+                                                                        : `Exceeds available amount (${material.quantity} ${material.unit})`
+                                                                    }
+                                                                </Text>
+                                                            </View>
+                                                        )}
+                                                        
+                                                        {/* Helpful info when no error and no input */}
+                                                        {!hasError && currentQuantity === '' && (
+                                                            <View style={styles.quantityHint}>
+                                                                <Ionicons name="information-circle-outline" size={16} color="#3B82F6" />
+                                                                <Text style={styles.quantityHintText}>
+                                                                    Enter the amount you want to use
+                                                                </Text>
+                                                            </View>
+                                                        )}
+                                                    </View>
+                                                </View>
+                                            );
+                                        })}
+                                    </View>
+                                </View>
+                            </>
+                        )}
                     </ScrollView>
 
                     {/* Footer Buttons */}
                     <View style={styles.footer}>
-                        <TouchableOpacity
-                            style={styles.cancelButton}
-                            onPress={handleClose}
-                        >
-                            <Text style={styles.cancelButtonText}>Cancel</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[
-                                styles.submitButton,
-                                (!selectedMiniSectionId || !selectedMaterialId || !quantity) && styles.submitButtonDisabled
-                            ]}
-                            onPress={handleSubmit}
-                            disabled={!selectedMiniSectionId || !selectedMaterialId || !quantity}
-                        >
-                            <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-                            <Text style={styles.submitButtonText}>Record Usage</Text>
-                        </TouchableOpacity>
+                        {currentStep === 'selection' ? (
+                            // Step 1 Footer
+                            <>
+                                <TouchableOpacity
+                                    style={styles.cancelButtonIcon}
+                                    onPress={handleClose}
+                                >
+                                    <Ionicons name="close" size={24} color="#64748B" />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.nextButtonLarge,
+                                        !canProceedToQuantity() && styles.nextButtonDisabled
+                                    ]}
+                                    onPress={handleNextStep}
+                                    disabled={!canProceedToQuantity()}
+                                >
+                                    <Text style={styles.nextButtonText}>
+                                        Next: Enter Quantities
+                                    </Text>
+                                    <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
+                                </TouchableOpacity>
+                            </>
+                        ) : (
+                            // Step 2 Footer
+                            <>
+                                <TouchableOpacity
+                                    style={styles.backButtonIcon}
+                                    onPress={handlePreviousStep}
+                                >
+                                    <Ionicons name="arrow-back" size={24} color="#64748B" />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.submitButtonLarge,
+                                        !canSubmitForm() && styles.submitButtonDisabled
+                                    ]}
+                                    onPress={handleSubmit}
+                                    disabled={!canSubmitForm()}
+                                >
+                                    <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+                                    <Text style={styles.submitButtonText}>Record Usage</Text>
+                                </TouchableOpacity>
+                            </>
+                        )}
                     </View>
                 </View>
             </View>
@@ -732,6 +977,22 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
+    cancelButtonSmall: {
+        flex: 0.4, // Smaller cancel button for Step 1
+        paddingVertical: 14,
+        borderRadius: 12,
+        backgroundColor: '#F1F5F9',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    cancelButtonIcon: {
+        width: 48, // Fixed width for icon-only button
+        height: 48, // Fixed height for icon-only button
+        borderRadius: 12,
+        backgroundColor: '#F1F5F9',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     cancelButtonText: {
         fontSize: 16,
         fontWeight: '600',
@@ -754,6 +1015,432 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#FFFFFF',
+    },
+    checkboxContainer: {
+        padding: 8,
+    },
+    quantityInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginLeft: 12,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        paddingHorizontal: 8,
+        minWidth: 80,
+    },
+    quantityInput: {
+        flex: 1,
+        paddingVertical: 8,
+        fontSize: 14,
+        color: '#1E293B',
+        textAlign: 'center',
+        minWidth: 40,
+    },
+    quantityInputError: {
+        borderColor: '#EF4444',
+        backgroundColor: '#FEF2F2',
+    },
+    quantityUnit: {
+        fontSize: 12,
+        color: '#64748B',
+        marginLeft: 4,
+    },
+    errorIndicator: {
+        marginLeft: 8,
+    },
+    selectedSummary: {
+        backgroundColor: '#F0F9FF',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#BAE6FD',
+    },
+    summaryTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#0369A1',
+        marginBottom: 12,
+    },
+    summaryItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#BAE6FD',
+    },
+    summaryItemLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    summaryIconBadge: {
+        width: 24,
+        height: 24,
+        borderRadius: 6,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 8,
+    },
+    summaryItemName: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#0C4A6E',
+        flex: 1,
+    },
+    summaryItemRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    summaryQuantity: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#0C4A6E',
+    },
+    summaryQuantityError: {
+        color: '#EF4444',
+    },
+    // Step Indicator Styles
+    stepIndicator: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        backgroundColor: '#F8FAFC',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E2E8F0',
+    },
+    stepContainer: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    stepCircle: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    stepCircleActive: {
+        backgroundColor: '#3B82F6',
+    },
+    stepCircleCompleted: {
+        backgroundColor: '#10B981',
+    },
+    stepCircleInactive: {
+        backgroundColor: '#E2E8F0',
+    },
+    stepNumber: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    stepNumberActive: {
+        color: '#FFFFFF',
+    },
+    stepNumberCompleted: {
+        color: '#FFFFFF',
+    },
+    stepNumberInactive: {
+        color: '#94A3B8',
+    },
+    stepLabel: {
+        fontSize: 12,
+        fontWeight: '500',
+        textAlign: 'center',
+    },
+    stepLabelActive: {
+        color: '#3B82F6',
+    },
+    stepLabelCompleted: {
+        color: '#10B981',
+    },
+    stepLabelInactive: {
+        color: '#94A3B8',
+    },
+    stepConnector: {
+        height: 2,
+        flex: 0.5,
+        marginHorizontal: 8,
+        marginBottom: 24,
+    },
+    stepConnectorActive: {
+        backgroundColor: '#10B981',
+    },
+    stepConnectorInactive: {
+        backgroundColor: '#E2E8F0',
+    },
+    // Selection Preview Styles
+    selectionPreview: {
+        backgroundColor: '#F0F9FF',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#BAE6FD',
+    },
+    previewTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#0369A1',
+        marginBottom: 12,
+    },
+    previewList: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    previewItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#BAE6FD',
+    },
+    previewIconBadge: {
+        width: 20,
+        height: 20,
+        borderRadius: 4,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 6,
+    },
+    previewItemName: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: '#0C4A6E',
+    },
+    previewItemUnit: {
+        fontSize: 11,
+        color: '#64748B',
+        marginLeft: 4,
+    },
+    // Section Info Styles
+    sectionInfo: {
+        backgroundColor: '#EFF6FF',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#DBEAFE',
+    },
+    sectionInfoHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    sectionInfoTitle: {
+        fontSize: 14,
+        color: '#3B82F6',
+        fontWeight: '500',
+        marginLeft: 8,
+    },
+    sectionInfoName: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1E40AF',
+    },
+    // Quantity Section Styles
+    quantitySection: {
+        gap: 16,
+    },
+    quantityCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    quantityCardHeader: {
+        marginBottom: 12,
+    },
+    quantityCardLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    quantityIconBadge: {
+        width: 40,
+        height: 40,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    quantityCardInfo: {
+        flex: 1,
+    },
+    quantityCardName: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1E293B',
+        marginBottom: 2,
+    },
+    quantityCardAvailable: {
+        fontSize: 13,
+        color: '#64748B',
+    },
+    quantityInputSection: {
+        gap: 8,
+    },
+    quantityInputLabel: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#374151',
+    },
+    quantityInputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        paddingHorizontal: 12,
+    },
+    quantityInputLarge: {
+        flex: 1,
+        paddingVertical: 12,
+        fontSize: 16,
+        color: '#1E293B',
+        fontWeight: '500',
+    },
+    quantityUnitLarge: {
+        fontSize: 14,
+        color: '#64748B',
+        fontWeight: '500',
+        marginLeft: 8,
+    },
+    quantityError: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 4,
+    },
+    quantityErrorText: {
+        fontSize: 12,
+        color: '#EF4444',
+        flex: 1,
+    },
+    // Button Styles
+    nextButton: {
+        flex: 1,
+        paddingVertical: 14,
+        borderRadius: 12,
+        backgroundColor: '#3B82F6',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: 8,
+    },
+    nextButtonLarge: {
+        flex: 1.6, // Larger "Enter Quantities" button for Step 1
+        paddingVertical: 16, // Slightly larger padding
+        borderRadius: 12,
+        backgroundColor: '#3B82F6',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: 8,
+    },
+    nextButtonDisabled: {
+        backgroundColor: '#CBD5E1',
+    },
+    nextButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#FFFFFF',
+    },
+    backButton: {
+        flex: 0.4, // Reduced from flex: 1 to make it smaller
+        paddingVertical: 14,
+        borderRadius: 12,
+        backgroundColor: '#F1F5F9',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: 8,
+    },
+    backButtonIcon: {
+        width: 48, // Fixed width for icon-only button
+        height: 48, // Fixed height for icon-only button
+        borderRadius: 12,
+        backgroundColor: '#F1F5F9',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    backButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#64748B',
+    },
+    // Large Submit Button for Step 2
+    submitButtonLarge: {
+        flex: 1.6, // Larger than the back button
+        paddingVertical: 16, // Slightly larger padding
+        borderRadius: 12,
+        backgroundColor: '#3B82F6',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: 8,
+    },
+    // Quantity Hint
+    quantityHint: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 6,
+        backgroundColor: '#EFF6FF',
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#DBEAFE',
+    },
+    quantityHintText: {
+        fontSize: 12,
+        color: '#3B82F6',
+        flex: 1,
+    },
+    // Quantity Progress Styles
+    quantityProgress: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: 8,
+        padding: 12,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    quantityProgressHeader: {
+        gap: 8,
+    },
+    quantityProgressText: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#64748B',
+    },
+    quantityProgressBar: {
+        height: 4,
+        backgroundColor: '#E2E8F0',
+        borderRadius: 2,
+        overflow: 'hidden',
+    },
+    quantityProgressFill: {
+        height: '100%',
+        backgroundColor: '#10B981',
+        borderRadius: 2,
     },
 });
 
