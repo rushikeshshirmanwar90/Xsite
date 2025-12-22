@@ -54,7 +54,20 @@ const StaffCard: React.FC<StaffCardProps> = ({ staff, onPress }) => {
                     </LinearGradient>
 
                     <View style={styles.staffDetails}>
-                        <Text style={styles.staffName}>{fullName}</Text>
+                        <View style={styles.nameRow}>
+                            <Text style={styles.staffName}>{fullName}</Text>
+                            {staff.emailVerified ? (
+                                <View style={styles.verifiedBadge}>
+                                    <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                                    <Text style={styles.verifiedText}>Verified</Text>
+                                </View>
+                            ) : (
+                                <View style={styles.unverifiedBadge}>
+                                    <Ionicons name="mail-outline" size={14} color="#F59E0B" />
+                                    <Text style={styles.unverifiedText}>Unverified</Text>
+                                </View>
+                            )}
+                        </View>
                         <Text style={styles.staffRole}>{staff.role}</Text>
 
                         <View style={styles.contactInfo}>
@@ -64,8 +77,17 @@ const StaffCard: React.FC<StaffCardProps> = ({ staff, onPress }) => {
                             </View>
 
                             <View style={styles.contactItem}>
-                                <Ionicons name="mail" size={12} color="#6B7280" />
-                                <Text style={styles.contactText} numberOfLines={1}>{staff.email}</Text>
+                                <Ionicons 
+                                    name={staff.emailVerified ? "mail" : "mail-outline"} 
+                                    size={12} 
+                                    color={staff.emailVerified ? "#10B981" : "#6B7280"} 
+                                />
+                                <Text style={[
+                                    styles.contactText,
+                                    staff.emailVerified && styles.verifiedEmail
+                                ]} numberOfLines={1}>
+                                    {staff.email}
+                                </Text>
                             </View>
                         </View>
                     </View>
@@ -143,11 +165,59 @@ const styles = StyleSheet.create({
     staffDetails: {
         flex: 1,
     },
+    nameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 4,
+    },
     staffName: {
         fontSize: 18,
         fontWeight: 'bold',
         color: '#111827',
-        marginBottom: 4,
+        flex: 1,
+    },
+    verifiedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#ECFDF5',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        gap: 4,
+    },
+    verifiedText: {
+        fontSize: 11,
+        color: '#10B981',
+        fontWeight: '600',
+    },
+    verifyButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FEF3C7',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        gap: 4,
+    },
+    verifyButtonText: {
+        fontSize: 11,
+        color: '#F59E0B',
+        fontWeight: '600',
+    },
+    unverifiedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FEF3C7',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        gap: 4,
+    },
+    unverifiedText: {
+        fontSize: 11,
+        color: '#F59E0B',
+        fontWeight: '600',
     },
     staffRole: {
         fontSize: 14,
@@ -167,6 +237,10 @@ const styles = StyleSheet.create({
         color: '#6B7280',
         marginLeft: 6,
         flex: 1,
+    },
+    verifiedEmail: {
+        color: '#10B981',
+        fontWeight: '500',
     },
     projectsSection: {
         borderTopWidth: 1,

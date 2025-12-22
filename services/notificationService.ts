@@ -1,5 +1,6 @@
 import { domain } from '@/lib/domain';
 import axios from 'axios';
+import { emailService, WelcomeEmailPayload } from './emailService';
 
 export interface NotificationPayload {
     recipientEmail: string;
@@ -34,23 +35,47 @@ export class NotificationService {
             console.log('📋 Notification payload:', JSON.stringify(payload, null, 2));
             console.log('🌐 Domain:', domain);
             
-            const url = `${domain}/api/notifications/staff-welcome`;
-            console.log('📤 POST URL:', url);
+            // First, send the actual email using the email service
+            console.log('📧 Sending actual welcome email...');
+            const emailPayload: WelcomeEmailPayload = {
+                email: payload.recipientEmail,
+                staffName: payload.recipientName,
+                companyName: payload.companyName
+            };
             
-            const response = await axios.post(url, payload);
+            const emailSent = await emailService.sendWelcomeEmail(emailPayload);
             
-            console.log('📥 Response status:', response.status);
-            console.log('📥 Response data:', JSON.stringify(response.data, null, 2));
-            
-            if (response.data.success) {
-                console.log('✅ Staff welcome notification sent successfully');
-                return true;
-            } else {
-                console.error('❌ Staff welcome notification failed:', response.data.error);
+            if (!emailSent) {
+                console.error('❌ Failed to send welcome email');
                 return false;
             }
+            
+            console.log('✅ Welcome email sent successfully');
+            
+            // Then, log the notification in the system (optional)
+            try {
+                const url = `${domain}/api/notifications/staff-welcome`;
+                console.log('📤 Logging notification: POST URL:', url);
+                
+                const response = await axios.post(url, payload);
+                
+                console.log('📥 Notification log response status:', response.status);
+                console.log('📥 Notification log response data:', JSON.stringify(response.data, null, 2));
+                
+                if (response.data.success) {
+                    console.log('✅ Staff welcome notification logged successfully');
+                } else {
+                    console.warn('⚠️ Failed to log notification, but email was sent');
+                }
+            } catch (logError: any) {
+                console.warn('⚠️ Failed to log notification, but email was sent:', logError.message);
+                // Don't fail the whole process if logging fails
+            }
+            
+            return true;
+            
         } catch (error: any) {
-            console.error('❌ Error sending staff welcome notification:', error);
+            console.error('❌ Error in sendStaffWelcomeMessage:', error);
             console.error('❌ Error message:', error.message);
             if (error.response) {
                 console.error('❌ Error response status:', error.response.status);

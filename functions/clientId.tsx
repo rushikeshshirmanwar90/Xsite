@@ -7,9 +7,7 @@ export const getClientId = async () => {
 
         if (!userDetailsString || userDetailsString.trim() === '') {
             console.warn('⚠️ No user data in AsyncStorage');
-            // TEMPORARY FIX: Return the known working client ID
-            console.log('🔧 Using fallback client ID');
-            return '6941b27c7fdcea3d37e02ada';
+            return null; // Return null instead of fallback
         }
 
         const userDetails = JSON.parse(userDetailsString);
@@ -31,19 +29,15 @@ export const getClientId = async () => {
         console.log('✅ ClientId type:', typeof clientId);
         console.log('✅ ClientId length:', clientId.length);
 
-        if (!clientId || clientId === '') {
-            console.error('❌ ClientId is empty!');
+        if (!clientId || clientId === '' || clientId === 'null' || clientId === 'undefined') {
+            console.error('❌ ClientId is empty or invalid!');
             console.error('❌ User data:', JSON.stringify(userDetails, null, 2));
-            // TEMPORARY FIX: Return the known working client ID
-            console.log('🔧 Using fallback client ID');
-            return '6941b27c7fdcea3d37e02ada';
+            return null; // Return null for invalid clientId
         }
 
         return clientId;
     } catch (error) {
         console.error('❌ Error getting client ID:', error);
-        // TEMPORARY FIX: Return the known working client ID
-        console.log('🔧 Using fallback client ID due to error');
-        return '6941b27c7fdcea3d37e02ada';
+        return null; // Return null on error
     }
 };

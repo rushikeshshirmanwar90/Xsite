@@ -1,7 +1,30 @@
 import axios from "axios";
 import { domain } from "../lib/domain";
 
-export const getUser = async (email: string, userType: string) => {
+// Type definitions for API responses
+interface ApiResponse<T = any> {
+  success?: boolean;
+  data?: T;
+  message?: string;
+  error?: string;
+}
+
+interface UserData {
+  _id?: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  userType?: string;
+  [key: string]: any;
+}
+
+interface FindUserResponse {
+  isUser: {
+    userType: string;
+  };
+}
+
+export const getUser = async (email: string, userType: string): Promise<UserData | null> => {
   try {
     console.log("🌐 Fetching user data...");
     console.log("   Email:", email);
@@ -16,19 +39,19 @@ export const getUser = async (email: string, userType: string) => {
 
     console.log("   URL:", endpoint);
 
-    const res = await axios.get(endpoint);
+    const res = await axios.get<ApiResponse<UserData>>(endpoint);
 
     console.log("📦 API Response Status:", res.status);
     console.log("📦 API Response Data:", JSON.stringify(res.data, null, 2));
 
     if (res.status === 200) {
-      const userData = (res.data as any).data;
+      const userData = res.data.data;
       console.log("✅ Extracted user data:", JSON.stringify(userData, null, 2));
       console.log("✅ User data keys:", Object.keys(userData || {}));
       console.log("✅ Has _id?", !!userData?._id);
       console.log("✅ _id value:", userData?._id);
       console.log("✅ _id type:", typeof userData?._id);
-      return userData;
+      return userData || null;
     }
     return null;
   } catch (error) {
@@ -37,33 +60,35 @@ export const getUser = async (email: string, userType: string) => {
   }
 };
 
-export const confirmMail = async (email: string) => {
-  const res = await axios.post(`${domain}/api/findUser`, {
-    email: email,
-  });
+export const confirmMail = async (email: string): Promise<{ verified: boolean; isUser: boolean; userType: string }> => {
+  try {
+    const res = await axios.post<FindUserResponse>(`${domain}/api/findUser`, {
+      email: email,
+    });
 
-  const data = (res.data as any).isUser;
+    const data = res.data.isUser;
 
-  if (res.status === 200) {
-    const obj = { verified: true, isUser: true, userType: data.userType };
-    return obj;
-  } else if (res.status === 201) {
-    const obj = { verified: false, isUser: true, userType: data.userType };
-    return obj;
-  } else {
-    const obj = { verified: false, isUser: false, userType: "" };
-    return obj;
+    if (res.status === 200) {
+      return { verified: true, isUser: true, userType: data.userType };
+    } else if (res.status === 201) {
+      return { verified: false, isUser: true, userType: data.userType };
+    } else {
+      return { verified: false, isUser: false, userType: "" };
+    }
+  } catch (error) {
+    console.error("❌ Failed to confirm mail:", error);
+    return { verified: false, isUser: false, userType: "" };
   }
 };
 
-export const sendOtp = async (email: string, OTP: number) => {
+export const sendOtp = async (email: string, OTP: number): Promise<boolean> => {
   try {
     console.log("📧 Sending OTP email...");
     console.log("   Email:", email);
     console.log("   OTP:", OTP);
     console.log("   URL:", `${domain}/api/otp`);
 
-    const res = await axios.post(`${domain}/api/otp`, {
+    const res = await axios.post<ApiResponse>(`${domain}/api/otp`, {
       email: email,
       OTP: OTP,
     });
@@ -72,11 +97,7 @@ export const sendOtp = async (email: string, OTP: number) => {
     console.log("   Status:", res.status);
     console.log("   Response:", res.data);
 
-    if (res.status === 200) {
-      return true;
-    } else {
-      return false;
-    }
+    return res.status === 200;
   } catch (error: any) {
     console.error("❌ Failed to send OTP email:", error);
     console.error("   Error response:", error.response?.data);
@@ -89,14 +110,14 @@ export const addPassword = async (
   email: string,
   password: string,
   userType: string
-) => {
+): Promise<{ success: boolean; message?: string; error?: string }> => {
   try {
     console.log('🔐 ADD PASSWORD API CALL');
     console.log('📧 Email:', email);
     console.log('👤 User Type:', userType);
     console.log('🔑 Password length:', password.length);
 
-    const res = await axios.post(`${domain}/api/password`, {
+    const res = await axios.post<ApiResponse>(`${domain}/api/password`, {
       email: email,
       password: password,
       userType: userType,
@@ -127,9 +148,9 @@ export const addPassword = async (
   }
 };
 
-export const login = async (email: string, password: string) => {
+export const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
   try {
-    const res = await axios.post(`${domain}/api/login`, {
+    const res = await axios.post<ApiResponse>(`${domain}/api/login`, {
       email,
       password,
     });
@@ -139,7 +160,7 @@ export const login = async (email: string, password: string) => {
     } else {
       return {
         success: false,
-        error: (res.data as any).message || "Login failed",
+        error: res.data.message || "Login failed",
       };
     }
   } catch (error: any) {
@@ -153,14 +174,14 @@ export const login = async (email: string, password: string) => {
   }
 };
 
-export const findUserType = async (email: string) => {
+export const findUserType = async (email: string): Promise<{ success: boolean; userType: string }> => {
   try {
-    const res = await axios.post(`${domain}/api/findUser`, {
+    const res = await axios.post<FindUserResponse>(`${domain}/api/findUser`, {
       email: email,
     });
 
     if (res.status === 200 || res.status === 201) {
-      const data = (res.data as any).isUser;
+      const data = res.data.isUser;
       return { success: true, userType: data.userType };
     } else {
       return { success: false, userType: "" };
@@ -171,7 +192,7 @@ export const findUserType = async (email: string) => {
   }
 };
 
-export const forgetPassword = async (email: string, userType: string) => {
+export const forgetPassword = async (email: string, userType: string): Promise<{ success: boolean; message?: string; error?: string }> => {
   try {
     const payload = {
       email: email,
@@ -187,7 +208,7 @@ export const forgetPassword = async (email: string, userType: string) => {
     console.log("UserType:", userType);
     console.log("========================================\n");
 
-    const res = await axios.post(`${domain}/api/forget-password`, payload);
+    const res = await axios.post<ApiResponse>(`${domain}/api/forget-password`, payload);
 
     console.log("Forget Password Response Status:", res.status);
     console.log(
@@ -198,12 +219,12 @@ export const forgetPassword = async (email: string, userType: string) => {
     if (res.status === 200) {
       return {
         success: true,
-        message: (res.data as any).message || "Password reset email sent",
+        message: res.data.message || "Password reset email sent",
       };
     } else {
       return {
         success: false,
-        error: (res.data as any).message || "Failed to send reset email",
+        error: res.data.message || "Failed to send reset email",
       };
     }
   } catch (error: any) {

@@ -1,6 +1,6 @@
 // screens/StaffManagement.tsx
 import Loading from '@/components/Loading';
-import AddStaffModal from '@/components/staff/AddStaffModel';
+import AddStaffModalWithVerification from '@/components/staff/AddStaffModalWithVerification';
 import StaffHeader from '@/components/staff/StaffHeader';
 import StaffCard from '@/components/staff/StaffCard';
 import StaffEmptyState from '@/components/staff/StaffEmptyState';
@@ -66,7 +66,15 @@ const StaffManagement: React.FC = () => {
             console.log('🔍 Fetching clientId...');
             const id = await getClientId();
             console.log('✅ ClientId received:', id);
-            setClientId(id)
+            
+            if (!id) {
+                console.error('❌ No valid clientId found. User may need to log in again.');
+                toast.error('Session expired. Please log in again.');
+                setLoading(false);
+                return;
+            }
+            
+            setClientId(id);
         }
         fetchClientId()
     }, []); // Empty dependency array to run only once
@@ -151,23 +159,36 @@ const StaffManagement: React.FC = () => {
                     toast.error('Failed to load data. Please check your connection.');
                 }
                 
-            } catch (error: any) {
+            } catch (error) {
                 console.error('❌ Error fetching data:', error);
-                console.error('❌ Error response:', error.response?.data);
-                console.error('❌ Error status:', error.response?.status);
-                console.error('❌ Error config:', error.config);
                 
                 // Handle specific error cases
-                if (error.response?.status === 400) {
-                    console.error('❌ 400 Error - likely missing or invalid clientId');
-                    toast.error('Invalid client configuration. Please contact support.');
-                } else if (error.response?.status === 404) {
-                    console.error('❌ 404 Error - endpoint not found');
-                    toast.error('API endpoint not found. Please contact support.');
-                } else if (!error.response) {
-                    console.error('❌ Network error - server might be down');
-                    toast.error('Unable to connect to server. Please check your connection.');
+                if (error && typeof error === 'object' && 'response' in error) {
+                    const axiosError = error as any;
+                    console.error('❌ Error response:', axiosError.response?.data);
+                    console.error('❌ Error status:', axiosError.response?.status);
+                    console.error('❌ Error config:', axiosError.config);
+                    
+                    // Handle specific error cases
+                    if (axiosError.response?.status === 400) {
+                        console.error('❌ 400 Error - likely missing or invalid clientId');
+                        toast.error('Invalid client configuration. Please contact support.');
+                    } else if (axiosError.response?.status === 404) {
+                        console.error('❌ 404 Error - client or endpoint not found');
+                        const errorMessage = axiosError.response?.data?.message || 'Data not found';
+                        if (errorMessage.includes('Client not found')) {
+                            toast.error('Your account is not properly configured. Please contact support.');
+                        } else {
+                            toast.error('API endpoint not found. Please contact support.');
+                        }
+                    } else if (!axiosError.response) {
+                        console.error('❌ Network error - server might be down');
+                        toast.error('Unable to connect to server. Please check your connection.');
+                    } else {
+                        toast.error('Failed to load staff and admin data');
+                    }
                 } else {
+                    console.error('❌ Unknown error type:', error);
                     toast.error('Failed to load staff and admin data');
                 }
                 
@@ -183,7 +204,6 @@ const StaffManagement: React.FC = () => {
         fetchData();
     }, [clientId]); // Depend on clientId
 
-    // Function to send welcome message to new staff member
     const sendWelcomeMessage = async (staffMember: Staff, companyName: string) => {
         try {
             console.log('📱 Starting welcome message process...');
@@ -237,7 +257,10 @@ const StaffManagement: React.FC = () => {
             }
         } catch (error: any) {
             console.error('❌ Error in sendWelcomeMessage function:', error);
-            console.error('❌ Error stack:', error.stack);
+            if (error instanceof Error) {
+                console.error('❌ Error stack:', error.stack);
+                console.error('❌ Error message:', error.message);
+            }
             // Don't fail the staff addition if notification fails
             toast.error('Staff added successfully, but welcome message failed to send');
         }
@@ -333,7 +356,10 @@ const StaffManagement: React.FC = () => {
             }
         } catch (error) {
             console.error('❌ Error in handleAddStaff:', error);
-            console.error('❌ Error stack:', error.stack);
+            if (error instanceof Error) {
+                console.error('❌ Error stack:', error.stack);
+                console.error('❌ Error message:', error.message);
+            }
             toast.error('Failed to add staff');
         }
     };
@@ -519,10 +545,11 @@ const StaffManagement: React.FC = () => {
                 />
             )}
 
-            <AddStaffModal
+            <AddStaffModalWithVerification
                 visible={showAddModal}
                 onClose={() => setShowAddModal(false)}
                 onAdd={handleAddStaff}
+                companyName={clientData?.name}
             />
         </SafeAreaView>
     );

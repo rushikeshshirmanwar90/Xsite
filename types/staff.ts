@@ -10,6 +10,8 @@ export interface Staff {
   assignedProjects: string[];
   role: string;
   clientId?: string;
+  emailVerified?: boolean;
+  emailVerifiedAt?: string;
 }
 
 export interface StaffMembers {
@@ -21,6 +23,7 @@ export interface AddStaffModalProps {
   visible: boolean;
   onClose: () => void;
   onAdd: (staff: Omit<Staff, "id">) => void;
+  companyName?: string;
 }
 
 export interface StaffCardProps {
