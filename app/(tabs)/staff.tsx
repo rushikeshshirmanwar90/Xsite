@@ -2,19 +2,21 @@
 import Loading from '@/components/Loading';
 import AddStaffModal from '@/components/staff/AddStaffModel';
 import StaffHeader from '@/components/staff/StaffHeader';
-import StaffList from '@/components/staff/StaffList';
+import StaffCard from '@/components/staff/StaffCard';
+import StaffEmptyState from '@/components/staff/StaffEmptyState';
 import AdminCard from '@/components/staff/AdminCard';
 import { getClientId } from '@/functions/clientId';
 import { addStaff } from '@/functions/staff';
 import { isAdmin, useUser } from '@/hooks/useUser';
 import { domain } from '@/lib/domain';
 import { Staff } from '@/types/staff';
+import { notificationService } from '@/services/notificationService';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ScrollView,
+    FlatList,
     StatusBar,
     StyleSheet,
     Text,
@@ -32,12 +34,23 @@ interface Admin {
     clientId?: string;
 }
 
+interface ClientData {
+    _id: string;
+    name: string;
+    email: string;
+    phoneNumber: number;
+    city: string;
+    state: string;
+    address: string;
+}
+
 const StaffManagement: React.FC = () => {
     const [staffList, setStaffList] = useState<Staff[]>([]);
     const [adminList, setAdminList] = useState<Admin[]>([]);
     const [showAddModal, setShowAddModal] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [clientId, setClientId] = useState('');
+    const [clientData, setClientData] = useState<ClientData | null>(null);
     const [loading, setLoading] = useState(true);
 
     // Get user role for access control
@@ -50,7 +63,9 @@ const StaffManagement: React.FC = () => {
     // !! fetching clientId
     useEffect(() => {
         const fetchClientId = async () => {
+            console.log('🔍 Fetching clientId...');
             const id = await getClientId();
+            console.log('✅ ClientId received:', id);
             setClientId(id)
         }
         fetchClientId()
@@ -60,19 +75,55 @@ const StaffManagement: React.FC = () => {
     // !! fetching staff and admin data
     useEffect(() => {
         const fetchData = async () => {
+            console.log('🔍 Attempting to fetch staff data with clientId:', clientId);
+            
+            if (!clientId) {
+                console.log('⚠️ ClientId is not available yet, skipping API call');
+                return;
+            }
+            
             setLoading(true);
             try {
-                // Fetch both staff and admin data in parallel
-                const [staffRes, adminRes] = await Promise.all([
-                    axios.get(`${domain}/api/staff`),
-                    axios.get(`${domain}/api/admin?clientId=${clientId}`)
-                ]);
+                console.log('📡 Making API calls with clientId:', clientId);
+                console.log('📡 Domain:', domain);
                 
-                const staffData = staffRes.data.data;
-                const adminData = adminRes.data.data;
+                // Test each API individually with detailed logging
+                console.log('🔍 Testing Staff API...');
+                const staffUrl = `${domain}/api/users/staff?clientId=${clientId}`;
+                console.log('📤 Staff URL:', staffUrl);
                 
-                setStaffList(staffData);
-                // Handle admin data - could be single admin or array
+                const staffRes = await axios.get(staffUrl);
+                console.log('📥 Staff Response Status:', staffRes.status);
+                console.log('📥 Staff Response Data:', JSON.stringify(staffRes.data, null, 2));
+                
+                console.log('🔍 Testing Admin API...');
+                const adminUrl = `${domain}/api/users/admin?clientId=${clientId}`;
+                console.log('📤 Admin URL:', adminUrl);
+                
+                const adminRes = await axios.get(adminUrl);
+                console.log('📥 Admin Response Status:', adminRes.status);
+                console.log('📥 Admin Response Data:', JSON.stringify(adminRes.data, null, 2));
+                
+                console.log('🔍 Testing Client API...');
+                const clientUrl = `${domain}/api/clients?id=${clientId}`;
+                console.log('📤 Client URL:', clientUrl);
+                
+                const clientRes = await axios.get(clientUrl);
+                console.log('📥 Client Response Status:', clientRes.status);
+                console.log('📥 Client Response Data:', JSON.stringify(clientRes.data, null, 2));
+                
+                // Handle staff data with proper typing
+                const staffResponse = staffRes.data as { success?: boolean; data?: Staff[] };
+                const staffData = staffResponse?.success ? (staffResponse.data || []) : [];
+                console.log('✅ Staff data processed:', staffData.length, 'items');
+                console.log('📋 Staff data details:', staffData);
+                setStaffList(Array.isArray(staffData) ? staffData : []);
+                
+                // Handle admin data with proper typing
+                const adminResponse = adminRes.data as { success?: boolean; data?: Admin | Admin[] };
+                const adminData = adminResponse?.success ? adminResponse.data : null;
+                console.log('✅ Admin data processed:', adminData ? 'Found' : 'Not found');
+                console.log('📋 Admin data details:', adminData);
                 if (Array.isArray(adminData)) {
                     setAdminList(adminData);
                 } else if (adminData) {
@@ -80,18 +131,117 @@ const StaffManagement: React.FC = () => {
                 } else {
                     setAdminList([]);
                 }
-            } catch (error) {
-                console.error('Error fetching data:', error);
-                toast.error('Failed to load staff and admin data');
+                
+                // Handle client data with proper typing
+                const clientResponse = clientRes.data as { success?: boolean; data?: ClientData };
+                const clientInfo = clientResponse?.success ? clientResponse.data : null;
+                console.log('✅ Client data processed:', clientInfo?.name || 'Unknown Company');
+                console.log('📋 Client data details:', clientInfo);
+                setClientData(clientInfo || null);
+                
+                // Show success message if at least one API worked
+                const staffSuccess = staffResponse?.success || false;
+                const adminSuccess = adminResponse?.success || false;
+                const clientSuccess = clientResponse?.success || false;
+                
+                if (staffSuccess || adminSuccess || clientSuccess) {
+                    console.log('✅ Data loading completed successfully');
+                } else {
+                    console.log('❌ All APIs failed');
+                    toast.error('Failed to load data. Please check your connection.');
+                }
+                
+            } catch (error: any) {
+                console.error('❌ Error fetching data:', error);
+                console.error('❌ Error response:', error.response?.data);
+                console.error('❌ Error status:', error.response?.status);
+                console.error('❌ Error config:', error.config);
+                
+                // Handle specific error cases
+                if (error.response?.status === 400) {
+                    console.error('❌ 400 Error - likely missing or invalid clientId');
+                    toast.error('Invalid client configuration. Please contact support.');
+                } else if (error.response?.status === 404) {
+                    console.error('❌ 404 Error - endpoint not found');
+                    toast.error('API endpoint not found. Please contact support.');
+                } else if (!error.response) {
+                    console.error('❌ Network error - server might be down');
+                    toast.error('Unable to connect to server. Please check your connection.');
+                } else {
+                    toast.error('Failed to load staff and admin data');
+                }
+                
+                // Set empty arrays on error to prevent UI issues
+                setStaffList([]);
+                setAdminList([]);
+                setClientData(null);
             } finally {
                 setLoading(false);
             }
         };
 
-        if (clientId) {
-            fetchData();
-        }
+        fetchData();
     }, [clientId]); // Depend on clientId
+
+    // Function to send welcome message to new staff member
+    const sendWelcomeMessage = async (staffMember: Staff, companyName: string) => {
+        try {
+            console.log('📱 Starting welcome message process...');
+            console.log('📋 Staff member:', JSON.stringify(staffMember, null, 2));
+            console.log('🏢 Company name:', companyName);
+            console.log('🆔 Client ID:', clientId);
+            
+            // Create welcome message using the notification service
+            const welcomeMessage = notificationService.createWelcomeMessage(
+                `${staffMember.firstName} ${staffMember.lastName}`,
+                companyName,
+                staffMember.role
+            );
+            
+            const welcomeSubject = notificationService.createWelcomeSubject(companyName);
+            
+            console.log('📧 Welcome subject:', welcomeSubject);
+            console.log('📝 Welcome message preview:', welcomeMessage.substring(0, 100) + '...');
+            
+            // Create notification payload
+            const notificationPayload = {
+                recipientEmail: staffMember.email,
+                recipientName: `${staffMember.firstName} ${staffMember.lastName}`,
+                subject: welcomeSubject,
+                message: welcomeMessage,
+                type: 'staff_welcome',
+                clientId: clientId,
+                staffId: staffMember._id,
+                companyName: companyName,
+                metadata: {
+                    role: staffMember.role,
+                    addedBy: user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : 'Administrator',
+                    addedAt: new Date().toISOString()
+                }
+            };
+
+            console.log('📦 Final notification payload:', JSON.stringify(notificationPayload, null, 2));
+
+            // Send notification using the notification service
+            console.log('🚀 Calling notification service...');
+            const success = await notificationService.sendStaffWelcomeMessage(notificationPayload);
+            
+            console.log('📊 Notification service result:', success);
+            
+            if (success) {
+                console.log('✅ Welcome message sent successfully');
+                toast.success(`Welcome message sent to ${staffMember.firstName} ${staffMember.lastName}`);
+            } else {
+                console.log('⚠️ Welcome message failed to send');
+                toast.error('Staff added successfully, but welcome message failed to send');
+            }
+        } catch (error: any) {
+            console.error('❌ Error in sendWelcomeMessage function:', error);
+            console.error('❌ Error stack:', error.stack);
+            // Don't fail the staff addition if notification fails
+            toast.error('Staff added successfully, but welcome message failed to send');
+        }
+    };
 
     const handleAddStaff = async (newStaff: Staff) => {
         // Check if user is admin
@@ -105,6 +255,11 @@ const StaffManagement: React.FC = () => {
             return;
         }
 
+        if (!clientData) {
+            toast.error('Company information not available');
+            return;
+        }
+
         const payload = {
             ...newStaff,
             clientId: clientId
@@ -113,22 +268,47 @@ const StaffManagement: React.FC = () => {
         console.log(payload);
 
         try {
+            console.log('🚀 Starting staff addition process...');
+            console.log('📋 Staff payload:', JSON.stringify(payload, null, 2));
+            
             const res = await addStaff(payload);
+            console.log('📥 addStaff function result:', res);
 
             if (res) {
+                console.log('✅ Staff added successfully, showing success toast');
                 toast.success('Staff Added successfully');
                 setShowAddModal(false);
+                
+                // Send welcome message to the new staff member
+                console.log('📧 Preparing to send welcome message...');
+                const staffWithId = { ...newStaff, _id: res._id || res.id };
+                console.log('👤 Staff with ID:', JSON.stringify(staffWithId, null, 2));
+                console.log('🏢 Company data:', JSON.stringify(clientData, null, 2));
+                
+                console.log('🎯 Calling sendWelcomeMessage...');
+                await sendWelcomeMessage(staffWithId, clientData.name);
+                console.log('✅ Welcome message process completed');
+                
                 // Refresh staff and admin list after adding new staff
                 const refreshData = async () => {
+                    if (!clientId) {
+                        console.log('⚠️ ClientId not available for refresh');
+                        return;
+                    }
+                    
+                    console.log('🔄 Refreshing staff and admin data...');
                     setLoading(true);
                     try {
                         const [staffRes, adminRes] = await Promise.all([
-                            axios.get(`${domain}/api/staff`),
-                            axios.get(`${domain}/api/admin?clientId=${clientId}`)
+                            axios.get(`${domain}/api/users/staff?clientId=${clientId}`),
+                            axios.get(`${domain}/api/users/admin?clientId=${clientId}`)
                         ]);
                         
-                        const staffData = staffRes.data.data;
-                        const adminData = adminRes.data.data;
+                        const staffResponse = staffRes.data as { success?: boolean; data?: Staff[] };
+                        const staffData = staffResponse?.data || [];
+                        
+                        const adminResponse = adminRes.data as { success?: boolean; data?: Admin | Admin[] };
+                        const adminData = adminResponse?.data;
                         
                         setStaffList(staffData);
                         if (Array.isArray(adminData)) {
@@ -138,8 +318,9 @@ const StaffManagement: React.FC = () => {
                         } else {
                             setAdminList([]);
                         }
+                        console.log('✅ Data refresh completed');
                     } catch (error) {
-                        console.error('Error refreshing data:', error);
+                        console.error('❌ Error refreshing data:', error);
                         toast.error('Failed to refresh data');
                     } finally {
                         setLoading(false);
@@ -147,10 +328,12 @@ const StaffManagement: React.FC = () => {
                 };
                 refreshData();
             } else {
+                console.log('❌ addStaff function returned null/false');
                 toast.error('Something went wrong');
             }
         } catch (error) {
-            console.error('Error adding staff:', error);
+            console.error('❌ Error in handleAddStaff:', error);
+            console.error('❌ Error stack:', error.stack);
             toast.error('Failed to add staff');
         }
     };
@@ -203,6 +386,114 @@ const StaffManagement: React.FC = () => {
         toast.success(`Admin: ${admin.firstName} ${admin.lastName}`);
     };
 
+    // Prepare data for single FlatList
+    const listData = [];
+    
+    // Add admin section header if there are admins
+    if (filteredAdmins.length > 0) {
+        listData.push({
+            type: 'adminHeader',
+            id: 'admin-header',
+            count: filteredAdmins.length
+        });
+        
+        // Add each admin
+        filteredAdmins.forEach(admin => {
+            listData.push({
+                type: 'admin',
+                id: `admin-${admin._id}`,
+                data: admin
+            });
+        });
+    }
+    
+    // Add staff section header
+    listData.push({
+        type: 'staffHeader',
+        id: 'staff-header',
+        count: filteredStaff.length
+    });
+    
+    // Add each staff member or empty state
+    if (filteredStaff.length > 0) {
+        filteredStaff.forEach(staff => {
+            listData.push({
+                type: 'staff',
+                id: `staff-${staff._id}`,
+                data: staff
+            });
+        });
+    } else {
+        listData.push({
+            type: 'staffEmpty',
+            id: 'staff-empty',
+            hasSearchQuery: searchQuery.length > 0
+        });
+    }
+
+    const renderItem = ({ item }: { item: any }) => {
+        switch (item.type) {
+            case 'adminHeader':
+                return (
+                    <View style={styles.sectionHeader}>
+                        <View style={styles.sectionTitleContainer}>
+                            <Ionicons name="shield-checkmark" size={20} color="#F59E0B" />
+                            <Text style={styles.sectionTitle}>Administrators</Text>
+                        </View>
+                        <Text style={styles.sectionCount}>
+                            {item.count} admin{item.count !== 1 ? 's' : ''}
+                        </Text>
+                    </View>
+                );
+            
+            case 'admin':
+                return (
+                    <View style={styles.adminContainer}>
+                        <AdminCard
+                            admin={item.data}
+                            onPress={() => handleAdminPress(item.data)}
+                        />
+                    </View>
+                );
+            
+            case 'staffHeader':
+                return (
+                    <View style={styles.sectionHeader}>
+                        <View style={styles.sectionTitleContainer}>
+                            <Ionicons name="people" size={20} color="#3B82F6" />
+                            <Text style={styles.sectionTitle}>Staff Members</Text>
+                        </View>
+                        <Text style={styles.sectionCount}>
+                            {item.count} staff member{item.count !== 1 ? 's' : ''}
+                        </Text>
+                    </View>
+                );
+            
+            case 'staff':
+                return (
+                    <View style={styles.staffContainer}>
+                        <StaffCard
+                            staff={item.data}
+                            onPress={() => handleStaffPress(item.data)}
+                        />
+                    </View>
+                );
+            
+            case 'staffEmpty':
+                return (
+                    <View style={styles.staffContainer}>
+                        <StaffEmptyState
+                            hasSearchQuery={item.hasSearchQuery}
+                            onAddPress={() => setShowAddModal(true)}
+                        />
+                    </View>
+                );
+            
+            default:
+                return null;
+        }
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
@@ -219,52 +510,13 @@ const StaffManagement: React.FC = () => {
             {loading ? (
                 <Loading />
             ) : (
-                <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-                    {/* Admins Section */}
-                    {filteredAdmins.length > 0 && (
-                        <View style={styles.section}>
-                            <View style={styles.sectionHeader}>
-                                <View style={styles.sectionTitleContainer}>
-                                    <Ionicons name="shield-checkmark" size={20} color="#F59E0B" />
-                                    <Text style={styles.sectionTitle}>Administrators</Text>
-                                </View>
-                                <Text style={styles.sectionCount}>
-                                    {filteredAdmins.length} admin{filteredAdmins.length !== 1 ? 's' : ''}
-                                </Text>
-                            </View>
-                            <View style={[styles.sectionContent, styles.adminContainer]}>
-                                {filteredAdmins.map((admin) => (
-                                    <AdminCard
-                                        key={admin._id}
-                                        admin={admin}
-                                        onPress={() => handleAdminPress(admin)}
-                                    />
-                                ))}
-                            </View>
-                        </View>
-                    )}
-
-                    {/* Staff Section */}
-                    <View style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                            <View style={styles.sectionTitleContainer}>
-                                <Ionicons name="people" size={20} color="#3B82F6" />
-                                <Text style={styles.sectionTitle}>Staff Members</Text>
-                            </View>
-                            <Text style={styles.sectionCount}>
-                                {filteredStaff.length} staff member{filteredStaff.length !== 1 ? 's' : ''}
-                            </Text>
-                        </View>
-                        <View style={styles.sectionContent}>
-                            <StaffList
-                                staffData={filteredStaff}
-                                hasSearchQuery={searchQuery.length > 0}
-                                onStaffPress={handleStaffPress}
-                                onAddPress={() => setShowAddModal(true)}
-                            />
-                        </View>
-                    </View>
-                </ScrollView>
+                <FlatList
+                    data={listData}
+                    keyExtractor={(item) => item.id}
+                    renderItem={renderItem}
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.listContainer}
+                />
             )}
 
             <AddStaffModal
@@ -281,21 +533,19 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#F9FAFB',
     },
-    scrollView: {
-        flex: 1,
-    },
-    section: {
-        marginBottom: 8,
+    listContainer: {
+        paddingBottom: 20,
     },
     sectionHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 20,
-        paddingVertical: 8,
+        paddingVertical: 12,
         backgroundColor: '#FFFFFF',
         borderBottomWidth: 1,
         borderBottomColor: '#E2E8F0',
+        marginBottom: 8,
     },
     sectionTitleContainer: {
         flexDirection: 'row',
@@ -312,11 +562,13 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         color: '#64748B',
     },
-    sectionContent: {
-        paddingTop: 8,
-    },
     adminContainer: {
         paddingHorizontal: 20,
+        paddingVertical: 8,
+    },
+    staffContainer: {
+        paddingHorizontal: 20,
+        paddingVertical: 4,
     },
 });
 

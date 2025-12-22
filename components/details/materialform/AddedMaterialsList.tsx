@@ -38,7 +38,7 @@ const AddedMaterialsList: React.FC<AddedMaterialsListProps> = ({
           <View style={styles.addedMaterialInfo}>
             <Text style={styles.addedMaterialName}>{material.name}</Text>
             <Text style={styles.addedMaterialDetails}>
-              {material.quantity} {material.unit} • ₹{material.cost.toLocaleString('en-IN')}
+              {material.quantity} {material.unit} • ₹{material.perUnitCost.toLocaleString('en-IN')} {/* ✅ UPDATED: Use perUnitCost */}
             </Text>
             {Object.keys(material.specs).length > 0 && (
               <View style={styles.materialSpecsPreview}>

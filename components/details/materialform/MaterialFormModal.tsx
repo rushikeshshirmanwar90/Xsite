@@ -47,7 +47,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     unit: '',
     quantity: '',
     specs: {},
-    cost: '',
+    perUnitCost: '', // ✅ UPDATED: Use perUnitCost instead of cost
   });
   const [customSpecs, setCustomSpecs] = useState<CustomSpec[]>([]);
   const [showAddSpecModal, setShowAddSpecModal] = useState(false);
@@ -62,7 +62,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       unit: template.unit,
       quantity: '',
       specs: {},
-      cost: '',
+      perUnitCost: '', // ✅ UPDATED: Use perUnitCost instead of cost
     });
     setSelectedTemplateKey(templateKey);
     setCustomSpecs([]);
@@ -105,20 +105,20 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   };
 
   const handleAddMaterial = () => {
-    if (!formData.name || !formData.unit || !formData.quantity || !formData.cost) {
+    if (!formData.name || !formData.unit || !formData.quantity || !formData.perUnitCost) {
       Alert.alert('Error', 'Please fill in all required fields (name, unit, quantity, and cost per unit)');
       return;
     }
 
     const quantity = parseFloat(formData.quantity);
-    const costPerUnit = parseFloat(formData.cost);
+    const perUnitCost = parseFloat(formData.perUnitCost); // ✅ UPDATED: Use perUnitCost
 
     if (isNaN(quantity) || quantity <= 0) {
       Alert.alert('Error', 'Please enter a valid quantity greater than 0');
       return;
     }
 
-    if (isNaN(costPerUnit) || costPerUnit < 0) {
+    if (isNaN(perUnitCost) || perUnitCost < 0) {
       Alert.alert('Error', 'Please enter a valid cost per unit (0 or greater)');
       return;
     }
@@ -133,7 +133,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
         name: formData.name,
         unit: formData.unit,
         quantity,
-        cost: costPerUnit, // Store per-unit cost
+        perUnitCost: perUnitCost, // ✅ UPDATED: Store per-unit cost
         specs: formData.specs,
       };
       setAddedMaterials(updatedMaterials);
@@ -147,7 +147,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
         name: formData.name,
         unit: formData.unit,
         quantity,
-        cost: costPerUnit, // Store per-unit cost
+        perUnitCost: perUnitCost, // ✅ UPDATED: Store per-unit cost
         specs: formData.specs,
         date: new Date().toLocaleDateString('en-IN'),
       };
@@ -172,16 +172,14 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       value: String(value),
     }));
 
-    // Calculate per-unit cost from total cost
-    const costPerUnit = materialToEdit.quantity > 0
-      ? (materialToEdit.cost || 0) / materialToEdit.quantity
-      : 0;
+    // Use per-unit cost directly (no calculation needed)
+    const perUnitCost = materialToEdit.perUnitCost || 0; // ✅ UPDATED: Use perUnitCost directly
 
     setFormData({
       name: materialToEdit.name,
       unit: materialToEdit.unit,
       quantity: String(materialToEdit.quantity),
-      cost: String(costPerUnit.toFixed(2)), // Show per-unit cost
+      perUnitCost: String(perUnitCost.toFixed(2)), // ✅ UPDATED: Use perUnitCost
       specs: materialToEdit.specs || {},
     });
 
@@ -241,7 +239,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       unit: material.unit,
       qnt: material.quantity,
       specs: material.specs || {},
-      cost: material.cost || 0,
+      perUnitCost: material.perUnitCost || 0, // ✅ UPDATED: Use perUnitCost instead of cost
       mergeIfExists: true,
     }));
 
@@ -269,7 +267,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       unit: '',
       quantity: '',
       specs: {},
-      cost: '',
+      perUnitCost: '', // ✅ UPDATED: Use perUnitCost instead of cost
     });
     setSelectedTemplateKey(null);
     setShowSpecDropdown(null);
@@ -291,7 +289,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     }
 
     // If there are added materials or form data, confirm before closing
-    if (addedMaterials.length > 0 || formData.name || formData.quantity || formData.cost) {
+    if (addedMaterials.length > 0 || formData.name || formData.quantity || formData.perUnitCost) {
       Alert.alert(
         'Discard Changes?',
         'You have unsaved materials. Are you sure you want to close?',

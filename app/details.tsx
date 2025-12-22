@@ -337,12 +337,23 @@ const Details = () => {
                     console.warn(`⚠️ Material "${material.name}" is missing _id field!`, material);
                 }
 
+                // ✅ FIXED: Handle different cost field structures
+                let materialCost = 0;
+                if (material.perUnitCost !== undefined) {
+                    materialCost = Number(material.perUnitCost) || 0;
+                } else if (material.totalCost !== undefined) {
+                    materialCost = Number(material.totalCost) || 0;
+                } else if (material.cost !== undefined) {
+                    materialCost = Number(material.cost) || 0;
+                }
+
                 // Log material sectionId for debugging
                 console.log(`📦 Material: ${material.name}`);
                 console.log(`   _id: ${material._id}`);
                 console.log(`   sectionId: ${material.sectionId || 'NONE'}`);
                 console.log(`   Current page sectionId: ${sectionId}`);
                 console.log(`   Match: ${!material.sectionId || material.sectionId === sectionId ? '✅' : '❌'}`);
+                console.log(`   Cost (normalized): ${materialCost}`);
 
                 return {
                     id: index + 1,
@@ -350,7 +361,7 @@ const Details = () => {
                     name: material.name,
                     quantity: material.qnt,
                     unit: material.unit,
-                    price: material.cost || 0,
+                    price: materialCost, // Use normalized cost
                     date: new Date().toLocaleDateString(),
                     icon,
                     color,
@@ -362,13 +373,33 @@ const Details = () => {
             // Transform MaterialUsed
             const transformedUsed: Material[] = materialUsed.map((material: any, index: number) => {
                 const { icon, color } = getMaterialIconAndColor(material.name);
+                
+                // ✅ FIXED: Handle different cost field structures for used materials
+                let materialCost = 0;
+                if (material.totalCost !== undefined) {
+                    // For used materials, totalCost is the total cost of the quantity used
+                    materialCost = Number(material.totalCost) || 0;
+                } else if (material.perUnitCost !== undefined) {
+                    // If only per-unit cost is available, calculate total
+                    materialCost = (Number(material.perUnitCost) || 0) * (Number(material.qnt) || 1);
+                } else if (material.cost !== undefined) {
+                    materialCost = Number(material.cost) || 0;
+                }
+
+                console.log(`🔄 Used Material: ${material.name}`);
+                console.log(`   Quantity: ${material.qnt} ${material.unit}`);
+                console.log(`   Per-unit cost: ${material.perUnitCost || 'N/A'}`);
+                console.log(`   Total cost: ${material.totalCost || 'N/A'}`);
+                console.log(`   Legacy cost: ${material.cost || 'N/A'}`);
+                console.log(`   Normalized cost: ${materialCost}`);
+
                 return {
                     id: index + 1000,
                     _id: material._id,
                     name: material.name,
                     quantity: material.qnt,
                     unit: material.unit,
-                    price: material.cost || 0,
+                    price: materialCost, // Use normalized cost
                     date: new Date().toLocaleDateString(),
                     icon,
                     color,
@@ -577,13 +608,24 @@ const Details = () => {
             // Transform MaterialAvailable to Material interface
             const transformedAvailable: Material[] = materialAvailable.map((material: any, index: number) => {
                 const { icon, color } = getMaterialIconAndColor(material.name);
+                
+                // ✅ FIXED: Handle different cost field structures
+                let materialCost = 0;
+                if (material.perUnitCost !== undefined) {
+                    materialCost = Number(material.perUnitCost) || 0;
+                } else if (material.totalCost !== undefined) {
+                    materialCost = Number(material.totalCost) || 0;
+                } else if (material.cost !== undefined) {
+                    materialCost = Number(material.cost) || 0;
+                }
+
                 return {
                     id: index + 1,
                     _id: material._id, // Store MongoDB _id for API calls
                     name: material.name,
                     quantity: material.qnt,
                     unit: material.unit,
-                    price: material.cost || 0,
+                    price: materialCost, // Use normalized cost
                     date: new Date().toLocaleDateString(),
                     icon,
                     color,
@@ -594,13 +636,26 @@ const Details = () => {
             // Transform MaterialUsed to Material interface
             const transformedUsed: Material[] = materialUsed.map((material: any, index: number) => {
                 const { icon, color } = getMaterialIconAndColor(material.name);
+                
+                // ✅ FIXED: Handle different cost field structures for used materials
+                let materialCost = 0;
+                if (material.totalCost !== undefined) {
+                    // For used materials, totalCost is the total cost of the quantity used
+                    materialCost = Number(material.totalCost) || 0;
+                } else if (material.perUnitCost !== undefined) {
+                    // If only per-unit cost is available, calculate total
+                    materialCost = (Number(material.perUnitCost) || 0) * (Number(material.qnt) || 1);
+                } else if (material.cost !== undefined) {
+                    materialCost = Number(material.cost) || 0;
+                }
+
                 return {
                     id: index + 1000, // Different ID range to avoid conflicts
                     _id: material._id, // Store MongoDB _id
                     name: material.name,
                     quantity: material.qnt,
                     unit: material.unit,
-                    price: material.cost || 0,
+                    price: materialCost, // Use normalized cost
                     date: new Date().toLocaleDateString(),
                     icon,
                     color,
@@ -1018,7 +1073,8 @@ const Details = () => {
                         unit: usedMaterial.unit,
                         specs: usedMaterial.specs || {},
                         qnt: usedMaterial.qnt,
-                        cost: usedMaterial.cost,
+                        perUnitCost: usedMaterial.perUnitCost || 0, // ✅ FIXED: Use perUnitCost
+                        totalCost: usedMaterial.totalCost || 0, // ✅ FIXED: Use totalCost
                         addedAt: new Date(),
                     }));
 
@@ -1123,13 +1179,14 @@ const Details = () => {
                             
                             console.log(`Processing material ${usage.materialId} with single API...`);
                             const singleResponse = await axios.post(`${domain}/api/material-usage`, singleApiPayload);
+                            const singleResponseData = singleResponse.data as any; // ✅ FIXED: Type assertion
                             
-                            if (singleResponse.data.success) {
+                            if (singleResponseData.success) {
                                 successCount++;
                                 console.log(`✅ Material ${usage.materialId} processed successfully`);
                             } else {
                                 failCount++;
-                                console.log(`❌ Material ${usage.materialId} failed:`, singleResponse.data.error);
+                                console.log(`❌ Material ${usage.materialId} failed:`, singleResponseData.error);
                             }
                         } catch (singleError: any) {
                             failCount++;
@@ -1479,7 +1536,7 @@ const Details = () => {
             unit: material.unit,
             specs: material.specs || {},
             qnt: material.qnt,
-            cost: material.cost,
+            perUnitCost: material.perUnitCost, // ✅ FIXED: Use perUnitCost instead of cost
             mergeIfExists: material.mergeIfExists !== undefined ? material.mergeIfExists : true,
         }));
 
@@ -1514,27 +1571,48 @@ const Details = () => {
                 if (successCount > 0) {
                     toast.success(`Successfully added ${successCount} material${successCount > 1 ? 's' : ''}!`);
 
-                    // Log material activity for imported materials
-                    const successfulMaterials = materials.map((material: any) => ({
-                        name: material.materialName,
-                        unit: material.unit,
-                        specs: material.specs || {},
-                        qnt: material.qnt,
-                        cost: material.cost || 0,
+                    // ✅ FIXED: Log material activity ONLY for successful materials
+                    const successfulResults = responseData.results?.filter((r: any) => r.success) || [];
+                    const successfulMaterials = successfulResults.map((result: any) => ({
+                        name: result.material?.name || result.input?.materialName,
+                        unit: result.material?.unit || result.input?.unit,
+                        specs: result.material?.specs || result.input?.specs || {},
+                        qnt: result.material?.qnt || result.input?.qnt,
+                        perUnitCost: result.material?.perUnitCost || result.input?.perUnitCost || 0, // ✅ FIXED: Use perUnitCost
+                        totalCost: result.material?.totalCost || result.input?.totalCost || 0, // ✅ FIXED: Use totalCost
                         addedAt: new Date(),
                     }));
 
-                    await logMaterialActivity(successfulMaterials, 'imported', message);
+                    console.log('🔔 LOGGING ACTIVITY FOR SUCCESSFUL MATERIALS:');
+                    console.log('  - Successful materials count:', successfulMaterials.length);
+                    console.log('  - Materials to log:', successfulMaterials.map((m: any) => `${m.name} (${m.qnt} ${m.unit})`)); // ✅ FIXED: Type annotation
 
-                    // Log to general activity API
-                    const totalCost = materials.reduce((sum: number, m: any) => sum + (m.cost || 0), 0);
-                    await logMaterialImported(
-                        projectId,
-                        projectName,
-                        successCount,
-                        totalCost,
-                        message
-                    );
+                    // Only log activity if we have successful materials
+                    if (successfulMaterials.length > 0) {
+                        try {
+                            await logMaterialActivity(successfulMaterials, 'imported', message);
+                            console.log('✅ Material activity logged successfully');
+                        } catch (activityError) {
+                            console.error('❌ Failed to log material activity:', activityError);
+                            // Don't fail the whole operation if activity logging fails
+                        }
+
+                        // Log to general activity API
+                        const totalCost = successfulMaterials.reduce((sum: number, m: any) => sum + (m.totalCost || 0), 0); // ✅ FIXED: Use totalCost
+                        try {
+                            await logMaterialImported(
+                                projectId,
+                                projectName,
+                                successCount,
+                                totalCost,
+                                message
+                            );
+                            console.log('✅ General activity logged successfully');
+                        } catch (generalActivityError) {
+                            console.error('❌ Failed to log general activity:', generalActivityError);
+                            // Don't fail the whole operation if general activity logging fails
+                        }
+                    }
                 }
 
                 if (failCount > 0) {

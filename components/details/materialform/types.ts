@@ -19,7 +19,7 @@ export interface InternalMaterial {
   name: string;
   unit: string;
   quantity: number;
-  cost: number;
+  perUnitCost: number; // ✅ UPDATED: Use perUnitCost instead of cost
   specs: Record<string, string | number | boolean>;
   date: string;
 }
@@ -28,7 +28,7 @@ export interface MaterialFormData {
   name: string;
   unit: string;
   quantity: string;
-  cost: string;
+  perUnitCost: string; // ✅ UPDATED: Use perUnitCost instead of cost
   specs: Record<string, any>;
 }
 

@@ -82,15 +82,15 @@ const MaterialDetailsForm: React.FC<MaterialDetailsFormProps> = ({
         <TextInput
           style={sharedStyles.input}
           placeholder="Enter cost per unit"
-          value={formData.cost}
-          onChangeText={(value) => onInputChange('cost', value)}
+          value={formData.perUnitCost} // ✅ UPDATED: Use perUnitCost
+          onChangeText={(value) => onInputChange('perUnitCost', value)} // ✅ UPDATED: Use perUnitCost
           keyboardType="decimal-pad"
           placeholderTextColor="#94A3B8"
           returnKeyType="done"
         />
-        {formData.quantity && formData.cost && (
+        {formData.quantity && formData.perUnitCost && ( // ✅ UPDATED: Use perUnitCost
           <Text style={{ fontSize: 12, color: '#10B981', marginTop: 4, fontWeight: '500' }}>
-            Total Cost: ₹{(parseFloat(formData.quantity) * parseFloat(formData.cost)).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+            Total Cost: ₹{(parseFloat(formData.quantity) * parseFloat(formData.perUnitCost)).toLocaleString('en-IN', { maximumFractionDigits: 2 })} {/* ✅ UPDATED: Use perUnitCost */}
           </Text>
         )}
       </View>

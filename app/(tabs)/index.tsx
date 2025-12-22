@@ -193,7 +193,7 @@ const Index: React.FC = () => {
     useEffect(() => {
         const getStaffData = async () => {
             try {
-                const res = await axios.get(`${domain}/api/staff`);
+                const res = await axios.get(`${domain}/api/staff?clientId=${clientId}`);
                 const data = (res.data as any)?.data || [];
                 const filterData = data.map((item: any) => {
                     return {

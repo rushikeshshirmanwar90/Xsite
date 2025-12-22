@@ -20,6 +20,7 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ReportGenerator from '@/components/profile/ReportGenerator';
 
 interface UserData {
     name?: string;
@@ -59,6 +60,7 @@ const CompanyProfile: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [loadingClient, setLoadingClient] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [showReportGenerator, setShowReportGenerator] = useState(false);
 
     // Force refresh data every time the screen is focused (after login/logout)
     useFocusEffect(
@@ -620,6 +622,29 @@ const CompanyProfile: React.FC = () => {
                     </TouchableOpacity>
                 </View>
 
+                {/* Reports Section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Reports</Text>
+                    <TouchableOpacity
+                        style={styles.reportButton}
+                        onPress={() => setShowReportGenerator(true)}
+                        activeOpacity={0.7}
+                    >
+                        <View style={styles.reportButtonLeft}>
+                            <View style={styles.reportButtonIcon}>
+                                <Ionicons name="document-text-outline" size={22} color="#10B981" />
+                            </View>
+                            <View style={styles.reportButtonContent}>
+                                <Text style={styles.reportButtonTitle}>Generate Material Report</Text>
+                                <Text style={styles.reportButtonSubtitle}>Download PDF report of material activities</Text>
+                            </View>
+                        </View>
+                        <View style={styles.reportButtonBadge}>
+                            <Ionicons name="download" size={16} color="#10B981" />
+                        </View>
+                    </TouchableOpacity>
+                </View>
+
                 {/* Logout Button */}
                 <View style={styles.section}>
                     <TouchableOpacity
@@ -638,6 +663,14 @@ const CompanyProfile: React.FC = () => {
                     <Text style={styles.footerVersion}>Version 1.0.0</Text>
                 </View>
             </ScrollView>
+
+            {/* Report Generator Modal */}
+            <ReportGenerator
+                visible={showReportGenerator}
+                onClose={() => setShowReportGenerator(false)}
+                clientData={clientData}
+                userData={userData}
+            />
         </SafeAreaView>
     );
 };
@@ -927,6 +960,57 @@ const styles = StyleSheet.create({
     activityButtonSubtitle: {
         fontSize: 13,
         color: '#64748B',
+    },
+    // Report button styles
+    reportButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
+        borderWidth: 1,
+        borderColor: '#D1FAE5',
+    },
+    reportButtonLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    reportButtonIcon: {
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: '#ECFDF5',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    reportButtonContent: {
+        flex: 1,
+    },
+    reportButtonTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1E293B',
+        marginBottom: 2,
+    },
+    reportButtonSubtitle: {
+        fontSize: 13,
+        color: '#64748B',
+    },
+    reportButtonBadge: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        backgroundColor: '#ECFDF5',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });
 
