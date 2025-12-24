@@ -332,6 +332,14 @@ const AnalyticsDashboard: React.FC = () => {
             >
               <Ionicons name="bug" size={22} color="#F59E0B" />
             </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.refreshButton, { backgroundColor: '#E0F2FE' }]}
+              onPress={() => {
+                router.push('/test-materials');
+              }}
+            >
+              <Ionicons name="flask" size={22} color="#0891B2" />
+            </TouchableOpacity>
           </View>
         </View>
 

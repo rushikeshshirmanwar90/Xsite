@@ -123,6 +123,9 @@ const NotificationPage: React.FC = () => {
     // Animation
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(50)).current;
+    
+    // ScrollView reference for scroll-to-top functionality
+    const scrollViewRef = useRef<ScrollView>(null);
 
     // Get current user data from AsyncStorage
     const getCurrentUser = async () => {
@@ -171,10 +174,21 @@ const NotificationPage: React.FC = () => {
     const [nextDate, setNextDate] = useState<string | null>(null);
     const [loadingMore, setLoadingMore] = useState(false);
 
-    const fetchActivities = async (showLoadingState = true, loadMore = false) => {
+    // Date-based navigation state
+    const [currentDate, setCurrentDate] = useState<string>(() => {
+        // Start with today's date in ISO format (YYYY-MM-DD)
+        return new Date().toISOString().split('T')[0];
+    });
+    const [availableDates, setAvailableDates] = useState<string[]>([]);
+    const [hasNextDate, setHasNextDate] = useState(false);
+    const [hasPrevDate, setHasPrevDate] = useState(false);
+
+    const fetchActivities = async (showLoadingState = true, loadMore = false, targetDate?: string) => {
         console.log('🚀 fetchActivities CALLED');
         console.log('   - showLoadingState:', showLoadingState);
         console.log('   - loadMore:', loadMore);
+        console.log('   - targetDate:', targetDate);
+        console.log('   - currentDate:', currentDate);
         console.log('   - isLoadingRef.current:', isLoadingRef.current);
 
         // Prevent duplicate calls
@@ -208,7 +222,7 @@ const NotificationPage: React.FC = () => {
 
             const clientId = await getClientId();
             console.log('\n========================================');
-            console.log('FETCHING ACTIVITIES WITH DATE PAGINATION');
+            console.log('FETCHING ACTIVITIES - DATE PAGINATION');
             console.log('========================================');
             console.log('Client ID:', clientId);
             console.log('Load More:', loadMore);
@@ -218,24 +232,24 @@ const NotificationPage: React.FC = () => {
                 throw new Error('Client ID not found');
             }
 
-            // Build API URLs with date-based pagination
+            // Date-based navigation - fetch activities for specific date
+            const dateToFetch = targetDate || currentDate;
+            
             const activityParams = new URLSearchParams({
                 clientId,
                 paginationMode: 'date',
-                dateLimit: '10'
+                targetDate: dateToFetch, // Fetch activities for specific date
+                dateLimit: '1' // Only get one date at a time
             });
             
             const materialParams = new URLSearchParams({
                 clientId,
                 paginationMode: 'date',
-                dateLimit: '10'
+                targetDate: dateToFetch, // Fetch activities for specific date
+                dateLimit: '1' // Only get one date at a time
             });
 
-            // If loading more, add beforeDate parameter
-            if (loadMore && nextDate) {
-                activityParams.append('beforeDate', nextDate);
-                materialParams.append('beforeDate', nextDate);
-            }
+            console.log('📅 Date-based navigation - fetching for date:', dateToFetch);
 
             console.log('API URLs:');
             console.log('  - Activity:', `${domain}/api/activity?${activityParams.toString()}`);
@@ -252,7 +266,7 @@ const NotificationPage: React.FC = () => {
                             data: { 
                                 success: false, 
                                 error: err?.response?.data?.message || err.message,
-                                data: { dateGroups: [], hasMoreDates: false, nextDate: null } 
+                                data: { dateGroups: [], hasMoreDates: false, nextDate: null }
                             } 
                         };
                     }),
@@ -265,7 +279,7 @@ const NotificationPage: React.FC = () => {
                             data: { 
                                 success: false, 
                                 error: err?.response?.data?.message || err.message,
-                                data: { dateGroups: [], hasMoreDates: false, nextDate: null } 
+                                data: { dateGroups: [], hasMoreDates: false, nextDate: null }
                             } 
                         };
                     }),
@@ -276,15 +290,15 @@ const NotificationPage: React.FC = () => {
             console.log('Material Activity Response Success:', materialActivityRes.data.success !== false);
             
             // Check if both APIs failed
-            if (activityRes.data.success === false && materialActivityRes.data.success === false) {
+            if ((activityRes.data as any).success === false && (materialActivityRes.data as any).success === false) {
                 console.error('❌ Both APIs failed, throwing error');
-                throw new Error(`API Error - Activity: ${activityRes.data.error}, Material: ${materialActivityRes.data.error}`);
+                throw new Error(`API Error - Activity: ${(activityRes.data as any).error}, Material: ${(materialActivityRes.data as any).error}`);
             }
 
             const activityData = activityRes.data as any;
             const materialData = materialActivityRes.data as any;
 
-            // Extract date groups from both APIs - handle nested data structure and API failures
+            // Handle date-based navigation - single date at a time
             const activityDateGroups = (activityData.success !== false) 
                 ? (activityData.data?.dateGroups || activityData.dateGroups || [])
                 : [];
@@ -292,75 +306,48 @@ const NotificationPage: React.FC = () => {
                 ? (materialData.data?.dateGroups || materialData.dateGroups || [])
                 : [];
 
-            console.log('\n--- EXTRACTED DATE GROUPS ---');
+            console.log('\n--- DATE NAVIGATION ---');
+            console.log('Target Date:', targetDate || currentDate);
             console.log('Activity Date Groups:', activityDateGroups.length);
             console.log('Material Date Groups:', materialDateGroups.length);
 
-            // If no date groups found, try fallback to traditional pagination
-            if (activityDateGroups.length === 0 && materialDateGroups.length === 0 && !loadMore) {
-                console.log('⚠️ No date groups found, falling back to traditional pagination...');
-                
-                // Try traditional pagination as fallback
-                const [fallbackActivityRes, fallbackMaterialRes] = await Promise.all([
-                    axios.get(`${domain}/api/activity?clientId=${clientId}&limit=50`)
-                        .catch((err) => {
-                            console.error('❌ Fallback Activity API Error:', err?.response?.data || err.message);
-                            return { data: { activities: [] } };
-                        }),
-                    axios.get(`${domain}/api/materialActivity?clientId=${clientId}&limit=50`)
-                        .catch((err) => {
-                            console.error('❌ Fallback Material API Error:', err?.response?.data || err.message);
-                            return { data: [] };
-                        }),
-                ]);
+            // Get available dates for navigation
+            const activityAvailableDates = (activityData.data?.availableDates || activityData.availableDates || []);
+            const materialAvailableDates = (materialData.data?.availableDates || materialData.availableDates || []);
+            
+            // Merge and sort all available dates
+            const allAvailableDates = [...new Set([...activityAvailableDates, ...materialAvailableDates])].sort((a, b) => b.localeCompare(a));
+            setAvailableDates(allAvailableDates);
 
-                console.log('📦 Fallback API responses received');
-                
-                // Process fallback responses
-                const fallbackActivityData = fallbackActivityRes.data as any;
-                const fallbackMaterialDataRaw = fallbackMaterialRes.data as any;
-
-                // Handle different response formats for Activity API
-                let activities: Activity[] = [];
-                if (Array.isArray(fallbackActivityData)) {
-                    activities = fallbackActivityData;
-                } else if (fallbackActivityData && typeof fallbackActivityData === 'object') {
-                    activities = (fallbackActivityData.data?.activities ||
-                        fallbackActivityData.activities ||
-                        fallbackActivityData.data ||
-                        []) as Activity[];
-                }
-
-                // Handle different response formats for Material Activity API
-                let materialData: MaterialActivity[] = [];
-                if (Array.isArray(fallbackMaterialDataRaw)) {
-                    materialData = fallbackMaterialDataRaw;
-                } else if (fallbackMaterialDataRaw && typeof fallbackMaterialDataRaw === 'object') {
-                    materialData = (fallbackMaterialDataRaw.data?.activities ||
-                        fallbackMaterialDataRaw.materialActivities ||
-                        fallbackMaterialDataRaw.activities ||
-                        fallbackMaterialDataRaw.data ||
-                        []) as MaterialActivity[];
-                }
-
-                console.log('📊 Fallback data extracted:');
-                console.log('   - Activities:', activities.length);
-                console.log('   - Materials:', materialData.length);
-
-                // Set legacy state for backward compatibility
-                setActivitiesRaw(activities || []);
-                setMaterialActivities(materialData || []);
-                
-                // Clear date groups since we're using traditional mode
-                setDateGroups([]);
-                setHasMoreDates(false);
-                setNextDate(null);
-
-                console.log('✅ Fallback to traditional pagination completed');
-                return; // Exit early, let the existing logic handle the display
+            // Update current date if targetDate was provided
+            const dateToUse = targetDate || currentDate;
+            if (targetDate) {
+                setCurrentDate(targetDate);
             }
 
-            // Merge and sort date groups
+            // Check if there are previous/next dates available using the actual date being used
+            const currentDateIndex = allAvailableDates.indexOf(dateToUse);
+            setHasPrevDate(currentDateIndex < allAvailableDates.length - 1); // Previous = older date
+            setHasNextDate(currentDateIndex > 0); // Next = newer date
+
+            console.log('📅 Date Navigation State:');
+            console.log('   - Current Date:', dateToUse);
+            console.log('   - Available Dates:', allAvailableDates.length);
+            console.log('   - Current Date Index:', currentDateIndex);
+            console.log('   - Has Previous Date:', currentDateIndex < allAvailableDates.length - 1);
+            console.log('   - Has Next Date:', currentDateIndex > 0);
+            console.log('   - Available Dates Array:', allAvailableDates);
+
+            // If no activities found for current date, show empty state but keep navigation
+            if (activityDateGroups.length === 0 && materialDateGroups.length === 0) {
+                console.log('📭 No activities found for date:', currentDate);
+                setDateGroups([]);
+                setActivitiesRaw([]);
+                setMaterialActivities([]);
+                return;
+            }
+
+            // Merge activities for the current date
             const allDateGroups: { [date: string]: any[] } = {};
 
             // Add activity date groups
@@ -384,7 +371,7 @@ const NotificationPage: React.FC = () => {
                 });
             });
 
-            // Convert to sorted array
+            // Convert to sorted array (should only be one date)
             const sortedDates = Object.keys(allDateGroups).sort((a, b) => b.localeCompare(a));
             const newDateGroups = sortedDates.map(date => ({
                 date,
@@ -394,29 +381,28 @@ const NotificationPage: React.FC = () => {
                 count: allDateGroups[date].length
             }));
 
-            // Update state
-            if (loadMore) {
-                // Append new date groups
-                setDateGroups(prev => [...prev, ...newDateGroups]);
-            } else {
-                // Replace date groups
-                setDateGroups(newDateGroups);
-                
-                // Also update legacy state for backward compatibility
-                const allActivities: Activity[] = [];
-                const allMaterials: MaterialActivity[] = [];
-                
-                activityDateGroups.forEach((group: any) => {
-                    allActivities.push(...group.activities);
-                });
-                
-                materialDateGroups.forEach((group: any) => {
-                    allMaterials.push(...group.activities);
-                });
-                
-                setActivitiesRaw(allActivities);
-                setMaterialActivities(allMaterials);
-            }
+            // Always replace date groups for single date navigation
+            setDateGroups(newDateGroups);
+            
+            // Also update legacy state for backward compatibility
+            const allActivities: Activity[] = [];
+            const allMaterials: MaterialActivity[] = [];
+            
+            activityDateGroups.forEach((group: any) => {
+                allActivities.push(...group.activities);
+            });
+            
+            materialDateGroups.forEach((group: any) => {
+                allMaterials.push(...group.activities);
+            });
+            
+            setActivitiesRaw(allActivities);
+            setMaterialActivities(allMaterials);
+
+            console.log('✅ Date navigation state updated');
+            console.log('   - Date Groups:', newDateGroups.length);
+            console.log('   - Activities:', allActivities.length);
+            console.log('   - Materials:', allMaterials.length);
 
             // Update pagination state - handle nested data structure
             const hasMoreFromActivity = activityData.data?.hasMoreDates || activityData.hasMoreDates || false;
@@ -465,6 +451,72 @@ const NotificationPage: React.FC = () => {
         fetchActivities();
     }, []);
 
+    // Reset pagination when tab changes
+    useEffect(() => {
+        // For date mode, fetch activities for current date
+        fetchActivities(true, false, currentDate);
+    }, [activeTab, materialSubTab]);
+
+    // Date navigation functions
+    const handlePreviousDay = async () => {
+        if (hasPrevDate && !loading) {
+            const currentIndex = availableDates.indexOf(currentDate);
+            if (currentIndex < availableDates.length - 1) {
+                const previousDate = availableDates[currentIndex + 1]; // Previous = older date
+                console.log('📅 Navigating to previous day:', previousDate);
+                
+                // Set loading state
+                setLoading(true);
+                
+                try {
+                    await fetchActivities(false, false, previousDate);
+                    
+                    // Scroll to top AFTER content has loaded
+                    setTimeout(() => {
+                        scrollViewRef.current?.scrollTo({
+                            y: 0,
+                            animated: true,
+                        });
+                    }, 100); // Small delay to ensure content is rendered
+                } finally {
+                    // Loading state will be cleared in fetchActivities finally block
+                }
+            }
+        }
+    };
+
+    const handleNextDay = async () => {
+        if (hasNextDate && !loading) {
+            const currentIndex = availableDates.indexOf(currentDate);
+            if (currentIndex > 0) {
+                const nextDate = availableDates[currentIndex - 1]; // Next = newer date
+                console.log('📅 Navigating to next day:', nextDate);
+                
+                // Set loading state
+                setLoading(true);
+                
+                try {
+                    await fetchActivities(false, false, nextDate);
+                    
+                    // Scroll to top AFTER content has loaded
+                    setTimeout(() => {
+                        scrollViewRef.current?.scrollTo({
+                            y: 0,
+                            animated: true,
+                        });
+                    }, 100); // Small delay to ensure content is rendered
+                } finally {
+                    // Loading state will be cleared in fetchActivities finally block
+                }
+            }
+        }
+    };
+
+    const handleLoadMore = async () => {
+        // In date navigation mode, load more means go to previous day
+        await handlePreviousDay();
+    };
+
     const onRefresh = async () => {
         if (refreshing || isLoadingRef.current) {
             return;
@@ -472,7 +524,8 @@ const NotificationPage: React.FC = () => {
 
         setRefreshing(true);
         try {
-            await fetchActivities(false);
+            // For date mode, refresh current date
+            await fetchActivities(false, false, currentDate);
         } finally {
             setRefreshing(false);
         }
@@ -920,10 +973,10 @@ const NotificationPage: React.FC = () => {
             if (dateOnly.getTime() === todayOnly.getTime()) return 'Today';
             if (dateOnly.getTime() === yesterdayOnly.getTime()) return 'Yesterday';
 
-            // Format as "December 7, 2025"
+            // Format as "Dec 7, 25" (short month, 2-digit year)
             return date.toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'long',
+                year: '2-digit',
+                month: 'short',
                 day: 'numeric'
             });
         } catch (error) {
@@ -947,6 +1000,8 @@ const NotificationPage: React.FC = () => {
     console.log('- Active Tab:', activeTab);
     console.log('- Material Sub Tab:', materialSubTab);
     console.log('- Date Groups (raw):', dateGroups.length);
+    console.log('- Current Date:', currentDate);
+    console.log('- Available Dates:', availableDates.length);
     console.log('- Should show empty state?', !loading && !error && filteredActivities.length === 0);
     console.log('- Should show activities?', !loading && !error && filteredActivities.length > 0);
     
@@ -979,12 +1034,11 @@ const NotificationPage: React.FC = () => {
                     <Ionicons name="arrow-back" size={24} color="#1F2937" />
                 </TouchableOpacity>
                 <View style={styles.headerContent}>
-                    <Text style={styles.headerTitle}>Activity Feed</Text>
+                    <View style={styles.headerTitleContainer}>
+                        <Text style={styles.headerTitle}>Activity Feed</Text>
+                    </View>
                     <Text style={styles.headerSubtitle}>
-                        {groupedActivities.length > 0 
-                            ? `${groupedActivities.reduce((sum, group) => sum + group.activities.length, 0)} activities in ${groupedActivities.length} dates`
-                            : `${filteredActivities.length} ${filteredActivities.length === 1 ? 'activity' : 'activities'}`
-                        }
+                        {`${formatDateHeader(currentDate)} • ${groupedActivities.reduce((sum, group) => sum + group.activities.length, 0)} activities`}
                     </Text>
                 </View>
                 <TouchableOpacity onPress={onRefresh} style={styles.refreshButton}>
@@ -993,62 +1047,6 @@ const NotificationPage: React.FC = () => {
                         size={22}
                         color="#3B82F6"
                     />
-                </TouchableOpacity>
-                <TouchableOpacity
-                    onPress={async () => {
-                        console.log('\n========================================');
-                        console.log('ENHANCED DEBUG INFO');
-                        console.log('========================================');
-                        console.log('Current State:');
-                        console.log('   - Activities (legacy):', activities.length);
-                        console.log('   - Material Activities (legacy):', materialActivities.length);
-                        console.log('   - Date Groups (new):', dateGroups.length);
-                        console.log('   - Has More Dates:', hasMoreDates);
-                        console.log('   - Next Date:', nextDate);
-                        console.log('   - Active Tab:', activeTab);
-                        console.log('   - Filtered Activities:', filteredActivities.length);
-                        console.log('   - Loading:', loading);
-                        console.log('   - Loading More:', loadingMore);
-                        console.log('   - Error:', error);
-
-                        // Test both API modes
-                        console.log('\n🧪 TESTING API CALLS...');
-                        try {
-                            const clientId = await getClientId();
-                            console.log('Client ID:', clientId);
-
-                            // Test traditional pagination
-                            console.log('\n1. Testing Traditional Pagination:');
-                            const traditionalRes = await axios.get(`${domain}/api/activity?clientId=${clientId}&paginationMode=traditional&limit=5`);
-                            const traditionalData = traditionalRes.data as any;
-                            console.log('   ✅ Traditional Response Structure:', Object.keys(traditionalData));
-                            console.log('   ✅ Traditional Activities:', traditionalData.data?.activities?.length || 0);
-
-                            // Test date-based pagination
-                            console.log('\n2. Testing Date-Based Pagination:');
-                            const dateRes = await axios.get(`${domain}/api/activity?clientId=${clientId}&paginationMode=date&dateLimit=3`);
-                            const dateData = dateRes.data as any;
-                            console.log('   ✅ Date Response Structure:', Object.keys(dateData));
-                            console.log('   ✅ Date Groups:', dateData.data?.dateGroups?.length || 0);
-                            console.log('   ✅ Total Activities:', dateData.data?.totalActivities || 0);
-
-                            // Test material activity
-                            console.log('\n3. Testing Material Activity:');
-                            const materialRes = await axios.get(`${domain}/api/materialActivity?clientId=${clientId}&paginationMode=date&dateLimit=3`);
-                            const materialData = materialRes.data as any;
-                            console.log('   ✅ Material Response Structure:', Object.keys(materialData));
-                            console.log('   ✅ Material Date Groups:', materialData.data?.dateGroups?.length || 0);
-
-                        } catch (err: any) {
-                            console.error('❌ API Test Error:', err?.response?.data || err.message);
-                            console.error('❌ Error Status:', err?.response?.status);
-                        }
-
-                        console.log('========================================\n');
-                    }}
-                    style={styles.refreshButton}
-                >
-                    <Ionicons name="bug" size={22} color="#F59E0B" />
                 </TouchableOpacity>
             </View>
 
@@ -1120,6 +1118,7 @@ const NotificationPage: React.FC = () => {
 
             {/* Content */}
             <ScrollView
+                ref={scrollViewRef}
                 style={styles.scrollView}
                 refreshControl={
                     <RefreshControl
@@ -1166,38 +1165,6 @@ const NotificationPage: React.FC = () => {
                                     <Ionicons name="refresh" size={16} color="#FFFFFF" />
                                     <Text style={styles.retryButtonText}>Retry</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity 
-                                    style={[styles.retryButton, styles.debugButton]} 
-                                    onPress={async () => {
-                                        // Force traditional pagination as fallback
-                                        try {
-                                            const clientId = await getClientId();
-                                            const [activityRes, materialRes] = await Promise.all([
-                                                axios.get(`${domain}/api/activity?clientId=${clientId}&limit=50`),
-                                                axios.get(`${domain}/api/materialActivity?clientId=${clientId}&limit=50`)
-                                            ]);
-                                            
-                                            console.log('🔧 Force traditional mode results:');
-                                            console.log('   - Activity response:', activityRes.data);
-                                            console.log('   - Material response:', materialRes.data);
-                                            
-                                            // Process and set data manually
-                                            const activities = activityRes.data.data?.activities || activityRes.data.activities || [];
-                                            const materials = materialRes.data.data?.activities || materialRes.data || [];
-                                            
-                                            setActivitiesRaw(activities);
-                                            setMaterialActivities(materials);
-                                            setDateGroups([]);
-                                            setError(null);
-                                            
-                                        } catch (err: any) {
-                                            console.error('🔧 Force traditional mode failed:', err.message);
-                                        }
-                                    }}
-                                >
-                                    <Ionicons name="build" size={16} color="#FFFFFF" />
-                                    <Text style={styles.retryButtonText}>Force Load</Text>
-                                </TouchableOpacity>
                             </View>
                         </View>
                     </>
@@ -1225,7 +1192,10 @@ const NotificationPage: React.FC = () => {
                                         Active Tab: {activeTab}{'\n'}
                                         Material Sub Tab: {materialSubTab}{'\n'}
                                         Filtered Groups: {groupedActivities.length}{'\n'}
-                                        Tap the bug icon (🐛) for more details
+                                        Current Date: {currentDate}{'\n'}
+                                        Available Dates: {availableDates.length}{'\n'}
+                                        Has More Dates: {hasMoreDates}{'\n'}
+                                        Tap the refresh icon (🔄) for more details
                                     </Text>
                                 </View>
                                 <TouchableOpacity
@@ -1289,12 +1259,12 @@ const NotificationPage: React.FC = () => {
                                 );
                             })}
                             
-                            {/* Load More Button */}
+                            {/* Load More Button for Date Mode */}
                             {hasMoreDates && (
                                 <View style={styles.loadMoreContainer}>
                                     <TouchableOpacity
                                         style={[styles.loadMoreButton, loadingMore && styles.loadMoreButtonDisabled]}
-                                        onPress={() => fetchActivities(false, true)}
+                                        onPress={handleLoadMore}
                                         disabled={loadingMore}
                                         activeOpacity={0.7}
                                     >
@@ -1315,6 +1285,78 @@ const NotificationPage: React.FC = () => {
                                     </Text>
                                 </View>
                             )}
+                            
+                            {/* Date Navigation Controls */}
+                            <View style={styles.compactDateNavigation}>
+                                {/* Compact Date Navigation Bar */}
+                                <View style={styles.dateNavigationBar}>
+                                    {/* Previous Day Button */}
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.compactNavButton,
+                                            styles.prevButton,
+                                            (!hasPrevDate || loading) && styles.navButtonDisabled
+                                        ]}
+                                        onPress={handlePreviousDay}
+                                        disabled={!hasPrevDate || loading}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons 
+                                            name="chevron-back" 
+                                            size={20} 
+                                            color={(!hasPrevDate || loading) ? '#9CA3AF' : '#10B981'} 
+                                        />
+                                    </TouchableOpacity>
+
+                                    {/* Current Date Display - Compact */}
+                                    <View style={styles.compactDateDisplay}>
+                                        <View style={styles.compactDateBadge}>
+                                            <Ionicons name="calendar" size={14} color="#10B981" />
+                                            <Text style={styles.compactDateText}>
+                                                {formatDateHeader(currentDate)}
+                                            </Text>
+                                        </View>
+                                        <Text style={styles.compactActivityCount}>
+                                            {groupedActivities.reduce((sum, group) => sum + group.activities.length, 0)} activities
+                                        </Text>
+                                    </View>
+
+                                    {/* Next Day Button */}
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.compactNavButton,
+                                            styles.nextButton,
+                                            (!hasNextDate || loading) && styles.navButtonDisabled
+                                        ]}
+                                        onPress={handleNextDay}
+                                        disabled={!hasNextDate || loading}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons 
+                                            name="chevron-forward" 
+                                            size={20} 
+                                            color={(!hasNextDate || loading) ? '#9CA3AF' : '#10B981'} 
+                                        />
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* Loading indicator - show when loading with enhanced animation */}
+                                {loading && (
+                                    <View style={styles.compactLoadingIndicator}>
+                                        <ActivityIndicator size="small" color="#10B981" />
+                                        <Text style={styles.compactLoadingText}>Loading date...</Text>
+                                    </View>
+                                )}
+
+                                {/* Optional: Date navigation info - very compact */}
+                                {availableDates.length > 1 && (
+                                    <View style={styles.compactNavigationInfo}>
+                                        <Text style={styles.compactInfoText}>
+                                            {availableDates.indexOf(currentDate) + 1} of {availableDates.length} dates
+                                        </Text>
+                                    </View>
+                                )}
+                            </View>
                         </Animated.View>
                     </>
                 )}
@@ -1348,6 +1390,11 @@ const styles = StyleSheet.create({
     },
     headerContent: {
         flex: 1,
+    },
+    headerTitleContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
     },
     headerTitle: {
         fontSize: 20,
@@ -2026,14 +2073,25 @@ const styles = StyleSheet.create({
         minWidth: 200,
         justifyContent: 'center',
     },
+    loadMoreButtonSecondary: {
+        backgroundColor: '#FFFFFF',
+        borderWidth: 2,
+        borderColor: '#3B82F6',
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
+    },
     loadMoreButtonDisabled: {
         backgroundColor: '#9CA3AF',
         shadowColor: '#9CA3AF',
+        borderColor: '#9CA3AF',
     },
     loadMoreText: {
         color: '#FFFFFF',
         fontSize: 16,
         fontWeight: '600',
+    },
+    loadMoreTextSecondary: {
+        color: '#3B82F6',
     },
     loadMoreHint: {
         marginTop: 12,
@@ -2041,6 +2099,315 @@ const styles = StyleSheet.create({
         color: '#64748B',
         textAlign: 'center',
         lineHeight: 18,
+    },
+    // Traditional Pagination Styles
+    paginationContainer: {
+        marginTop: 24,
+        paddingTop: 20,
+        borderTopWidth: 1,
+        borderTopColor: '#E2E8F0',
+        alignItems: 'center',
+        gap: 16,
+    },
+    paginationLoadingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 12,
+    },
+    paginationLoadingText: {
+        fontSize: 14,
+        color: '#64748B',
+        fontStyle: 'italic',
+    },
+    paginationControls: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 16,
+    },
+    paginationButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 10,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        gap: 6,
+        minWidth: 100,
+        justifyContent: 'center',
+    },
+    paginationButtonDisabled: {
+        backgroundColor: '#F1F5F9',
+        borderColor: '#E2E8F0',
+    },
+    paginationButtonText: {
+        fontSize: 14,
+        color: '#3B82F6',
+        fontWeight: '500',
+    },
+    paginationButtonTextDisabled: {
+        color: '#CBD5E1',
+    },
+    pageNumbersContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    pageNumberButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 10,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    pageNumberButtonActive: {
+        backgroundColor: '#3B82F6',
+        borderColor: '#3B82F6',
+    },
+    pageNumberText: {
+        fontSize: 14,
+        color: '#64748B',
+        fontWeight: '500',
+    },
+    pageNumberTextActive: {
+        color: '#FFFFFF',
+        fontWeight: '600',
+    },
+    paginationInfo: {
+        alignItems: 'center',
+        gap: 4,
+    },
+    paginationInfoText: {
+        fontSize: 13,
+        color: '#64748B',
+        fontWeight: '500',
+    },
+    paginationTotalText: {
+        fontSize: 12,
+        color: '#94A3B8',
+        fontStyle: 'italic',
+    },
+    paginationStatusContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#EFF6FF',
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        marginBottom: 12,
+        gap: 8,
+    },
+    paginationStatusText: {
+        fontSize: 13,
+        color: '#1E40AF',
+        fontWeight: '500',
+    },
+    singlePageHint: {
+        fontSize: 11,
+        color: '#F59E0B',
+        fontStyle: 'italic',
+        textAlign: 'center',
+        marginTop: 4,
+    },
+    // Pagination Banner Styles
+    paginationBanner: {
+        backgroundColor: '#EFF6FF',
+        borderBottomWidth: 1,
+        borderBottomColor: '#BFDBFE',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+    },
+    paginationBannerContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    paginationBannerText: {
+        fontSize: 13,
+        color: '#1E40AF',
+        fontWeight: '500',
+        flex: 1,
+        textAlign: 'center',
+    },
+    paginationBannerBadge: {
+        backgroundColor: '#3B82F6',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    paginationBannerBadgeText: {
+        fontSize: 11,
+        color: '#FFFFFF',
+        fontWeight: '600',
+    },
+    // Date Navigation Styles
+    dateNavigationButton: {
+        backgroundColor: '#F0FDF4',
+        borderColor: '#BBF7D0',
+        minWidth: 120,
+    },
+    dateNavigationButtonText: {
+        color: '#10B981',
+    },
+    currentDateContainer: {
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+    },
+    currentDateBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#ECFDF5',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#BBF7D0',
+        gap: 8,
+        marginBottom: 4,
+    },
+    currentDateText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#059669',
+    },
+    currentDateSubtext: {
+        fontSize: 12,
+        color: '#6B7280',
+        fontStyle: 'italic',
+    },
+    // Compact Date Navigation Styles
+    compactDateNavigation: {
+        backgroundColor: '#FFFFFF',
+        width: '98%', // Increased from 96% to 98% for maximum space utilization
+        alignSelf: 'center', // Center the container
+        marginVertical: 12,
+        borderRadius: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 3,
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
+    },
+    dateNavigationBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8, // Further reduced padding to maximize space
+        paddingVertical: 12,
+        justifyContent: 'space-between',
+    },
+    compactNavButton: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 44, // Fixed square size for icon-only buttons
+        height: 44, // Fixed square size for icon-only buttons
+        borderRadius: 12, // Slightly larger border radius for better appearance
+        backgroundColor: '#F0FDF4',
+        borderWidth: 1,
+        borderColor: '#BBF7D0',
+        flex: 0, // Don't let buttons grow
+    },
+    prevButton: {
+        // Specific styles for previous button if needed
+    },
+    nextButton: {
+        // Specific styles for next button if needed
+    },
+    navButtonDisabled: {
+        backgroundColor: '#F9FAFB',
+        borderColor: '#E5E7EB',
+        opacity: 0.6,
+    },
+    compactNavButtonText: {
+        fontSize: 11, // Further reduced from 12 to make buttons more compact
+        fontWeight: '600',
+        color: '#10B981',
+    },
+    navButtonTextDisabled: {
+        color: '#9CA3AF',
+    },
+    compactDateDisplay: {
+        alignItems: 'center',
+        flex: 3, // Increased from 2 to 3 since buttons are now much smaller
+        paddingHorizontal: 16, // Increased padding for better spacing
+        minWidth: 0, // Allow shrinking if needed
+    },
+    compactDateBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center', // Center the content horizontally within the badge
+        backgroundColor: '#ECFDF5',
+        paddingHorizontal: 16, // Increased padding since we have more space
+        paddingVertical: 10, // Increased vertical padding
+        borderRadius: 12, // Larger border radius for better appearance
+        borderWidth: 1,
+        borderColor: '#BBF7D0',
+        gap: 10, // Increased gap between icon and text
+        marginBottom: 2,
+        maxWidth: '100%', // Ensure it doesn't overflow
+        minWidth: 140, // Increased minimum width for better appearance
+    },
+    compactDateText: {
+        fontSize: 15, // Increased font size since we have more space
+        fontWeight: '600',
+        color: '#059669',
+        flexShrink: 1, // Allow text to shrink if needed
+        textAlign: 'center', // Center align the date text
+    },
+    compactActivityCount: {
+        fontSize: 10, // Slightly smaller
+        color: '#6B7280',
+        fontWeight: '500',
+        textAlign: 'center',
+    },
+    compactLoadingIndicator: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        backgroundColor: '#F8FAFC',
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+        gap: 6,
+    },
+    compactLoadingText: {
+        fontSize: 12,
+        color: '#6B7280',
+        fontStyle: 'italic',
+    },
+    compactNavigationInfo: {
+        alignItems: 'center',
+        paddingVertical: 6,
+        paddingHorizontal: 16,
+        backgroundColor: '#F8FAFC',
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+    },
+    compactInfoText: {
+        fontSize: 11,
+        color: '#9CA3AF',
+        fontWeight: '500',
+    },
+    // Loading Animation Styles
+    navigationBarLoading: {
+        opacity: 0.8,
+    },
+    navButtonLoading: {
+        backgroundColor: '#F0FDF4',
+        borderColor: '#BBF7D0',
+    },
+    dateBadgeLoading: {
+        opacity: 0.9,
     },
 });
 

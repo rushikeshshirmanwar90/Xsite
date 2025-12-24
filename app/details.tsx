@@ -49,6 +49,14 @@ const Details = () => {
     const [newSectionDesc, setNewSectionDesc] = useState('');
     const [showNotifications, setShowNotifications] = useState(false);
     const cardAnimations = useRef<Animated.Value[]>([]).current;
+    const scrollViewRef = useRef<ScrollView>(null);
+
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(10); // Fixed items per page
+    const [totalAvailableCount, setTotalAvailableCount] = useState(0);
+    const [totalUsedCount, setTotalUsedCount] = useState(0);
+    const [apiLoading, setApiLoading] = useState(false);
 
     // Performance optimization: Request cancellation and debouncing
     const abortControllerRef = useRef<AbortController | null>(null);
@@ -177,8 +185,8 @@ const Details = () => {
         return { icon: 'cube-outline' as keyof typeof import('@expo/vector-icons').Ionicons.glyphMap, color: '#6B7280' };
     };
 
-    // Function to reload both available and used materials
-    const reloadProjectMaterials = async (forceReload: boolean = false) => {
+    // Function to reload both available and used materials with pagination
+    const reloadProjectMaterials = async (forceReload: boolean = false, page: number = currentPage) => {
         if (!projectId) {
             return;
         }
@@ -214,6 +222,7 @@ const Details = () => {
 
         isLoadingRef.current = true;
         setLoading(true);
+        setApiLoading(true);
 
         try {
             // Get clientId from storage
@@ -225,22 +234,46 @@ const Details = () => {
             }
 
             console.log('\n========================================');
-            console.log('RELOADING MATERIALS - API CALLS');
+            console.log('RELOADING MATERIALS - API CALLS WITH PAGINATION');
             console.log('========================================');
             console.log('Project ID:', projectId);
             console.log('Client ID:', clientId);
+            console.log('Page:', page);
+            console.log('Items per page:', itemsPerPage);
+            console.log('Active Tab:', activeTab);
+            console.log('Selected Mini Section:', selectedMiniSection);
+
+            // Build pagination parameters
+            const paginationParams = new URLSearchParams({
+                projectId: projectId,
+                clientId: clientId,
+                page: page.toString(),
+                limit: itemsPerPage.toString(),
+            });
+
+            // Add section filtering if in used tab
+            if (activeTab === 'used') {
+                paginationParams.append('sectionId', sectionId);
+                if (selectedMiniSection && selectedMiniSection !== 'all-sections') {
+                    paginationParams.append('miniSectionId', selectedMiniSection);
+                }
+            }
+
             console.log('API URLs:');
-            console.log('  - Available:', `${domain}/api/material?projectId=${projectId}&clientId=${clientId}`);
-            console.log('  - Used:', `${domain}/api/material-usage?projectId=${projectId}&clientId=${clientId}`);
+            console.log('  - Available:', `${domain}/api/material?${paginationParams.toString()}`);
+            console.log('  - Used:', `${domain}/api/material-usage?${paginationParams.toString()}`);
             console.log('========================================\n');
 
             // Fetch MaterialAvailable and MaterialUsed separately with individual error handling
             let materialAvailable: any[] = [];
             let materialUsed: any[] = [];
+            let availableTotal = 0;
+            let usedTotal = 0;
 
-            // Fetch MaterialAvailable
+            // Fetch MaterialAvailable with pagination
             try {
-                const availableResponse = await axios.get(`${domain}/api/material?projectId=${projectId}&clientId=${clientId}`, {
+                const availableUrl = `${domain}/api/material?${paginationParams.toString()}`;
+                const availableResponse = await axios.get(availableUrl, {
                     timeout: 10000, // 10 second timeout
                 });
 
@@ -254,8 +287,9 @@ const Details = () => {
                 const availableData = availableResponse.data as any;
 
                 if (availableData.success) {
-                    materialAvailable = availableData.MaterialAvailable || [];
-                    console.log('✓ MaterialAvailable extracted:', materialAvailable.length, 'items');
+                    materialAvailable = availableData.MaterialAvailable || availableData.data?.materials || [];
+                    availableTotal = availableData.pagination?.totalCount || availableData.totalCount || availableData.total || materialAvailable.length;
+                    console.log('✓ MaterialAvailable extracted:', materialAvailable.length, 'items, Total:', availableTotal);
                     if (materialAvailable.length > 0) {
                         console.log('Sample material:', materialAvailable[0]);
                     }
@@ -266,9 +300,10 @@ const Details = () => {
                 console.error('❌ Error fetching MaterialAvailable:', availError?.response?.data || availError.message);
             }
 
-            // Fetch MaterialUsed
+            // Fetch MaterialUsed with pagination
             try {
-                const usedResponse = await axios.get(`${domain}/api/material-usage?projectId=${projectId}&clientId=${clientId}`, {
+                const usedUrl = `${domain}/api/material-usage?${paginationParams.toString()}`;
+                const usedResponse = await axios.get(usedUrl, {
                     timeout: 10000, // 10 second timeout
                 });
 
@@ -285,24 +320,20 @@ const Details = () => {
                 console.log('usedData.success:', usedData.success);
                 console.log('usedData.MaterialUsed:', usedData.MaterialUsed);
                 console.log('usedData.materialUsed:', usedData.materialUsed);
-                console.log('usedData.MaterialAvailable:', usedData.MaterialAvailable);
-                console.log('usedData.data:', usedData.data);
+                console.log('usedData.totalCount:', usedData.totalCount);
+                console.log('usedData.total:', usedData.total);
                 console.log('All keys in response:', Object.keys(usedData));
-                console.log('Full response data:', JSON.stringify(usedData, null, 2));
 
                 if (usedData.success) {
                     // ✅ FIXED: API now consistently returns MaterialUsed field
-                    materialUsed = usedData.MaterialUsed || [];
+                    materialUsed = usedData.MaterialUsed || usedData.data?.materials || [];
+                    usedTotal = usedData.pagination?.totalCount || usedData.totalCount || usedData.total || materialUsed.length;
 
-                    console.log('✓ MaterialUsed extracted:', materialUsed.length, 'items');
+                    console.log('✓ MaterialUsed extracted:', materialUsed.length, 'items, Total:', usedTotal);
                     if (materialUsed.length > 0) {
                         console.log('✅ Found used materials! Sample:', JSON.stringify(materialUsed[0], null, 2));
                     } else {
-                        console.warn('⚠️ MaterialUsed array is EMPTY!');
-                        console.warn('This could mean:');
-                        console.warn('1. No materials have been used yet');
-                        console.warn('2. API is returning data in a different field');
-                        console.warn('3. The material usage was not saved properly');
+                        console.warn('⚠️ MaterialUsed array is EMPTY for this page!');
                     }
                 } else {
                     console.warn('⚠ MaterialUsed API returned success: false');
@@ -313,6 +344,7 @@ const Details = () => {
             }
 
             console.log('Extracted - Available:', materialAvailable.length, 'Used:', materialUsed.length);
+            console.log('Totals - Available:', availableTotal, 'Used:', usedTotal);
 
             // Log raw data to check if API is returning correct data
             console.log('\n========================================');
@@ -435,12 +467,16 @@ const Details = () => {
             console.log('🚨 SETTING STATE NOW:');
             console.log('  - availableMaterials:', transformedAvailable.length);
             console.log('  - usedMaterials:', transformedUsed.length);
+            console.log('  - totalAvailableCount:', availableTotal);
+            console.log('  - totalUsedCount:', usedTotal);
 
             // Use functional updates to ensure we're working with latest state
             // Only update if component is still mounted
             if (isMountedRef.current) {
                 setAvailableMaterials(() => transformedAvailable);
                 setUsedMaterials(() => transformedUsed);
+                setTotalAvailableCount(availableTotal);
+                setTotalUsedCount(usedTotal);
             }
 
             // Reinitialize animations
@@ -477,6 +513,7 @@ const Details = () => {
         } finally {
             isLoadingRef.current = false;
             setLoading(false);
+            setApiLoading(false);
             abortControllerRef.current = null;
         }
     };
@@ -1397,6 +1434,33 @@ const Details = () => {
         return groupMaterialsByName(materials, isUsedTab);
     };
 
+    // Pagination helper functions
+    const getPaginatedData = (data: any[]) => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        return data.slice(startIndex, endIndex);
+    };
+
+    const getTotalPages = (totalItems: number) => {
+        return Math.ceil(totalItems / itemsPerPage);
+    };
+
+    const handlePageChange = async (page: number) => {
+        setCurrentPage(page);
+        // Scroll to top when page changes
+        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+        
+        // Fetch new page data from API
+        await reloadProjectMaterials(true, page);
+    };
+
+    // Reset pagination when tab changes or filters change and reload data
+    useEffect(() => {
+        setCurrentPage(1);
+        // Reload data with new filters
+        reloadProjectMaterials(true, 1);
+    }, [activeTab, selectedMiniSection]);
+
     // Group materials by date for "Used Materials" tab
     const getGroupedByDate = () => {
         if (activeTab !== 'used') {
@@ -1491,6 +1555,22 @@ const Details = () => {
     const filteredMaterials = getCurrentData();
     const groupedMaterials = getGroupedData();
     const totalCost = filteredMaterials.reduce((sum, material) => sum + (material.price * material.quantity), 0);
+
+    // Pagination calculations using API totals
+    const getDataForPagination = () => {
+        if (activeTab === 'used') {
+            return totalUsedCount;
+        }
+        return totalAvailableCount;
+    };
+
+    const totalItemsCount = getDataForPagination();
+    const totalPages = getTotalPages(totalItemsCount);
+    const startItem = (currentPage - 1) * itemsPerPage + 1;
+    const endItem = Math.min(currentPage * itemsPerPage, totalItemsCount);
+
+    // For display, we use the current page data directly (no client-side pagination needed)
+    const displayMaterials = activeTab === 'imported' ? availableMaterials : usedMaterials;
 
     // Minimal logging for debugging (only in development)
     if (__DEV__ && consoleLogCount < MAX_CONSOLE_LOGS) {
@@ -1722,6 +1802,7 @@ const Details = () => {
             />
 
             <ScrollView
+                ref={scrollViewRef}
                 style={styles.scrollContainer}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
@@ -1815,14 +1896,30 @@ const Details = () => {
                 )}
 
                 <View style={styles.materialsSection}>
-                    <Text style={styles.sectionTitle}>
-                        {activeTab === 'imported' ? 'Available Materials' : 'Used Materials'}
-                        {activeTab === 'used' && selectedMiniSection && (
-                            <Text style={{ fontSize: 14, color: '#64748B', fontWeight: '400' }}>
-                                {' '}(Filtered)
-                            </Text>
+                    <View style={paginationStyles.headerContainer}>
+                        <Text style={styles.sectionTitle}>
+                            {activeTab === 'imported' ? 'Available Materials' : 'Used Materials'}
+                            {activeTab === 'used' && selectedMiniSection && (
+                                <Text style={{ fontSize: 14, color: '#64748B', fontWeight: '400' }}>
+                                    {' '}(Filtered)
+                                </Text>
+                            )}
+                        </Text>
+                        
+                        {/* Material count and pagination info */}
+                        {!loading && totalItemsCount > 0 && (
+                            <View style={paginationStyles.infoContainer}>
+                                <Text style={paginationStyles.infoText}>
+                                    Showing {startItem}-{endItem} of {totalItemsCount} {activeTab === 'used' ? 'used materials' : 'available materials'}
+                                </Text>
+                                {totalPages > 1 && (
+                                    <Text style={paginationStyles.pageInfo}>
+                                        Page {currentPage} of {totalPages}
+                                    </Text>
+                                )}
+                            </View>
                         )}
-                    </Text>
+                    </View>
                     {loading ? (
                         <View style={styles.noMaterialsContainer}>
                             <Animated.View style={{
@@ -1841,96 +1938,111 @@ const Details = () => {
                             </Text>
                         </View>
                     ) : activeTab === 'used' ? (
-                        // Day-wise grouping for "Used Materials" tab
+                        // Used Materials tab - display API data directly
                         (() => {
-                            const groupedByDate = getGroupedByDate();
-                            return groupedByDate && groupedByDate.length > 0 ? (
-                                groupedByDate.map((dateGroup, dateIndex) => (
-                                    <View key={dateGroup.date} style={dateGroupStyles.dateGroupContainer}>
-                                        {/* Date Header */}
-                                        <View style={dateGroupStyles.dateHeader}>
-                                            {/* Left: Material count */}
-                                            <View style={dateGroupStyles.dateHeaderLeft}>
-                                                <Ionicons name="cube-outline" size={16} color="#64748B" />
-                                                <Text style={dateGroupStyles.materialCountText}>
-                                                    {dateGroup.materials.length} {dateGroup.materials.length === 1 ? 'Material' : 'Materials'}
+                            if (usedMaterials.length === 0) {
+                                return (
+                                    <View style={styles.noMaterialsContainer}>
+                                        {miniSections.length === 0 ? (
+                                            <>
+                                                <Ionicons name="layers-outline" size={64} color="#CBD5E1" />
+                                                <Text style={styles.noMaterialsTitle}>No Mini-Sections Found</Text>
+                                                <Text style={[styles.noMaterialsDescription, { marginBottom: 20 }]}>
+                                                    Create mini-sections to organize and track material usage in different areas of your project.
                                                 </Text>
-                                            </View>
+                                                <TouchableOpacity
+                                                    style={{
+                                                        flexDirection: 'row',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        backgroundColor: '#3B82F6',
+                                                        paddingVertical: 12,
+                                                        paddingHorizontal: 24,
+                                                        borderRadius: 10,
+                                                        gap: 8,
+                                                        marginTop: 8,
+                                                        shadowColor: '#3B82F6',
+                                                        shadowOffset: { width: 0, height: 4 },
+                                                        shadowOpacity: 0.3,
+                                                        shadowRadius: 8,
+                                                        elevation: 4,
+                                                    }}
+                                                    onPress={() => {
+                                                        setShowAddSectionModal(true);
+                                                    }}
+                                                >
+                                                    <Ionicons name="add-circle" size={20} color="#FFFFFF" />
+                                                    <Text style={{ fontSize: 15, fontWeight: '600', color: '#FFFFFF' }}>
+                                                        Add Section
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Ionicons name="cube-outline" size={64} color="#CBD5E1" />
+                                                <Text style={styles.noMaterialsTitle}>No Materials Found</Text>
+                                                <Text style={styles.noMaterialsDescription}>
+                                                    No used materials found for this section.
+                                                </Text>
+                                            </>
+                                        )}
+                                    </View>
+                                );
+                            }
 
-                                            {/* Right: Date */}
-                                            <View style={dateGroupStyles.dateHeaderRight}>
-                                                <Text style={dateGroupStyles.dateHeaderText}>
-                                                    {formatDateHeader(dateGroup.date)}
-                                                </Text>
-                                                <Ionicons name="calendar-outline" size={16} color="#64748B" />
-                                            </View>
+                            // Group materials by date for display
+                            const groupedByDate = getGroupedByDate();
+                            if (!groupedByDate || groupedByDate.length === 0) {
+                                return (
+                                    <View style={styles.noMaterialsContainer}>
+                                        <Ionicons name="cube-outline" size={64} color="#CBD5E1" />
+                                        <Text style={styles.noMaterialsTitle}>No Materials Found</Text>
+                                        <Text style={styles.noMaterialsDescription}>
+                                            No used materials found for this page.
+                                        </Text>
+                                    </View>
+                                );
+                            }
+                            
+                            return groupedByDate.map((dateGroup, dateIndex) => (
+                                <View key={dateGroup.date} style={dateGroupStyles.dateGroupContainer}>
+                                    {/* Date Header */}
+                                    <View style={dateGroupStyles.dateHeader}>
+                                        {/* Left: Material count */}
+                                        <View style={dateGroupStyles.dateHeaderLeft}>
+                                            <Ionicons name="cube-outline" size={16} color="#64748B" />
+                                            <Text style={dateGroupStyles.materialCountText}>
+                                                {dateGroup.materials.length} {dateGroup.materials.length === 1 ? 'Material' : 'Materials'}
+                                            </Text>
                                         </View>
 
-                                        {/* Materials for this date */}
-                                        {dateGroup.materials.map((material, index) => (
-                                            <MaterialCardEnhanced
-                                                key={`${dateGroup.date}-${material.name}-${material.unit}-${JSON.stringify(material.specs || {})}`}
-                                                material={material}
-                                                animation={cardAnimations[dateIndex * 10 + index] || new Animated.Value(1)}
-                                                activeTab={activeTab}
-                                                onAddUsage={handleAddUsage}
-                                                miniSections={miniSections}
-                                                showMiniSectionLabel={!selectedMiniSection}
-                                            />
-                                        ))}
+                                        {/* Right: Date */}
+                                        <View style={dateGroupStyles.dateHeaderRight}>
+                                            <Text style={dateGroupStyles.dateHeaderText}>
+                                                {formatDateHeader(dateGroup.date)}
+                                            </Text>
+                                            <Ionicons name="calendar-outline" size={16} color="#64748B" />
+                                        </View>
                                     </View>
-                                ))
-                            ) : (
-                                <View style={styles.noMaterialsContainer}>
-                                    {miniSections.length === 0 ? (
-                                        <>
-                                            <Ionicons name="layers-outline" size={64} color="#CBD5E1" />
-                                            <Text style={styles.noMaterialsTitle}>No Mini-Sections Found</Text>
-                                            <Text style={[styles.noMaterialsDescription, { marginBottom: 20 }]}>
-                                                Create mini-sections to organize and track material usage in different areas of your project.
-                                            </Text>
-                                            <TouchableOpacity
-                                                style={{
-                                                    flexDirection: 'row',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    backgroundColor: '#3B82F6',
-                                                    paddingVertical: 12,
-                                                    paddingHorizontal: 24,
-                                                    borderRadius: 10,
-                                                    gap: 8,
-                                                    marginTop: 8,
-                                                    shadowColor: '#3B82F6',
-                                                    shadowOffset: { width: 0, height: 4 },
-                                                    shadowOpacity: 0.3,
-                                                    shadowRadius: 8,
-                                                    elevation: 4,
-                                                }}
-                                                onPress={() => {
-                                                    setShowAddSectionModal(true);
-                                                }}
-                                            >
-                                                <Ionicons name="add-circle" size={20} color="#FFFFFF" />
-                                                <Text style={{ fontSize: 15, fontWeight: '600', color: '#FFFFFF' }}>
-                                                    Add Section
-                                                </Text>
-                                            </TouchableOpacity>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Ionicons name="cube-outline" size={64} color="#CBD5E1" />
-                                            <Text style={styles.noMaterialsTitle}>No Materials Found</Text>
-                                            <Text style={styles.noMaterialsDescription}>
-                                                No used materials found for this section.
-                                            </Text>
-                                        </>
-                                    )}
+
+                                    {/* Materials for this date */}
+                                    {dateGroup.materials.map((material: any, index: number) => (
+                                        <MaterialCardEnhanced
+                                            key={`${dateGroup.date}-${material.name}-${material.unit}-${JSON.stringify(material.specs || {})}`}
+                                            material={material}
+                                            animation={cardAnimations[dateIndex * 10 + index] || new Animated.Value(1)}
+                                            activeTab={activeTab}
+                                            onAddUsage={handleAddUsage}
+                                            miniSections={miniSections}
+                                            showMiniSectionLabel={!selectedMiniSection}
+                                        />
+                                    ))}
                                 </View>
-                            );
+                            ));
                         })()
-                    ) : groupedMaterials.length > 0 ? (
-                        // Regular grouping for "Imported Materials" tab
-                        groupedMaterials.map((material, index) => (
+                    ) : availableMaterials.length > 0 ? (
+                        // Available Materials tab - display API data directly
+                        groupMaterialsByName(availableMaterials, false).map((material, index) => (
                             <MaterialCardEnhanced
                                 key={`${material.name}-${material.unit}-${JSON.stringify(material.specs || {})}`}
                                 material={material}
@@ -1987,6 +2099,130 @@ const Details = () => {
                                     </Text>
                                 </>
                             )}
+                        </View>
+                    )}
+
+                    {/* Pagination Controls */}
+                    {!loading && totalPages > 1 && (
+                        <View style={paginationStyles.paginationContainer}>
+                            {apiLoading && (
+                                <View style={paginationStyles.loadingContainer}>
+                                    <Animated.View style={{
+                                        transform: [{
+                                            rotate: cardAnimations[0]?.interpolate({
+                                                inputRange: [0, 1],
+                                                outputRange: ['0deg', '360deg'],
+                                            }) || '0deg'
+                                        }]
+                                    }}>
+                                        <Ionicons name="sync" size={20} color="#3B82F6" />
+                                    </Animated.View>
+                                    <Text style={paginationStyles.loadingText}>Loading page...</Text>
+                                </View>
+                            )}
+                            
+                            <View style={[paginationStyles.paginationControls, apiLoading && { opacity: 0.5 }]}>
+                                {/* Previous Button */}
+                                <TouchableOpacity
+                                    style={[
+                                        paginationStyles.paginationButton,
+                                        (currentPage === 1 || apiLoading) && paginationStyles.paginationButtonDisabled
+                                    ]}
+                                    onPress={() => handlePageChange(currentPage - 1)}
+                                    disabled={currentPage === 1 || apiLoading}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons 
+                                        name="chevron-back" 
+                                        size={20} 
+                                        color={(currentPage === 1 || apiLoading) ? '#CBD5E1' : '#3B82F6'} 
+                                    />
+                                    <Text style={[
+                                        paginationStyles.paginationButtonText,
+                                        (currentPage === 1 || apiLoading) && paginationStyles.paginationButtonTextDisabled
+                                    ]}>
+                                        Previous
+                                    </Text>
+                                </TouchableOpacity>
+
+                                {/* Page Numbers */}
+                                <View style={paginationStyles.pageNumbersContainer}>
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                                        // Show first page, last page, current page, and pages around current
+                                        const showPage = page === 1 || 
+                                                        page === totalPages || 
+                                                        Math.abs(page - currentPage) <= 1;
+                                        
+                                        if (!showPage && page !== 2 && page !== totalPages - 1) {
+                                            // Show ellipsis for gaps
+                                            if (page === 2 && currentPage > 4) {
+                                                return (
+                                                    <Text key={`ellipsis-${page}`} style={paginationStyles.ellipsis}>
+                                                        ...
+                                                    </Text>
+                                                );
+                                            }
+                                            if (page === totalPages - 1 && currentPage < totalPages - 3) {
+                                                return (
+                                                    <Text key={`ellipsis-${page}`} style={paginationStyles.ellipsis}>
+                                                        ...
+                                                    </Text>
+                                                );
+                                            }
+                                            return null;
+                                        }
+
+                                        return (
+                                            <TouchableOpacity
+                                                key={page}
+                                                style={[
+                                                    paginationStyles.pageNumberButton,
+                                                    page === currentPage && paginationStyles.pageNumberButtonActive,
+                                                    apiLoading && { opacity: 0.5 }
+                                                ]}
+                                                onPress={() => handlePageChange(page)}
+                                                disabled={apiLoading}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Text style={[
+                                                    paginationStyles.pageNumberText,
+                                                    page === currentPage && paginationStyles.pageNumberTextActive
+                                                ]}>
+                                                    {page}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
+
+                                {/* Next Button */}
+                                <TouchableOpacity
+                                    style={[
+                                        paginationStyles.paginationButton,
+                                        (currentPage === totalPages || apiLoading) && paginationStyles.paginationButtonDisabled
+                                    ]}
+                                    onPress={() => handlePageChange(currentPage + 1)}
+                                    disabled={currentPage === totalPages || apiLoading}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={[
+                                        paginationStyles.paginationButtonText,
+                                        (currentPage === totalPages || apiLoading) && paginationStyles.paginationButtonTextDisabled
+                                    ]}>
+                                        Next
+                                    </Text>
+                                    <Ionicons 
+                                        name="chevron-forward" 
+                                        size={20} 
+                                        color={(currentPage === totalPages || apiLoading) ? '#CBD5E1' : '#3B82F6'} 
+                                    />
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Items per page info */}
+                            <Text style={paginationStyles.itemsPerPageText}>
+                                {itemsPerPage} items per page
+                            </Text>
                         </View>
                     )}
                 </View>
@@ -2377,6 +2613,114 @@ const sectionStyles = StyleSheet.create({
         fontSize: 15,
         fontWeight: '600',
         color: '#FFFFFF',
+    },
+});
+
+const paginationStyles = StyleSheet.create({
+    headerContainer: {
+        marginBottom: 16,
+    },
+    infoContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 8,
+        paddingHorizontal: 4,
+    },
+    infoText: {
+        fontSize: 14,
+        color: '#64748B',
+        fontWeight: '500',
+    },
+    pageInfo: {
+        fontSize: 14,
+        color: '#64748B',
+        fontWeight: '500',
+    },
+    paginationContainer: {
+        marginTop: 24,
+        paddingTop: 20,
+        borderTopWidth: 1,
+        borderTopColor: '#E2E8F0',
+        alignItems: 'center',
+        gap: 12,
+    },
+    paginationControls: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 16,
+    },
+    paginationButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        gap: 4,
+    },
+    paginationButtonDisabled: {
+        backgroundColor: '#F1F5F9',
+        borderColor: '#E2E8F0',
+    },
+    paginationButtonText: {
+        fontSize: 14,
+        color: '#3B82F6',
+        fontWeight: '500',
+    },
+    paginationButtonTextDisabled: {
+        color: '#CBD5E1',
+    },
+    pageNumbersContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    pageNumberButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 8,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    pageNumberButtonActive: {
+        backgroundColor: '#3B82F6',
+        borderColor: '#3B82F6',
+    },
+    pageNumberText: {
+        fontSize: 14,
+        color: '#64748B',
+        fontWeight: '500',
+    },
+    pageNumberTextActive: {
+        color: '#FFFFFF',
+        fontWeight: '600',
+    },
+    ellipsis: {
+        fontSize: 14,
+        color: '#64748B',
+        paddingHorizontal: 8,
+    },
+    itemsPerPageText: {
+        fontSize: 12,
+        color: '#94A3B8',
+        fontStyle: 'italic',
+    },
+    loadingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 12,
+    },
+    loadingText: {
+        fontSize: 14,
+        color: '#64748B',
+        fontStyle: 'italic',
     },
 });
 
