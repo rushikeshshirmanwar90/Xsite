@@ -176,7 +176,7 @@ const NotificationPage: React.FC = () => {
 
     // Date-based navigation state
     const [currentDate, setCurrentDate] = useState<string>(() => {
-        // Start with today's date in ISO format (YYYY-MM-DD)
+        // Always start with today's date
         return new Date().toISOString().split('T')[0];
     });
     const [availableDates, setAvailableDates] = useState<string[]>([]);
@@ -190,6 +190,28 @@ const NotificationPage: React.FC = () => {
         console.log('   - targetDate:', targetDate);
         console.log('   - currentDate:', currentDate);
         console.log('   - isLoadingRef.current:', isLoadingRef.current);
+        
+        // DEBUG: Check what clientId we're getting
+        const debugClientId = await getClientId();
+        console.log('🔍 DEBUG: ClientId from getClientId():', debugClientId);
+        console.log('🔍 DEBUG: ClientId type:', typeof debugClientId);
+        console.log('🔍 DEBUG: ClientId length:', debugClientId?.length);
+        
+        // DEBUG: Check AsyncStorage directly
+        try {
+            const userDetailsString = await AsyncStorage.getItem("user");
+            console.log('🔍 DEBUG: Raw user data from AsyncStorage:', userDetailsString);
+            if (userDetailsString) {
+                const userData = JSON.parse(userDetailsString);
+                console.log('🔍 DEBUG: Parsed user data keys:', Object.keys(userData || {}));
+                console.log('🔍 DEBUG: User _id:', userData?._id);
+                console.log('🔍 DEBUG: User clientId:', userData?.clientId);
+                console.log('🔍 DEBUG: User firstName:', userData?.firstName);
+                console.log('🔍 DEBUG: User lastName:', userData?.lastName);
+            }
+        } catch (debugError) {
+            console.log('🔍 DEBUG: Error reading AsyncStorage:', debugError);
+        }
 
         // Prevent duplicate calls
         if (isLoadingRef.current) {
@@ -225,12 +247,18 @@ const NotificationPage: React.FC = () => {
             console.log('FETCHING ACTIVITIES - DATE PAGINATION');
             console.log('========================================');
             console.log('Client ID:', clientId);
+            console.log('Client ID type:', typeof clientId);
+            console.log('Client ID length:', clientId?.length);
             console.log('Load More:', loadMore);
             console.log('Next Date:', nextDate);
 
             if (!clientId) {
-                throw new Error('Client ID not found');
+                console.error('❌ CRITICAL: Client ID not found!');
+                console.error('❌ This means user is not logged in or clientId is missing');
+                throw new Error('Client ID not found - user may not be logged in');
             }
+
+            console.log('✅ Client ID is valid, proceeding with API calls...');
 
             // Date-based navigation - fetch activities for specific date
             const dateToFetch = targetDate || currentDate;
@@ -259,8 +287,13 @@ const NotificationPage: React.FC = () => {
             const [activityRes, materialActivityRes] = await Promise.all([
                 axios.get(`${domain}/api/activity?${activityParams.toString()}`)
                     .catch((err) => {
-                        console.error('❌ Activity API Error:', err?.response?.data || err.message);
-                        console.error('❌ Activity API Status:', err?.response?.status);
+                        console.error('❌ Activity API Error Details:');
+                        console.error('   - URL:', `${domain}/api/activity?${activityParams.toString()}`);
+                        console.error('   - Status:', err?.response?.status);
+                        console.error('   - Status Text:', err?.response?.statusText);
+                        console.error('   - Response Data:', err?.response?.data);
+                        console.error('   - Error Message:', err.message);
+                        console.error('   - Error Code:', err.code);
                         // Return structure that matches successful response but indicates failure
                         return { 
                             data: { 
@@ -272,8 +305,13 @@ const NotificationPage: React.FC = () => {
                     }),
                 axios.get(`${domain}/api/materialActivity?${materialParams.toString()}`)
                     .catch((err) => {
-                        console.error('❌ Material Activity API Error:', err?.response?.data || err.message);
-                        console.error('❌ Material Activity API Status:', err?.response?.status);
+                        console.error('❌ Material Activity API Error Details:');
+                        console.error('   - URL:', `${domain}/api/materialActivity?${materialParams.toString()}`);
+                        console.error('   - Status:', err?.response?.status);
+                        console.error('   - Status Text:', err?.response?.statusText);
+                        console.error('   - Response Data:', err?.response?.data);
+                        console.error('   - Error Message:', err.message);
+                        console.error('   - Error Code:', err.code);
                         // Return structure that matches successful response but indicates failure
                         return { 
                             data: { 
@@ -288,6 +326,22 @@ const NotificationPage: React.FC = () => {
             console.log('\n--- API RESPONSES ---');
             console.log('Activity Response Success:', activityRes.data.success !== false);
             console.log('Material Activity Response Success:', materialActivityRes.data.success !== false);
+            
+            // DEBUG: Log full response structure
+            console.log('\n--- FULL API RESPONSE DEBUG ---');
+            console.log('Activity Response Structure:');
+            console.log('  - Status:', activityRes.status);
+            console.log('  - Data keys:', Object.keys(activityRes.data || {}));
+            console.log('  - Success field:', activityRes.data.success);
+            console.log('  - Message field:', activityRes.data.message);
+            console.log('  - Data field keys:', Object.keys(activityRes.data.data || {}));
+            
+            console.log('Material Activity Response Structure:');
+            console.log('  - Status:', materialActivityRes.status);
+            console.log('  - Data keys:', Object.keys(materialActivityRes.data || {}));
+            console.log('  - Success field:', materialActivityRes.data.success);
+            console.log('  - Message field:', materialActivityRes.data.message);
+            console.log('  - Data field keys:', Object.keys(materialActivityRes.data.data || {}));
             
             // Check if both APIs failed
             if ((activityRes.data as any).success === false && (materialActivityRes.data as any).success === false) {
@@ -310,6 +364,17 @@ const NotificationPage: React.FC = () => {
             console.log('Target Date:', targetDate || currentDate);
             console.log('Activity Date Groups:', activityDateGroups.length);
             console.log('Material Date Groups:', materialDateGroups.length);
+            
+            // DEBUG: Log the actual date groups content
+            console.log('\n--- DATE GROUPS CONTENT DEBUG ---');
+            console.log('Activity Date Groups Content:');
+            activityDateGroups.forEach((group, index) => {
+                console.log(`  Group ${index + 1}: Date=${group.date}, Count=${group.count}, Activities=${group.activities?.length || 0}`);
+            });
+            console.log('Material Date Groups Content:');
+            materialDateGroups.forEach((group, index) => {
+                console.log(`  Group ${index + 1}: Date=${group.date}, Count=${group.count}, Activities=${group.activities?.length || 0}`);
+            });
 
             // Get available dates for navigation
             const activityAvailableDates = (activityData.data?.availableDates || activityData.availableDates || []);
@@ -320,27 +385,44 @@ const NotificationPage: React.FC = () => {
             setAvailableDates(allAvailableDates);
 
             // Update current date if targetDate was provided
-            const dateToUse = targetDate || currentDate;
+            const finalDateToUse = targetDate || currentDate;
             if (targetDate) {
                 setCurrentDate(targetDate);
             }
 
             // Check if there are previous/next dates available using the actual date being used
-            const currentDateIndex = allAvailableDates.indexOf(dateToUse);
-            setHasPrevDate(currentDateIndex < allAvailableDates.length - 1); // Previous = older date
-            setHasNextDate(currentDateIndex > 0); // Next = newer date
+            // For navigation, we should allow going to any date, not just dates with activities
+            const today = new Date().toISOString().split('T')[0];
+            const currentDateObj = new Date(finalDateToUse);
+            const todayObj = new Date(today);
+            
+            // Allow navigation to previous dates (older dates)
+            setHasPrevDate(true); // Always allow going to previous dates
+            
+            // Only allow navigation to future dates if there are activities on future dates, or if we're not on today
+            if (finalDateToUse === today) {
+                // If we're on today, only allow next if there are future dates with activities
+                const futureDatesWithActivities = allAvailableDates.filter(date => date > today);
+                setHasNextDate(futureDatesWithActivities.length > 0);
+            } else if (finalDateToUse < today) {
+                // If we're on a past date, allow going to more recent dates (including today)
+                setHasNextDate(true);
+            } else {
+                // If we're somehow on a future date, allow going back
+                setHasNextDate(false);
+            }
 
             console.log('📅 Date Navigation State:');
-            console.log('   - Current Date:', dateToUse);
+            console.log('   - Final Date Used:', finalDateToUse);
+            console.log('   - Today:', today);
             console.log('   - Available Dates:', allAvailableDates.length);
-            console.log('   - Current Date Index:', currentDateIndex);
-            console.log('   - Has Previous Date:', currentDateIndex < allAvailableDates.length - 1);
-            console.log('   - Has Next Date:', currentDateIndex > 0);
+            console.log('   - Has Previous Date:', true);
+            console.log('   - Has Next Date:', finalDateToUse < today);
             console.log('   - Available Dates Array:', allAvailableDates);
 
             // If no activities found for current date, show empty state but keep navigation
             if (activityDateGroups.length === 0 && materialDateGroups.length === 0) {
-                console.log('📭 No activities found for date:', currentDate);
+                console.log('📭 No activities found for date:', finalDateToUse);
                 setDateGroups([]);
                 setActivitiesRaw([]);
                 setMaterialActivities([]);
@@ -448,6 +530,7 @@ const NotificationPage: React.FC = () => {
 
     useEffect(() => {
         console.log('📱 NotificationPage mounted - calling fetchActivities()');
+        // For initial load, don't specify a target date - let the function determine the best starting date
         fetchActivities();
     }, []);
 
@@ -460,54 +543,56 @@ const NotificationPage: React.FC = () => {
     // Date navigation functions
     const handlePreviousDay = async () => {
         if (hasPrevDate && !loading) {
-            const currentIndex = availableDates.indexOf(currentDate);
-            if (currentIndex < availableDates.length - 1) {
-                const previousDate = availableDates[currentIndex + 1]; // Previous = older date
-                console.log('📅 Navigating to previous day:', previousDate);
+            // Go to previous day (yesterday)
+            const currentDateObj = new Date(currentDate);
+            currentDateObj.setDate(currentDateObj.getDate() - 1);
+            const previousDate = currentDateObj.toISOString().split('T')[0];
+            
+            console.log('📅 Navigating to previous day:', previousDate);
+            
+            // Set loading state
+            setLoading(true);
+            
+            try {
+                await fetchActivities(false, false, previousDate);
                 
-                // Set loading state
-                setLoading(true);
-                
-                try {
-                    await fetchActivities(false, false, previousDate);
-                    
-                    // Scroll to top AFTER content has loaded
-                    setTimeout(() => {
-                        scrollViewRef.current?.scrollTo({
-                            y: 0,
-                            animated: true,
-                        });
-                    }, 100); // Small delay to ensure content is rendered
-                } finally {
-                    // Loading state will be cleared in fetchActivities finally block
-                }
+                // Scroll to top AFTER content has loaded
+                setTimeout(() => {
+                    scrollViewRef.current?.scrollTo({
+                        y: 0,
+                        animated: true,
+                    });
+                }, 100); // Small delay to ensure content is rendered
+            } finally {
+                // Loading state will be cleared in fetchActivities finally block
             }
         }
     };
 
     const handleNextDay = async () => {
         if (hasNextDate && !loading) {
-            const currentIndex = availableDates.indexOf(currentDate);
-            if (currentIndex > 0) {
-                const nextDate = availableDates[currentIndex - 1]; // Next = newer date
-                console.log('📅 Navigating to next day:', nextDate);
+            // Go to next day (tomorrow, but not beyond today)
+            const currentDateObj = new Date(currentDate);
+            currentDateObj.setDate(currentDateObj.getDate() + 1);
+            const nextDate = currentDateObj.toISOString().split('T')[0];
+            
+            console.log('📅 Navigating to next day:', nextDate);
+            
+            // Set loading state
+            setLoading(true);
+            
+            try {
+                await fetchActivities(false, false, nextDate);
                 
-                // Set loading state
-                setLoading(true);
-                
-                try {
-                    await fetchActivities(false, false, nextDate);
-                    
-                    // Scroll to top AFTER content has loaded
-                    setTimeout(() => {
-                        scrollViewRef.current?.scrollTo({
-                            y: 0,
-                            animated: true,
-                        });
-                    }, 100); // Small delay to ensure content is rendered
-                } finally {
-                    // Loading state will be cleared in fetchActivities finally block
-                }
+                // Scroll to top AFTER content has loaded
+                setTimeout(() => {
+                    scrollViewRef.current?.scrollTo({
+                        y: 0,
+                        animated: true,
+                    });
+                }, 100); // Small delay to ensure content is rendered
+            } finally {
+                // Loading state will be cleared in fetchActivities finally block
             }
         }
     };
@@ -1171,41 +1256,93 @@ const NotificationPage: React.FC = () => {
                 ) : groupedActivities.length === 0 || groupedActivities.reduce((sum, group) => sum + group.activities.length, 0) === 0 ? (
                     <>
                         {console.log('📭 Rendering: EMPTY STATE')}
-                        <View style={styles.centerContainer}>
-                            <LinearGradient
-                                colors={['#F8FAFC', '#F1F5F9']}
-                                style={styles.emptyStateGradient}
-                            >
-                                <View style={styles.emptyIconContainer}>
-                                    <Ionicons name="notifications-off-outline" size={64} color="#94A3B8" />
-                                </View>
-                                <Text style={styles.emptyTitle}>No Activities Yet</Text>
-                                <Text style={styles.emptySubtitle}>
-                                    Your project activities will appear here{'\n'}
-                                    Start by creating a project or adding materials
+                        {/* Simple "No activity today" message while keeping all UI elements */}
+                        <View style={styles.simpleEmptyState}>
+                            <View style={styles.simpleEmptyContainer}>
+                                <Ionicons name="calendar-outline" size={48} color="#94A3B8" />
+                                <Text style={styles.simpleEmptyTitle}>
+                                    {(() => {
+                                        const today = new Date().toISOString().split('T')[0];
+                                        if (currentDate === today) {
+                                            return 'No activity today';
+                                        } else {
+                                            return `No activity on ${formatDateHeader(currentDate)}`;
+                                        }
+                                    })()}
                                 </Text>
-                                <View style={{ marginTop: 20, padding: 15, backgroundColor: '#FEF3C7', borderRadius: 10 }}>
-                                    <Text style={{ fontSize: 12, color: '#92400E', textAlign: 'center' }}>
-                                        Debug Info:{'\n'}
-                                        Raw Activities: {activities.length}{'\n'}
-                                        Material Activities: {materialActivities.length}{'\n'}
-                                        Active Tab: {activeTab}{'\n'}
-                                        Material Sub Tab: {materialSubTab}{'\n'}
-                                        Filtered Groups: {groupedActivities.length}{'\n'}
-                                        Current Date: {currentDate}{'\n'}
-                                        Available Dates: {availableDates.length}{'\n'}
-                                        Has More Dates: {hasMoreDates}{'\n'}
-                                        Tap the refresh icon (🔄) for more details
+                            </View>
+                        </View>
+                        
+                        {/* Show Date Navigation Controls even when no activities */}
+                        <View style={styles.compactDateNavigation}>
+                            {/* Compact Date Navigation Bar */}
+                            <View style={styles.dateNavigationBar}>
+                                {/* Previous Day Button */}
+                                <TouchableOpacity
+                                    style={[
+                                        styles.compactNavButton,
+                                        styles.prevButton,
+                                        (!hasPrevDate || loading) && styles.navButtonDisabled
+                                    ]}
+                                    onPress={handlePreviousDay}
+                                    disabled={!hasPrevDate || loading}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons 
+                                        name="chevron-back" 
+                                        size={20} 
+                                        color={(!hasPrevDate || loading) ? '#9CA3AF' : '#10B981'} 
+                                    />
+                                </TouchableOpacity>
+
+                                {/* Current Date Display - Compact */}
+                                <View style={styles.compactDateDisplay}>
+                                    <View style={styles.compactDateBadge}>
+                                        <Ionicons name="calendar" size={14} color="#10B981" />
+                                        <Text style={styles.compactDateText}>
+                                            {formatDateHeader(currentDate)}
+                                        </Text>
+                                    </View>
+                                    <Text style={styles.compactActivityCount}>
+                                        0 activities
                                     </Text>
                                 </View>
+
+                                {/* Next Day Button */}
                                 <TouchableOpacity
-                                    style={styles.emptyActionButton}
-                                    onPress={() => router.push('/(tabs)')}
+                                    style={[
+                                        styles.compactNavButton,
+                                        styles.nextButton,
+                                        (!hasNextDate || loading) && styles.navButtonDisabled
+                                    ]}
+                                    onPress={handleNextDay}
+                                    disabled={!hasNextDate || loading}
+                                    activeOpacity={0.7}
                                 >
-                                    <Ionicons name="add-circle" size={20} color="#FFFFFF" />
-                                    <Text style={styles.emptyActionText}>Get Started</Text>
+                                    <Ionicons 
+                                        name="chevron-forward" 
+                                        size={20} 
+                                        color={(!hasNextDate || loading) ? '#9CA3AF' : '#10B981'} 
+                                    />
                                 </TouchableOpacity>
-                            </LinearGradient>
+                            </View>
+
+                            {/* Loading indicator - show when loading with enhanced animation */}
+                            {loading && (
+                                <View style={styles.compactLoadingIndicator}>
+                                    <ActivityIndicator size="small" color="#10B981" />
+                                    <Text style={styles.compactLoadingText}>Loading date...</Text>
+                                </View>
+                            )}
+
+                            {/* Optional: Date navigation info - very compact */}
+                            {availableDates.length > 1 && (
+                                <View style={styles.compactNavigationInfo}>
+                                    <Text style={styles.compactInfoText}>
+                                        {availableDates.length} dates with activities available
+                                    </Text>
+                                </View>
+                            )}
                         </View>
                     </>
                 ) : (
@@ -2397,6 +2534,24 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: '#9CA3AF',
         fontWeight: '500',
+    },
+    // Simple Empty State Styles (keeps all UI elements visible)
+    simpleEmptyState: {
+        padding: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 200,
+    },
+    simpleEmptyContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    simpleEmptyTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#6B7280',
+        marginTop: 16,
+        textAlign: 'center',
     },
     // Loading Animation Styles
     navigationBarLoading: {

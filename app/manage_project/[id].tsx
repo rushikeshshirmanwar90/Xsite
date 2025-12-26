@@ -10,6 +10,18 @@ import { Alert, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, T
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
+interface BuildingDetails {
+    totalFloors: number;
+    totalUnits: number;
+    totalBookedUnits: number;
+    buildingType: string;
+    constructionStatus: string;
+    description: string;
+    location: string;
+    area: number;
+    completionDate: string;
+}
+
 const ManageProject = () => {
     const params = useLocalSearchParams();
     const { id, name, sectionData } = params;
@@ -18,10 +30,25 @@ const ManageProject = () => {
     const [sections, setSections] = useState<ProjectSection[]>([]);
     const [showAddModal, setShowAddModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
+    const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [editingSection, setEditingSection] = useState<ProjectSection | null>(null);
+    const [selectedSection, setSelectedSection] = useState<ProjectSection | null>(null);
     const [editSectionName, setEditSectionName] = useState('');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+
+    // Building details state
+    const [buildingDetails, setBuildingDetails] = useState<BuildingDetails>({
+        totalFloors: 0,
+        totalUnits: 0,
+        totalBookedUnits: 0,
+        buildingType: 'Residential',
+        constructionStatus: 'Planning',
+        description: '',
+        location: '',
+        area: 0,
+        completionDate: ''
+    });
 
     // Performance optimization
     const isLoadingRef = React.useRef(false);
@@ -263,6 +290,64 @@ const ManageProject = () => {
         );
     };
 
+    // Handle section details - Open details modal
+    const handleSectionDetails = async (section: ProjectSection) => {
+        setSelectedSection(section);
+        
+        // If it's a building, fetch existing details
+        if (section.type === 'Buildings') {
+            try {
+                const sectionId = section._id || section.sectionId;
+                const response = await axios.get(`${domain}/api/building?id=${sectionId}`);
+                const responseData = response.data as any;
+                
+                if (responseData && responseData.success && responseData.data) {
+                    const building = responseData.data;
+                    setBuildingDetails({
+                        totalFloors: building.totalFloors || 0,
+                        totalUnits: building.totalUnits || 0,
+                        totalBookedUnits: building.totalBookedUnits || 0,
+                        buildingType: building.buildingType || 'Residential',
+                        constructionStatus: building.constructionStatus || 'Planning',
+                        description: building.description || '',
+                        location: building.location || '',
+                        area: building.area || 0,
+                        completionDate: building.completionDate ? new Date(building.completionDate).toISOString().split('T')[0] : ''
+                    });
+                } else {
+                    // Reset to defaults if no data found
+                    setBuildingDetails({
+                        totalFloors: 0,
+                        totalUnits: 0,
+                        totalBookedUnits: 0,
+                        buildingType: 'Residential',
+                        constructionStatus: 'Planning',
+                        description: '',
+                        location: '',
+                        area: 0,
+                        completionDate: ''
+                    });
+                }
+            } catch (error) {
+                console.error('Error fetching building details:', error);
+                // Reset to defaults on error
+                setBuildingDetails({
+                    totalFloors: 0,
+                    totalUnits: 0,
+                    totalBookedUnits: 0,
+                    buildingType: 'Residential',
+                    constructionStatus: 'Planning',
+                    description: '',
+                    location: '',
+                    area: 0,
+                    completionDate: ''
+                });
+            }
+        }
+        
+        setShowDetailsModal(true);
+    };
+
     // Handle section editing - Open modal
     const handleEditSection = (section: ProjectSection) => {
         setEditingSection(section);
@@ -388,6 +473,67 @@ const ManageProject = () => {
                 'Failed to update section';
             toast.error(errorMessage);
         }
+    };
+
+    // Handle saving building details
+    const handleSaveBuildingDetails = async () => {
+        if (!selectedSection) return;
+
+        let loadingToast: any = null;
+
+        try {
+            loadingToast = toast.loading('Saving building details...');
+
+            const sectionId = selectedSection._id || selectedSection.sectionId;
+            const payload = {
+                ...buildingDetails,
+                clientId: 'unknown' // You may want to get this from user context
+            };
+
+            const response = await axios.put(`${domain}/api/building?id=${sectionId}`, payload);
+
+            toast.dismiss(loadingToast);
+
+            if (response.status === 200) {
+                toast.success('Building details saved successfully!');
+                setShowDetailsModal(false);
+                setSelectedSection(null);
+                
+                // Optionally refresh the sections list
+                await fetchSections(false);
+            }
+        } catch (error: any) {
+            if (loadingToast) {
+                toast.dismiss(loadingToast);
+            }
+
+            console.error('Error saving building details:', error);
+            const errorMessage = error?.response?.data?.error ||
+                error?.response?.data?.message ||
+                error?.message ||
+                'Failed to save building details';
+            toast.error(errorMessage);
+        }
+    };
+
+    // Handle navigate to floors management
+    const handleManageFloors = () => {
+        if (!selectedSection) return;
+
+        const sectionId = selectedSection._id || selectedSection.sectionId;
+        
+        // Close the current modal
+        setShowDetailsModal(false);
+        setSelectedSection(null);
+        
+        // Navigate to floors management page
+        router.push({
+            pathname: '/building_floors/[id]',
+            params: { 
+                id: sectionId,
+                buildingName: selectedSection.name 
+            }
+        });
     };
 
     // Handle section addition
@@ -618,21 +764,13 @@ const ManageProject = () => {
 
                                     <View style={styles.actionButtonsRow}>
                                         <TouchableOpacity
-                                            style={styles.viewMaterialsButton}
-                                            onPress={() => {
-                                                router.push({
-                                                    pathname: '/details',
-                                                    params: {
-                                                        projectId: id,
-                                                        projectName: name,
-                                                        sectionId: section._id || section.sectionId,
-                                                        sectionName: section.name,
-                                                    }
-                                                });
-                                            }}
+                                            style={styles.addDetailsButton}
+                                            onPress={() => handleSectionDetails(section)}
                                         >
-                                            <Ionicons name="cube-outline" size={18} color="#3B82F6" />
-                                            <Text style={styles.viewMaterialsText}>View Materials</Text>
+                                            <Ionicons name="settings-outline" size={18} color="#3B82F6" />
+                                            <Text style={styles.addDetailsText}>
+                                                {section.type === 'Buildings' ? 'Building Details' : 'Add Details'}
+                                            </Text>
                                         </TouchableOpacity>
 
                                         <View style={styles.actionButtons}>
@@ -666,26 +804,26 @@ const ManageProject = () => {
                 projectId={id as string}
             />
 
-            {/* Edit Section Modal */}
+            {/* Building Details Modal */}
             <Modal
-                visible={showEditModal}
+                visible={showDetailsModal}
                 animationType="slide"
                 transparent={true}
                 onRequestClose={() => {
-                    setShowEditModal(false);
-                    setEditingSection(null);
-                    setEditSectionName('');
+                    setShowDetailsModal(false);
+                    setSelectedSection(null);
                 }}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
+                    <View style={[styles.modalContent, { maxHeight: '90%' }]}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Edit Section</Text>
+                            <Text style={styles.modalTitle}>
+                                {selectedSection?.type === 'Buildings' ? 'Building Details' : 'Section Details'}
+                            </Text>
                             <TouchableOpacity
                                 onPress={() => {
-                                    setShowEditModal(false);
-                                    setEditingSection(null);
-                                    setEditSectionName('');
+                                    setShowDetailsModal(false);
+                                    setSelectedSection(null);
                                 }}
                                 style={styles.closeButton}
                             >
@@ -693,37 +831,188 @@ const ManageProject = () => {
                             </TouchableOpacity>
                         </View>
 
-                        <View style={styles.modalBody}>
-                            <Text style={styles.inputLabel}>Section Name</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={editSectionName}
-                                onChangeText={setEditSectionName}
-                                placeholder="Enter section name"
-                                placeholderTextColor="#94A3B8"
-                                autoFocus
-                            />
-                        </View>
+                        <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+                            {selectedSection?.type === 'Buildings' ? (
+                                <>
+                                    {/* Building Type */}
+                                    <View style={styles.inputGroup}>
+                                        <Text style={styles.inputLabel}>Building Type</Text>
+                                        <View style={styles.pickerContainer}>
+                                            <TouchableOpacity
+                                                style={[styles.pickerButton, buildingDetails.buildingType === 'Residential' && styles.pickerButtonActive]}
+                                                onPress={() => setBuildingDetails(prev => ({ ...prev, buildingType: 'Residential' }))}
+                                            >
+                                                <Text style={[styles.pickerButtonText, buildingDetails.buildingType === 'Residential' && styles.pickerButtonTextActive]}>
+                                                    Residential
+                                                </Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[styles.pickerButton, buildingDetails.buildingType === 'Commercial' && styles.pickerButtonActive]}
+                                                onPress={() => setBuildingDetails(prev => ({ ...prev, buildingType: 'Commercial' }))}
+                                            >
+                                                <Text style={[styles.pickerButtonText, buildingDetails.buildingType === 'Commercial' && styles.pickerButtonTextActive]}>
+                                                    Commercial
+                                                </Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[styles.pickerButton, buildingDetails.buildingType === 'Mixed Use' && styles.pickerButtonActive]}
+                                                onPress={() => setBuildingDetails(prev => ({ ...prev, buildingType: 'Mixed Use' }))}
+                                            >
+                                                <Text style={[styles.pickerButtonText, buildingDetails.buildingType === 'Mixed Use' && styles.pickerButtonTextActive]}>
+                                                    Mixed Use
+                                                </Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
 
-                        <View style={styles.modalFooter}>
-                            <TouchableOpacity
-                                style={styles.cancelButton}
-                                onPress={() => {
-                                    setShowEditModal(false);
-                                    setEditingSection(null);
-                                    setEditSectionName('');
-                                }}
-                            >
-                                <Text style={styles.cancelButtonText}>Cancel</Text>
-                            </TouchableOpacity>
+                                    {/* Construction Status */}
+                                    <View style={styles.inputGroup}>
+                                        <Text style={styles.inputLabel}>Construction Status</Text>
+                                        <View style={styles.pickerContainer}>
+                                            <TouchableOpacity
+                                                style={[styles.pickerButton, buildingDetails.constructionStatus === 'Planning' && styles.pickerButtonActive]}
+                                                onPress={() => setBuildingDetails(prev => ({ ...prev, constructionStatus: 'Planning' }))}
+                                            >
+                                                <Text style={[styles.pickerButtonText, buildingDetails.constructionStatus === 'Planning' && styles.pickerButtonTextActive]}>
+                                                    Planning
+                                                </Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[styles.pickerButton, buildingDetails.constructionStatus === 'Under Construction' && styles.pickerButtonActive]}
+                                                onPress={() => setBuildingDetails(prev => ({ ...prev, constructionStatus: 'Under Construction' }))}
+                                            >
+                                                <Text style={[styles.pickerButtonText, buildingDetails.constructionStatus === 'Under Construction' && styles.pickerButtonTextActive]}>
+                                                    Under Construction
+                                                </Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[styles.pickerButton, buildingDetails.constructionStatus === 'Completed' && styles.pickerButtonActive]}
+                                                onPress={() => setBuildingDetails(prev => ({ ...prev, constructionStatus: 'Completed' }))}
+                                            >
+                                                <Text style={[styles.pickerButtonText, buildingDetails.constructionStatus === 'Completed' && styles.pickerButtonTextActive]}>
+                                                    Completed
+                                                </Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
 
-                            <TouchableOpacity
-                                style={styles.updateButton}
-                                onPress={handleUpdateSection}
-                            >
-                                <Text style={styles.updateButtonText}>Update</Text>
-                            </TouchableOpacity>
-                        </View>
+                                    {/* Total Floors */}
+                                    <View style={styles.inputGroup}>
+                                        <Text style={styles.inputLabel}>Total Floors</Text>
+                                        <TextInput
+                                            style={styles.input}
+                                            value={buildingDetails.totalFloors.toString()}
+                                            onChangeText={(text) => setBuildingDetails(prev => ({ ...prev, totalFloors: parseInt(text) || 0 }))}
+                                            placeholder="Enter total floors"
+                                            placeholderTextColor="#94A3B8"
+                                            keyboardType="numeric"
+                                        />
+                                    </View>
+
+                                    {/* Total Units */}
+                                    <View style={styles.inputGroup}>
+                                        <Text style={styles.inputLabel}>Total Units</Text>
+                                        <TextInput
+                                            style={styles.input}
+                                            value={buildingDetails.totalUnits.toString()}
+                                            onChangeText={(text) => setBuildingDetails(prev => ({ ...prev, totalUnits: parseInt(text) || 0 }))}
+                                            placeholder="Enter total units"
+                                            placeholderTextColor="#94A3B8"
+                                            keyboardType="numeric"
+                                        />
+                                    </View>
+
+                                    {/* Location */}
+                                    <View style={styles.inputGroup}>
+                                        <Text style={styles.inputLabel}>Location</Text>
+                                        <TextInput
+                                            style={styles.input}
+                                            value={buildingDetails.location}
+                                            onChangeText={(text) => setBuildingDetails(prev => ({ ...prev, location: text }))}
+                                            placeholder="Enter building location"
+                                            placeholderTextColor="#94A3B8"
+                                        />
+                                    </View>
+
+                                    {/* Area */}
+                                    <View style={styles.inputGroup}>
+                                        <Text style={styles.inputLabel}>Area (sq ft)</Text>
+                                        <TextInput
+                                            style={styles.input}
+                                            value={buildingDetails.area.toString()}
+                                            onChangeText={(text) => setBuildingDetails(prev => ({ ...prev, area: parseFloat(text) || 0 }))}
+                                            placeholder="Enter area in square feet"
+                                            placeholderTextColor="#94A3B8"
+                                            keyboardType="numeric"
+                                        />
+                                    </View>
+
+                                    {/* Completion Date */}
+                                    <View style={styles.inputGroup}>
+                                        <Text style={styles.inputLabel}>Expected Completion Date</Text>
+                                        <TextInput
+                                            style={styles.input}
+                                            value={buildingDetails.completionDate}
+                                            onChangeText={(text) => setBuildingDetails(prev => ({ ...prev, completionDate: text }))}
+                                            placeholder="YYYY-MM-DD"
+                                            placeholderTextColor="#94A3B8"
+                                        />
+                                    </View>
+
+                                    {/* Description */}
+                                    <View style={styles.inputGroup}>
+                                        <Text style={styles.inputLabel}>Description</Text>
+                                        <TextInput
+                                            style={[styles.input, styles.textArea]}
+                                            value={buildingDetails.description}
+                                            onChangeText={(text) => setBuildingDetails(prev => ({ ...prev, description: text }))}
+                                            placeholder="Enter building description"
+                                            placeholderTextColor="#94A3B8"
+                                            multiline
+                                            numberOfLines={4}
+                                        />
+                                    </View>
+
+                                    {/* Manage Floors Button */}
+                                    <TouchableOpacity
+                                        style={styles.manageFloorsButton}
+                                        onPress={handleManageFloors}
+                                    >
+                                        <Ionicons name="layers-outline" size={20} color="#FFFFFF" />
+                                        <Text style={styles.manageFloorsText}>Manage Floors & Units</Text>
+                                    </TouchableOpacity>
+                                </>
+                            ) : (
+                                <View style={styles.comingSoonContainer}>
+                                    <Ionicons name="construct-outline" size={64} color="#94A3B8" />
+                                    <Text style={styles.comingSoonTitle}>Coming Soon</Text>
+                                    <Text style={styles.comingSoonText}>
+                                        Details management for {selectedSection?.type} sections will be available in a future update.
+                                    </Text>
+                                </View>
+                            )}
+                        </ScrollView>
+
+                        {selectedSection?.type === 'Buildings' && (
+                            <View style={styles.modalFooter}>
+                                <TouchableOpacity
+                                    style={styles.cancelButton}
+                                    onPress={() => {
+                                        setShowDetailsModal(false);
+                                        setSelectedSection(null);
+                                    }}
+                                >
+                                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.saveButton}
+                                    onPress={handleSaveBuildingDetails}
+                                >
+                                    <Text style={styles.saveButtonText}>Save Details</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
                     </View>
                 </View>
             </Modal>
@@ -1036,5 +1325,99 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: '600',
         color: '#FFFFFF',
+    },
+    // Building Details Modal Styles
+    inputGroup: {
+        marginBottom: 16,
+    },
+    textArea: {
+        height: 80,
+        textAlignVertical: 'top',
+    },
+    pickerContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    pickerButton: {
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        backgroundColor: '#F8FAFC',
+    },
+    pickerButtonActive: {
+        backgroundColor: '#3B82F6',
+        borderColor: '#3B82F6',
+    },
+    pickerButtonText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#64748B',
+    },
+    pickerButtonTextActive: {
+        color: '#FFFFFF',
+    },
+    addDetailsButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#EFF6FF',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        gap: 6,
+        flex: 1,
+        borderWidth: 1,
+        borderColor: '#DBEAFE',
+    },
+    addDetailsText: {
+        color: '#3B82F6',
+        fontWeight: '600',
+        fontSize: 14,
+    },
+    manageFloorsButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#10B981',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        gap: 8,
+        marginTop: 8,
+    },
+    manageFloorsText: {
+        color: '#FFFFFF',
+        fontWeight: '600',
+        fontSize: 16,
+    },
+    saveButton: {
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 8,
+        backgroundColor: '#3B82F6',
+    },
+    saveButtonText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#FFFFFF',
+    },
+    comingSoonContainer: {
+        alignItems: 'center',
+        paddingVertical: 40,
+    },
+    comingSoonTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#64748B',
+        marginTop: 16,
+        marginBottom: 8,
+    },
+    comingSoonText: {
+        fontSize: 14,
+        color: '#94A3B8',
+        textAlign: 'center',
+        lineHeight: 20,
     },
 });
