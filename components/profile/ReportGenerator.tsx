@@ -32,6 +32,23 @@ interface Project {
     createdAt: string;
 }
 
+interface ApiResponse<T = any> {
+    success: boolean;
+    data?: T;
+    error?: string;
+}
+
+interface ProjectsResponse {
+    projects: Project[];
+}
+
+interface MaterialActivityResponse {
+    activities: any[];
+    summary: {
+        totalCost: number;
+    };
+}
+
 const ReportGenerator: React.FC<ReportGeneratorProps> = ({
     visible,
     onClose,
@@ -47,7 +64,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
     
     const [endDate, setEndDate] = useState<Date>(new Date());
     const [activityFilter, setActivityFilter] = useState<ActivityFilter>('all');
-    const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
+    const [selectedProjectId, setSelectedProjectId] = useState<string>(''); // Will be set to first project when loaded
     const [projects, setProjects] = useState<Project[]>([]);
     const [loadingProjects, setLoadingProjects] = useState(false);
     const [showStartDatePicker, setShowStartDatePicker] = useState(false);
@@ -73,11 +90,18 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
 
             console.log('📋 Fetching projects for client:', clientId);
             
-            const response = await axios.get(`${domain}/api/client-projects?clientId=${clientId}`);
+            const response = await axios.get<ApiResponse<ProjectsResponse>>(`${domain}/api/client-projects?clientId=${clientId}`);
             
-            if (response.data.success) {
-                setProjects(response.data.data.projects);
-                console.log('✅ Loaded projects:', response.data.data.projects.length);
+            if (response.data.success && response.data.data) {
+                const projectsList = response.data.data.projects;
+                setProjects(projectsList);
+                
+                // Auto-select first project if no project is selected and projects exist
+                if (projectsList.length > 0 && !selectedProjectId) {
+                    setSelectedProjectId(projectsList[0]._id);
+                }
+                
+                console.log('✅ Loaded projects:', projectsList.length);
             } else {
                 console.error('Failed to fetch projects:', response.data.error);
                 setProjects([]);
@@ -124,6 +148,12 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
 
     const generateReport = async () => {
         try {
+            // Validate that a project is selected
+            if (!selectedProjectId) {
+                Alert.alert('Project Required', 'Please select a project to generate the report.');
+                return;
+            }
+
             setGenerating(true);
             
             console.log('\n========================================');
@@ -155,14 +185,14 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
             });
 
             // Add project filter if specific project is selected
-            if (selectedProjectId && selectedProjectId !== 'all') {
+            if (selectedProjectId && selectedProjectId !== '') {
                 params.append('projectId', selectedProjectId);
             }
 
             console.log('🌐 API Request URL:', `${domain}/api/material-activity-report?${params.toString()}`);
 
             // Fetch material activity data
-            const response = await axios.get(`${domain}/api/material-activity-report?${params.toString()}`);
+            const response = await axios.get<ApiResponse<MaterialActivityResponse>>(`${domain}/api/material-activity-report?${params.toString()}`);
             
             console.log('✅ API Response received');
             console.log('  - Success:', response.data.success);
@@ -173,7 +203,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                 throw new Error(response.data.error || 'Failed to fetch report data');
             }
 
-            const { activities, summary } = response.data.data;
+            const { activities, summary } = response.data.data!;
 
             if (!activities || activities.length === 0) {
                 Alert.alert(
@@ -197,22 +227,28 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
 
             console.log('📄 Generating PDF with activities:', activities.length);
 
+            // Get selected project name for PDF title
+            const selectedProject = projects.find(p => p._id === selectedProjectId);
+            const projectName = selectedProject?.name || 'Unknown Project';
+            
+            console.log('📄 Selected project:', selectedProject);
+            console.log('📄 Project name for PDF:', projectName);
+            console.log('📄 Client data:', clientData);
+            console.log('📄 User data:', userData);
+
             // Generate PDF report
+            console.log('📄 Creating PDF generator...');
             const pdfGenerator = new PDFReportGenerator(clientData, userData);
-            await pdfGenerator.generatePDF(activities);
+            
+            console.log('📄 Calling generatePDF...');
+            await pdfGenerator.generatePDF(activities, projectName);
+            console.log('📄 generatePDF completed successfully');
 
             console.log('✅ PDF generation completed successfully');
             console.log('========================================\n');
 
-            // Close modal after successful generation
-            onClose();
-
-            // Show success message
-            Alert.alert(
-                'Report Generated',
-                `Successfully generated report with ${activities.length} activities.\n\nTotal Value: ₹${summary.totalCost.toLocaleString('en-IN')}`,
-                [{ text: 'OK' }]
-            );
+            // Don't close modal automatically - let user choose what to do with PDF
+            // The PDF generator will show view/share options
 
         } catch (error: any) {
             console.error('❌ Report generation error:', error);
@@ -343,7 +379,9 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                             </View>
                         </View>
 
-                        {/* Activity Filter Section */}
+                        {/* Activity Filter Section - HIDDEN as requested */}
+                        {/* Activity type is now fixed to 'all' by default */}
+                        {false && (
                         <View style={styles.section}>
                             <Text style={styles.sectionTitle}>Activity Type</Text>
                             <Text style={styles.sectionSubtitle}>
@@ -394,12 +432,13 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                                 ))}
                             </View>
                         </View>
+                        )}
 
                         {/* Project Filter Section */}
                         <View style={styles.section}>
                             <Text style={styles.sectionTitle}>Project Filter</Text>
                             <Text style={styles.sectionSubtitle}>
-                                Choose which project to include in the report
+                                Select a specific project for the report
                             </Text>
                             
                             {loadingProjects ? (
@@ -409,42 +448,8 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                                 </View>
                             ) : (
                                 <View style={styles.projectButtons}>
-                                    {/* All Projects Option */}
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.projectButton,
-                                            selectedProjectId === 'all' && styles.projectButtonActive
-                                        ]}
-                                        onPress={() => setSelectedProjectId('all')}
-                                    >
-                                        <View style={styles.projectButtonLeft}>
-                                            <View style={[
-                                                styles.projectButtonIcon,
-                                                { backgroundColor: '#3B82F620' }
-                                            ]}>
-                                                <Ionicons
-                                                    name="apps"
-                                                    size={20}
-                                                    color="#3B82F6"
-                                                />
-                                            </View>
-                                            <View style={styles.projectButtonText}>
-                                                <Text style={[
-                                                    styles.projectButtonLabel,
-                                                    selectedProjectId === 'all' && styles.projectButtonLabelActive
-                                                ]}>
-                                                    All Projects
-                                                </Text>
-                                                <Text style={styles.projectButtonDescription}>
-                                                    Include activities from all projects
-                                                </Text>
-                                            </View>
-                                        </View>
-                                        {selectedProjectId === 'all' && (
-                                            <Ionicons name="checkmark-circle" size={22} color="#3B82F6" />
-                                        )}
-                                    </TouchableOpacity>
-
+                                    {/* All Projects Option - REMOVED as requested */}
+                                    
                                     {/* Individual Project Options */}
                                     {projects.map((project) => (
                                         <TouchableOpacity
@@ -522,8 +527,9 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                                     <View style={styles.previewRow}>
                                         <Text style={styles.previewLabel}>Project:</Text>
                                         <Text style={styles.previewValue}>
-                                            {selectedProjectId === 'all' ? 'All Projects' : 
-                                             projects.find(p => p._id === selectedProjectId)?.name || 'Selected Project'}
+                                            {selectedProjectId ? 
+                                             projects.find(p => p._id === selectedProjectId)?.name || 'Selected Project' :
+                                             'No project selected'}
                                         </Text>
                                     </View>
                                     <View style={styles.previewRow}>
@@ -548,9 +554,12 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                         </TouchableOpacity>
                         
                         <TouchableOpacity
-                            style={[styles.generateButton, generating && styles.generateButtonDisabled]}
+                            style={[
+                                styles.generateButton, 
+                                (generating || !selectedProjectId) && styles.generateButtonDisabled
+                            ]}
                             onPress={generateReport}
-                            disabled={generating}
+                            disabled={generating || !selectedProjectId}
                         >
                             {generating ? (
                                 <>

@@ -57,7 +57,8 @@ const AnalyticsDashboard: React.FC = () => {
       return 0;
     }
     return project.MaterialAvailable.reduce((total, material) => {
-      return total + (material.cost || 0);
+      // Use totalCost field which contains the actual cost data
+      return total + (material.totalCost || material.cost || 0);
     }, 0);
   };
 
@@ -67,7 +68,8 @@ const AnalyticsDashboard: React.FC = () => {
       return 0;
     }
     return project.MaterialUsed.reduce((total, material) => {
-      return total + (material.cost || 0);
+      // Use totalCost field which contains the actual cost data
+      return total + (material.totalCost || material.cost || 0);
     }, 0);
   };
 

@@ -19,7 +19,8 @@ interface MaterialUsed {
   name: string;
   qnt: number;
   unit: string;
-  cost: number;
+  cost?: number;
+  totalCost?: number;
   specs: Record<string, any>;
   addedAt?: string;
   createdAt?: string;
@@ -71,7 +72,7 @@ const MaterialsAnalytics: React.FC = () => {
     }
   };
 
-  const totalExpense = materials.reduce((sum, material) => sum + material.cost, 0);
+  const totalExpense = materials.reduce((sum, material) => sum + (material.totalCost || material.cost || 0), 0);
 
   const getMaterialIcon = (materialName: string) => {
     const name = materialName.toLowerCase();
@@ -174,7 +175,7 @@ const MaterialsAnalytics: React.FC = () => {
                     </Text>
                   </View>
                   <View style={styles.materialCostContainer}>
-                    <Text style={styles.materialCost}>{formatCurrency(material.cost)}</Text>
+                    <Text style={styles.materialCost}>{formatCurrency(material.totalCost || material.cost || 0)}</Text>
                     <Text style={styles.materialCostLabel}>Total Cost</Text>
                   </View>
                 </View>

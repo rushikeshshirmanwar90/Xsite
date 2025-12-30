@@ -1,5 +1,6 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 import { Alert } from 'react-native';
 
 interface MaterialActivity {
@@ -206,7 +207,7 @@ export class PDFReportGenerator {
     }
 
     // Generate complete HTML for the PDF
-    private generateHTML(activities: MaterialActivity[]): string {
+    private generateHTML(activities: MaterialActivity[], projectName?: string): string {
         const groupedActivities = this.groupActivitiesByDate(activities);
         const sortedDates = Object.keys(groupedActivities).sort((a, b) => b.localeCompare(a)); // Latest first
 
@@ -315,7 +316,7 @@ export class PDFReportGenerator {
             <html>
             <head>
                 <meta charset="utf-8">
-                <title>Material Activity Report</title>
+                <title>${projectName ? `${projectName} - Material Report` : 'Material Activity Report'}</title>
                 <style>
                     body {
                         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -326,7 +327,6 @@ export class PDFReportGenerator {
                         background-color: #ffffff;
                     }
                     .header {
-                        text-align: center;
                         margin-bottom: 32px;
                         padding-bottom: 20px;
                         border-bottom: 2px solid #e2e8f0;
@@ -346,15 +346,37 @@ export class PDFReportGenerator {
             </head>
             <body>
                 <div class="header">
-                    <h1 style="margin: 0 0 8px 0; color: #1e293b; font-size: 28px;">Material Activity Report</h1>
-                    <p style="margin: 0; color: #6b7280; font-size: 14px;">Generated on ${new Date().toLocaleDateString('en-US', { 
-                        weekday: 'long', 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    })}</p>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+                        <div style="flex: 0 0 auto;">
+                            <!-- Client Logo -->
+                            <!-- TODO: Replace with actual client logo image when available -->
+                            <!-- <img src="data:image/png;base64,..." style="width: 80px; height: 80px; border-radius: 12px; object-fit: cover;" alt="Company Logo" /> -->
+                            <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #3B82F6, #1E40AF); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 18px; text-align: center; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                                ${this.clientData.companyName ? this.clientData.companyName.substring(0, 2).toUpperCase() : 'CM'}
+                            </div>
+                        </div>
+                        <div style="flex: 1; text-align: center; margin: 0 20px;">
+                            <h1 style="margin: 0 0 8px 0; color: #1e293b; font-size: 32px; font-weight: 800;">${projectName || 'Material Activity Report'}</h1>
+                            <div style="background: linear-gradient(90deg, #3B82F6, #1E40AF); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 16px; font-weight: 600; margin-bottom: 8px;">
+                                Material Activity Report
+                            </div>
+                            <p style="margin: 0; color: #6b7280; font-size: 13px;">Generated on ${new Date().toLocaleDateString('en-US', { 
+                                weekday: 'long', 
+                                year: 'numeric', 
+                                month: 'long', 
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            })}</p>
+                        </div>
+                        <div style="flex: 0 0 auto; width: 80px; text-align: right;">
+                            <!-- Company Info Badge -->
+                            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; font-size: 10px; color: #6b7280; text-align: center;">
+                                <div style="font-weight: 600; color: #374151;">REPORT</div>
+                                <div>ID: ${Date.now().toString().slice(-6)}</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="company-info">
@@ -391,8 +413,8 @@ export class PDFReportGenerator {
                 `}
 
                 <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #9ca3af; font-size: 12px;">
-                    <p>This report was automatically generated by Construction Manager App</p>
-                    <p>Report ID: ${Date.now()}</p>
+                    <p>This report was automatically generated by Xsite Application</p>
+                    <p>Project: ${projectName || 'N/A'} | Report ID: ${Date.now()}</p>
                 </div>
             </body>
             </html>
@@ -400,15 +422,27 @@ export class PDFReportGenerator {
     }
 
     // Generate and download PDF
-    async generatePDF(activities: MaterialActivity[]): Promise<void> {
+    async generatePDF(activities: MaterialActivity[], projectName?: string): Promise<void> {
         try {
             console.log('📄 Starting PDF generation...');
             console.log('📊 Activities to include:', activities.length);
+            console.log('📊 Project name:', projectName);
 
             // Generate HTML content
-            const htmlContent = this.generateHTML(activities);
+            const htmlContent = this.generateHTML(activities, projectName);
+            console.log('📄 HTML content generated, length:', htmlContent.length);
+            
+            // Create custom filename: Company Name - Project Name - Date
+            const companyName = this.clientData?.companyName || this.userData?.company || 'Company';
+            const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+            const sanitizedCompanyName = companyName.replace(/[^a-zA-Z0-9\s]/g, '').trim();
+            const sanitizedProjectName = (projectName || 'Project').replace(/[^a-zA-Z0-9\s]/g, '').trim();
+            
+            const customFilename = `${sanitizedCompanyName} - ${sanitizedProjectName} - ${currentDate}.pdf`;
+            console.log('📄 Custom filename:', customFilename);
             
             // Generate PDF
+            console.log('📄 Calling Print.printToFileAsync...');
             const { uri } = await Print.printToFileAsync({
                 html: htmlContent,
                 base64: false,
@@ -420,37 +454,125 @@ export class PDFReportGenerator {
                 },
             });
 
-            console.log('✅ PDF generated at:', uri);
+            console.log('✅ PDF generated successfully at:', uri);
 
-            // Share the PDF directly without moving it
-            if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(uri, {
-                    mimeType: 'application/pdf',
-                    dialogTitle: 'Share Material Activity Report',
-                });
-                
-                console.log('📁 PDF shared successfully');
-                
-                // Show success message
+            // Copy PDF to a new location with custom filename
+            let finalUri = uri; // Default to original URI
+            
+            try {
+                if (FileSystem.documentDirectory) {
+                    const customUri = `${FileSystem.documentDirectory}${customFilename}`;
+                    
+                    await FileSystem.copyAsync({
+                        from: uri,
+                        to: customUri
+                    });
+                    
+                    // Verify the file was copied successfully
+                    const fileInfo = await FileSystem.getInfoAsync(customUri);
+                    if (fileInfo.exists) {
+                        finalUri = customUri;
+                        console.log('📄 PDF copied with custom filename to:', customUri);
+                    } else {
+                        console.warn('⚠️ Custom file not found after copy, using original');
+                    }
+                } else {
+                    console.warn('⚠️ Document directory not available, using original URI');
+                }
+            } catch (copyError) {
+                console.warn('⚠️ Could not copy PDF with custom name, using original:', copyError);
+                // Continue with original URI if copy fails
+            }
+            
+            console.log('📄 Final PDF URI for sharing:', finalUri);
+
+            // Show options to View or Share the PDF
+            console.log('📄 Showing view/share options...');
+            
+            // Test if Alert is working
+            setTimeout(() => {
                 Alert.alert(
                     'PDF Generated Successfully',
-                    'Your material activity report has been generated and is ready to share.',
-                    [{ text: 'OK' }]
+                    'Your material activity report has been generated. What would you like to do?',
+                    [
+                        {
+                            text: 'View PDF',
+                            style: 'default',
+                            onPress: async () => {
+                                try {
+                                    console.log('📖 User selected View PDF');
+                                    console.log('📖 PDF URI:', finalUri);
+                                    
+                                    // Try to open with sharing first (simpler approach)
+                                    if (await Sharing.isAvailableAsync()) {
+                                        console.log('📖 Opening PDF with sharing API...');
+                                        await Sharing.shareAsync(finalUri, {
+                                            mimeType: 'application/pdf',
+                                            dialogTitle: 'View Material Activity Report',
+                                        });
+                                        console.log('📖 PDF opened successfully');
+                                    } else {
+                                        console.log('📖 Sharing not available, showing fallback message');
+                                        Alert.alert(
+                                            'PDF Ready',
+                                            'PDF has been generated successfully. Your device will handle the viewing.',
+                                            [{ text: 'OK' }]
+                                        );
+                                    }
+                                } catch (error) {
+                                    console.error('❌ Error viewing PDF:', error);
+                                    Alert.alert('Error', 'Could not open PDF for viewing. Error: ' + error);
+                                }
+                            }
+                        },
+                        {
+                            text: 'Share PDF',
+                            onPress: async () => {
+                                try {
+                                    console.log('📤 User selected Share PDF');
+                                    console.log('📤 PDF URI:', finalUri);
+                                    console.log('📤 PDF filename:', customFilename);
+                                    
+                                    // Share the PDF with custom filename
+                                    if (await Sharing.isAvailableAsync()) {
+                                        console.log('📤 Sharing PDF...');
+                                        await Sharing.shareAsync(finalUri, {
+                                            mimeType: 'application/pdf',
+                                            dialogTitle: 'Share Material Activity Report',
+                                        });
+                                        console.log('✅ PDF shared successfully');
+                                    } else {
+                                        console.log('📤 Sharing not available');
+                                        Alert.alert(
+                                            'Sharing Not Available',
+                                            'Sharing is not available on this device.',
+                                            [{ text: 'OK' }]
+                                        );
+                                    }
+                                } catch (error) {
+                                    console.error('❌ Error sharing PDF:', error);
+                                    Alert.alert('Error', 'Could not share PDF. Error: ' + error);
+                                }
+                            }
+                        },
+                        {
+                            text: 'Cancel',
+                            style: 'cancel',
+                            onPress: () => {
+                                console.log('📄 User cancelled PDF action');
+                            }
+                        }
+                    ],
+                    { cancelable: true }
                 );
-            } else {
-                // Fallback for devices without sharing capability
-                Alert.alert(
-                    'PDF Generated',
-                    `Report generated successfully!\n\nThe PDF has been created and is available for use.`,
-                    [{ text: 'OK' }]
-                );
-            }
+            }, 100); // Small delay to ensure UI is ready
 
         } catch (error) {
             console.error('❌ PDF generation error:', error);
+            console.error('❌ Error details:', JSON.stringify(error, null, 2));
             Alert.alert(
                 'Error',
-                'Failed to generate PDF report. Please try again.',
+                'Failed to generate PDF report. Please try again. Error: ' + (error instanceof Error ? error.message : String(error)),
                 [{ text: 'OK' }]
             );
         }

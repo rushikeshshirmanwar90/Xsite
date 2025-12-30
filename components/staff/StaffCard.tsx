@@ -56,15 +56,10 @@ const StaffCard: React.FC<StaffCardProps> = ({ staff, onPress }) => {
                     <View style={styles.staffDetails}>
                         <View style={styles.nameRow}>
                             <Text style={styles.staffName}>{fullName}</Text>
-                            {staff.emailVerified ? (
+                            {staff.emailVerified && (
                                 <View style={styles.verifiedBadge}>
                                     <Ionicons name="checkmark-circle" size={16} color="#10B981" />
                                     <Text style={styles.verifiedText}>Verified</Text>
-                                </View>
-                            ) : (
-                                <View style={styles.unverifiedBadge}>
-                                    <Ionicons name="mail-outline" size={14} color="#F59E0B" />
-                                    <Text style={styles.unverifiedText}>Unverified</Text>
                                 </View>
                             )}
                         </View>
@@ -201,20 +196,6 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     verifyButtonText: {
-        fontSize: 11,
-        color: '#F59E0B',
-        fontWeight: '600',
-    },
-    unverifiedBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#FEF3C7',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-        gap: 4,
-    },
-    unverifiedText: {
         fontSize: 11,
         color: '#F59E0B',
         fontWeight: '600',

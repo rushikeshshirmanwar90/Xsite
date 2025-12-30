@@ -12,14 +12,10 @@ import { toast } from 'sonner-native';
 
 interface BuildingDetails {
     totalFloors: number;
-    totalUnits: number;
     totalBookedUnits: number;
-    buildingType: string;
-    constructionStatus: string;
     description: string;
-    location: string;
-    area: number;
-    completionDate: string;
+    hasBasement: boolean;
+    hasGroundFloor: boolean;
 }
 
 const ManageProject = () => {
@@ -40,15 +36,15 @@ const ManageProject = () => {
     // Building details state
     const [buildingDetails, setBuildingDetails] = useState<BuildingDetails>({
         totalFloors: 0,
-        totalUnits: 0,
         totalBookedUnits: 0,
-        buildingType: 'Residential',
-        constructionStatus: 'Planning',
         description: '',
-        location: '',
-        area: 0,
-        completionDate: ''
+        hasBasement: false,
+        hasGroundFloor: true
     });
+
+    // Edit mode state
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [hasExistingData, setHasExistingData] = useState(false);
 
     // Performance optimization
     const isLoadingRef = React.useRef(false);
@@ -179,7 +175,7 @@ const ManageProject = () => {
                     style: 'destructive',
                     onPress: async () => {
                         let loadingToast: any = null;
-                        const sectionId = section._id || section.sectionId; // Define outside try block
+                        const sectionId = section._id || section.sectionId;
 
                         try {
                             loadingToast = toast.loading('Deleting section...');
@@ -263,7 +259,7 @@ const ManageProject = () => {
                                     });
                                 });
 
-                                return; // Exit early, don't show error toast
+                                return;
                             } else if (error?.response?.status === 500) {
                                 errorMessage = 'Server error. The section may have been deleted.';
 
@@ -292,56 +288,76 @@ const ManageProject = () => {
 
     // Handle section details - Open details modal
     const handleSectionDetails = async (section: ProjectSection) => {
+        console.log('🔍 DEBUG: Opening section details');
+        console.log('Section data:', JSON.stringify(section, null, 2));
+        
         setSelectedSection(section);
+        setIsEditMode(false); // Reset to view mode
         
         // If it's a building, fetch existing details
         if (section.type === 'Buildings') {
             try {
-                const sectionId = section._id || section.sectionId;
+                // Use sectionId for buildings (this is the actual building ID)
+                const sectionId = section.sectionId || section._id;
+                console.log('🔍 DEBUG: Fetching building details for ID:', sectionId);
+                console.log('🌐 API URL:', `${domain}/api/building?id=${sectionId}`);
+                
                 const response = await axios.get(`${domain}/api/building?id=${sectionId}`);
                 const responseData = response.data as any;
                 
+                console.log('📥 Building details response:', JSON.stringify(responseData, null, 2));
+                
                 if (responseData && responseData.success && responseData.data) {
                     const building = responseData.data;
-                    setBuildingDetails({
+                    const details = {
                         totalFloors: building.totalFloors || 0,
-                        totalUnits: building.totalUnits || 0,
                         totalBookedUnits: building.totalBookedUnits || 0,
-                        buildingType: building.buildingType || 'Residential',
-                        constructionStatus: building.constructionStatus || 'Planning',
                         description: building.description || '',
-                        location: building.location || '',
-                        area: building.area || 0,
-                        completionDate: building.completionDate ? new Date(building.completionDate).toISOString().split('T')[0] : ''
-                    });
+                        hasBasement: building.hasBasement || false,
+                        hasGroundFloor: building.hasGroundFloor !== undefined ? building.hasGroundFloor : true
+                    };
+                    setBuildingDetails(details);
+                    
+                    // Check if data exists (at least one meaningful value)
+                    const dataExists = details.totalFloors > 0 || details.description.trim() !== '' || 
+                                      details.hasBasement || !details.hasGroundFloor;
+                    setHasExistingData(dataExists);
+                    
+                    console.log('✅ Building details loaded successfully');
+                    console.log('Has existing data:', dataExists);
                 } else {
+                    console.log('⚠️ No building data found, using defaults');
                     // Reset to defaults if no data found
                     setBuildingDetails({
                         totalFloors: 0,
-                        totalUnits: 0,
                         totalBookedUnits: 0,
-                        buildingType: 'Residential',
-                        constructionStatus: 'Planning',
                         description: '',
-                        location: '',
-                        area: 0,
-                        completionDate: ''
+                        hasBasement: false,
+                        hasGroundFloor: true
                     });
+                    setHasExistingData(false);
+                    setIsEditMode(true); // Auto-enable edit mode if no data
                 }
-            } catch (error) {
-                console.error('Error fetching building details:', error);
-                // Reset to defaults on error
+            } catch (error: any) {
+                console.error('❌ Error fetching building details:', error);
+                console.error('❌ Error response:', error?.response?.data);
+                console.error('❌ Error status:', error?.response?.status);
+                
+                if (error?.response?.status === 404) {
+                    console.error('🔍 Building not found in database. This building section exists but the building record is missing.');
+                    toast.warning('Building record not found. You can create it by adding details.');
+                }
+                
+                // Reset to defaults on error - the save function will create the building
                 setBuildingDetails({
                     totalFloors: 0,
-                    totalUnits: 0,
                     totalBookedUnits: 0,
-                    buildingType: 'Residential',
-                    constructionStatus: 'Planning',
                     description: '',
-                    location: '',
-                    area: 0,
-                    completionDate: ''
+                    hasBasement: false,
+                    hasGroundFloor: true
                 });
+                setHasExistingData(false);
+                setIsEditMode(true); // Auto-enable edit mode on error
             }
         }
         
@@ -380,42 +396,28 @@ const ManageProject = () => {
             console.log('========================================');
             console.log('Full section object:', JSON.stringify(editingSection, null, 2));
             console.log('Section type:', editingSection.type);
-            console.log('Section type (typeof):', typeof editingSection.type);
-            console.log('Section type === "Buildings":', editingSection.type === 'Buildings');
-            console.log('Section type === "rowhouse":', editingSection.type === 'rowhouse');
-            console.log('Section type === "other":', editingSection.type === 'other');
             console.log('Section ID:', sectionId);
             console.log('New name:', newName);
             console.log('========================================');
 
             // Determine the correct API endpoint based on section type
-            // Check exact type value with strict comparison
             if (editingSection.type === 'Buildings' || editingSection.type === 'building') {
                 endpoint = `${domain}/api/building?id=${sectionId}`;
                 console.log('✅ MATCHED: Building type');
-                console.log('Building endpoint:', endpoint);
             } else if (editingSection.type === 'rowhouse' || editingSection.type === 'row house' || editingSection.type === 'Rowhouse') {
-                // RowHouse API uses 'rh' parameter
                 endpoint = `${domain}/api/rowHouse?rh=${sectionId}`;
                 console.log('✅ MATCHED: Rowhouse type');
-                console.log('Rowhouse endpoint:', endpoint);
 
-                // Include totalHouses if it exists
                 const sectionData = editingSection as any;
                 if (sectionData.totalHouses) {
                     payload.totalHouses = sectionData.totalHouses;
                 }
             } else {
-                // OtherSection API uses 'rh' parameter
                 endpoint = `${domain}/api/otherSection?rh=${sectionId}`;
-                console.log('✅ MATCHED: Other section type (default)');
-                console.log('Other section endpoint:', endpoint);
+                console.log('✅ MATCHED: Other section type');
             }
 
-            console.log('========================================');
             console.log('FINAL ENDPOINT:', endpoint);
-            console.log('========================================');
-
             console.log('Payload:', payload);
 
             const res = await axios.put(endpoint, payload);
@@ -440,7 +442,7 @@ const ManageProject = () => {
                     }]
                 );
 
-                // Update the section in the list immediately (optimistic update)
+                // Update the section in the list
                 setSections(prevSections => {
                     return prevSections.map(s => {
                         const currentId = s._id || s.sectionId;
@@ -482,24 +484,103 @@ const ManageProject = () => {
         let loadingToast: any = null;
 
         try {
-            loadingToast = toast.loading('Saving building details...');
+            loadingToast = toast.loading('Saving building details and creating floors...');
 
-            const sectionId = selectedSection._id || selectedSection.sectionId;
+            const sectionId = selectedSection.sectionId || selectedSection._id;
+            
+            console.log('🔍 DEBUG: Building save details');
+            console.log('Selected section:', JSON.stringify(selectedSection, null, 2));
+            console.log('Section ID:', sectionId);
+            console.log('Building details:', JSON.stringify(buildingDetails, null, 2));
+            
+            // Create floors array
+            const floorsToCreate = [];
+
+            if (buildingDetails.hasBasement) {
+                floorsToCreate.push({
+                    floorNumber: -1,
+                    floorName: 'Basement',
+                    floorType: 'Parking',
+                    totalUnits: 0,
+                    totalBookedUnits: 0,
+                    description: 'Basement floor',
+                    isActive: true
+                });
+            }
+
+            if (buildingDetails.hasGroundFloor) {
+                floorsToCreate.push({
+                    floorNumber: 0,
+                    floorName: 'Ground Floor',
+                    floorType: 'Commercial',
+                    totalUnits: 0,
+                    totalBookedUnits: 0,
+                    description: 'Ground floor',
+                    isActive: true
+                });
+            }
+
+            for (let i = 1; i <= buildingDetails.totalFloors; i++) {
+                const floorName = i === 1 ? '1st Floor' : 
+                                 i === 2 ? '2nd Floor' : 
+                                 i === 3 ? '3rd Floor' : 
+                                 `${i}th Floor`;
+                
+                floorsToCreate.push({
+                    floorNumber: i,
+                    floorName: floorName,
+                    floorType: 'Residential',
+                    totalUnits: 0,
+                    totalBookedUnits: 0,
+                    description: `${floorName} - Residential units`,
+                    isActive: true
+                });
+            }
+
             const payload = {
                 ...buildingDetails,
-                clientId: 'unknown' // You may want to get this from user context
+                floors: floorsToCreate,
+                clientId: 'unknown'
             };
 
-            const response = await axios.put(`${domain}/api/building?id=${sectionId}`, payload);
+            console.log('📤 API Payload:', JSON.stringify(payload, null, 2));
+            console.log('🌐 API URL:', `${domain}/api/building?id=${sectionId}`);
+
+            let response;
+            
+            try {
+                response = await axios.put(`${domain}/api/building?id=${sectionId}`, payload);
+                console.log('✅ Building updated successfully');
+            } catch (updateError: any) {
+                if (updateError?.response?.status === 404) {
+                    console.log('🔄 Building not found, creating new building...');
+                    
+                    const createPayload = {
+                        ...payload,
+                        _id: sectionId,
+                        name: selectedSection.name,
+                        projectId: id
+                    };
+                    
+                    console.log('📤 Create Payload:', JSON.stringify(createPayload, null, 2));
+                    
+                    response = await axios.post(`${domain}/api/building`, createPayload);
+                    console.log('✅ Building created successfully');
+                } else {
+                    throw updateError;
+                }
+            }
+
+            console.log('📥 API Response:', response.data);
 
             toast.dismiss(loadingToast);
 
-            if (response.status === 200) {
-                toast.success('Building details saved successfully!');
-                setShowDetailsModal(false);
-                setSelectedSection(null);
+            if (response.status === 200 || response.status === 201) {
+                toast.success(`Building details saved! Created ${floorsToCreate.length} floors automatically.`);
+                setIsEditMode(false);
+                setHasExistingData(true);
                 
-                // Optionally refresh the sections list
+                // Optionally refresh
                 await fetchSections(false);
             }
         } catch (error: any) {
@@ -507,11 +588,22 @@ const ManageProject = () => {
                 toast.dismiss(loadingToast);
             }
 
-            console.error('Error saving building details:', error);
-            const errorMessage = error?.response?.data?.error ||
-                error?.response?.data?.message ||
-                error?.message ||
-                'Failed to save building details';
+            console.error('❌ Error saving building details:', error);
+            console.error('❌ Error response:', error?.response?.data);
+            console.error('❌ Error status:', error?.response?.status);
+
+            let errorMessage = 'Failed to save building details';
+            
+            if (error?.response?.status === 404) {
+                errorMessage = 'Building not found and could not be created.';
+            } else if (error?.response?.data?.error) {
+                errorMessage = error.response.data.error;
+            } else if (error?.response?.data?.message) {
+                errorMessage = error.response.data.message;
+            } else if (error?.message) {
+                errorMessage = error.message;
+            }
+
             toast.error(errorMessage);
         }
     };
@@ -520,13 +612,11 @@ const ManageProject = () => {
     const handleManageFloors = () => {
         if (!selectedSection) return;
 
-        const sectionId = selectedSection._id || selectedSection.sectionId;
+        const sectionId = selectedSection.sectionId || selectedSection._id;
         
-        // Close the current modal
         setShowDetailsModal(false);
         setSelectedSection(null);
         
-        // Navigate to floors management page
         router.push({
             pathname: '/building_floors/[id]',
             params: { 
@@ -538,7 +628,6 @@ const ManageProject = () => {
 
     // Handle section addition
     const handleAddSection = async (type: string, title: string, totalHouses?: number) => {
-        // Create the base payload
         const payload = {
             projectId: id,
             name: title
@@ -588,21 +677,15 @@ const ManageProject = () => {
 
             console.log('Section added successfully, full response:', JSON.stringify(res?.data, null, 2));
 
-            // The API returns the section data directly or wrapped in a property
-            // We need to extract it properly
             let newSectionData: any = null;
 
             if (res && res.data) {
                 const responseData = res.data as any;
-                // Check different possible response structures
                 if (responseData._id || responseData.sectionId) {
-                    // Direct section object
                     newSectionData = responseData;
                 } else if (responseData.section) {
-                    // Wrapped in 'section' property
                     newSectionData = responseData.section;
                 } else if (responseData.data) {
-                    // Wrapped in 'data' property
                     newSectionData = responseData.data;
                 }
             }
@@ -610,7 +693,6 @@ const ManageProject = () => {
             if (newSectionData && (newSectionData._id || newSectionData.sectionId)) {
                 console.log('✅ Found new section data:', newSectionData);
 
-                // Ensure the section has all required fields
                 const formattedSection: ProjectSection = {
                     _id: newSectionData._id,
                     sectionId: newSectionData.sectionId || newSectionData._id,
@@ -621,7 +703,6 @@ const ManageProject = () => {
 
                 console.log('Adding formatted section to list:', formattedSection);
 
-                // Log activity
                 await logSectionCreated(
                     id as string,
                     name as string,
@@ -629,7 +710,6 @@ const ManageProject = () => {
                     title
                 );
 
-                // Add the new section to the existing sections
                 setSections(prevSections => {
                     const updated = [...prevSections, formattedSection];
                     console.log('Updated sections count:', updated.length);
@@ -638,11 +718,10 @@ const ManageProject = () => {
 
                 console.log('✅ Section added to list successfully');
             } else {
-                // If we can't find section data in response, create it manually
                 console.log('⚠️ No section data in response, creating manually...');
 
                 const manualSection: ProjectSection = {
-                    _id: `temp-${Date.now()}`, // Temporary ID
+                    _id: `temp-${Date.now()}`,
                     sectionId: `temp-${Date.now()}`,
                     name: title,
                     type: type === 'building' ? 'Buildings' : (type === 'rowhouse' ? 'rowhouse' : 'other'),
@@ -652,10 +731,8 @@ const ManageProject = () => {
 
                 console.log('⚠️ Manual section added, will refresh from server...');
 
-                // Wait and refresh from server to get the real data
                 await new Promise(resolve => setTimeout(resolve, 1000));
 
-                // Force refresh from server
                 isLoadingRef.current = false;
                 lastLoadTimeRef.current = 0;
 
@@ -680,6 +757,207 @@ const ManageProject = () => {
             toast.error(errorMessage);
         }
     };
+
+    // Render Building Details View Mode
+    const renderBuildingDetailsView = () => (
+        <ScrollView 
+            contentContainerStyle={styles.modalScrollContent}
+            showsVerticalScrollIndicator={true}
+            style={{ flex: 1 }}
+            bounces={true}
+        >
+            {/* Floor Summary Section */}
+            <View style={styles.viewSection}>
+                <Text style={styles.viewSectionTitle}>Floor Configuration</Text>
+                <View style={styles.floorSummaryView}>
+                    {buildingDetails.hasBasement && (
+                        <View style={styles.floorSummaryItemView}>
+                            <View style={styles.floorIconContainer}>
+                                <Ionicons name="arrow-down" size={20} color="#3B82F6" />
+                            </View>
+                            <View style={styles.floorInfoView}>
+                                <Text style={styles.floorNameView}>Basement</Text>
+                                <Text style={styles.floorTypeView}>Parking</Text>
+                            </View>
+                        </View>
+                    )}
+                    {buildingDetails.hasGroundFloor && (
+                        <View style={styles.floorSummaryItemView}>
+                            <View style={styles.floorIconContainer}>
+                                <Ionicons name="storefront" size={20} color="#10B981" />
+                            </View>
+                            <View style={styles.floorInfoView}>
+                                <Text style={styles.floorNameView}>Ground Floor</Text>
+                                <Text style={styles.floorTypeView}>Commercial</Text>
+                            </View>
+                        </View>
+                    )}
+                    {Array.from({length: buildingDetails.totalFloors}, (_, i) => {
+                        const floorNum = i + 1;
+                        const floorName = floorNum === 1 ? '1st' : floorNum === 2 ? '2nd' : floorNum === 3 ? '3rd' : `${floorNum}th`;
+                        return (
+                            <View key={i} style={styles.floorSummaryItemView}>
+                                <View style={styles.floorIconContainer}>
+                                    <Ionicons name="home" size={20} color="#8B5CF6" />
+                                </View>
+                                <View style={styles.floorInfoView}>
+                                    <Text style={styles.floorNameView}>{floorName} Floor</Text>
+                                    <Text style={styles.floorTypeView}>Residential</Text>
+                                </View>
+                            </View>
+                        );
+                    })}
+                    {!buildingDetails.hasBasement && !buildingDetails.hasGroundFloor && buildingDetails.totalFloors === 0 && (
+                        <Text style={styles.noDataText}>No floors configured yet</Text>
+                    )}
+                </View>
+            </View>
+
+            {/* Description Section */}
+            {buildingDetails.description && (
+                <View style={styles.viewSection}>
+                    <Text style={styles.viewSectionTitle}>Description</Text>
+                    <Text style={styles.descriptionText}>{buildingDetails.description}</Text>
+                </View>
+            )}
+
+            {/* Total Floors Count */}
+            <View style={styles.statsContainer}>
+                <View style={styles.statCard}>
+                    <Ionicons name="layers-outline" size={24} color="#3B82F6" />
+                    <Text style={styles.statValue}>
+                        {(buildingDetails.hasBasement ? 1 : 0) + 
+                         (buildingDetails.hasGroundFloor ? 1 : 0) + 
+                         buildingDetails.totalFloors}
+                    </Text>
+                    <Text style={styles.statLabel}>Total Floors</Text>
+                </View>
+                <View style={styles.statCard}>
+                    <Ionicons name="business-outline" size={24} color="#10B981" />
+                    <Text style={styles.statValue}>{buildingDetails.totalFloors}</Text>
+                    <Text style={styles.statLabel}>Upper Floors</Text>
+                </View>
+            </View>
+
+            {/* Manage Floors Button */}
+            <TouchableOpacity
+                style={styles.manageFloorsButton}
+                onPress={handleManageFloors}
+            >
+                <Ionicons name="layers-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.manageFloorsText}>Manage Floors & Units</Text>
+            </TouchableOpacity>
+        </ScrollView>
+    );
+
+    // Render Building Details Edit Mode
+    const renderBuildingDetailsEdit = () => (
+        <ScrollView 
+            contentContainerStyle={styles.modalScrollContent}
+            showsVerticalScrollIndicator={true}
+            style={{ flex: 1 }}
+            bounces={true}
+        >
+            {/* Floor Configuration */}
+            <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Floor Configuration</Text>
+                
+                {/* Basement Checkbox */}
+                <TouchableOpacity
+                    style={styles.checkboxContainer}
+                    onPress={() => setBuildingDetails(prev => ({ ...prev, hasBasement: !prev.hasBasement }))}
+                >
+                    <View style={[styles.checkbox, buildingDetails.hasBasement && styles.checkboxChecked]}>
+                        {buildingDetails.hasBasement && (
+                            <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                        )}
+                    </View>
+                    <Text style={styles.checkboxLabel}>Include Basement</Text>
+                </TouchableOpacity>
+
+                {/* Ground Floor Checkbox */}
+                <TouchableOpacity
+                    style={styles.checkboxContainer}
+                    onPress={() => setBuildingDetails(prev => ({ ...prev, hasGroundFloor: !prev.hasGroundFloor }))}
+                >
+                    <View style={[styles.checkbox, buildingDetails.hasGroundFloor && styles.checkboxChecked]}>
+                        {buildingDetails.hasGroundFloor && (
+                            <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                        )}
+                    </View>
+                    <Text style={styles.checkboxLabel}>Include Ground Floor</Text>
+                </TouchableOpacity>
+            </View>
+
+            {/* Total Floors */}
+            <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Number of Upper Floors</Text>
+                <TextInput
+                    style={styles.input}
+                    value={buildingDetails.totalFloors.toString()}
+                    onChangeText={(text) => setBuildingDetails(prev => ({ ...prev, totalFloors: parseInt(text) || 0 }))}
+                    placeholder="Enter number of floors above ground"
+                    placeholderTextColor="#94A3B8"
+                    keyboardType="numeric"
+                />
+                <Text style={styles.inputHint}>
+                    This will create floors: {buildingDetails.totalFloors > 0 ? 
+                        Array.from({length: buildingDetails.totalFloors}, (_, i) => {
+                            const floorNum = i + 1;
+                            return floorNum === 1 ? '1st' : floorNum === 2 ? '2nd' : floorNum === 3 ? '3rd' : `${floorNum}th`;
+                        }).join(', ') + ' Floor' + (buildingDetails.totalFloors > 1 ? 's' : '')
+                        : 'No upper floors'
+                    }
+                </Text>
+            </View>
+
+            {/* Floor Summary */}
+            <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Floor Summary</Text>
+                <View style={styles.floorSummary}>
+                    {buildingDetails.hasBasement && (
+                        <View style={styles.floorSummaryItem}>
+                            <Ionicons name="arrow-down" size={16} color="#6B7280" />
+                            <Text style={styles.floorSummaryText}>Basement (Parking)</Text>
+                        </View>
+                    )}
+                    {buildingDetails.hasGroundFloor && (
+                        <View style={styles.floorSummaryItem}>
+                            <Ionicons name="storefront" size={16} color="#6B7280" />
+                            <Text style={styles.floorSummaryText}>Ground Floor (Commercial)</Text>
+                        </View>
+                    )}
+                    {Array.from({length: buildingDetails.totalFloors}, (_, i) => {
+                        const floorNum = i + 1;
+                        const floorName = floorNum === 1 ? '1st' : floorNum === 2 ? '2nd' : floorNum === 3 ? '3rd' : `${floorNum}th`;
+                        return (
+                            <View key={i} style={styles.floorSummaryItem}>
+                                <Ionicons name="home" size={16} color="#6B7280" />
+                                <Text style={styles.floorSummaryText}>{floorName} Floor (Residential)</Text>
+                            </View>
+                        );
+                    })}
+                    {!buildingDetails.hasBasement && !buildingDetails.hasGroundFloor && buildingDetails.totalFloors === 0 && (
+                        <Text style={styles.noFloorsText}>No floors configured</Text>
+                    )}
+                </View>
+            </View>
+
+            {/* Description */}
+            <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Description</Text>
+                <TextInput
+                    style={[styles.input, styles.textArea]}
+                    value={buildingDetails.description}
+                    onChangeText={(text) => setBuildingDetails(prev => ({ ...prev, description: text }))}
+                    placeholder="Enter building description"
+                    placeholderTextColor="#94A3B8"
+                    multiline
+                    numberOfLines={4}
+                />
+            </View>
+        </ScrollView>
+    );
 
     return (
         <SafeAreaView style={styles.container}>
@@ -804,6 +1082,64 @@ const ManageProject = () => {
                 projectId={id as string}
             />
 
+            {/* Edit Section Name Modal */}
+            <Modal
+                visible={showEditModal}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => {
+                    setShowEditModal(false);
+                    setEditingSection(null);
+                }}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, { height: 'auto', maxHeight: 300 }]}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Edit Section Name</Text>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setShowEditModal(false);
+                                    setEditingSection(null);
+                                }}
+                                style={styles.closeButton}
+                            >
+                                <Ionicons name="close" size={24} color="#64748B" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={[styles.modalBody, { paddingHorizontal: 20, paddingVertical: 20 }]}>
+                            <Text style={styles.inputLabel}>Section Name</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={editSectionName}
+                                onChangeText={setEditSectionName}
+                                placeholder="Enter section name"
+                                placeholderTextColor="#94A3B8"
+                            />
+                        </View>
+
+                        <View style={styles.modalFooter}>
+                            <TouchableOpacity
+                                style={styles.cancelButton}
+                                onPress={() => {
+                                    setShowEditModal(false);
+                                    setEditingSection(null);
+                                }}
+                            >
+                                <Text style={styles.cancelButtonText}>Cancel</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.updateButton}
+                                onPress={handleUpdateSection}
+                            >
+                                <Text style={styles.updateButtonText}>Update</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
             {/* Building Details Modal */}
             <Modal
                 visible={showDetailsModal}
@@ -812,197 +1148,78 @@ const ManageProject = () => {
                 onRequestClose={() => {
                     setShowDetailsModal(false);
                     setSelectedSection(null);
+                    setIsEditMode(false);
                 }}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+                    <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>
                                 {selectedSection?.type === 'Buildings' ? 'Building Details' : 'Section Details'}
                             </Text>
-                            <TouchableOpacity
-                                onPress={() => {
-                                    setShowDetailsModal(false);
-                                    setSelectedSection(null);
-                                }}
-                                style={styles.closeButton}
-                            >
-                                <Ionicons name="close" size={24} color="#64748B" />
-                            </TouchableOpacity>
+                            <View style={styles.headerActions}>
+                                {/* Edit Button - Only show in view mode when data exists */}
+                                {selectedSection?.type === 'Buildings' && !isEditMode && hasExistingData && (
+                                    <TouchableOpacity
+                                        onPress={() => setIsEditMode(true)}
+                                        style={styles.editModeButton}
+                                    >
+                                        <Ionicons name="create-outline" size={20} color="#3B82F6" />
+                                        <Text style={styles.editModeButtonText}>Edit</Text>
+                                    </TouchableOpacity>
+                                )}
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setShowDetailsModal(false);
+                                        setSelectedSection(null);
+                                        setIsEditMode(false);
+                                    }}
+                                    style={styles.closeButton}
+                                >
+                                    <Ionicons name="close" size={24} color="#64748B" />
+                                </TouchableOpacity>
+                            </View>
                         </View>
 
-                        <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+                        <View style={styles.modalBody}>
                             {selectedSection?.type === 'Buildings' ? (
                                 <>
-                                    {/* Building Type */}
-                                    <View style={styles.inputGroup}>
-                                        <Text style={styles.inputLabel}>Building Type</Text>
-                                        <View style={styles.pickerContainer}>
-                                            <TouchableOpacity
-                                                style={[styles.pickerButton, buildingDetails.buildingType === 'Residential' && styles.pickerButtonActive]}
-                                                onPress={() => setBuildingDetails(prev => ({ ...prev, buildingType: 'Residential' }))}
-                                            >
-                                                <Text style={[styles.pickerButtonText, buildingDetails.buildingType === 'Residential' && styles.pickerButtonTextActive]}>
-                                                    Residential
-                                                </Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity
-                                                style={[styles.pickerButton, buildingDetails.buildingType === 'Commercial' && styles.pickerButtonActive]}
-                                                onPress={() => setBuildingDetails(prev => ({ ...prev, buildingType: 'Commercial' }))}
-                                            >
-                                                <Text style={[styles.pickerButtonText, buildingDetails.buildingType === 'Commercial' && styles.pickerButtonTextActive]}>
-                                                    Commercial
-                                                </Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity
-                                                style={[styles.pickerButton, buildingDetails.buildingType === 'Mixed Use' && styles.pickerButtonActive]}
-                                                onPress={() => setBuildingDetails(prev => ({ ...prev, buildingType: 'Mixed Use' }))}
-                                            >
-                                                <Text style={[styles.pickerButtonText, buildingDetails.buildingType === 'Mixed Use' && styles.pickerButtonTextActive]}>
-                                                    Mixed Use
-                                                </Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                    </View>
-
-                                    {/* Construction Status */}
-                                    <View style={styles.inputGroup}>
-                                        <Text style={styles.inputLabel}>Construction Status</Text>
-                                        <View style={styles.pickerContainer}>
-                                            <TouchableOpacity
-                                                style={[styles.pickerButton, buildingDetails.constructionStatus === 'Planning' && styles.pickerButtonActive]}
-                                                onPress={() => setBuildingDetails(prev => ({ ...prev, constructionStatus: 'Planning' }))}
-                                            >
-                                                <Text style={[styles.pickerButtonText, buildingDetails.constructionStatus === 'Planning' && styles.pickerButtonTextActive]}>
-                                                    Planning
-                                                </Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity
-                                                style={[styles.pickerButton, buildingDetails.constructionStatus === 'Under Construction' && styles.pickerButtonActive]}
-                                                onPress={() => setBuildingDetails(prev => ({ ...prev, constructionStatus: 'Under Construction' }))}
-                                            >
-                                                <Text style={[styles.pickerButtonText, buildingDetails.constructionStatus === 'Under Construction' && styles.pickerButtonTextActive]}>
-                                                    Under Construction
-                                                </Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity
-                                                style={[styles.pickerButton, buildingDetails.constructionStatus === 'Completed' && styles.pickerButtonActive]}
-                                                onPress={() => setBuildingDetails(prev => ({ ...prev, constructionStatus: 'Completed' }))}
-                                            >
-                                                <Text style={[styles.pickerButtonText, buildingDetails.constructionStatus === 'Completed' && styles.pickerButtonTextActive]}>
-                                                    Completed
-                                                </Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                    </View>
-
-                                    {/* Total Floors */}
-                                    <View style={styles.inputGroup}>
-                                        <Text style={styles.inputLabel}>Total Floors</Text>
-                                        <TextInput
-                                            style={styles.input}
-                                            value={buildingDetails.totalFloors.toString()}
-                                            onChangeText={(text) => setBuildingDetails(prev => ({ ...prev, totalFloors: parseInt(text) || 0 }))}
-                                            placeholder="Enter total floors"
-                                            placeholderTextColor="#94A3B8"
-                                            keyboardType="numeric"
-                                        />
-                                    </View>
-
-                                    {/* Total Units */}
-                                    <View style={styles.inputGroup}>
-                                        <Text style={styles.inputLabel}>Total Units</Text>
-                                        <TextInput
-                                            style={styles.input}
-                                            value={buildingDetails.totalUnits.toString()}
-                                            onChangeText={(text) => setBuildingDetails(prev => ({ ...prev, totalUnits: parseInt(text) || 0 }))}
-                                            placeholder="Enter total units"
-                                            placeholderTextColor="#94A3B8"
-                                            keyboardType="numeric"
-                                        />
-                                    </View>
-
-                                    {/* Location */}
-                                    <View style={styles.inputGroup}>
-                                        <Text style={styles.inputLabel}>Location</Text>
-                                        <TextInput
-                                            style={styles.input}
-                                            value={buildingDetails.location}
-                                            onChangeText={(text) => setBuildingDetails(prev => ({ ...prev, location: text }))}
-                                            placeholder="Enter building location"
-                                            placeholderTextColor="#94A3B8"
-                                        />
-                                    </View>
-
-                                    {/* Area */}
-                                    <View style={styles.inputGroup}>
-                                        <Text style={styles.inputLabel}>Area (sq ft)</Text>
-                                        <TextInput
-                                            style={styles.input}
-                                            value={buildingDetails.area.toString()}
-                                            onChangeText={(text) => setBuildingDetails(prev => ({ ...prev, area: parseFloat(text) || 0 }))}
-                                            placeholder="Enter area in square feet"
-                                            placeholderTextColor="#94A3B8"
-                                            keyboardType="numeric"
-                                        />
-                                    </View>
-
-                                    {/* Completion Date */}
-                                    <View style={styles.inputGroup}>
-                                        <Text style={styles.inputLabel}>Expected Completion Date</Text>
-                                        <TextInput
-                                            style={styles.input}
-                                            value={buildingDetails.completionDate}
-                                            onChangeText={(text) => setBuildingDetails(prev => ({ ...prev, completionDate: text }))}
-                                            placeholder="YYYY-MM-DD"
-                                            placeholderTextColor="#94A3B8"
-                                        />
-                                    </View>
-
-                                    {/* Description */}
-                                    <View style={styles.inputGroup}>
-                                        <Text style={styles.inputLabel}>Description</Text>
-                                        <TextInput
-                                            style={[styles.input, styles.textArea]}
-                                            value={buildingDetails.description}
-                                            onChangeText={(text) => setBuildingDetails(prev => ({ ...prev, description: text }))}
-                                            placeholder="Enter building description"
-                                            placeholderTextColor="#94A3B8"
-                                            multiline
-                                            numberOfLines={4}
-                                        />
-                                    </View>
-
-                                    {/* Manage Floors Button */}
-                                    <TouchableOpacity
-                                        style={styles.manageFloorsButton}
-                                        onPress={handleManageFloors}
-                                    >
-                                        <Ionicons name="layers-outline" size={20} color="#FFFFFF" />
-                                        <Text style={styles.manageFloorsText}>Manage Floors & Units</Text>
-                                    </TouchableOpacity>
+                                    {!isEditMode && hasExistingData ? renderBuildingDetailsView() : renderBuildingDetailsEdit()}
                                 </>
                             ) : (
-                                <View style={styles.comingSoonContainer}>
-                                    <Ionicons name="construct-outline" size={64} color="#94A3B8" />
-                                    <Text style={styles.comingSoonTitle}>Coming Soon</Text>
-                                    <Text style={styles.comingSoonText}>
-                                        Details management for {selectedSection?.type} sections will be available in a future update.
-                                    </Text>
-                                </View>
+                                <ScrollView 
+                                    contentContainerStyle={styles.modalScrollContent}
+                                    showsVerticalScrollIndicator={true}
+                                    style={{ flex: 1 }}
+                                    bounces={true}
+                                >
+                                    <View style={styles.comingSoonContainer}>
+                                        <Ionicons name="construct-outline" size={64} color="#94A3B8" />
+                                        <Text style={styles.comingSoonTitle}>Coming Soon</Text>
+                                        <Text style={styles.comingSoonText}>
+                                            Details management for {selectedSection?.type} sections will be available in a future update.
+                                        </Text>
+                                    </View>
+                                </ScrollView>
                             )}
-                        </ScrollView>
+                        </View>
 
-                        {selectedSection?.type === 'Buildings' && (
+                        {selectedSection?.type === 'Buildings' && isEditMode && (
                             <View style={styles.modalFooter}>
                                 <TouchableOpacity
                                     style={styles.cancelButton}
                                     onPress={() => {
-                                        setShowDetailsModal(false);
-                                        setSelectedSection(null);
+                                        if (hasExistingData) {
+                                            setIsEditMode(false);
+                                        } else {
+                                            setShowDetailsModal(false);
+                                            setSelectedSection(null);
+                                        }
                                     }}
                                 >
-                                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                                    <Text style={styles.cancelButtonText}>
+                                        {hasExistingData ? 'Cancel' : 'Close'}
+                                    </Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
@@ -1174,23 +1391,6 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         gap: 8,
     },
-    viewMaterialsButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#EFF6FF',
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        borderRadius: 8,
-        gap: 6,
-        flex: 1,
-        borderWidth: 1,
-        borderColor: '#DBEAFE',
-    },
-    viewMaterialsText: {
-        color: '#3B82F6',
-        fontWeight: '600',
-        fontSize: 14,
-    },
     actionButtons: {
         flexDirection: 'row',
         gap: 8,
@@ -1239,23 +1439,28 @@ const styles = StyleSheet.create({
         color: '#64748b',
         textAlign: 'center',
     },
-    // Edit Modal Styles
+    // Modal Styles
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'center',
         alignItems: 'center',
+        padding: 10,
     },
     modalContent: {
         backgroundColor: '#FFFFFF',
         borderRadius: 16,
-        width: '90%',
-        maxWidth: 400,
+        width: '95%',
+        maxWidth: 500,
+        height: '90%',
+        maxHeight: '90%',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
         elevation: 8,
+        display: 'flex',
+        flexDirection: 'column',
     },
     modalHeader: {
         flexDirection: 'row',
@@ -1272,11 +1477,41 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#1E293B',
     },
+    headerActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    editModeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#EFF6FF',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+        gap: 6,
+        borderWidth: 1,
+        borderColor: '#DBEAFE',
+    },
+    editModeButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#3B82F6',
+    },
     closeButton: {
         padding: 4,
     },
     modalBody: {
-        padding: 20,
+        flex: 1,
+        paddingHorizontal: 0,
+        backgroundColor: '#FFFFFF',
+        minHeight: 400,
+    },
+    modalScrollContent: {
+        paddingHorizontal: 20,
+        paddingTop: 20,
+        paddingBottom: 40,
+        flexGrow: 1,
     },
     inputLabel: {
         fontSize: 14,
@@ -1288,11 +1523,12 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#E2E8F0',
         borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
         fontSize: 16,
         color: '#1E293B',
         backgroundColor: '#F8FAFC',
+        minHeight: 48,
     },
     modalFooter: {
         flexDirection: 'row',
@@ -1303,6 +1539,7 @@ const styles = StyleSheet.create({
         paddingTop: 16,
         borderTopWidth: 1,
         borderTopColor: '#F1F5F9',
+        backgroundColor: '#FFFFFF',
     },
     cancelButton: {
         paddingVertical: 10,
@@ -1329,35 +1566,14 @@ const styles = StyleSheet.create({
     // Building Details Modal Styles
     inputGroup: {
         marginBottom: 16,
+        backgroundColor: '#F9FAFB',
+        padding: 12,
+        borderRadius: 8,
     },
     textArea: {
-        height: 80,
+        height: 100,
         textAlignVertical: 'top',
-    },
-    pickerContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-    },
-    pickerButton: {
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        borderRadius: 6,
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-        backgroundColor: '#F8FAFC',
-    },
-    pickerButtonActive: {
-        backgroundColor: '#3B82F6',
-        borderColor: '#3B82F6',
-    },
-    pickerButtonText: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: '#64748B',
-    },
-    pickerButtonTextActive: {
-        color: '#FFFFFF',
+        paddingTop: 14,
     },
     addDetailsButton: {
         flexDirection: 'row',
@@ -1381,16 +1597,21 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: '#10B981',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderRadius: 8,
-        gap: 8,
-        marginTop: 8,
+        paddingVertical: 16,
+        paddingHorizontal: 24,
+        borderRadius: 12,
+        gap: 10,
+        marginTop: 16,
+        shadowColor: '#10B981',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 3,
     },
     manageFloorsText: {
         color: '#FFFFFF',
-        fontWeight: '600',
-        fontSize: 16,
+        fontWeight: '700',
+        fontSize: 17,
     },
     saveButton: {
         paddingVertical: 10,
@@ -1419,5 +1640,151 @@ const styles = StyleSheet.create({
         color: '#94A3B8',
         textAlign: 'center',
         lineHeight: 20,
+    },
+    // Checkbox styles
+    checkboxContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    checkbox: {
+        width: 20,
+        height: 20,
+        borderRadius: 4,
+        borderWidth: 2,
+        borderColor: '#D1D5DB',
+        backgroundColor: '#FFFFFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    checkboxChecked: {
+        backgroundColor: '#3B82F6',
+        borderColor: '#3B82F6',
+    },
+    checkboxLabel: {
+        fontSize: 16,
+        color: '#374151',
+        fontWeight: '500',
+    },
+    inputHint: {
+        fontSize: 12,
+        color: '#6B7280',
+        marginTop: 4,
+        fontStyle: 'italic',
+    },
+    floorSummary: {
+        backgroundColor: '#F9FAFB',
+        borderRadius: 8,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    floorSummaryItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+        gap: 8,
+    },
+    floorSummaryText: {
+        fontSize: 14,
+        color: '#374151',
+        fontWeight: '500',
+    },
+    noFloorsText: {
+        fontSize: 14,
+        color: '#9CA3AF',
+        fontStyle: 'italic',
+        textAlign: 'center',
+    },
+    // View Mode Styles
+    viewSection: {
+        marginBottom: 24,
+        backgroundColor: '#FFFFFF',
+        padding: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    viewSectionTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#1F2937',
+        marginBottom: 12,
+    },
+    floorSummaryView: {
+        gap: 10,
+    },
+    floorSummaryItemView: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F9FAFB',
+        padding: 12,
+        borderRadius: 8,
+        gap: 12,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    floorIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 8,
+        backgroundColor: '#FFFFFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    floorInfoView: {
+        flex: 1,
+    },
+    floorNameView: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#1F2937',
+        marginBottom: 2,
+    },
+    floorTypeView: {
+        fontSize: 13,
+        color: '#6B7280',
+        fontWeight: '500',
+    },
+    descriptionText: {
+        fontSize: 14,
+        color: '#4B5563',
+        lineHeight: 20,
+    },
+    noDataText: {
+        fontSize: 14,
+        color: '#9CA3AF',
+        fontStyle: 'italic',
+        textAlign: 'center',
+        paddingVertical: 20,
+    },
+    statsContainer: {
+        flexDirection: 'row',
+        gap: 12,
+        marginBottom: 16,
+    },
+    statCard: {
+        flex: 1,
+        backgroundColor: '#FFFFFF',
+        padding: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    statValue: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#1F2937',
+        marginTop: 8,
+    },
+    statLabel: {
+        fontSize: 12,
+        color: '#6B7280',
+        marginTop: 4,
+        fontWeight: '500',
     },
 });

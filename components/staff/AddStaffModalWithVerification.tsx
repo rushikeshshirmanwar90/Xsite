@@ -29,7 +29,6 @@ const AddStaffModalWithVerification: React.FC<AddStaffModalProps> = ({ visible, 
     
     // Simplified verification states
     const [otp, setOtp] = useState('');
-    const [generatedOtp, setGeneratedOtp] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isEmailVerified, setIsEmailVerified] = useState(false);
     const [showOtpInput, setShowOtpInput] = useState(false);
@@ -89,15 +88,10 @@ const AddStaffModalWithVerification: React.FC<AddStaffModalProps> = ({ visible, 
         try {
             console.log('📧 Sending OTP to:', email);
             
-            const localOtp = Math.floor(100000 + Math.random() * 900000).toString();
-            setGeneratedOtp(localOtp);
-            console.log('� GeneratedT OTP locally:', localOtp);
-            
             const otpPayload = {
                 email: email.trim().toLowerCase(),
                 staffName: `${firstName.trim()} ${lastName.trim()}`,
-                companyName: companyName,
-                otp: localOtp
+                companyName: companyName
             };
 
             const success = await emailService.sendOTPEmail(otpPayload);
@@ -117,12 +111,10 @@ const AddStaffModalWithVerification: React.FC<AddStaffModalProps> = ({ visible, 
                 );
             } else {
                 Alert.alert('Error', 'Failed to send verification email. Please try again.');
-                setGeneratedOtp('');
             }
         } catch (error) {
             console.error('❌ Error sending OTP:', error);
             Alert.alert('Error', 'Failed to send verification email. Please try again.');
-            setGeneratedOtp('');
         } finally {
             setIsLoading(false);
         }
@@ -141,12 +133,15 @@ const AddStaffModalWithVerification: React.FC<AddStaffModalProps> = ({ visible, 
 
         setIsLoading(true);
         try {
-            console.log('� Veerifying OTP locally...');
+            console.log('🔐 Verifying OTP with backend...');
             console.log('🔍 Entered OTP:', otp.trim());
-            console.log('🔍 Generated OTP:', generatedOtp);
+            console.log('📧 Email:', email.trim().toLowerCase());
             
-            if (otp.trim() === generatedOtp) {
-                console.log('✅ OTP verified successfully (local validation)');
+            // Use the backend verification API
+            const success = await emailService.verifyOTP(email.trim().toLowerCase(), otp.trim());
+            
+            if (success) {
+                console.log('✅ OTP verified successfully (backend validation)');
                 setIsEmailVerified(true);
                 Alert.alert(
                     'Email Verified!',
@@ -154,7 +149,7 @@ const AddStaffModalWithVerification: React.FC<AddStaffModalProps> = ({ visible, 
                     [{ text: 'OK' }]
                 );
             } else {
-                console.log('❌ Invalid OTP (local validation)');
+                console.log('❌ Invalid OTP (backend validation)');
                 Alert.alert('Error', 'Invalid verification code. Please try again.');
                 setOtp('');
             }
@@ -194,7 +189,6 @@ const AddStaffModalWithVerification: React.FC<AddStaffModalProps> = ({ visible, 
         setEmail('');
         setRole('');
         setOtp('');
-        setGeneratedOtp('');
         setShowRoleDropdown(false);
         setIsEmailVerified(false);
         setShowOtpInput(false);

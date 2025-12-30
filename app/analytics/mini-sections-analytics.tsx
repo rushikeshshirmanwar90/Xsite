@@ -60,7 +60,7 @@ const MiniSectionsAnalytics: React.FC = () => {
         );
 
         const totalExpense = miniSectionMaterials.reduce(
-          (sum: number, material: any) => sum + (material.cost || 0),
+          (sum: number, material: any) => sum + (material.totalCost || material.cost || 0),
           0
         );
 

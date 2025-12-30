@@ -62,11 +62,11 @@ const ProjectSectionsAnalytics: React.FC = () => {
 
       // Calculate totals for available and used
       const availableTotal = parsedMaterialAvailable.reduce(
-        (sum: number, material: any) => sum + (material.cost || 0),
+        (sum: number, material: any) => sum + (material.totalCost || material.cost || 0),
         0
       );
       const usedTotal = parsedMaterialUsed.reduce(
-        (sum: number, material: any) => sum + (material.cost || 0),
+        (sum: number, material: any) => sum + (material.totalCost || material.cost || 0),
         0
       );
 
@@ -81,7 +81,7 @@ const ProjectSectionsAnalytics: React.FC = () => {
         );
 
         const totalExpense = sectionMaterials.reduce(
-          (sum: number, material: any) => sum + (material.cost || 0),
+          (sum: number, material: any) => sum + (material.totalCost || material.cost || 0),
           0
         );
 
