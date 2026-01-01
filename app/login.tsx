@@ -214,17 +214,14 @@ export default function LoginScreen() {
 
                 // Show navigating state
                 setIsNavigating(true);
-                setLoading(false);
 
                 // Trigger auth context to update
                 await checkAuthStatus();
 
-                // Navigate after a brief moment
-                setTimeout(() => {
-                    router.replace({
-                        pathname: "/(tabs)"
-                    });
-                }, 300);
+                // Let the AuthContext and _layout handle navigation automatically
+                // Don't manually navigate - the layout will detect auth change and redirect
+                setLoading(false);
+                setIsNavigating(false);
             } else {
                 console.error('❌ Password setup failed:', res.error);
                 toast.error(res.error || "Failed to set password. Please try again.");
@@ -295,17 +292,14 @@ export default function LoginScreen() {
 
                 // Show navigating state
                 setIsNavigating(true);
-                setLoading(false);
 
                 // Trigger auth context to update
                 await checkAuthStatus();
 
-                // Navigate after a brief moment
-                setTimeout(() => {
-                    router.replace({
-                        pathname: "/(tabs)",
-                    });
-                }, 300);
+                // Let the AuthContext and _layout handle navigation automatically
+                // Don't manually navigate - the layout will detect auth change and redirect
+                setLoading(false);
+                setIsNavigating(false);
             } else {
                 toast.error(result.error || "Invalid email or password");
                 setLoading(false);

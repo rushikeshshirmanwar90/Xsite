@@ -25,26 +25,37 @@ function RootLayoutNav() {
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === '(tabs)' || segments[0] === 'details';
+    const currentRoute = segments.join('/') || 'index';
 
-    // Use requestAnimationFrame to ensure navigation happens after render
-    const navigationFrame = requestAnimationFrame(() => {
+    console.log('🧭 Navigation check:', {
+      isAuthenticated,
+      currentRoute,
+      inAuthGroup,
+      segments
+    });
+
+    // Use setTimeout to ensure navigation happens after render
+    const navigationTimeout = setTimeout(() => {
       try {
         if (!isAuthenticated && inAuthGroup) {
           // User is not authenticated but trying to access protected route
+          console.log('🚫 Redirecting to login - not authenticated in protected route');
           router.replace('/login');
-        } else if (isAuthenticated && segments[0] === 'login') {
-          // User is authenticated but on login page
+        } else if (isAuthenticated && (segments[0] === 'login' || segments[0] === 'index')) {
+          // User is authenticated but on login or index page
+          console.log('✅ Redirecting to tabs - authenticated user on login/index');
           router.replace('/(tabs)');
         } else if (!isAuthenticated && segments[0] !== 'login' && segments[0] !== 'index') {
           // User is not authenticated and not on login or index page
+          console.log('🚫 Redirecting to login - not authenticated');
           router.replace('/login');
         }
       } catch (error) {
-        console.error('Navigation error:', error);
+        console.error('❌ Navigation error:', error);
       }
-    });
+    }, 100); // Small delay to ensure state is settled
 
-    return () => cancelAnimationFrame(navigationFrame);
+    return () => clearTimeout(navigationTimeout);
   }, [isAuthenticated, segments, isLoading]);
 
   // Show nothing while loading to prevent flash

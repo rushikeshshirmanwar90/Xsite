@@ -1,7 +1,8 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
-import { Alert } from 'react-native';
+import { Paths, File } from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
+import { Alert, Platform } from 'react-native';
 
 interface MaterialActivity {
     _id: string;
@@ -439,7 +440,13 @@ export class PDFReportGenerator {
             const sanitizedProjectName = (projectName || 'Project').replace(/[^a-zA-Z0-9\s]/g, '').trim();
             
             const customFilename = `${sanitizedCompanyName} - ${sanitizedProjectName} - ${currentDate}.pdf`;
-            console.log('📄 Custom filename:', customFilename);
+            console.log('📄 Custom filename components:');
+            console.log('  - Company Name (raw):', companyName);
+            console.log('  - Company Name (sanitized):', sanitizedCompanyName);
+            console.log('  - Project Name (raw):', projectName);
+            console.log('  - Project Name (sanitized):', sanitizedProjectName);
+            console.log('  - Current Date:', currentDate);
+            console.log('📄 Final custom filename:', customFilename);
             
             // Generate PDF
             console.log('📄 Calling Print.printToFileAsync...');
@@ -455,49 +462,114 @@ export class PDFReportGenerator {
             });
 
             console.log('✅ PDF generated successfully at:', uri);
+            console.log('📄 Original filename from Print API:', uri.split('/').pop());
+            console.log('📄 Desired custom filename:', customFilename);
 
             // Copy PDF to a new location with custom filename
             let finalUri = uri; // Default to original URI
+            let actualFilename = customFilename; // Track the actual filename being used
             
             try {
-                if (FileSystem.documentDirectory) {
-                    const customUri = `${FileSystem.documentDirectory}${customFilename}`;
+                const documentDir = Paths.document;
+                if (documentDir) {
+                    const customFile = new File(documentDir, customFilename);
+                    const customUri = customFile.uri;
+                    console.log('📄 Attempting to copy PDF to custom location:', customUri);
                     
-                    await FileSystem.copyAsync({
-                        from: uri,
-                        to: customUri
-                    });
+                    // Delete existing file if it exists
+                    if (customFile.exists) {
+                        customFile.delete();
+                        console.log('📄 Deleted existing file at custom location');
+                    }
+                    
+                    // Copy the original file to the new location
+                    const originalFile = new File(uri);
+                    originalFile.copy(customFile);
                     
                     // Verify the file was copied successfully
-                    const fileInfo = await FileSystem.getInfoAsync(customUri);
-                    if (fileInfo.exists) {
+                    if (customFile.exists) {
                         finalUri = customUri;
-                        console.log('📄 PDF copied with custom filename to:', customUri);
+                        console.log('✅ PDF successfully copied with custom filename to:', customUri);
+                        const fileInfo = customFile.info();
+                        console.log('📄 File size:', fileInfo.size, 'bytes');
+                        
+                        // Delete the original temporary file to avoid confusion
+                        try {
+                            originalFile.delete();
+                            console.log('📄 Deleted original temporary file');
+                        } catch (deleteError) {
+                            console.warn('⚠️ Could not delete original temp file:', deleteError);
+                        }
                     } else {
                         console.warn('⚠️ Custom file not found after copy, using original');
+                        actualFilename = 'Material_Activity_Report.pdf'; // Fallback name
                     }
                 } else {
                     console.warn('⚠️ Document directory not available, using original URI');
+                    actualFilename = 'Material_Activity_Report.pdf'; // Fallback name
                 }
             } catch (copyError) {
-                console.warn('⚠️ Could not copy PDF with custom name, using original:', copyError);
+                console.error('❌ Could not copy PDF with custom name:', copyError);
+                console.error('❌ Copy error details:', JSON.stringify(copyError, null, 2));
+                actualFilename = 'Material_Activity_Report.pdf'; // Fallback name
                 // Continue with original URI if copy fails
             }
             
             console.log('📄 Final PDF URI for sharing:', finalUri);
 
-            // Show options to View or Share the PDF
-            console.log('📄 Showing view/share options...');
+            // Show options to View, Share, or Save the PDF
+            console.log('📄 Showing view/share/save options...');
+            console.log('📄 Final URI being used:', finalUri);
+            console.log('📄 Actual filename being used:', actualFilename);
             
             // Test if Alert is working
             setTimeout(() => {
                 Alert.alert(
                     'PDF Generated Successfully',
-                    'Your material activity report has been generated. What would you like to do?',
+                    `Your material activity report has been generated.\n\nFilename: ${actualFilename}\n\nWhat would you like to do?`,
                     [
                         {
-                            text: 'View PDF',
+                            text: 'Save to Device',
                             style: 'default',
+                            onPress: async () => {
+                                try {
+                                    console.log('💾 User selected Save to Device');
+                                    
+                                    // Request media library permissions
+                                    const { status } = await MediaLibrary.requestPermissionsAsync();
+                                    if (status !== 'granted') {
+                                        Alert.alert(
+                                            'Permission Required',
+                                            'Permission to access media library is required to save the PDF.',
+                                            [{ text: 'OK' }]
+                                        );
+                                        return;
+                                    }
+                                    
+                                    // Save to media library with custom filename
+                                    const asset = await MediaLibrary.createAssetAsync(finalUri);
+                                    const album = await MediaLibrary.getAlbumAsync('Download');
+                                    
+                                    if (album == null) {
+                                        await MediaLibrary.createAlbumAsync('Download', asset, false);
+                                    } else {
+                                        await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+                                    }
+                                    
+                                    Alert.alert(
+                                        'PDF Saved',
+                                        `PDF has been saved to your device as "${actualFilename}"`,
+                                        [{ text: 'OK' }]
+                                    );
+                                    console.log('✅ PDF saved to device successfully');
+                                } catch (error) {
+                                    console.error('❌ Error saving PDF to device:', error);
+                                    Alert.alert('Error', 'Could not save PDF to device. Error: ' + error);
+                                }
+                            }
+                        },
+                        {
+                            text: 'View PDF',
                             onPress: async () => {
                                 try {
                                     console.log('📖 User selected View PDF');
@@ -509,13 +581,14 @@ export class PDFReportGenerator {
                                         await Sharing.shareAsync(finalUri, {
                                             mimeType: 'application/pdf',
                                             dialogTitle: 'View Material Activity Report',
+                                            UTI: 'com.adobe.pdf'
                                         });
                                         console.log('📖 PDF opened successfully');
                                     } else {
                                         console.log('📖 Sharing not available, showing fallback message');
                                         Alert.alert(
                                             'PDF Ready',
-                                            'PDF has been generated successfully. Your device will handle the viewing.',
+                                            `PDF has been generated successfully: ${actualFilename}`,
                                             [{ text: 'OK' }]
                                         );
                                     }
@@ -531,21 +604,25 @@ export class PDFReportGenerator {
                                 try {
                                     console.log('📤 User selected Share PDF');
                                     console.log('📤 PDF URI:', finalUri);
-                                    console.log('📤 PDF filename:', customFilename);
+                                    console.log('📤 PDF filename:', actualFilename);
                                     
                                     // Share the PDF with custom filename
                                     if (await Sharing.isAvailableAsync()) {
                                         console.log('📤 Sharing PDF...');
+                                        console.log('📤 Final URI being shared:', finalUri);
+                                        console.log('📤 Expected filename:', actualFilename);
+                                        
                                         await Sharing.shareAsync(finalUri, {
                                             mimeType: 'application/pdf',
-                                            dialogTitle: 'Share Material Activity Report',
+                                            dialogTitle: `Share: ${actualFilename}`,
+                                            UTI: 'com.adobe.pdf'
                                         });
                                         console.log('✅ PDF shared successfully');
                                     } else {
                                         console.log('📤 Sharing not available');
                                         Alert.alert(
                                             'Sharing Not Available',
-                                            'Sharing is not available on this device.',
+                                            `Sharing is not available on this device. PDF saved as: ${actualFilename}`,
                                             [{ text: 'OK' }]
                                         );
                                     }

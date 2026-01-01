@@ -34,26 +34,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
+      console.log('🔍 Checking auth status...');
       const userDetails = await AsyncStorage.getItem("user");
+      console.log('📱 Raw user data from storage:', userDetails ? 'Found' : 'Not found');
+      
       if (userDetails && userDetails.trim() !== '') {
         try {
           const data = JSON.parse(userDetails);
+          console.log('📊 Parsed user data:', data ? 'Valid object' : 'Invalid');
+          
           if (data && typeof data === 'object' && Object.keys(data).length > 0) {
             const extractedClientId = data._id || data.clientId;
 
-            // ✅ CRITICAL FIX: Validate that the stored client ID actually exists
-            // This prevents using old/deleted client IDs from previous sessions
             if (extractedClientId) {
-              console.log('🔍 Validating stored client ID:', extractedClientId);
-              console.log('🔍 Full user data being set:', JSON.stringify(data, null, 2));
+              console.log('✅ Valid user data found, setting authenticated state');
+              console.log('🆔 User ID:', data._id);
+              console.log('🏢 Client ID:', data.clientId);
 
-              // Note: We'll set auth state first, then validate in background
-              // to avoid blocking the UI. If validation fails, we'll clear on next check.
               setIsAuthenticated(true);
               setUser(data);
               setClientId(typeof extractedClientId === 'string' ? extractedClientId : null);
               
-              console.log('✅ Auth state updated with fresh data');
+              console.log('✅ Auth state updated successfully');
             } else {
               console.warn('⚠️ No client ID found in stored user data');
               await AsyncStorage.clear();
@@ -76,6 +78,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setClientId(null);
         }
       } else {
+        console.log('📭 No user data found in storage');
         setIsAuthenticated(false);
         setUser(null);
         setClientId(null);

@@ -53,7 +53,8 @@
     "sonner-native": "^0.21.1",
     "expo-print": "~15.0.8",
     "expo-sharing": "~14.0.8",
-    "expo-file-system": "~19.0.21"
+    "expo-file-system": "~19.0.21",
+    "expo-media-library": "~18.2.1"
   },
   "devDependencies": {
     "@types/axios": "^0.9.36",
