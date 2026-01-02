@@ -608,6 +608,9 @@ export const styles = StyleSheet.create({
         paddingHorizontal: 24,
         paddingTop: 32,
         paddingBottom: 20,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
     },
     sectionTitle: {
         fontSize: 24,
@@ -621,6 +624,23 @@ export const styles = StyleSheet.create({
         height: 3,
         backgroundColor: '#0EA5E9',
         borderRadius: 2,
+    },
+    clientNameContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#EFF6FF',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+        gap: 8,
+    },
+    clientNameText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1E40AF',
+        letterSpacing: 0.2,
     },
 
     // Floating Action Button

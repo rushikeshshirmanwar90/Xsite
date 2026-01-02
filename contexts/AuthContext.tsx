@@ -44,12 +44,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.log('📊 Parsed user data:', data ? 'Valid object' : 'Invalid');
           
           if (data && typeof data === 'object' && Object.keys(data).length > 0) {
-            const extractedClientId = data._id || data.clientId;
+            // For staff users with clientIds array, use the first clientId
+            // For other users, use _id or clientId
+            let extractedClientId = data._id || data.clientId;
+            
+            // Handle staff users with clientIds array
+            if (data.clientIds && Array.isArray(data.clientIds) && data.clientIds.length > 0) {
+              extractedClientId = data.clientIds[0]; // Use first client ID
+              console.log('👥 Staff user with multiple clients, using first clientId:', extractedClientId);
+            }
 
             if (extractedClientId) {
               console.log('✅ Valid user data found, setting authenticated state');
               console.log('🆔 User ID:', data._id);
-              console.log('🏢 Client ID:', data.clientId);
+              console.log('🏢 Client ID:', extractedClientId);
 
               setIsAuthenticated(true);
               setUser(data);

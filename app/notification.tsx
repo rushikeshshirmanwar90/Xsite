@@ -9,6 +9,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Animated,
+    Modal,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -17,6 +18,7 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 interface Activity {
     _id: string;
@@ -182,6 +184,10 @@ const NotificationPage: React.FC = () => {
     const [availableDates, setAvailableDates] = useState<string[]>([]);
     const [hasNextDate, setHasNextDate] = useState(false);
     const [hasPrevDate, setHasPrevDate] = useState(false);
+    
+    // Date picker state
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [selectedDate, setSelectedDate] = useState(new Date());
 
     const fetchActivities = async (showLoadingState = true, loadMore = false, targetDate?: string) => {
         console.log('🚀 fetchActivities CALLED');
@@ -593,6 +599,43 @@ const NotificationPage: React.FC = () => {
                 }, 100); // Small delay to ensure content is rendered
             } finally {
                 // Loading state will be cleared in fetchActivities finally block
+            }
+        }
+    };
+
+    // Handle date picker
+    const handleDatePickerOpen = () => {
+        // Set the picker to current viewing date
+        const dateObj = new Date(currentDate + 'T00:00:00');
+        setSelectedDate(dateObj);
+        setShowDatePicker(true);
+    };
+
+    const handleDateChange = (event: any, date?: Date) => {
+        if (event.type === 'dismissed') {
+            setShowDatePicker(false);
+            return;
+        }
+
+        if (date) {
+            setSelectedDate(date);
+            // On Android, picker closes automatically after selection
+            if (event.type === 'set') {
+                const dateString = date.toISOString().split('T')[0];
+                console.log('📅 Date selected from picker:', dateString);
+                setShowDatePicker(false);
+                
+                // Fetch activities for selected date
+                setLoading(true);
+                fetchActivities(false, false, dateString).finally(() => {
+                    // Scroll to top after loading
+                    setTimeout(() => {
+                        scrollViewRef.current?.scrollTo({
+                            y: 0,
+                            animated: true,
+                        });
+                    }, 100);
+                });
             }
         }
     };
@@ -1295,8 +1338,12 @@ const NotificationPage: React.FC = () => {
                                     />
                                 </TouchableOpacity>
 
-                                {/* Current Date Display - Compact */}
-                                <View style={styles.compactDateDisplay}>
+                                {/* Current Date Display - Compact - Clickable */}
+                                <TouchableOpacity 
+                                    style={styles.compactDateDisplay}
+                                    onPress={handleDatePickerOpen}
+                                    activeOpacity={0.7}
+                                >
                                     <View style={styles.compactDateBadge}>
                                         <Ionicons name="calendar" size={14} color="#10B981" />
                                         <Text style={styles.compactDateText}>
@@ -1306,7 +1353,7 @@ const NotificationPage: React.FC = () => {
                                     <Text style={styles.compactActivityCount}>
                                         0 activities
                                     </Text>
-                                </View>
+                                </TouchableOpacity>
 
                                 {/* Next Day Button */}
                                 <TouchableOpacity
@@ -1498,6 +1545,17 @@ const NotificationPage: React.FC = () => {
                     </>
                 )}
             </ScrollView>
+
+            {/* Date Picker Modal */}
+            {showDatePicker && (
+                <DateTimePicker
+                    value={selectedDate}
+                    mode="date"
+                    display="default"
+                    onChange={handleDateChange}
+                    maximumDate={new Date()} // Can't select future dates
+                />
+            )}
         </SafeAreaView>
     );
 };

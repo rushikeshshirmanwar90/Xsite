@@ -45,6 +45,12 @@ const Index: React.FC = () => {
     // Get user role for access control
     const { user } = useUser();
     const userIsAdmin = isAdmin(user);
+    
+    // Check if user is a client (has clientId but is not staff)
+    const isClient = user && user.clientId && !('role' in user);
+    
+    // Get client name from user data
+    const clientName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Client';
 
     // Performance optimization
     const isLoadingRef = React.useRef(false);
@@ -272,37 +278,47 @@ const Index: React.FC = () => {
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-            <View style={styles.fixedHeader}>
-                <View style={styles.userInfo}>
-                    {companyLogo ? (
-                        <Image
-                            source={{ uri: companyLogo }}
-                            style={styles.companyLogo}
-                            resizeMode="contain"
-                        />
-                    ) : (
-                        <View style={styles.avatarContainer}>
-                            <Text style={styles.avatarText}>{companyInitials}</Text>
+            
+            {/* Conditional Header - Hide for clients */}
+            {!isClient && (
+                <View style={styles.fixedHeader}>
+                    <View style={styles.userInfo}>
+                        {companyLogo ? (
+                            <Image
+                                source={{ uri: companyLogo }}
+                                style={styles.companyLogo}
+                                resizeMode="contain"
+                            />
+                        ) : (
+                            <View style={styles.avatarContainer}>
+                                <Text style={styles.avatarText}>{companyInitials}</Text>
+                            </View>
+                        )}
+                        <View style={styles.userDetails}>
+                            <Text style={styles.userName}>{companyName}</Text>
+                            <Text style={styles.userSubtitle}>Project Management Dashboard</Text>
                         </View>
-                    )}
-                    <View style={styles.userDetails}>
-                        <Text style={styles.userName}>{companyName}</Text>
-                        <Text style={styles.userSubtitle}>Project Management Dashboard</Text>
                     </View>
+                    <TouchableOpacity style={styles.notificationButton}
+                        onPress={() => router.push('/notification')}
+                    >
+                        <Ionicons name="notifications" size={22} color="#1F2937" />
+                        {/* {projectStats.overdueProjects > 0 && <View style={styles.notificationDot} />} */}
+                    </TouchableOpacity>
                 </View>
-                <TouchableOpacity style={styles.notificationButton}
-                    onPress={() => router.push('/notification')}
-                >
-                    <Ionicons name="notifications" size={22} color="#1F2937" />
-                    {/* {projectStats.overdueProjects > 0 && <View style={styles.notificationDot} />} */}
-                </TouchableOpacity>
-            </View>
+            )}
 
 
-            {/* Section Header */}
+            {/* Section Header - Modified for clients */}
             <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>My Projects</Text>
-                <View style={styles.sectionDivider} />
+                {isClient && (
+                    <View style={styles.clientNameContainer}>
+                        <Ionicons name="person-circle-outline" size={20} color="#3B82F6" />
+                        <Text style={styles.clientNameText}>{clientName}</Text>
+                    </View>
+                )}
+                {!isClient && <View style={styles.sectionDivider} />}
             </View>
 
             <ScrollView

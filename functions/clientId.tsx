@@ -14,10 +14,25 @@ export const getClientId = async () => {
         console.log('📝 Parsed user data keys:', Object.keys(userDetails || {}));
         console.log('📝 Has _id?', !!userDetails?._id);
         console.log('📝 Has clientId?', !!userDetails?.clientId);
+        console.log('📝 Has clientIds?', !!userDetails?.clientIds);
 
-        // ✅ FIX: Use clientId field, NOT _id field
-        // _id = user's own ID, clientId = the client/company they belong to
-        let clientId = userDetails?.clientId || '';
+        // ✅ Handle both clientId (single) and clientIds (array) for staff users
+        let clientId = '';
+        
+        // For staff users with clientIds array, use the first one
+        if (userDetails?.clientIds && Array.isArray(userDetails.clientIds) && userDetails.clientIds.length > 0) {
+            console.log('👥 Staff user with clientIds array, using first clientId');
+            clientId = userDetails.clientIds[0];
+        } 
+        // For other users with single clientId
+        else if (userDetails?.clientId) {
+            clientId = userDetails.clientId;
+        }
+        // Fallback to _id for admin users
+        else if (userDetails?._id) {
+            console.log('🔄 Using _id as fallback for admin user');
+            clientId = userDetails._id;
+        }
 
         // Handle ObjectId objects (convert to string)
         if (typeof clientId === 'object' && clientId !== null) {

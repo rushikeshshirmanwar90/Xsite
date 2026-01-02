@@ -191,8 +191,12 @@ export default function LoginScreen() {
                         user.clientId = user.clientId.toString();
                     }
                     
+                    // ✅ ADD userType to user object for tab navigation
+                    user.userType = userType;
+                    
                     console.log('✅ User ID (_id):', user._id);
                     console.log('✅ Client ID (clientId):', user.clientId);
+                    console.log('✅ User Type:', user.userType);
                     console.log('✅ These should be DIFFERENT values!');
                 }
 
@@ -269,8 +273,12 @@ export default function LoginScreen() {
                         user.clientId = user.clientId.toString();
                     }
                     
+                    // ✅ ADD userType to user object for tab navigation
+                    user.userType = userType;
+                    
                     console.log('✅ User ID (_id):', user._id);
                     console.log('✅ Client ID (clientId):', user.clientId);
+                    console.log('✅ User Type:', user.userType);
                     console.log('✅ These should be DIFFERENT values!');
                 }
 

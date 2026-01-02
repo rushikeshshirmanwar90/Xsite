@@ -21,7 +21,7 @@ export interface StaffUser {
   phoneNumber: string;
   email: string;
   password?: string;
-  clientId: string;
+  clientIds: string[]; // Changed from clientId to clientIds array
   role: 'site-engineer' | 'supervisor' | 'manager';
   assignedProjects?: string[];
 }
