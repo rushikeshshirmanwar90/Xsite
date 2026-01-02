@@ -15,7 +15,7 @@ const PROTECTED_ROUTES = ['(tabs)', 'details'];
 
 
 function RootLayoutNav() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
   const segments = useSegments();
 
@@ -26,13 +26,25 @@ function RootLayoutNav() {
 
     const inAuthGroup = segments[0] === '(tabs)' || segments[0] === 'details';
     const currentRoute = segments.join('/') || 'index';
+    const currentSegment = String(segments[0]);
 
     console.log('🧭 Navigation check:', {
       isAuthenticated,
       currentRoute,
       inAuthGroup,
-      segments
+      segments,
+      hasUser: !!user,
+      userRole: user?.role,
+      userClientIds: user?.clientIds
     });
+
+    // Check if user is staff without clients
+    const isStaffWithoutClients = user && 
+      user.role && 
+      ['site-engineer', 'supervisor', 'manager'].includes(user.role) &&
+      (!user.clientIds || user.clientIds.length === 0);
+
+    console.log('🔍 Staff check in layout:', { isStaffWithoutClients });
 
     // Use setTimeout to ensure navigation happens after render
     const navigationTimeout = setTimeout(() => {
@@ -41,22 +53,24 @@ function RootLayoutNav() {
           // User is not authenticated but trying to access protected route
           console.log('🚫 Redirecting to login - not authenticated in protected route');
           router.replace('/login');
-        } else if (isAuthenticated && (segments[0] === 'login' || segments[0] === 'index')) {
-          // User is authenticated but on login or index page
-          console.log('✅ Redirecting to tabs - authenticated user on login/index');
+        } else if (isAuthenticated && isStaffWithoutClients && currentSegment !== 'index') {
+          // Staff without clients should stay on index page (which shows QR screen)
+          console.log('⚠️ Staff without clients - redirecting to index for QR screen');
+          router.replace('/');
+        } else if (isAuthenticated && !isStaffWithoutClients && (currentSegment === 'login' || currentSegment === 'index' || currentSegment === 'register')) {
+          // User is authenticated with clients but on login, index, or register page
+          console.log('✅ Redirecting to tabs - authenticated user with clients on public page');
           router.replace('/(tabs)');
-        } else if (!isAuthenticated && segments[0] !== 'login' && segments[0] !== 'index') {
-          // User is not authenticated and not on login or index page
-          console.log('🚫 Redirecting to login - not authenticated');
-          router.replace('/login');
         }
+        // Don't redirect if user is on login, index, or register pages while not authenticated
+        // This allows them to navigate freely between these pages
       } catch (error) {
         console.error('❌ Navigation error:', error);
       }
     }, 100); // Small delay to ensure state is settled
 
     return () => clearTimeout(navigationTimeout);
-  }, [isAuthenticated, segments, isLoading]);
+  }, [isAuthenticated, segments, isLoading, user]);
 
   // Show nothing while loading to prevent flash
   if (isLoading) {
@@ -68,6 +82,7 @@ function RootLayoutNav() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
+        <Stack.Screen name="register" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="details" options={{ headerShown: false }} />
       </Stack>

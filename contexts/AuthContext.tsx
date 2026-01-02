@@ -44,16 +44,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.log('📊 Parsed user data:', data ? 'Valid object' : 'Invalid');
           
           if (data && typeof data === 'object' && Object.keys(data).length > 0) {
-            // For staff users with clientIds array, use the first clientId
-            // For other users, use _id or clientId
-            let extractedClientId = data._id || data.clientId;
+            // Check if user is staff
+            const isStaff = data.role && ['site-engineer', 'supervisor', 'manager'].includes(data.role);
             
-            // Handle staff users with clientIds array
-            if (data.clientIds && Array.isArray(data.clientIds) && data.clientIds.length > 0) {
-              extractedClientId = data.clientIds[0]; // Use first client ID
-              console.log('👥 Staff user with multiple clients, using first clientId:', extractedClientId);
+            // For staff users with clientIds array
+            if (isStaff) {
+              console.log('👷 Staff user detected');
+              
+              // Allow staff to login even without clientIds (they'll see the QR screen)
+              if (!data.clientIds || data.clientIds.length === 0) {
+                console.log('⚠️ Staff user with no clients - allowing login to show QR screen');
+                setIsAuthenticated(true);
+                setUser(data);
+                setClientId(null); // No client assigned yet
+                console.log('✅ Auth state updated for staff without clients');
+                return;
+              }
+              
+              // Staff with clients - use first clientId
+              const extractedClientId = data.clientIds[0];
+              console.log('👥 Staff user with clients, using first clientId:', extractedClientId);
+              setIsAuthenticated(true);
+              setUser(data);
+              setClientId(extractedClientId);
+              console.log('✅ Auth state updated successfully');
+              return;
             }
-
+            
+            // For non-staff users (admin, client, etc.)
+            const extractedClientId = data._id || data.clientId;
+            
             if (extractedClientId) {
               console.log('✅ Valid user data found, setting authenticated state');
               console.log('🆔 User ID:', data._id);

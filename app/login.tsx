@@ -597,6 +597,21 @@ export default function LoginScreen() {
                         <View style={styles.formContainer}>
                             {renderStep()}
                         </View>
+                        
+                        {/* Registration Link */}
+                        <View style={styles.registerContainer}>
+                            <Text style={styles.registerText}>New staff member? </Text>
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    console.log('Register button pressed');
+                                    router.push('/register');
+                                }}
+                                activeOpacity={0.7}
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            >
+                                <Text style={styles.registerLink}>Register here</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -821,5 +836,26 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#3b82f6',
+    },
+    registerContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 24,
+        marginBottom: 20,
+        paddingTop: 20,
+        paddingBottom: 10,
+        borderTopWidth: 1,
+        borderTopColor: '#f1f5f9',
+    },
+    registerText: {
+        fontSize: 14,
+        color: '#6B7280',
+    },
+    registerLink: {
+        fontSize: 14,
+        color: '#4f46e5',
+        fontWeight: '700',
+        textDecorationLine: 'underline',
     },
 });

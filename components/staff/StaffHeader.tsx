@@ -16,6 +16,7 @@ interface StaffHeaderProps {
     searchQuery: string;
     onSearchChange: (query: string) => void;
     onAddPress: () => void;
+    onScanQRPress?: () => void;
     isAdmin?: boolean;
 }
 
@@ -25,6 +26,7 @@ const StaffHeader: React.FC<StaffHeaderProps> = ({
     searchQuery,
     onSearchChange,
     onAddPress,
+    onScanQRPress,
     isAdmin = true,
 }) => {
     return (
@@ -53,21 +55,34 @@ const StaffHeader: React.FC<StaffHeaderProps> = ({
 
             {/* Add Staff Button - Full Width */}
             {isAdmin && (
-                <TouchableOpacity
-                    style={styles.addButton}
-                    onPress={onAddPress}
-                    activeOpacity={0.8}
-                >
-                    <LinearGradient
-                        colors={['#3B82F6', '#8B5CF6']}
-                        style={styles.addButtonGradient}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
+                <View style={styles.buttonRow}>
+                    <TouchableOpacity
+                        style={styles.addButton}
+                        onPress={onAddPress}
+                        activeOpacity={0.8}
                     >
-                        <Ionicons name="add-circle" size={22} color="white" />
-                        <Text style={styles.addButtonText}>Add New Staff Member</Text>
-                    </LinearGradient>
-                </TouchableOpacity>
+                        <LinearGradient
+                            colors={['#3B82F6', '#8B5CF6']}
+                            style={styles.addButtonGradient}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                        >
+                            <Ionicons name="add-circle" size={22} color="white" />
+                            <Text style={styles.addButtonText}>Add Staff</Text>
+                        </LinearGradient>
+                    </TouchableOpacity>
+
+                    {onScanQRPress && (
+                        <TouchableOpacity
+                            style={styles.scanButton}
+                            onPress={onScanQRPress}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="qr-code-outline" size={22} color="#3B82F6" />
+                            <Text style={styles.scanButtonText}>Scan QR</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
             )}
 
             {/* View-only message for non-admin */}
@@ -147,8 +162,13 @@ const styles = StyleSheet.create({
         color: '#64748B',
         fontWeight: '500',
     },
-    addButton: {
+    buttonRow: {
+        flexDirection: 'row',
+        gap: 12,
         marginBottom: 16,
+    },
+    addButton: {
+        flex: 1,
         borderRadius: 12,
         overflow: 'hidden',
         shadowColor: '#3B82F6',
@@ -167,6 +187,24 @@ const styles = StyleSheet.create({
     },
     addButtonText: {
         color: '#FFFFFF',
+        fontWeight: '600',
+        fontSize: 15,
+        letterSpacing: 0.3,
+    },
+    scanButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 20,
+        gap: 8,
+        borderRadius: 12,
+        backgroundColor: '#EFF6FF',
+        borderWidth: 2,
+        borderColor: '#3B82F6',
+    },
+    scanButtonText: {
+        color: '#3B82F6',
         fontWeight: '600',
         fontSize: 15,
         letterSpacing: 0.3,

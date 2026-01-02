@@ -119,12 +119,112 @@ ${companyName} Team`;
     }
 
     /**
+     * Send material added notification
+     */
+    async sendMaterialAddedNotification(payload: {
+        recipientEmail: string;
+        recipientName: string;
+        materialName: string;
+        quantity: number;
+        unit: string;
+        projectName: string;
+        clientId: string;
+        companyName: string;
+    }): Promise<boolean> {
+        try {
+            console.log('📦 Sending material added notification...');
+            
+            const notificationPayload: NotificationPayload = {
+                recipientEmail: payload.recipientEmail,
+                recipientName: payload.recipientName,
+                subject: `Material Added - ${payload.materialName}`,
+                message: `${payload.quantity} ${payload.unit} of ${payload.materialName} has been added to ${payload.projectName}`,
+                type: 'material_added',
+                clientId: payload.clientId,
+                companyName: payload.companyName,
+                metadata: {
+                    materialName: payload.materialName,
+                    quantity: payload.quantity,
+                    unit: payload.unit,
+                    projectName: payload.projectName
+                }
+            };
+            
+            // Log notification (you can extend this to send actual emails/push notifications)
+            const url = `${domain}/api/notifications/material-activity`;
+            const response = await axios.post(url, notificationPayload);
+            
+            if (response.data.success) {
+                console.log('✅ Material added notification sent successfully');
+                return true;
+            }
+            
+            return false;
+        } catch (error: any) {
+            console.error('❌ Error sending material added notification:', error.message);
+            return false;
+        }
+    }
+
+    /**
+     * Send material used notification
+     */
+    async sendMaterialUsedNotification(payload: {
+        recipientEmail: string;
+        recipientName: string;
+        materialName: string;
+        quantity: number;
+        unit: string;
+        projectName: string;
+        clientId: string;
+        companyName: string;
+    }): Promise<boolean> {
+        try {
+            console.log('🔨 Sending material used notification...');
+            
+            const notificationPayload: NotificationPayload = {
+                recipientEmail: payload.recipientEmail,
+                recipientName: payload.recipientName,
+                subject: `Material Used - ${payload.materialName}`,
+                message: `${payload.quantity} ${payload.unit} of ${payload.materialName} has been used in ${payload.projectName}`,
+                type: 'material_used',
+                clientId: payload.clientId,
+                companyName: payload.companyName,
+                metadata: {
+                    materialName: payload.materialName,
+                    quantity: payload.quantity,
+                    unit: payload.unit,
+                    projectName: payload.projectName
+                }
+            };
+            
+            // Log notification
+            const url = `${domain}/api/notifications/material-activity`;
+            const response = await axios.post(url, notificationPayload);
+            
+            if (response.data.success) {
+                console.log('✅ Material used notification sent successfully');
+                return true;
+            }
+            
+            return false;
+        } catch (error: any) {
+            console.error('❌ Error sending material used notification:', error.message);
+            return false;
+        }
+    }
+
+    /**
      * Send a general notification (can be extended for other types)
      */
     async sendNotification(type: string, payload: NotificationPayload): Promise<boolean> {
         switch (type) {
             case 'staff_welcome':
                 return this.sendStaffWelcomeMessage(payload);
+            case 'material_added':
+                return this.sendMaterialAddedNotification(payload as any);
+            case 'material_used':
+                return this.sendMaterialUsedNotification(payload as any);
             default:
                 console.warn(`⚠️ Unknown notification type: ${type}`);
                 return false;

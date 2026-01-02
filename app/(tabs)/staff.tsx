@@ -1,10 +1,11 @@
-// screens/StaffManagement.tsx
 import Loading from '@/components/Loading';
 import AddStaffModalWithVerification from '@/components/staff/AddStaffModalWithVerification';
 import StaffHeader from '@/components/staff/StaffHeader';
 import StaffCard from '@/components/staff/StaffCard';
 import StaffEmptyState from '@/components/staff/StaffEmptyState';
 import AdminCard from '@/components/staff/AdminCard';
+import StaffQRScannerModal from '@/components/staff/StaffQRScannerModal';
+import ManualStaffAssignModal from '@/components/staff/ManualStaffAssignModal';
 import { getClientId } from '@/functions/clientId';
 import { addStaff } from '@/functions/staff';
 import { isAdmin, useUser } from '@/hooks/useUser';
@@ -20,7 +21,9 @@ import {
     StatusBar,
     StyleSheet,
     Text,
-    View
+    View,
+    TouchableOpacity,
+    Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -48,6 +51,7 @@ const StaffManagement: React.FC = () => {
     const [staffList, setStaffList] = useState<Staff[]>([]);
     const [adminList, setAdminList] = useState<Admin[]>([]);
     const [showAddModal, setShowAddModal] = useState(false);
+    const [showQRScanner, setShowQRScanner] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [clientId, setClientId] = useState('');
     const [clientData, setClientData] = useState<ClientData | null>(null);
@@ -95,14 +99,33 @@ const StaffManagement: React.FC = () => {
                 console.log('📡 Making API calls with clientId:', clientId);
                 console.log('📡 Domain:', domain);
                 
-                // Test each API individually with detailed logging
-                console.log('🔍 Testing Staff API...');
-                const staffUrl = `${domain}/api/users/staff?clientId=${clientId}`;
+                // ✅ Try new API first (using client's staffs array)
+                console.log('🔍 Trying new Staff API (client staffs array)...');
+                let staffUrl = `${domain}/api/clients/staff?clientId=${clientId}`;
                 console.log('📤 Staff URL:', staffUrl);
                 
-                const staffRes = await axios.get(staffUrl);
+                let staffRes = await axios.get(staffUrl);
                 console.log('📥 Staff Response Status:', staffRes.status);
-                console.log('📥 Staff Response Data:', JSON.stringify(staffRes.data, null, 2));
+                
+                let staffResponse = staffRes.data as { success?: boolean; data?: Staff[] };
+                let staffData = staffResponse?.success ? (staffResponse.data || []) : [];
+                
+                // ✅ Fallback to old API if new API returns empty
+                if (staffData.length === 0) {
+                    console.log('⚠️ New API returned empty, falling back to old API...');
+                    staffUrl = `${domain}/api/users/staff?clientId=${clientId}`;
+                    console.log('📤 Fallback Staff URL:', staffUrl);
+                    
+                    staffRes = await axios.get(staffUrl);
+                    console.log('📥 Fallback Response Status:', staffRes.status);
+                    
+                    staffResponse = staffRes.data as { success?: boolean; data?: Staff[] };
+                    staffData = staffResponse?.success ? (staffResponse.data || []) : [];
+                }
+                
+                console.log('✅ Staff data processed:', staffData.length, 'items');
+                console.log('📋 Staff data details:', staffData);
+                setStaffList(Array.isArray(staffData) ? staffData : []);
                 
                 console.log('🔍 Testing Admin API...');
                 const adminUrl = `${domain}/api/users/admin?clientId=${clientId}`;
@@ -119,13 +142,6 @@ const StaffManagement: React.FC = () => {
                 const clientRes = await axios.get(clientUrl);
                 console.log('📥 Client Response Status:', clientRes.status);
                 console.log('📥 Client Response Data:', JSON.stringify(clientRes.data, null, 2));
-                
-                // Handle staff data with proper typing
-                const staffResponse = staffRes.data as { success?: boolean; data?: Staff[] };
-                const staffData = staffResponse?.success ? (staffResponse.data || []) : [];
-                console.log('✅ Staff data processed:', staffData.length, 'items');
-                console.log('📋 Staff data details:', staffData);
-                setStaffList(Array.isArray(staffData) ? staffData : []);
                 
                 // Handle admin data with proper typing
                 const adminResponse = adminRes.data as { success?: boolean; data?: Admin | Admin[] };
@@ -323,7 +339,7 @@ const StaffManagement: React.FC = () => {
                     setLoading(true);
                     try {
                         const [staffRes, adminRes] = await Promise.all([
-                            axios.get(`${domain}/api/users/staff?clientId=${clientId}`),
+                            axios.get(`${domain}/api/clients/staff?clientId=${clientId}`), // ✅ Use new API
                             axios.get(`${domain}/api/users/admin?clientId=${clientId}`)
                         ]);
                         
@@ -530,6 +546,7 @@ const StaffManagement: React.FC = () => {
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
                 onAddPress={() => setShowAddModal(true)}
+                onScanQRPress={() => setShowQRScanner(true)}
                 isAdmin={userIsAdmin}
             />
 
@@ -550,6 +567,29 @@ const StaffManagement: React.FC = () => {
                 onClose={() => setShowAddModal(false)}
                 onAdd={handleAddStaff}
                 companyName={clientData?.name}
+            />
+
+            <StaffQRScannerModal
+                visible={showQRScanner}
+                onClose={() => setShowQRScanner(false)}
+                clientId={clientId}
+                onSuccess={async () => {
+                    // Refresh staff list after successful assignment
+                    if (!clientId) return;
+                    
+                    setLoading(true);
+                    try {
+                        // ✅ Use new API to fetch staff
+                        const staffRes = await axios.get(`${domain}/api/clients/staff?clientId=${clientId}`);
+                        const staffResponse = staffRes.data as { success?: boolean; data?: Staff[] };
+                        const staffData = staffResponse?.data || [];
+                        setStaffList(staffData);
+                    } catch (error) {
+                        console.error('Error refreshing staff list:', error);
+                    } finally {
+                        setLoading(false);
+                    }
+                }}
             />
         </SafeAreaView>
     );

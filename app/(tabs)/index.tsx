@@ -49,8 +49,11 @@ const Index: React.FC = () => {
     // Check if user is a client (has clientId but is not staff)
     const isClient = user && user.clientId && !('role' in user);
     
-    // Get client name from user data
-    const clientName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Client';
+    // Check if user is staff (has role field)
+    const isStaff = user && 'role' in user;
+    
+    // Get user name from user data
+    const userName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'User';
 
     // Performance optimization
     const isLoadingRef = React.useRef(false);
@@ -83,6 +86,7 @@ const Index: React.FC = () => {
             const clientId = await getClientId();
             setClientId(clientId);
 
+            // ✅ Only fetch projects if clientId exists
             if (clientId) {
                 const { projects: projectData, meta } = await getProjectData(clientId, page, itemsPerPage);
                 setProjects(Array.isArray(projectData) ? projectData : []);
@@ -93,6 +97,11 @@ const Index: React.FC = () => {
                 setTotalProjects(meta.total);
                 setHasNextPage(meta.hasNextPage);
                 setHasPrevPage(meta.hasPrevPage);
+            } else {
+                // No clientId - staff without clients
+                console.log('⚠️ No clientId - skipping project fetch');
+                setProjects([]);
+                setLoading(false);
             }
         } catch (error) {
             console.error('Failed to fetch projects:', error);
@@ -108,29 +117,34 @@ const Index: React.FC = () => {
         const fetchClientData = async () => {
             try {
                 const clientId = await getClientId();
-                if (clientId) {
-                    console.log('📝 Fetching client data for:', clientId);
-                    const response = await axios.get(`${domain}/api/client?id=${clientId}`);
-                    const responseData = response.data as any;
+                
+                // ✅ Only fetch client data if clientId exists
+                if (!clientId) {
+                    console.log('⚠️ No clientId - skipping client data fetch');
+                    return;
+                }
+                
+                console.log('📝 Fetching client data for:', clientId);
+                const response = await axios.get(`${domain}/api/client?id=${clientId}`);
+                const responseData = response.data as any;
 
-                    console.log('📦 Client API Response:', JSON.stringify(responseData, null, 2));
+                console.log('📦 Client API Response:', JSON.stringify(responseData, null, 2));
 
-                    // Handle new response structure: { success, message, data }
-                    if (responseData.success && responseData.data) {
-                        const client = responseData.data;
-                        setCompanyName(client.companyName || client.name || 'Company Name');
-                        setCompanyLogo(client.logo || null);
-                        console.log('✅ Client data loaded:', client.companyName || client.name);
-                    }
-                    // Fallback for old response structure: { clientData }
-                    else if (responseData.clientData) {
-                        const client = responseData.clientData;
-                        setCompanyName(client.companyName || client.name || 'Company Name');
-                        setCompanyLogo(client.logo || null);
-                        console.log('✅ Client data loaded (legacy):', client.companyName || client.name);
-                    } else {
-                        console.warn('⚠️ Unexpected client response structure:', responseData);
-                    }
+                // Handle new response structure: { success, message, data }
+                if (responseData.success && responseData.data) {
+                    const client = responseData.data;
+                    setCompanyName(client.companyName || client.name || 'Company Name');
+                    setCompanyLogo(client.logo || null);
+                    console.log('✅ Client data loaded:', client.companyName || client.name);
+                }
+                // Fallback for old response structure: { clientData }
+                else if (responseData.clientData) {
+                    const client = responseData.clientData;
+                    setCompanyName(client.companyName || client.name || 'Company Name');
+                    setCompanyLogo(client.logo || null);
+                    console.log('✅ Client data loaded (legacy):', client.companyName || client.name);
+                } else {
+                    console.warn('⚠️ Unexpected client response structure:', responseData);
                 }
             } catch (error: unknown) {
                 console.error('❌ Error fetching client data:', error);
@@ -198,6 +212,12 @@ const Index: React.FC = () => {
     // Fetch staff data
     useEffect(() => {
         const getStaffData = async () => {
+            // ✅ Only fetch staff if clientId exists
+            if (!clientId) {
+                console.log('⚠️ No clientId - skipping staff fetch');
+                return;
+            }
+            
             try {
                 const res = await axios.get(`${domain}/api/staff?clientId=${clientId}`);
                 const data = (res.data as any)?.data || [];
@@ -279,8 +299,8 @@ const Index: React.FC = () => {
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
             
-            {/* Conditional Header - Hide for clients */}
-            {!isClient && (
+            {/* Conditional Header - Show only for admin users */}
+            {userIsAdmin && (
                 <View style={styles.fixedHeader}>
                     <View style={styles.userInfo}>
                         {companyLogo ? (
@@ -309,16 +329,12 @@ const Index: React.FC = () => {
             )}
 
 
-            {/* Section Header - Modified for clients */}
+            {/* Section Header - Simple for all users */}
             <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>My Projects</Text>
-                {isClient && (
-                    <View style={styles.clientNameContainer}>
-                        <Ionicons name="person-circle-outline" size={20} color="#3B82F6" />
-                        <Text style={styles.clientNameText}>{clientName}</Text>
-                    </View>
-                )}
-                {!isClient && <View style={styles.sectionDivider} />}
+                <View>
+                    <Text style={styles.sectionTitle}>My Projects</Text>
+                    {userIsAdmin && <View style={styles.sectionDivider} />}
+                </View>
             </View>
 
             <ScrollView
