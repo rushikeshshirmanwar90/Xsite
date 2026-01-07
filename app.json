@@ -5,7 +5,7 @@
     "owner": "codewithrushi",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/logo.ico",
+    "icon": "./assets/logo.jpg",
     "scheme": "siteex",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,

@@ -202,9 +202,13 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
         setSelectedMaterials(prev => {
             const newSelection = { ...prev };
             if (newSelection[materialId]) {
+                // Material is currently selected, deselect it
                 delete newSelection[materialId];
+                console.log(`🔄 Material deselected: ${materialId}`);
             } else {
+                // Material is not selected, select it
                 newSelection[materialId] = '';
+                console.log(`✅ Material selected: ${materialId}`);
             }
             return newSelection;
         });
@@ -419,6 +423,8 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                                                 alert('Error: Material ID not found. Please refresh and try again.');
                                                                 return;
                                                             }
+                                                            console.log(`🔄 Toggling material selection for: ${material.name} (ID: ${material._id})`);
+                                                            console.log(`Current selection state: ${isMaterialSelected(material._id) ? 'SELECTED' : 'NOT SELECTED'}`);
                                                             toggleMaterialSelection(material._id);
                                                         }}
                                                     >
@@ -450,13 +456,24 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                                         </View>
                                                         
                                                         {/* Selection Checkbox */}
-                                                        <View style={styles.checkboxContainer}>
+                                                        <TouchableOpacity 
+                                                            style={styles.checkboxContainer}
+                                                            onPress={() => {
+                                                                if (!material._id) {
+                                                                    alert('Error: Material ID not found. Please refresh and try again.');
+                                                                    return;
+                                                                }
+                                                                console.log(`🔄 Checkbox toggle for: ${material.name} (ID: ${material._id})`);
+                                                                toggleMaterialSelection(material._id);
+                                                            }}
+                                                            activeOpacity={0.7}
+                                                        >
                                                             <Ionicons 
                                                                 name={isSelected ? "checkmark-circle" : "ellipse-outline"} 
-                                                                size={24} 
+                                                                size={28} 
                                                                 color={isSelected ? "#3B82F6" : "#CBD5E1"} 
                                                             />
-                                                        </View>
+                                                        </TouchableOpacity>
                                                     </TouchableOpacity>
                                                 );
                                             })
@@ -477,19 +494,28 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                         <Text style={styles.previewTitle}>
                                             Selected Materials ({getSelectedMaterialsCount()})
                                         </Text>
+                                        <Text style={styles.previewSubtitle}>
+                                            Tap materials above to add or remove from selection
+                                        </Text>
                                         <View style={styles.previewList}>
                                             {Object.keys(selectedMaterials).map((materialId) => {
                                                 const material = availableMaterials.find(m => m._id === materialId);
                                                 if (!material) return null;
                                                 
                                                 return (
-                                                    <View key={materialId} style={styles.previewItem}>
+                                                    <TouchableOpacity
+                                                        key={materialId} 
+                                                        style={styles.previewItem}
+                                                        onPress={() => toggleMaterialSelection(materialId)}
+                                                        activeOpacity={0.7}
+                                                    >
                                                         <View style={[styles.previewIconBadge, { backgroundColor: material.color + '20' }]}>
                                                             <Ionicons name={material.icon} size={14} color={material.color} />
                                                         </View>
                                                         <Text style={styles.previewItemName}>{material.name}</Text>
                                                         <Text style={styles.previewItemUnit}>({material.unit})</Text>
-                                                    </View>
+                                                        <Ionicons name="close-circle" size={16} color="#EF4444" style={styles.previewRemoveIcon} />
+                                                    </TouchableOpacity>
                                                 );
                                             })}
                                         </View>
@@ -578,7 +604,21 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                                                 onChangeText={(text) => updateMaterialQuantity(materialId, text)}
                                                                 placeholder={`Enter quantity (Max: ${material.quantity})`}
                                                                 keyboardType="numeric"
+                                                                returnKeyType="next"
                                                                 placeholderTextColor="#94A3B8"
+                                                                selectTextOnFocus={true}
+                                                                onSubmitEditing={() => {
+                                                                    // Find next material input to focus
+                                                                    const materialIds = Object.keys(selectedMaterials);
+                                                                    const currentIndex = materialIds.indexOf(materialId);
+                                                                    if (currentIndex < materialIds.length - 1) {
+                                                                        // Focus next input if available
+                                                                        const nextMaterialId = materialIds[currentIndex + 1];
+                                                                        // Note: In React Native, we'd need refs for actual focus management
+                                                                        // For now, this provides better UX with returnKeyType
+                                                                    }
+                                                                }}
+                                                                blurOnSubmit={false}
                                                             />
                                                             <Text style={styles.quantityUnitLarge}>{material.unit}</Text>
                                                         </View>
@@ -1188,7 +1228,13 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: '600',
         color: '#0369A1',
+        marginBottom: 4,
+    },
+    previewSubtitle: {
+        fontSize: 12,
+        color: '#64748B',
         marginBottom: 12,
+        fontStyle: 'italic',
     },
     previewList: {
         flexDirection: 'row',
@@ -1222,6 +1268,9 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: '#64748B',
         marginLeft: 4,
+    },
+    previewRemoveIcon: {
+        marginLeft: 6,
     },
     // Section Info Styles
     sectionInfo: {

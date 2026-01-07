@@ -65,6 +65,9 @@ export type ActivityType =
   | "mini_section_deleted"
   | "staff_assigned"
   | "staff_removed"
+  | "labor_added"
+  | "labor_updated"
+  | "labor_removed"
   | "other";
 
 export type ActivityCategory =
@@ -73,8 +76,11 @@ export type ActivityCategory =
   | "mini_section"
   | "material"
   | "staff"
-  | "other";
+  | "other"
+  | "labor";
+
 export type ActivityAction =
+  | "add"
   | "create"
   | "update"
   | "delete"
@@ -516,3 +522,134 @@ export const logStaffRemoved = async (
     },
   });
 };
+
+
+// ============================================
+// LABOR ACTIVITIES
+// ============================================
+
+export const logLaborAdded = async (
+  projectId: string,
+  projectName: string,
+  sectionId: string,
+  sectionName: string,
+  miniSectionId: string,
+  miniSectionName: string,
+  laborEntries: Array<{
+    type: string;
+    category: string;
+    count: number;
+    perLaborCost: number;
+    totalCost: number;
+  }>,
+  message?: string
+) => {
+  const totalLaborers = laborEntries.reduce((sum, entry) => sum + entry.count, 0);
+  const totalCost = laborEntries.reduce((sum, entry) => sum + entry.totalCost, 0);
+  const categories = [...new Set(laborEntries.map(entry => entry.category))];
+
+  await logActivity({
+    activityType: "labor_added",
+    category: "labor",
+    action: "add",
+    description: `Added ${totalLaborers} laborer${totalLaborers > 1 ? 's' : ''} (${categories.length} categor${categories.length > 1 ? 'ies' : 'y'}) to "${miniSectionName || sectionName}"`,
+    projectId,
+    projectName,
+    sectionId,
+    sectionName,
+    miniSectionId,
+    miniSectionName,
+    message,
+    metadata: {
+      laborEntries,
+      totalLaborers,
+      totalCost,
+      categories,
+      entriesCount: laborEntries.length,
+    },
+  });
+};
+
+export const logLaborUpdated = async (
+  projectId: string,
+  projectName: string,
+  sectionId: string,
+  sectionName: string,
+  miniSectionId: string,
+  miniSectionName: string,
+  laborType: string,
+  laborCategory: string,
+  oldCount: number,
+  newCount: number,
+  oldCost: number,
+  newCost: number,
+  message?: string
+) => {
+  await logActivity({
+    activityType: "labor_updated",
+    category: "labor",
+    action: "update",
+    description: `Updated ${laborType} (${laborCategory}) in "${miniSectionName || sectionName}"`,
+    projectId,
+    projectName,
+    sectionId,
+    sectionName,
+    miniSectionId,
+    miniSectionName,
+    message,
+    changedData: [
+      {
+        field: "count",
+        oldValue: oldCount,
+        newValue: newCount,
+      },
+      {
+        field: "totalCost",
+        oldValue: oldCost,
+        newValue: newCost,
+      },
+    ],
+    metadata: {
+      laborType,
+      laborCategory,
+      countChange: newCount - oldCount,
+      costChange: newCost - oldCost,
+    },
+  });
+};
+
+export const logLaborRemoved = async (
+  projectId: string,
+  projectName: string,
+  sectionId: string,
+  sectionName: string,
+  miniSectionId: string,
+  miniSectionName: string,
+  laborType: string,
+  laborCategory: string,
+  count: number,
+  totalCost: number,
+  message?: string
+) => {
+  await logActivity({
+    activityType: "labor_removed",
+    category: "labor",
+    action: "remove",
+    description: `Removed ${count} ${laborType} (${laborCategory}) from "${miniSectionName || sectionName}"`,
+    projectId,
+    projectName,
+    sectionId,
+    sectionName,
+    miniSectionId,
+    miniSectionName,
+    message,
+    metadata: {
+      laborType,
+      laborCategory,
+      count,
+      totalCost,
+    },
+  });
+};
+
+

@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,6 +23,7 @@ import { toast } from 'sonner-native';
 
 const Details = () => {
     const params = useLocalSearchParams();
+    const router = useRouter();
     const projectId = params.projectId as string;
     const projectName = params.projectName as string;
     const sectionId = params.sectionId as string;
@@ -1809,6 +1810,34 @@ const Details = () => {
             >
                 <TabSelector activeTab={activeTab} onSelectTab={setActiveTab} />
 
+                {/* Navigation Section - Always visible */}
+                <View style={navigationStyles.navigationContainer}>
+                    <TouchableOpacity
+                        style={navigationStyles.laborNavigationButton}
+                        onPress={() => {
+                            router.push({
+                                pathname: '/labor',
+                                params: {
+                                    projectId,
+                                    projectName,
+                                    sectionId,
+                                    sectionName
+                                }
+                            });
+                        }}
+                        activeOpacity={0.7}
+                    >
+                        <View style={navigationStyles.laborButtonContent}>
+                            <Ionicons name="people-circle" size={24} color="#3B82F6" />
+                            <View style={navigationStyles.laborButtonTextContainer}>
+                                <Text style={navigationStyles.laborButtonTitle}>Labor Management</Text>
+                                <Text style={navigationStyles.laborButtonSubtitle}>Manage labor entries for this section</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                        </View>
+                    </TouchableOpacity>
+                </View>
+
                 {/* Notification Button - Inside scroll view */}
                 {/* <View style={notificationStyles.notificationButtonContainer}>
                     <TouchableOpacity
@@ -2428,6 +2457,44 @@ const actionStyles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         color: '#DC2626',
+    },
+});
+
+const navigationStyles = StyleSheet.create({
+    navigationContainer: {
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+    },
+    laborNavigationButton: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    laborButtonContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        gap: 12,
+    },
+    laborButtonTextContainer: {
+        flex: 1,
+    },
+    laborButtonTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1F2937',
+        marginBottom: 2,
+    },
+    laborButtonSubtitle: {
+        fontSize: 13,
+        color: '#6B7280',
     },
 });
 

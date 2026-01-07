@@ -18,6 +18,7 @@ interface HeaderProps {
     projectId?: string;
     sectionId?: string;
     onShowSectionPrompt?: () => void;
+    onShowNotifications?: () => void;
     hideSection?: boolean;
 }
 
@@ -32,6 +33,7 @@ const Header: React.FC<HeaderProps> = ({
     projectId,
     sectionId,
     onShowSectionPrompt,
+    onShowNotifications,
     hideSection = false,
 }) => {
     // State to store fetched sections
@@ -163,6 +165,19 @@ const Header: React.FC<HeaderProps> = ({
                                 }}
                             />
                         </View>
+                    )}
+                </View>
+
+                {/* Right side buttons */}
+                <View style={styles.headerActions}>
+                    {onShowNotifications && (
+                        <TouchableOpacity
+                            onPress={onShowNotifications}
+                            style={styles.notificationButton}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons name="notifications-outline" size={20} color="#1F2937" />
+                        </TouchableOpacity>
                     )}
                 </View>
             </View>

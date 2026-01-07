@@ -1,6 +1,6 @@
 import { styles } from '@/style/details';
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
+import * as React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
 interface TabSelectorProps {
