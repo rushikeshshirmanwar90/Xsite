@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     Modal,
     ScrollView,
@@ -48,6 +48,9 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
     const [selectedMaterials, setSelectedMaterials] = useState<{ [materialId: string]: string }>({});
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [currentStep, setCurrentStep] = useState<'selection' | 'quantity'>('selection');
+    
+    // Refs for quantity inputs to enable keyboard navigation
+    const quantityInputRefs = useRef<{ [materialId: string]: TextInput | null }>({});
 
     // Log when form opens and materials are passed
     useEffect(() => {
@@ -141,6 +144,8 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
         setSelectedMaterials({});
         setSearchQuery('');
         setCurrentStep('selection');
+        // Clear input refs
+        quantityInputRefs.current = {};
         onClose();
     };
 
@@ -199,17 +204,27 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
 
     // Helper functions for material selection
     const toggleMaterialSelection = (materialId: string) => {
+        console.log(`🔄 Toggle called for material: ${materialId}`);
+        console.log(`Current selectedMaterials:`, Object.keys(selectedMaterials));
+        
         setSelectedMaterials(prev => {
             const newSelection = { ...prev };
-            if (newSelection[materialId]) {
+            const isCurrentlySelected = materialId in newSelection;
+            
+            console.log(`Material ${materialId} is currently selected: ${isCurrentlySelected}`);
+            
+            if (isCurrentlySelected) {
                 // Material is currently selected, deselect it
                 delete newSelection[materialId];
                 console.log(`🔄 Material deselected: ${materialId}`);
+                console.log(`New selection after deselect:`, Object.keys(newSelection));
             } else {
-                // Material is not selected, select it
+                // Material is not selected, select it with empty quantity
                 newSelection[materialId] = '';
                 console.log(`✅ Material selected: ${materialId}`);
+                console.log(`New selection after select:`, Object.keys(newSelection));
             }
+            
             return newSelection;
         });
     };
@@ -249,6 +264,13 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
     const handleNextStep = () => {
         if (canProceedToQuantity()) {
             setCurrentStep('quantity');
+            // Focus on first quantity input after a short delay
+            setTimeout(() => {
+                const firstMaterialId = Object.keys(selectedMaterials)[0];
+                if (firstMaterialId && quantityInputRefs.current[firstMaterialId]) {
+                    quantityInputRefs.current[firstMaterialId]?.focus();
+                }
+            }, 300);
         }
     };
 
@@ -427,6 +449,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                                             console.log(`Current selection state: ${isMaterialSelected(material._id) ? 'SELECTED' : 'NOT SELECTED'}`);
                                                             toggleMaterialSelection(material._id);
                                                         }}
+                                                        activeOpacity={0.7}
                                                     >
                                                         <View style={styles.materialItemLeft}>
                                                             <View style={[styles.materialIconBadge, { backgroundColor: material.color + '20' }]}>
@@ -456,24 +479,13 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                                         </View>
                                                         
                                                         {/* Selection Checkbox */}
-                                                        <TouchableOpacity 
-                                                            style={styles.checkboxContainer}
-                                                            onPress={() => {
-                                                                if (!material._id) {
-                                                                    alert('Error: Material ID not found. Please refresh and try again.');
-                                                                    return;
-                                                                }
-                                                                console.log(`🔄 Checkbox toggle for: ${material.name} (ID: ${material._id})`);
-                                                                toggleMaterialSelection(material._id);
-                                                            }}
-                                                            activeOpacity={0.7}
-                                                        >
+                                                        <View style={styles.checkboxContainer}>
                                                             <Ionicons 
                                                                 name={isSelected ? "checkmark-circle" : "ellipse-outline"} 
                                                                 size={28} 
-                                                                color={isSelected ? "#3B82F6" : "#CBD5E1"} 
+                                                                color={isSelected ? "#10B981" : "#CBD5E1"} 
                                                             />
-                                                        </TouchableOpacity>
+                                                        </View>
                                                     </TouchableOpacity>
                                                 );
                                             })
@@ -567,7 +579,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                     </View>
 
                                     <View style={styles.quantitySection}>
-                                        {Object.keys(selectedMaterials).map((materialId) => {
+                                        {Object.keys(selectedMaterials).map((materialId, index) => {
                                             const material = availableMaterials.find(m => m._id === materialId);
                                             if (!material) return null;
                                             
@@ -575,6 +587,8 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                             const quantityNum = parseFloat(currentQuantity);
                                             // Only show error if user has interacted with the field (not empty by default)
                                             const hasError = currentQuantity !== '' && (quantityNum <= 0 || quantityNum > material.quantity);
+                                            const materialIds = Object.keys(selectedMaterials);
+                                            const isLastInput = index === materialIds.length - 1;
                                             
                                             return (
                                                 <View key={materialId} style={styles.quantityCard}>
@@ -596,6 +610,9 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                                         <Text style={styles.quantityInputLabel}>Quantity to use:</Text>
                                                         <View style={styles.quantityInputWrapper}>
                                                             <TextInput
+                                                                ref={(ref) => {
+                                                                    quantityInputRefs.current[materialId] = ref;
+                                                                }}
                                                                 style={[
                                                                     styles.quantityInputLarge,
                                                                     hasError && styles.quantityInputError
@@ -604,21 +621,24 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                                                 onChangeText={(text) => updateMaterialQuantity(materialId, text)}
                                                                 placeholder={`Enter quantity (Max: ${material.quantity})`}
                                                                 keyboardType="numeric"
-                                                                returnKeyType="next"
+                                                                returnKeyType={isLastInput ? "done" : "next"}
                                                                 placeholderTextColor="#94A3B8"
                                                                 selectTextOnFocus={true}
                                                                 onSubmitEditing={() => {
-                                                                    // Find next material input to focus
-                                                                    const materialIds = Object.keys(selectedMaterials);
-                                                                    const currentIndex = materialIds.indexOf(materialId);
-                                                                    if (currentIndex < materialIds.length - 1) {
-                                                                        // Focus next input if available
-                                                                        const nextMaterialId = materialIds[currentIndex + 1];
-                                                                        // Note: In React Native, we'd need refs for actual focus management
-                                                                        // For now, this provides better UX with returnKeyType
+                                                                    if (!isLastInput) {
+                                                                        // Focus next input
+                                                                        const nextMaterialId = materialIds[index + 1];
+                                                                        if (nextMaterialId && quantityInputRefs.current[nextMaterialId]) {
+                                                                            quantityInputRefs.current[nextMaterialId]?.focus();
+                                                                        }
+                                                                    } else {
+                                                                        // Last input, blur to hide keyboard
+                                                                        quantityInputRefs.current[materialId]?.blur();
                                                                     }
                                                                 }}
-                                                                blurOnSubmit={false}
+                                                                blurOnSubmit={isLastInput}
+                                                                autoCorrect={false}
+                                                                autoCapitalize="none"
                                                             />
                                                             <Text style={styles.quantityUnitLarge}>{material.unit}</Text>
                                                         </View>
@@ -642,6 +662,33 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                                                 <Text style={styles.quantityHintText}>
                                                                     Enter the amount you want to use
                                                                 </Text>
+                                                            </View>
+                                                        )}
+                                                        
+                                                        {/* Quick action buttons for common quantities */}
+                                                        {currentQuantity === '' && (
+                                                            <View style={styles.quickActionsContainer}>
+                                                                <Text style={styles.quickActionsLabel}>Quick fill:</Text>
+                                                                <View style={styles.quickActionButtons}>
+                                                                    <TouchableOpacity
+                                                                        style={styles.quickActionButton}
+                                                                        onPress={() => updateMaterialQuantity(materialId, '1')}
+                                                                    >
+                                                                        <Text style={styles.quickActionButtonText}>1</Text>
+                                                                    </TouchableOpacity>
+                                                                    <TouchableOpacity
+                                                                        style={styles.quickActionButton}
+                                                                        onPress={() => updateMaterialQuantity(materialId, Math.floor(material.quantity / 2).toString())}
+                                                                    >
+                                                                        <Text style={styles.quickActionButtonText}>Half</Text>
+                                                                    </TouchableOpacity>
+                                                                    <TouchableOpacity
+                                                                        style={styles.quickActionButton}
+                                                                        onPress={() => updateMaterialQuantity(materialId, material.quantity.toString())}
+                                                                    >
+                                                                        <Text style={styles.quickActionButtonText}>All</Text>
+                                                                    </TouchableOpacity>
+                                                                </View>
                                                             </View>
                                                         )}
                                                     </View>
@@ -840,11 +887,17 @@ const styles = StyleSheet.create({
         padding: 12,
         borderBottomWidth: 1,
         borderBottomColor: '#F1F5F9',
+        backgroundColor: '#FFFFFF',
     },
     materialItemSelected: {
-        backgroundColor: '#EFF6FF',
-        borderLeftWidth: 3,
-        borderLeftColor: '#3B82F6',
+        backgroundColor: '#F0F9FF',
+        borderLeftWidth: 4,
+        borderLeftColor: '#10B981',
+        shadowColor: '#10B981',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 2,
     },
     materialItemLeft: {
         flexDirection: 'row',
@@ -1490,6 +1543,38 @@ const styles = StyleSheet.create({
         height: '100%',
         backgroundColor: '#10B981',
         borderRadius: 2,
+    },
+    // Quick Actions Styles
+    quickActionsContainer: {
+        marginTop: 8,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+    },
+    quickActionsLabel: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: '#64748B',
+        marginBottom: 6,
+    },
+    quickActionButtons: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    quickActionButton: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        minWidth: 50,
+        alignItems: 'center',
+    },
+    quickActionButtonText: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: '#3B82F6',
     },
 });
 
