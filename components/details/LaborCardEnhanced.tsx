@@ -1,7 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet, Animated, TouchableOpacity, Alert } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { Labor } from '@/types/labor';
+import { Ionicons } from '@expo/vector-icons';
+import React from 'react';
+import { Alert, Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface LaborCardEnhancedProps {
     labor: Labor;

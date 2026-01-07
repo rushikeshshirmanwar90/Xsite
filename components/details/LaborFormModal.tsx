@@ -1,17 +1,17 @@
-import React, { useState, useRef } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import React, { useRef, useState } from 'react';
 import {
+  Alert,
+  Animated,
   Modal,
-  View,
+  PanResponder,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
-  Alert,
-  StyleSheet,
-  Animated,
-  PanResponder,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 
 interface LaborFormModalProps {
   visible: boolean;
@@ -192,11 +192,66 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [laborEntries, setLaborEntries] = useState<any[]>([]);
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
+  const [editingEntry, setEditingEntry] = useState<any | null>(null);
   const laborEntriesRef = useRef<any[]>([]);
 
   // Animation values for swipe to submit
   const swipeAnimation = useRef(new Animated.Value(0)).current;
   const [isSwipeComplete, setIsSwipeComplete] = useState(false);
+
+  // Animation values
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  // Animation values for types section
+  const typesSectionOpacity = useRef(new Animated.Value(0)).current;
+  const typesSectionHeight = useRef(new Animated.Value(0)).current;
+
+  // Swipe gesture handlers
+  const handleSwipeStart = () => {
+    // Reset swipe state
+    setIsSwipeComplete(false);
+  };
+
+  const handleSwipeMove = (gestureState: any) => {
+    const { dx } = gestureState;
+    const maxSwipe = 200; // Maximum swipe distance to match new design
+    const progress = Math.max(0, Math.min(dx / maxSwipe, 1));
+    
+    swipeAnimation.setValue(progress);
+    
+    // Check if swipe is complete (70% of the way)
+    if (progress >= 0.7 && !isSwipeComplete) {
+      setIsSwipeComplete(true);
+    }
+  };
+
+  const handleSwipeEnd = (gestureState: any) => {
+    const { dx } = gestureState;
+    const maxSwipe = 200;
+    const progress = dx / maxSwipe;
+    
+    console.log('Swipe ended, progress:', progress, 'laborEntries.length:', laborEntries.length);
+    
+    if (progress >= 0.7) {
+      // Complete the swipe and submit
+      Animated.timing(swipeAnimation, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: false,
+      }).start(() => {
+        console.log('Animation completed, calling handleFinalSubmit');
+        handleFinalSubmit();
+      });
+    } else {
+      // Animate back to start
+      Animated.timing(swipeAnimation, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+      setIsSwipeComplete(false);
+    }
+  };
 
   // Pan responder for swipe gesture
   const panResponder = useRef(
@@ -209,13 +264,6 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
     })
   ).current;
 
-  // Animation values
-  const scrollViewRef = useRef<ScrollView>(null);
-
-  // Animation values for types section
-  const typesSectionOpacity = useRef(new Animated.Value(0)).current;
-  const typesSectionHeight = useRef(new Animated.Value(0)).current;
-
   const resetForm = () => {
     setSelectedCategory('');
     setSelectedType('');
@@ -226,6 +274,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
     setLaborEntries([]);
     laborEntriesRef.current = []; // Reset ref too
     setShowAddForm(false);
+    setEditingEntry(null);
     setIsSwipeComplete(false);
     swipeAnimation.setValue(0);
     
@@ -282,6 +331,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
     setPerLaborCost('');
     setSelectedMiniSection('');
     setSearchQuery('');
+    setEditingEntry(null);
     
     // Reset types section animations
     typesSectionOpacity.setValue(0);
@@ -454,6 +504,9 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
   const editLaborEntry = (index: number) => {
     const entry = laborEntries[index];
     
+    // Set editing entry for display
+    setEditingEntry(entry);
+    
     // Set form values to the entry being edited
     const categoryData = laborCategories.find(cat => cat.name === entry.category);
     if (categoryData) {
@@ -478,52 +531,6 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
-  };
-
-  const handleSwipeStart = () => {
-    // Reset swipe state
-    setIsSwipeComplete(false);
-  };
-
-  const handleSwipeMove = (gestureState: any) => {
-    const { dx } = gestureState;
-    const maxSwipe = 200; // Maximum swipe distance to match new design
-    const progress = Math.max(0, Math.min(dx / maxSwipe, 1));
-    
-    swipeAnimation.setValue(progress);
-    
-    // Check if swipe is complete (70% of the way)
-    if (progress >= 0.7 && !isSwipeComplete) {
-      setIsSwipeComplete(true);
-    }
-  };
-
-  const handleSwipeEnd = (gestureState: any) => {
-    const { dx } = gestureState;
-    const maxSwipe = 200;
-    const progress = dx / maxSwipe;
-    
-    console.log('Swipe ended, progress:', progress, 'laborEntries.length:', laborEntries.length);
-    
-    if (progress >= 0.7) {
-      // Complete the swipe and submit
-      Animated.timing(swipeAnimation, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: false,
-      }).start(() => {
-        console.log('Animation completed, calling handleFinalSubmit');
-        handleFinalSubmit();
-      });
-    } else {
-      // Animate back to start
-      Animated.timing(swipeAnimation, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: false,
-      }).start();
-      setIsSwipeComplete(false);
-    }
   };
 
   const selectedCategoryData = laborCategories.find(cat => cat.id === selectedCategory);
@@ -645,6 +652,60 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
             {/* Labor Adding Form - Show by default when no entries, or when showAddForm is true */}
             {(laborEntries.length === 0 || showAddForm) && (
               <>
+                {/* Editing Entry Banner - Show when editing */}
+                {editingEntry && (
+                  <View style={styles.editingBannerContainer}>
+                    <View style={styles.editingBanner}>
+                      <View style={styles.editingBannerHeader}>
+                        <View style={styles.editingBannerLeft}>
+                          <View style={[styles.editingBannerIcon, { backgroundColor: `${editingEntry.color || '#3B82F6'}20` }]}>
+                            <Ionicons name="pencil" size={16} color={editingEntry.color || '#3B82F6'} />
+                          </View>
+                          <View style={styles.editingBannerInfo}>
+                            <Text style={styles.editingBannerTitle}>Editing Labor Entry</Text>
+                            <Text style={styles.editingBannerSubtitle}>
+                              {editingEntry.type} • {editingEntry.miniSectionName}
+                            </Text>
+                          </View>
+                        </View>
+                        <TouchableOpacity 
+                          style={styles.editingBannerClose}
+                          onPress={() => {
+                            // Restore the entry back to the list
+                            setLaborEntries(prev => {
+                              const newEntries = [...prev, editingEntry];
+                              laborEntriesRef.current = newEntries;
+                              return newEntries;
+                            });
+                            resetCurrentEntry();
+                            setShowAddForm(false);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="close" size={18} color="#6B7280" />
+                        </TouchableOpacity>
+                      </View>
+                      
+                      <View style={styles.editingBannerDetails}>
+                        <View style={styles.editingBannerMetric}>
+                          <Ionicons name="people" size={14} color="#64748B" />
+                          <Text style={styles.editingBannerMetricText}>{editingEntry.count} laborers</Text>
+                        </View>
+                        <View style={styles.editingBannerDivider} />
+                        <View style={styles.editingBannerMetric}>
+                          <Ionicons name="cash" size={14} color="#64748B" />
+                          <Text style={styles.editingBannerMetricText}>₹{editingEntry.perLaborCost.toLocaleString()}/each</Text>
+                        </View>
+                        <View style={styles.editingBannerDivider} />
+                        <View style={styles.editingBannerMetric}>
+                          <Text style={styles.editingBannerTotalLabel}>Total:</Text>
+                          <Text style={styles.editingBannerTotalValue}>₹{editingEntry.totalCost.toLocaleString()}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                )}
+
                 {/* Step 1: Category Selection */}
                 <View style={[styles.sectionContainer, styles.firstSectionContainer]}>
                   {!selectedCategory ? (
@@ -995,13 +1056,23 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                 <TouchableOpacity 
                   style={styles.cancelAddFormButton}
                   onPress={() => {
+                    // If editing, restore the entry back to the list
+                    if (editingEntry) {
+                      setLaborEntries(prev => {
+                        const newEntries = [...prev, editingEntry];
+                        laborEntriesRef.current = newEntries;
+                        return newEntries;
+                      });
+                    }
                     resetCurrentEntry();
                     setShowAddForm(false);
                   }}
                   activeOpacity={0.7} 
                 >
                   <Ionicons name="close" size={16} color="#6B7280" />
-                  <Text style={styles.cancelAddFormText}>Cancel</Text>
+                  <Text style={styles.cancelAddFormText}>
+                    {editingEntry ? "Cancel Edit" : "Cancel"}
+                  </Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -1012,8 +1083,10 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.submitButton} onPress={handleAddLabor}>
                 <View style={styles.submitButtonContainer}>
-                  <Ionicons name="add" size={20} color="#10B981" />
-                  <Text style={styles.submitButtonText}>Add Labor</Text>
+                  <Ionicons name={editingEntry ? "checkmark" : "add"} size={20} color="#10B981" />
+                  <Text style={styles.submitButtonText}>
+                    {editingEntry ? "Update Labor" : "Add Labor"}
+                  </Text>
                 </View>
               </TouchableOpacity>
             </View>
@@ -1164,6 +1237,101 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#10B981',
+  },
+  // Editing Banner Styles
+  editingBannerContainer: {
+    marginBottom: 16,
+  },
+  editingBanner: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: '#F59E0B',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  editingBannerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  editingBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flex: 1,
+  },
+  editingBannerIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  editingBannerInfo: {
+    flex: 1,
+  },
+  editingBannerTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#92400E',
+    marginBottom: 2,
+  },
+  editingBannerSubtitle: {
+    fontSize: 13,
+    color: '#A16207',
+    fontWeight: '500',
+  },
+  editingBannerClose: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editingBannerDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  editingBannerMetric: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flex: 1,
+  },
+  editingBannerMetricText: {
+    fontSize: 12,
+    color: '#374151',
+    fontWeight: '600',
+  },
+  editingBannerDivider: {
+    width: 1,
+    height: 16,
+    backgroundColor: '#F59E0B',
+    marginHorizontal: 8,
+  },
+  editingBannerTotalLabel: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  editingBannerTotalValue: {
+    fontSize: 12,
+    color: '#F59E0B',
+    fontWeight: '700',
   },
   cancelAddFormContainer: {
     paddingHorizontal: 4,
@@ -1822,12 +1990,12 @@ const styles = StyleSheet.create({
   },
   // Compact Labor Entries Summary Styles
   compactLaborEntriesList: {
-    gap: 8,
+    gap: 10,
   },
   compactLaborEntryCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    padding: 12,
+    borderRadius: 12,
+    padding: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#000',
@@ -1840,7 +2008,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   compactLaborEntryLeft: {
     flexDirection: 'row',
@@ -1848,45 +2016,47 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   compactLaborIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: 12,
   },
   compactLaborInfo: {
     flex: 1,
   },
   compactLaborType: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
     color: '#1E293B',
-    marginBottom: 2,
+    marginBottom: 3,
+    lineHeight: 20,
   },
   compactLaborCategory: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#64748B',
-    marginBottom: 4,
+    marginBottom: 6,
+    fontWeight: '500',
   },
   compactAreaInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
   },
   compactAreaText: {
-    fontSize: 11,
+    fontSize: 13,
     color: '#3B82F6',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   compactCardActions: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 8,
   },
   compactEditButton: {
-    width: 26,
-    height: 26,
-    borderRadius: 6,
+    width: 30,
+    height: 30,
+    borderRadius: 8,
     backgroundColor: '#EFF6FF',
     borderWidth: 1,
     borderColor: '#DBEAFE',
@@ -1894,9 +2064,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   compactRemoveButton: {
-    width: 26,
-    height: 26,
-    borderRadius: 6,
+    width: 30,
+    height: 30,
+    borderRadius: 8,
     backgroundColor: '#FEF2F2',
     borderWidth: 1,
     borderColor: '#FECACA',
@@ -1907,44 +2077,44 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
-    borderRadius: 6,
-    padding: 8,
+    borderRadius: 8,
+    padding: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
   compactMetricItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
     flex: 1,
   },
   compactMetricValue: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#1E293B',
-    fontWeight: '600',
+    fontWeight: '700',
   },
   compactMetricDivider: {
     width: 1,
-    height: 16,
+    height: 18,
     backgroundColor: '#E2E8F0',
-    marginHorizontal: 6,
+    marginHorizontal: 8,
   },
   compactTotalMetric: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
     flex: 1,
     justifyContent: 'flex-end',
   },
   compactTotalLabel: {
-    fontSize: 11,
+    fontSize: 13,
     color: '#64748B',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   compactTotalValue: {
-    fontSize: 12,
+    fontSize: 15,
     color: '#10B981',
-    fontWeight: '700',
+    fontWeight: '800',
   },
   // Legacy Labor Entries Summary Styles
   laborEntriesList: {
