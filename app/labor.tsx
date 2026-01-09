@@ -2,6 +2,8 @@ import Header from '@/components/details/Header';
 import LaborCardEnhanced from '@/components/details/LaborCardEnhanced';
 import LaborFormModal from '@/components/details/LaborFormModal';
 import SectionManager from '@/components/details/SectionManager';
+import { getSection, addSection } from '@/functions/details';
+import { getClientId } from '@/functions/clientId';
 
 import { styles } from '@/style/details';
 import { Section } from '@/types/details';
@@ -34,42 +36,98 @@ const LaborPage = () => {
     const [itemsPerPage] = useState(10);
     const [totalCount, setTotalCount] = useState(0);
 
-    // Mock data for demonstration
-    const mockMiniSections: Section[] = [
-        { 
-            _id: '1', 
-            name: 'Foundation Work', 
-            projectDetails: { projectName, projectId },
-            mainSectionDetails: { sectionName, sectionId },
-            MaterialUsed: [],
-            MaterialAvailable: [],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            __v: 0
-        },
-        { 
-            _id: '2', 
-            name: 'Structural Work', 
-            projectDetails: { projectName, projectId },
-            mainSectionDetails: { sectionName, sectionId },
-            MaterialUsed: [],
-            MaterialAvailable: [],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            __v: 0
-        },
-        { 
-            _id: '3', 
-            name: 'Finishing Work', 
-            projectDetails: { projectName, projectId },
-            mainSectionDetails: { sectionName, sectionId },
-            MaterialUsed: [],
-            MaterialAvailable: [],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            __v: 0
-        },
-    ];
+    // Function to fetch mini-sections from API
+    const fetchMiniSections = async () => {
+        try {
+            console.log('Fetching mini-sections for sectionId:', sectionId);
+            const sections = await getSection(sectionId);
+            console.log('Fetched mini-sections:', sections);
+            setMiniSections(sections);
+        } catch (error) {
+            console.error('Error fetching mini-sections:', error);
+            toast.error('Failed to load mini-sections');
+            setMiniSections([]);
+        }
+    };
+
+    // Function to fetch labor entries from API
+    const fetchLaborEntries = async () => {
+        try {
+            setLoading(true);
+            console.log('Fetching labor entries for project:', projectId);
+            
+            const clientId = await getClientId();
+            if (!clientId) {
+                throw new Error('Client ID not found');
+            }
+
+            // Import domain
+            const { domain } = await import('@/lib/domain');
+
+            // Use the labor API to get entries for this project
+            const response = await fetch(`${domain}/api/labor?entityType=project&entityId=${projectId}&sectionId=${sectionId}${selectedMiniSection ? `&miniSectionId=${selectedMiniSection}` : ''}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            const result = await response.json();
+            console.log('Labor API response:', result);
+
+            if (result.success && result.data) {
+                // Transform API response to match our Labor interface
+                const transformedEntries: Labor[] = (result.data.laborEntries || []).map((entry: any, index: number) => ({
+                    id: index + 1,
+                    _id: entry._id || `labor_${index}`,
+                    type: entry.type,
+                    category: entry.category,
+                    count: entry.count,
+                    perLaborCost: entry.perLaborCost,
+                    totalCost: entry.totalCost,
+                    date: entry.addedAt || entry.createdAt || new Date().toISOString(),
+                    icon: getLaborIconAndColor(entry.category).icon,
+                    color: getLaborIconAndColor(entry.category).color,
+                    sectionId: sectionId,
+                    miniSectionId: entry.miniSectionId,
+                    addedAt: entry.addedAt || entry.createdAt || new Date().toISOString(),
+                    createdAt: entry.createdAt || new Date().toISOString(),
+                    updatedAt: entry.updatedAt || new Date().toISOString()
+                }));
+
+                setLaborEntries(transformedEntries);
+                setTotalCount(transformedEntries.length);
+
+                // Initialize animations
+                cardAnimations.splice(0);
+                for (let i = 0; i < transformedEntries.length; i++) {
+                    cardAnimations.push(new Animated.Value(0));
+                }
+
+                Animated.stagger(100,
+                    cardAnimations.map((anim: Animated.Value) =>
+                        Animated.timing(anim, {
+                            toValue: 1,
+                            duration: 300,
+                            useNativeDriver: false,
+                        })
+                    )
+                ).start();
+            } else {
+                // No labor entries found
+                setLaborEntries([]);
+                setTotalCount(0);
+            }
+        } catch (error: any) {
+            console.error('Error fetching labor entries:', error);
+            toast.error('Failed to load labor entries');
+            // Fall back to mock data for now
+            setLaborEntries(mockLaborEntries);
+            setTotalCount(mockLaborEntries.length);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const mockLaborEntries: Labor[] = [
         {
@@ -128,94 +186,101 @@ const LaborPage = () => {
     // Function to get labor icon and color based on category
     const getLaborIconAndColor = (category: string) => {
         const categoryMap: { [key: string]: { icon: keyof typeof import('@expo/vector-icons').Ionicons.glyphMap, color: string } } = {
-            'Civil Works Labour': { icon: 'hammer-outline', color: '#EF4444' },
-            'Electrical Works Labour': { icon: 'flash-outline', color: '#F59E0B' },
-            'Plumbing & Sanitary Labour': { icon: 'water-outline', color: '#3B82F6' },
-            'Carpentry & Shuttering Labour': { icon: 'construct-outline', color: '#84CC16' },
-            'Steel / Reinforcement Labour': { icon: 'barbell-outline', color: '#6B7280' },
-            'Finishing Works Labour': { icon: 'brush-outline', color: '#EC4899' },
-            'Painting Labour': { icon: 'color-palette-outline', color: '#8B5CF6' },
-            'Flooring & Tiling Labour': { icon: 'grid-outline', color: '#06B6D4' },
-            'Waterproofing Labour': { icon: 'shield-outline', color: '#10B981' },
-            'HVAC / Mechanical Labour': { icon: 'thermometer-outline', color: '#F97316' },
-            'Fire Fighting Labour': { icon: 'flame-outline', color: '#DC2626' },
-            'External Development Labour': { icon: 'leaf-outline', color: '#65A30D' },
-            'Equipment Operator': { icon: 'car-outline', color: '#7C2D12' },
-            'Site Supervision Staff': { icon: 'people-outline', color: '#1E40AF' },
+            'Civil / Structural Works': { icon: 'hammer-outline', color: '#EF4444' },
+            'Electrical Works': { icon: 'flash-outline', color: '#F59E0B' },
+            'Plumbing & Sanitary Works': { icon: 'water-outline', color: '#3B82F6' },
+            'Finishing Works': { icon: 'brush-outline', color: '#EC4899' },
+            'Mechanical & HVAC Works': { icon: 'thermometer-outline', color: '#F97316' },
+            'Fire Fighting & Safety Works': { icon: 'flame-outline', color: '#DC2626' },
+            'External & Infrastructure Works': { icon: 'leaf-outline', color: '#65A30D' },
+            'Waterproofing & Treatment Works': { icon: 'shield-outline', color: '#10B981' },
+            'Site Management & Support Staff': { icon: 'people-outline', color: '#1E40AF' },
+            'Equipment Operators': { icon: 'car-outline', color: '#7C2D12' },
             'Security & Housekeeping': { icon: 'shield-checkmark-outline', color: '#374151' }
         };
 
         return categoryMap[category] || { icon: 'people-outline', color: '#6B7280' };
     };
 
-    // Function to load mock data
-    const loadMockData = () => {
+    // Function to load data
+    const loadData = async () => {
         setLoading(true);
         
-        // Simulate loading delay
-        setTimeout(() => {
-            setMiniSections(mockMiniSections);
-            setLaborEntries(mockLaborEntries);
-            setTotalCount(mockLaborEntries.length);
+        try {
+            // Load mini-sections from API
+            await fetchMiniSections();
             
-            // Initialize animations
-            cardAnimations.splice(0);
-            for (let i = 0; i < mockLaborEntries.length; i++) {
-                cardAnimations.push(new Animated.Value(0));
-            }
-
-            Animated.stagger(100,
-                cardAnimations.map((anim: Animated.Value) =>
-                    Animated.timing(anim, {
-                        toValue: 1,
-                        duration: 300,
-                        useNativeDriver: false,
-                    })
-                )
-            ).start();
-            
+            // Load labor entries from API
+            await fetchLaborEntries();
+        } catch (error) {
+            console.error('Error loading data:', error);
+        } finally {
             setLoading(false);
-        }, 1000);
+        }
     };
 
-    // Function to handle adding labor entries (mock implementation)
+    // Function to handle adding labor entries (real API implementation)
     const handleAddLaborEntries = async (laborEntries: LaborEntry[], message: string, miniSectionId?: string) => {
         try {
-            console.log('Adding labor entries (mock):', laborEntries);
+            console.log('Adding labor entries:', laborEntries);
             
             if (!miniSectionId) {
                 toast.error('Mini-section is required for labor entries');
                 return;
             }
 
-            // Create new labor entries with mock data
-            const newEntries: Labor[] = laborEntries.map((entry, index) => ({
-                id: laborEntries.length + index + 1,
-                _id: `labor_${Date.now()}_${index}`,
-                type: entry.type,
-                category: entry.category,
-                count: entry.count,
-                perLaborCost: entry.perLaborCost,
-                totalCost: entry.count * entry.perLaborCost,
-                date: new Date().toISOString(),
-                icon: getLaborIconAndColor(entry.category).icon,
-                color: getLaborIconAndColor(entry.category).color,
-                sectionId: sectionId,
-                miniSectionId: miniSectionId,
-                addedAt: new Date().toISOString(),
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            }));
+            const clientId = await getClientId();
+            if (!clientId) {
+                throw new Error('Client ID not found');
+            }
 
-            // Add to existing entries
-            setLaborEntries(prev => [...newEntries, ...prev]);
-            setTotalCount(prev => prev + newEntries.length);
-            
-            toast.success(`Successfully added ${newEntries.length} labor entries`);
+            // Import domain
+            const { domain } = await import('@/lib/domain');
+
+            // Prepare data for the labor API
+            const requestData = {
+                laborEntries: laborEntries.map(entry => ({
+                    type: entry.type,
+                    category: entry.category,
+                    count: entry.count,
+                    perLaborCost: entry.perLaborCost,
+                    totalCost: entry.count * entry.perLaborCost,
+                    notes: message || '',
+                    workDate: new Date().toISOString(),
+                    status: 'active'
+                })),
+                entityType: 'project',
+                entityId: projectId,
+                miniSectionId: miniSectionId,
+                sectionId: sectionId,
+                addedBy: clientId // Use clientId as the user who added the labor
+            };
+
+            console.log('Sending labor data to API:', requestData);
+
+            // Call the labor API
+            const response = await fetch(`${domain}/api/labor`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestData)
+            });
+
+            const result = await response.json();
+            console.log('Labor API response:', result);
+
+            if (result.success) {
+                toast.success(`Successfully added ${laborEntries.length} labor entries`);
+                // Refresh the labor entries list
+                await fetchLaborEntries();
+            } else {
+                throw new Error(result.message || 'Failed to add labor entries');
+            }
             
         } catch (error: any) {
             console.error('Error adding labor entries:', error);
-            toast.error('Failed to add labor entries');
+            toast.error(error.message || 'Failed to add labor entries');
         }
     };
 
@@ -270,22 +335,15 @@ const LaborPage = () => {
         return sectionName || 'Unknown Section';
     };
 
-    // Load mock data on component mount
+    // Load data on component mount
     useEffect(() => {
-        loadMockData();
+        loadData();
     }, [projectId, sectionId]);
 
     // Filter entries when mini-section selection changes
     useEffect(() => {
-        // This would normally trigger a new API call, but for mock data we'll just filter locally
-        if (selectedMiniSection && selectedMiniSection !== 'all-sections') {
-            const filtered = mockLaborEntries.filter(entry => entry.miniSectionId === selectedMiniSection);
-            setLaborEntries(filtered);
-            setTotalCount(filtered.length);
-        } else {
-            setLaborEntries(mockLaborEntries);
-            setTotalCount(mockLaborEntries.length);
-        }
+        // Reload labor entries when mini-section selection changes
+        fetchLaborEntries();
         setCurrentPage(1);
     }, [selectedMiniSection]);
 
@@ -354,20 +412,32 @@ const LaborPage = () => {
                                         setSelectedMiniSection(sectionId === 'all-sections' ? null : sectionId);
                                     }}
                                     onAddSection={async (newSection) => {
-                                        // Mock implementation - just add to local state
-                                        const newMockSection: Section = {
-                                            _id: `section_${Date.now()}`,
-                                            name: newSection.name,
-                                            projectDetails: { projectName, projectId },
-                                            mainSectionDetails: { sectionName, sectionId },
-                                            MaterialUsed: [],
-                                            MaterialAvailable: [],
-                                            createdAt: new Date().toISOString(),
-                                            updatedAt: new Date().toISOString(),
-                                            __v: 0
-                                        };
-                                        setMiniSections(prev => [...prev, newMockSection]);
-                                        toast.success('Section added successfully (mock)');
+                                        try {
+                                            console.log('Adding new mini-section:', newSection);
+                                            
+                                            // Prepare section data for API
+                                            const sectionData = {
+                                                name: newSection.name,
+                                                sectionId: sectionId, // Parent section ID
+                                                projectId: projectId,
+                                                projectName: projectName,
+                                                mainSectionName: sectionName
+                                            };
+                                            
+                                            // Call API to add section
+                                            const result = await addSection(sectionData);
+                                            
+                                            if (result && (result as any).success) {
+                                                // Refresh mini-sections list
+                                                await fetchMiniSections();
+                                                toast.success('Mini-section added successfully');
+                                            } else {
+                                                throw new Error((result as any)?.message || 'Failed to add section');
+                                            }
+                                        } catch (error: any) {
+                                            console.error('Error adding mini-section:', error);
+                                            toast.error(error.message || 'Failed to add mini-section');
+                                        }
                                     }}
                                     selectedSection={selectedMiniSection || 'all-sections'}
                                     sections={[

@@ -974,7 +974,7 @@ const Details = () => {
     // Handle adding material usage from the form (batch version)
     const handleAddMaterialUsage = async (
         miniSectionId: string,
-        materialUsages: Array<{ materialId: string; quantity: number }>
+        materialUsages: { materialId: string; quantity: number }[]
     ) => {
         // Prevent duplicate submissions
         if (isLoadingRef.current) {

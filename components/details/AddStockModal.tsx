@@ -6,7 +6,7 @@ interface AddStockModalProps {
     visible: boolean;
     onClose: () => void;
     onSubmit: (materialName: string, unit: string, specs: Record<string, any>, quantity: number, cost: number, mergeIfExists: boolean) => void;
-    existingMaterials?: Array<{ name: string; unit: string; specs: Record<string, any> }>;
+    existingMaterials?: { name: string; unit: string; specs: Record<string, any> }[];
 }
 
 const AddStockModal: React.FC<AddStockModalProps> = ({

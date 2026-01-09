@@ -13,6 +13,7 @@ export interface Project {
   section?: ProjectSection[];
   MaterialAvailable?: MaterialItem[];
   MaterialUsed?: MaterialItem[];
+  Labors?: LaborItem[]; // Added for labor expense tracking
   clientName?: string; // Added for staff users to show client name
   clientId?: string; // Added for staff users to show client ID
 }
@@ -24,6 +25,23 @@ export interface MaterialItem {
   specs: Record<string, any>;
   qnt: number;
   cost: number;
+  totalCost?: number; // Added for consistency with labor items
+}
+
+export interface LaborItem {
+  _id?: string;
+  type: string;
+  category: string;
+  count: number;
+  perLaborCost: number;
+  totalCost: number;
+  status?: string;
+  addedAt?: Date;
+  notes?: string;
+  workDate?: Date;
+  miniSectionId?: string;
+  miniSectionName?: string;
+  sectionId?: string;
 }
 
 export interface ProjectSection {

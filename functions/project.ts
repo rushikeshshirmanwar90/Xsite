@@ -77,6 +77,37 @@ export const getProjectData = async (
   }
 };
 
+export const getProject = async (projectId: string, clientId: string) => {
+  try {
+    if (!projectId) {
+      throw new Error("Project ID is required");
+    }
+    if (!clientId) {
+      throw new Error("Client ID is required");
+    }
+
+    console.log("📝 Fetching project for projectId:", projectId, "clientId:", clientId);
+
+    const res = await axios.get(`${domain}/api/project?id=${projectId}&clientId=${clientId}`);
+
+    console.log("📦 API Response:", JSON.stringify(res.data, null, 2));
+
+    // Handle response structure
+    const responseData = res.data as any;
+    if (responseData.success && responseData.data) {
+      console.log("✅ Project data extracted successfully");
+      return responseData.data;
+    }
+
+    // Fallback for direct data response
+    console.log("⚠️ Using fallback response parsing");
+    return responseData;
+  } catch (error) {
+    console.error("❌ Failed to fetch project:", error);
+    throw error;
+  }
+};
+
 export const addProject = async (data: Project, clientId: string) => {
   try {
     if (!clientId) {

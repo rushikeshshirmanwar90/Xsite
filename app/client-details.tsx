@@ -23,11 +23,11 @@ interface ClientData {
   city: string;
   state: string;
   address: string;
-  staffs: Array<{
+  staffs: {
     staffId: string;
     staffName: string;
     assignedAt: string;
-  }>;
+  }[];
   createdAt: string;
   updatedAt: string;
 }

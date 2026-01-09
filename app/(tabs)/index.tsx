@@ -11,8 +11,12 @@ import { StaffMembers } from '@/types/staff';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import QRCode from 'react-native-qrcode-svg';
+import * as Sharing from 'expo-sharing';
+import ViewShot from 'react-native-view-shot';
 import {
+    Alert,
     Image,
     RefreshControl,
     ScrollView,
@@ -33,6 +37,10 @@ const Index: React.FC = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [companyName, setCompanyName] = useState<string>('Company Name');
     const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+    const [isSharing, setIsSharing] = useState(false);
+
+    // Refs for capturing QR code views
+    const embeddedQRRef = useRef<ViewShot | null>(null);
 
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1);
@@ -54,6 +62,20 @@ const Index: React.FC = () => {
     
     // Get user name from user data
     const userName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'User';
+
+    // Debug logging for QR code condition
+    useEffect(() => {
+        if (user) {
+            console.log('🔍 Index.tsx - User data for QR code condition:', {
+                isStaff,
+                hasUser: !!user,
+                userId: user._id,
+                userRole: 'role' in user ? user.role : 'not-staff',
+                clientId,
+                shouldShowQR: isStaff && user && !clientId
+            });
+        }
+    }, [user, isStaff, clientId]);
 
     // Performance optimization
     const isLoadingRef = React.useRef(false);
@@ -414,6 +436,62 @@ const Index: React.FC = () => {
 
     const companyInitials = generateInitials(companyName);
 
+    const shareQRCode = async (viewShotRef: React.RefObject<ViewShot | null>) => {
+        if (!viewShotRef.current || !user) {
+            Alert.alert('Error', 'QR code not ready for sharing. Please try again.');
+            return;
+        }
+
+        setIsSharing(true);
+        try {
+            console.log('📱 Starting QR code sharing process...');
+            
+            // Check if sharing is available
+            const isAvailable = await Sharing.isAvailableAsync();
+            if (!isAvailable) {
+                Alert.alert(
+                    'Sharing Not Available',
+                    'Sharing is not available on this device. Please take a screenshot instead.',
+                    [{ text: 'OK' }]
+                );
+                return;
+            }
+
+            // Capture the QR code view as image
+            console.log('📸 Capturing QR code view...');
+            const uri = await (viewShotRef.current as any)?.capture({
+                format: 'png',
+                quality: 1.0,
+            });
+
+            if (!uri) {
+                throw new Error('Failed to capture QR code image');
+            }
+
+            console.log('✅ QR code captured:', uri);
+
+            // Share the QR code image directly
+            console.log('🚀 Sharing QR code...');
+            await Sharing.shareAsync(uri, {
+                mimeType: 'image/png',
+                dialogTitle: 'Share Staff QR Code',
+                UTI: 'public.png',
+            });
+
+            console.log('✅ QR code shared successfully');
+
+        } catch (error) {
+            console.error('❌ Error sharing QR code:', error);
+            Alert.alert(
+                'Sharing Failed',
+                'Could not share QR code. Please try taking a screenshot instead.',
+                [{ text: 'OK' }]
+            );
+        } finally {
+            setIsSharing(false);
+        }
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
@@ -444,6 +522,112 @@ const Index: React.FC = () => {
                         <Ionicons name="notifications" size={22} color="#1F2937" />
                         {/* {projectStats.overdueProjects > 0 && <View style={styles.notificationDot} />} */}
                     </TouchableOpacity>
+                </View>
+            )}
+
+            {/* Debug Section - Remove after testing */}
+            {user && (
+                <View style={styles.section}>
+                    <View style={styles.infoCard}>
+                        <Text style={styles.sectionTitle}>Debug Info</Text>
+                        <Text>User ID: {user._id}</Text>
+                        <Text>Is Staff: {isStaff ? 'Yes' : 'No'}</Text>
+                        <Text>Has Role: {'role' in user ? 'Yes' : 'No'}</Text>
+                        <Text>Role: {'role' in user ? user.role : 'N/A'}</Text>
+                        <Text>Client ID: {clientId || 'null'}</Text>
+                        <Text>Should Show QR: {(isStaff && user && !clientId) ? 'Yes' : 'No'}</Text>
+                        <Text>Condition Check: isStaff={String(isStaff)}, user={String(!!user)}, !clientId={String(!clientId)}</Text>
+                    </View>
+                </View>
+            )}
+
+            {/* Test QR Code Section - Always show for staff users */}
+            {isStaff && user && (
+                <View style={styles.section}>
+                    <View style={styles.infoCard}>
+                        <Text style={styles.sectionTitle}>🧪 Test QR Code (Always Shows for Staff)</Text>
+                        <Text>This section should always show for staff users regardless of clientId</Text>
+                        <Text>ClientId status: {clientId ? 'HAS CLIENT' : 'NO CLIENT'}</Text>
+                    </View>
+                </View>
+            )}
+
+            {/* QR Code Section - Priority for unassigned staff */}
+            {(() => {
+                console.log('🔍 QR Code condition check:', {
+                    isStaff,
+                    hasUser: !!user,
+                    clientId,
+                    shouldShow: isStaff && user && !clientId
+                });
+                return isStaff && user && !clientId;
+            })() && user && (
+                <View style={styles.section}>  
+                    <View style={[styles.qrCodeCard, styles.shareCard]}>
+                        <View style={styles.shareHeader}>
+                            <View style={styles.shareIconContainer}>
+                                <Ionicons name="qr-code-outline" size={24} color="#3B82F6" />
+                            </View>
+                            <View style={styles.shareContent}>
+                                <Text style={styles.shareTitle}>Get Connected</Text>
+                                <Text style={styles.shareSubtitle}>
+                                    Share your QR code with admin to join their organization
+                                </Text>
+                            </View>
+                        </View>
+                        
+                        {/* QR Code displayed directly */}
+                        <ViewShot ref={embeddedQRRef} options={{ format: 'png', quality: 1.0 }}>
+                            <View style={styles.embeddedQrContainer}>
+                                <QRCode
+                                    value={JSON.stringify({
+                                        staffId: user._id,
+                                        firstName: user.firstName || 'Staff',
+                                        lastName: user.lastName || 'Member',
+                                        email: user.email || '',
+                                        phoneNumber: user.phoneNumber || ('phone' in user ? user.phone : '') || '',
+                                        role: 'role' in user ? user.role : 'staff',
+                                        timestamp: new Date().toISOString()
+                                    })}
+                                    size={150}
+                                    color="#1E293B"
+                                    backgroundColor="#FFFFFF"
+                                />
+                                <View style={styles.qrCodeInfo}>
+                                    <Text style={styles.qrCodeTitle}>Staff QR Code</Text>
+                                    <Text style={styles.qrCodeSubtitle}>
+                                        {`${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Staff Member'}
+                                    </Text>
+                                    <Text style={styles.qrCodeId}>ID: {user._id}</Text>
+                                </View>
+                            </View>
+                        </ViewShot>
+                        
+                        <View style={styles.embeddedQrInfo}>
+                            <Text style={styles.embeddedQrTitle}>Staff Assignment QR Code</Text>
+                            <Text style={styles.embeddedQrId}>{user._id}</Text>
+                            <Text style={styles.embeddedQrInstructions}>
+                                Ask your admin to scan this QR code to assign you to their client organization and projects.
+                            </Text>
+                        </View>
+
+                        {/* Share Button */}
+                        <TouchableOpacity
+                            style={[styles.shareButton, isSharing && styles.shareButtonDisabled]}
+                            onPress={() => shareQRCode(embeddedQRRef)}
+                            activeOpacity={0.7}
+                            disabled={isSharing}
+                        >
+                            <Ionicons 
+                                name={isSharing ? "hourglass-outline" : "share-outline"} 
+                                size={20} 
+                                color="#FFFFFF" 
+                            />
+                            <Text style={styles.shareButtonText}>
+                                {isSharing ? 'Sharing...' : 'Share QR Code'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             )}
 

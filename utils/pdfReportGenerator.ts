@@ -1,7 +1,8 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as IntentLauncher from 'expo-intent-launcher';
+import * as FileSystemLegacy from 'expo-file-system/legacy';
 import { Paths, File } from 'expo-file-system';
-import * as MediaLibrary from 'expo-media-library';
 import { Alert, Platform } from 'react-native';
 
 interface MaterialActivity {
@@ -208,7 +209,7 @@ export class PDFReportGenerator {
     }
 
     // Generate complete HTML for the PDF
-    private generateHTML(activities: MaterialActivity[], projectName?: string): string {
+    private generateHTML(activities: MaterialActivity[], projectName?: string, laborData?: any[]): string {
         const groupedActivities = this.groupActivitiesByDate(activities);
         const sortedDates = Object.keys(groupedActivities).sort((a, b) => b.localeCompare(a)); // Latest first
 
@@ -218,7 +219,7 @@ export class PDFReportGenerator {
         const usedCount = activities.filter(a => a.activity === 'used').length;
         // ✅ FIXED: Only include IMPORTED materials in total cost calculation
         // Business Logic: We only spend money when importing materials, not when using them
-        const totalCost = activities.reduce((sum, activity) => {
+        const totalMaterialCost = activities.reduce((sum, activity) => {
             // ✅ CRITICAL: Only count imported materials, skip used materials
             if (activity.activity !== 'imported') {
                 return sum; // Skip used materials - they don't add to total cost
@@ -240,6 +241,13 @@ export class PDFReportGenerator {
             }, 0);
         }, 0);
 
+        // Calculate labor costs
+        const totalLaborCost = (laborData || []).reduce((sum, labor) => {
+            return sum + (Number(labor.totalCost) || 0);
+        }, 0);
+
+        const totalCost = totalMaterialCost + totalLaborCost;
+
         const dateRangeHTML = sortedDates.length > 0 ? `
             <div style="background-color: #f0f9ff; padding: 12px; border-radius: 6px; margin-bottom: 20px;">
                 <strong>Report Period:</strong> ${this.formatDate(sortedDates[sortedDates.length - 1])} to ${this.formatDate(sortedDates[0])}
@@ -256,15 +264,35 @@ export class PDFReportGenerator {
                     </div>
                     <div>
                         <div style="font-size: 24px; font-weight: bold; color: #059669;">${this.formatCurrency(totalCost)}</div>
-                        <div style="font-size: 12px; color: #6b7280;">Total Spent (Imported Only)</div>
+                        <div style="font-size: 12px; color: #6b7280;">Total Project Cost</div>
                     </div>
                     <div>
-                        <div style="font-size: 20px; font-weight: bold; color: #10b981;">${importedCount}</div>
-                        <div style="font-size: 12px; color: #6b7280;">Materials Imported</div>
+                        <div style="font-size: 20px; font-weight: bold; color: #10b981;">${this.formatCurrency(totalMaterialCost)}</div>
+                        <div style="font-size: 12px; color: #6b7280;">Materials Cost</div>
                     </div>
                     <div>
-                        <div style="font-size: 20px; font-weight: bold; color: #ef4444;">${usedCount}</div>
-                        <div style="font-size: 12px; color: #6b7280;">Materials Used</div>
+                        <div style="font-size: 20px; font-weight: bold; color: #f59e0b;">${this.formatCurrency(totalLaborCost)}</div>
+                        <div style="font-size: 12px; color: #6b7280;">Labor Cost</div>
+                    </div>
+                </div>
+                <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                        <div>
+                            <div style="font-size: 18px; font-weight: bold; color: #10b981;">${importedCount}</div>
+                            <div style="font-size: 12px; color: #6b7280;">Materials Imported</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 18px; font-weight: bold; color: #ef4444;">${usedCount}</div>
+                            <div style="font-size: 12px; color: #6b7280;">Materials Used</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 18px; font-weight: bold; color: #8b5cf6;">${(laborData || []).length}</div>
+                            <div style="font-size: 12px; color: #6b7280;">Labor Entries</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 18px; font-weight: bold; color: #6b7280;">-</div>
+                            <div style="font-size: 12px; color: #6b7280;">-</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -413,6 +441,61 @@ export class PDFReportGenerator {
                     </div>
                 `}
 
+                ${(laborData && laborData.length > 0) ? `
+                    <div style="page-break-inside: avoid; margin-top: 32px;">
+                        <h2 style="color: #1e293b; margin-bottom: 20px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
+                            Labor Costs Summary
+                        </h2>
+                        <div style="background-color: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="background-color: #f0f9ff;">
+                                        <th style="padding: 12px; text-align: left; font-size: 14px; color: #374151; border-bottom: 2px solid #e2e8f0;">Category</th>
+                                        <th style="padding: 12px; text-align: left; font-size: 14px; color: #374151; border-bottom: 2px solid #e2e8f0;">Type</th>
+                                        <th style="padding: 12px; text-align: center; font-size: 14px; color: #374151; border-bottom: 2px solid #e2e8f0;">Count</th>
+                                        <th style="padding: 12px; text-align: right; font-size: 14px; color: #374151; border-bottom: 2px solid #e2e8f0;">Per Labor Cost</th>
+                                        <th style="padding: 12px; text-align: right; font-size: 14px; color: #374151; border-bottom: 2px solid #e2e8f0;">Total Cost</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${laborData.map(labor => `
+                                        <tr>
+                                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9;">
+                                                <div style="display: flex; align-items: center;">
+                                                    <div style="width: 8px; height: 8px; background-color: #F59E0B; border-radius: 50%; margin-right: 8px;"></div>
+                                                    <strong>${labor.category || 'Unknown Category'}</strong>
+                                                </div>
+                                            </td>
+                                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9;">
+                                                ${labor.type || 'Unknown Type'}
+                                            </td>
+                                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; text-align: center;">
+                                                ${labor.count || 0}
+                                            </td>
+                                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; text-align: right;">
+                                                ${this.formatCurrency(Number(labor.perLaborCost) || 0)}
+                                            </td>
+                                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: bold;">
+                                                ${this.formatCurrency(Number(labor.totalCost) || 0)}
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                                <tfoot>
+                                    <tr style="background-color: #fef3c7; font-weight: bold;">
+                                        <td style="padding: 12px; border-top: 2px solid #e2e8f0;" colspan="4">
+                                            Total Labor Cost
+                                        </td>
+                                        <td style="padding: 12px; text-align: right; border-top: 2px solid #e2e8f0; color: #F59E0B; font-size: 16px;">
+                                            ${this.formatCurrency(totalLaborCost)}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                ` : ''}
+
                 <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #9ca3af; font-size: 12px;">
                     <p>This report was automatically generated by Xsite Application</p>
                     <p>Project: ${projectName || 'N/A'} | Report ID: ${Date.now()}</p>
@@ -423,14 +506,15 @@ export class PDFReportGenerator {
     }
 
     // Generate and download PDF
-    async generatePDF(activities: MaterialActivity[], projectName?: string): Promise<void> {
+    async generatePDF(activities: MaterialActivity[], projectName?: string, laborData?: any[]): Promise<void> {
         try {
             console.log('📄 Starting PDF generation...');
             console.log('📊 Activities to include:', activities.length);
+            console.log('📊 Labor entries to include:', laborData?.length || 0);
             console.log('📊 Project name:', projectName);
 
             // Generate HTML content
-            const htmlContent = this.generateHTML(activities, projectName);
+            const htmlContent = this.generateHTML(activities, projectName, laborData);
             console.log('📄 HTML content generated, length:', htmlContent.length);
             
             // Create custom filename: Company Name - Project Name - Date
@@ -517,57 +601,16 @@ export class PDFReportGenerator {
             
             console.log('📄 Final PDF URI for sharing:', finalUri);
 
-            // Show options to View, Share, or Save the PDF
-            console.log('📄 Showing view/share/save options...');
+            // Show options to View or Share the PDF
+            console.log('📄 Showing view/share options...');
             console.log('📄 Final URI being used:', finalUri);
             console.log('📄 Actual filename being used:', actualFilename);
             
-            // Test if Alert is working
             setTimeout(() => {
                 Alert.alert(
                     'PDF Generated Successfully',
-                    `Your material activity report has been generated.\n\nFilename: ${actualFilename}\n\nWhat would you like to do?`,
+                    `Your material & labor report has been generated.\n\nFilename: ${actualFilename}\n\nWhat would you like to do?`,
                     [
-                        {
-                            text: 'Save to Device',
-                            style: 'default',
-                            onPress: async () => {
-                                try {
-                                    console.log('💾 User selected Save to Device');
-                                    
-                                    // Request media library permissions
-                                    const { status } = await MediaLibrary.requestPermissionsAsync();
-                                    if (status !== 'granted') {
-                                        Alert.alert(
-                                            'Permission Required',
-                                            'Permission to access media library is required to save the PDF.',
-                                            [{ text: 'OK' }]
-                                        );
-                                        return;
-                                    }
-                                    
-                                    // Save to media library with custom filename
-                                    const asset = await MediaLibrary.createAssetAsync(finalUri);
-                                    const album = await MediaLibrary.getAlbumAsync('Download');
-                                    
-                                    if (album == null) {
-                                        await MediaLibrary.createAlbumAsync('Download', asset, false);
-                                    } else {
-                                        await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
-                                    }
-                                    
-                                    Alert.alert(
-                                        'PDF Saved',
-                                        `PDF has been saved to your device as "${actualFilename}"`,
-                                        [{ text: 'OK' }]
-                                    );
-                                    console.log('✅ PDF saved to device successfully');
-                                } catch (error) {
-                                    console.error('❌ Error saving PDF to device:', error);
-                                    Alert.alert('Error', 'Could not save PDF to device. Error: ' + error);
-                                }
-                            }
-                        },
                         {
                             text: 'View PDF',
                             onPress: async () => {
@@ -575,26 +618,66 @@ export class PDFReportGenerator {
                                     console.log('📖 User selected View PDF');
                                     console.log('📖 PDF URI:', finalUri);
                                     
-                                    // Try to open with sharing first (simpler approach)
-                                    if (await Sharing.isAvailableAsync()) {
-                                        console.log('📖 Opening PDF with sharing API...');
-                                        await Sharing.shareAsync(finalUri, {
-                                            mimeType: 'application/pdf',
-                                            dialogTitle: 'View Material Activity Report',
-                                            UTI: 'com.adobe.pdf'
-                                        });
-                                        console.log('📖 PDF opened successfully');
+                                    if (Platform.OS === 'android') {
+                                        // On Android, use IntentLauncher to open PDF directly in a PDF viewer
+                                        console.log('📖 Opening PDF with IntentLauncher on Android...');
+                                        
+                                        try {
+                                            // Use the legacy API for getContentUriAsync
+                                            const contentUri = await FileSystemLegacy.getContentUriAsync(finalUri);
+                                            console.log('📖 Content URI:', contentUri);
+                                            
+                                            await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+                                                data: contentUri,
+                                                flags: 1,
+                                                type: 'application/pdf',
+                                            });
+                                            console.log('📖 PDF opened successfully on Android');
+                                        } catch (contentUriError) {
+                                            console.warn('⚠️ Could not get content URI, trying direct URI:', contentUriError);
+                                            // Fallback: try with direct URI
+                                            await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+                                                data: finalUri,
+                                                flags: 1,
+                                                type: 'application/pdf',
+                                            });
+                                            console.log('📖 PDF opened successfully on Android with direct URI');
+                                        }
                                     } else {
-                                        console.log('📖 Sharing not available, showing fallback message');
-                                        Alert.alert(
-                                            'PDF Ready',
-                                            `PDF has been generated successfully: ${actualFilename}`,
-                                            [{ text: 'OK' }]
-                                        );
+                                        // On iOS, use sharing (this is the only way to view PDFs in iOS)
+                                        console.log('📖 Opening PDF with Sharing on iOS...');
+                                        if (await Sharing.isAvailableAsync()) {
+                                            await Sharing.shareAsync(finalUri, {
+                                                mimeType: 'application/pdf',
+                                                dialogTitle: `View: ${actualFilename}`,
+                                                UTI: 'com.adobe.pdf'
+                                            });
+                                            console.log('📖 PDF opened successfully on iOS');
+                                        } else {
+                                            Alert.alert(
+                                                'PDF Ready',
+                                                `PDF has been generated successfully: ${actualFilename}`,
+                                                [{ text: 'OK' }]
+                                            );
+                                        }
                                     }
                                 } catch (error) {
                                     console.error('❌ Error viewing PDF:', error);
-                                    Alert.alert('Error', 'Could not open PDF for viewing. Error: ' + error);
+                                    // Fallback to sharing if IntentLauncher fails
+                                    try {
+                                        console.log('📖 Fallback: trying sharing approach...');
+                                        if (await Sharing.isAvailableAsync()) {
+                                            await Sharing.shareAsync(finalUri, {
+                                                mimeType: 'application/pdf',
+                                                dialogTitle: `View: ${actualFilename}`,
+                                                UTI: 'com.adobe.pdf'
+                                            });
+                                        } else {
+                                            Alert.alert('Error', 'Could not open PDF for viewing. Error: ' + error);
+                                        }
+                                    } catch (fallbackError) {
+                                        Alert.alert('Error', 'Could not open PDF for viewing. Error: ' + error);
+                                    }
                                 }
                             }
                         },
@@ -622,7 +705,7 @@ export class PDFReportGenerator {
                                         console.log('📤 Sharing not available');
                                         Alert.alert(
                                             'Sharing Not Available',
-                                            `Sharing is not available on this device. PDF saved as: ${actualFilename}`,
+                                            `Sharing is not available on this device. PDF generated as: ${actualFilename}`,
                                             [{ text: 'OK' }]
                                         );
                                     }

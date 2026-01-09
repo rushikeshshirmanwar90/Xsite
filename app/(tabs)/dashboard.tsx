@@ -36,30 +36,13 @@ const AnalyticsDashboard: React.FC = () => {
   const lastLoadTimeRef = React.useRef<number>(0);
   const DEBOUNCE_DELAY = 500;
 
-  // Calculate total material value (only purchased materials, not double-counting used ones)
-  const calculateTotalMaterialValue = (project: Project): number => {
-    // ✅ FIXED: Only count available materials as actual spending
-    // Used materials are just transfers from available, not new spending
-    const availableTotal = (project.MaterialAvailable || []).reduce(
-      (sum, m) => sum + (m.cost || 0), 0
-    );
-    
-    // ✅ OPTION 1: Use project.spent field (if it tracks actual spending correctly)
-    // return project.spent || availableTotal;
-    
-    // ✅ OPTION 2: Use only available materials (since used materials were already counted when available)
-    return availableTotal;
-    
-    // ❌ OLD LOGIC: return availableTotal + usedTotal; // This double-counts!
-  };
-
   // Calculate available (not yet allocated) materials
   const calculateAvailableMaterials = (project: Project): number => {
     if (!project.MaterialAvailable || project.MaterialAvailable.length === 0) {
       return 0;
     }
     return project.MaterialAvailable.reduce((total, material) => {
-      // Use totalCost field which contains the actual cost data
+      // Use totalCost field if available, otherwise fall back to cost
       return total + (material.totalCost || material.cost || 0);
     }, 0);
   };
@@ -70,36 +53,63 @@ const AnalyticsDashboard: React.FC = () => {
       return 0;
     }
     return project.MaterialUsed.reduce((total, material) => {
-      // Use totalCost field which contains the actual cost data
+      // Use totalCost field if available, otherwise fall back to cost
       return total + (material.totalCost || material.cost || 0);
     }, 0);
+  };
+
+  // Calculate total labor costs
+  const calculateLaborCosts = (project: Project): number => {
+    if (!project.Labors || project.Labors.length === 0) {
+      return 0;
+    }
+    return project.Labors.reduce((total: number, labor: any) => {
+      // Use totalCost field which contains the actual labor cost
+      return total + (labor.totalCost || 0);
+    }, 0);
+  };
+
+  // Calculate labor costs by status
+  const calculateLaborCostsByStatus = (project: Project, status: string = 'active'): number => {
+    if (!project.Labors || project.Labors.length === 0) {
+      return 0;
+    }
+    return project.Labors
+      .filter((labor: any) => labor.status === status)
+      .reduce((total: number, labor: any) => total + (labor.totalCost || 0), 0);
   };
 
   // Transform projects to analytics format
   const transformedProjectData = projects.map(project => {
     const available = calculateAvailableMaterials(project);
     const used = calculateUsedMaterials(project);
+    const laborCosts = calculateLaborCosts(project);
+    const activeLaborCosts = calculateLaborCostsByStatus(project, 'active');
     
     // ✅ FIXED: Use project.spent for actual money spent, not available + used
     const actualSpent = project.spent || 0;
     
-    // ✅ For display purposes, show available and used values separately
+    // ✅ For display purposes, show available, used, and labor values separately
     const totalMaterialValue = available + used; // This is for information only
+    const totalProjectCost = actualSpent; // This includes both materials and labor
 
     return {
       _id: project._id || '',
       name: project.name,
-      budgetUsed: actualSpent, // ✅ Use actual spending, not material values
+      budgetUsed: actualSpent, // ✅ Use actual spending (includes materials + labor)
       available,
       used,
+      laborCosts,
+      activeLaborCosts,
       totalMaterialValue, // For information
-      description: `💰 Spent: ${formatCurrency(actualSpent)} • 📦 Available: ${formatCurrency(available)} • 🔨 Used: ${formatCurrency(used)}`,
+      totalProjectCost, // Total project spending
+      description: `Total Expenses: ${formatCurrency(actualSpent)}`,
       status: 'active' as const,
     };
   });
 
-  // Filter only projects with budget used > 0
-  const activeProjects = transformedProjectData.filter(p => p.budgetUsed > 0);
+  // Filter only projects with budget used > 0 (either materials or labor)
+  const activeProjects = transformedProjectData.filter(p => p.budgetUsed > 0 || p.laborCosts > 0);
   
   // Debug logging
   console.log('Dashboard - Raw projects state:', projects.length);
@@ -110,24 +120,34 @@ const AnalyticsDashboard: React.FC = () => {
   projects.forEach((project, index) => {
     console.log(`  ${index + 1}. ${project.name || 'Unnamed'}`);
     console.log(`     - _id: ${project._id}`);
+    console.log(`     - spent: ${project.spent || 0}`);
     console.log(`     - MaterialAvailable: ${project.MaterialAvailable?.length || 0} items`);
     console.log(`     - MaterialUsed: ${project.MaterialUsed?.length || 0} items`);
-    if (project.MaterialAvailable?.length > 0) {
+    console.log(`     - Labors: ${project.Labors?.length || 0} entries`);
+    if (project.MaterialAvailable && project.MaterialAvailable.length > 0) {
       console.log(`     - Available items:`, project.MaterialAvailable.map(m => `${m.name}: ₹${m.cost || 0}`));
     }
-    if (project.MaterialUsed?.length > 0) {
+    if (project.MaterialUsed && project.MaterialUsed.length > 0) {
       console.log(`     - Used items:`, project.MaterialUsed.map(m => `${m.name}: ₹${m.cost || 0}`));
+    }
+    if (project.Labors && project.Labors.length > 0) {
+      console.log(`     - Labor entries:`, project.Labors.map((l: any) => `${l.type}: ₹${l.totalCost || 0}`));
     }
   });
   
   console.log('\n🔍 DASHBOARD DEBUG - Transformed Projects:');
   transformedProjectData.forEach((project, index) => {
-    console.log(`  ${index + 1}. ${project.name} - Budget: ₹${project.budgetUsed}, Available: ₹${project.available}, Used: ₹${project.used}`);
+    console.log(`  ${index + 1}. ${project.name}`);
+    console.log(`     - Budget Used: ₹${project.budgetUsed}`);
+    console.log(`     - Materials Available: ₹${project.available}`);
+    console.log(`     - Materials Used: ₹${project.used}`);
+    console.log(`     - Labor Costs: ₹${project.laborCosts}`);
+    console.log(`     - Active Labor: ₹${project.activeLaborCosts}`);
   });
   
   console.log('\n🔍 DASHBOARD DEBUG - Active Projects:');
   activeProjects.forEach((project, index) => {
-    console.log(`  ${index + 1}. ${project.name} - Budget: ₹${project.budgetUsed}`);
+    console.log(`  ${index + 1}. ${project.name} - Total: ₹${project.budgetUsed}, Labor: ₹${project.laborCosts}`);
   });
   
   console.log(`\n🔍 DASHBOARD DEBUG - Render Decision:`);
@@ -135,22 +155,25 @@ const AnalyticsDashboard: React.FC = () => {
   console.log(`  - Error: ${error}`);
   console.log(`  - Projects length: ${projects.length}`);
   console.log(`  - Active projects length: ${activeProjects.length}`);
-  console.log(`  - Will show: ${loading ? 'LOADING' : error ? 'ERROR' : activeProjects.length === 0 ? 'NO MATERIAL DATA' : 'PIE CHART'}`);
+  console.log(`  - Will show: ${loading ? 'LOADING' : error ? 'ERROR' : activeProjects.length === 0 ? 'NO DATA' : 'PIE CHART'}`);
 
   // Transform project data using utility function
   const pieData = transformProjectDataToPieSlices(activeProjects, colors);
 
-  // Calculate total budget
+  // Calculate total budget (includes both materials and labor)
   const totalBudget = activeProjects.reduce((sum, project) => sum + project.budgetUsed, 0);
 
   // Calculate statistics
   const totalProjects = projects.length;
-  const projectsWithMaterials = activeProjects.length;
-  const projectsWithoutMaterials = totalProjects - projectsWithMaterials;
+  const projectsWithExpenses = activeProjects.length;
+  const projectsWithoutExpenses = totalProjects - projectsWithExpenses;
 
   // Calculate totals for all projects
   const totalAvailable = transformedProjectData.reduce((sum, p) => sum + p.available, 0);
   const totalUsed = transformedProjectData.reduce((sum, p) => sum + p.used, 0);
+  const totalLaborCosts = transformedProjectData.reduce((sum, p) => sum + p.laborCosts, 0);
+  const totalMaterialCosts = totalAvailable + totalUsed;
+  const grandTotal = totalMaterialCosts + totalLaborCosts;
 
   // Fetch projects data
   const fetchProjects = async (showLoadingState = true) => {
@@ -256,20 +279,40 @@ const AnalyticsDashboard: React.FC = () => {
     description: item.description,
   }));
 
-  // Handle slice/legend press - Navigate to project sections analytics (Level 2)
+  // Handle slice/legend press - Navigate to project sections analytics (Level 2) or directly to mini-sections if only one section
   const handlePress = (projectId: string, projectName: string) => {
     const project = projects.find(p => p._id === projectId);
     if (project) {
-      router.push({
-        pathname: '/analytics/project-sections-analytics',
-        params: {
-          projectId: project._id ?? '',
-          projectName: project.name,
-          sections: JSON.stringify(project.section || []),
-          materialAvailable: JSON.stringify(project.MaterialAvailable || []),
-          materialUsed: JSON.stringify(project.MaterialUsed || [])
-        }
-      });
+      // Check if project has only one section
+      const sections = project.section || [];
+      
+      if (sections.length === 1) {
+        // Navigate directly to mini-sections (Level 3) if only one section
+        const singleSection = sections[0];
+        router.push({
+          pathname: '/analytics/mini-sections-analytics',
+          params: {
+            projectId: project._id ?? '',
+            projectName: project.name,
+            sectionId: singleSection._id || singleSection.sectionId || '',
+            sectionName: singleSection.name || 'Section',
+            materialAvailable: JSON.stringify(project.MaterialAvailable || []),
+            materialUsed: JSON.stringify(project.MaterialUsed || [])
+          }
+        });
+      } else {
+        // Navigate to project sections analytics (Level 2) if multiple sections
+        router.push({
+          pathname: '/analytics/project-sections-analytics',
+          params: {
+            projectId: project._id ?? '',
+            projectName: project.name,
+            sections: JSON.stringify(sections),
+            materialAvailable: JSON.stringify(project.MaterialAvailable || []),
+            materialUsed: JSON.stringify(project.MaterialUsed || [])
+          }
+        });
+      }
     }
   };
 
@@ -347,25 +390,17 @@ const AnalyticsDashboard: React.FC = () => {
             >
               <Ionicons name="bug" size={22} color="#F59E0B" />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.refreshButton, { backgroundColor: '#E0F2FE' }]}
-              onPress={() => {
-                router.push('/test-materials');
-              }}
-            >
-              <Ionicons name="flask" size={22} color="#0891B2" />
-            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Stats Section */}
+        {/* Stats Section - Simplified */}
         <View style={styles.statsSection}>
           <View style={[styles.statBox, styles.statBoxPrimary]}>
-            <Text style={styles.statValue}>{projectsWithMaterials}</Text>
+            <Text style={styles.statValue}>{projectsWithExpenses}</Text>
             <Text style={styles.statLabel}>Ongoing Projects</Text>
           </View>
           <View style={[styles.statBox, styles.statBoxSecondary]}>
-            <Text style={styles.statValue}>{projectsWithoutMaterials}</Text>
+            <Text style={styles.statValue}>{projectsWithoutExpenses}</Text>
             <Text style={styles.statLabel}>Completed Projects</Text>
           </View>
           <View style={[styles.statBox, styles.statBoxTertiary]}>
@@ -407,9 +442,9 @@ const AnalyticsDashboard: React.FC = () => {
         ) : activeProjects.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="pie-chart-outline" size={64} color="#CBD5E1" />
-            <Text style={styles.emptyTitle}>No Material Data</Text>
+            <Text style={styles.emptyTitle}>No Expense Data</Text>
             <Text style={styles.emptySubtitle}>
-              Import materials to your projects to see budget analytics
+              Add materials and labor to your projects to see budget analytics
             </Text>
             <View style={{ marginTop: 20, padding: 15, backgroundColor: '#FEF3C7', borderRadius: 10 }}>
               <Text style={{ fontSize: 12, color: '#92400E', textAlign: 'center' }}>
@@ -417,6 +452,9 @@ const AnalyticsDashboard: React.FC = () => {
                 Projects: {projects.length}{'\n'}
                 Transformed: {transformedProjectData.length}{'\n'}
                 Active: {activeProjects.length}{'\n'}
+                Total Materials: {formatCurrency(totalMaterialCosts)}{'\n'}
+                Total Labor: {formatCurrency(totalLaborCosts)}{'\n'}
+                Grand Total: {formatCurrency(grandTotal)}{'\n'}
                 Loading: {loading ? 'Yes' : 'No'}{'\n'}
                 Error: {error || 'None'}{'\n'}
                 Tap the bug icon (🐛) to force refresh
@@ -449,8 +487,8 @@ const AnalyticsDashboard: React.FC = () => {
         ) : (
           <Animated.View style={[styles.card, { opacity: fadeAnim }]}>
             <View style={styles.heading}>
-              <Text style={styles.title}>Project Budget Analysis</Text>
-              <Text style={styles.subtitle}>Material Expenses Overview</Text>
+              <Text style={styles.title}>Project Expenses</Text>
+              <Text style={styles.subtitle}>Total Project Costs</Text>
             </View>
 
             <View style={styles.chartContainer}>
@@ -474,7 +512,7 @@ const AnalyticsDashboard: React.FC = () => {
               items={legendData}
               onItemClick={handlePress}
               showPercentage={true}
-              showDescription={true}
+              showDescription={false}
               layout="vertical"
             />
           </Animated.View>

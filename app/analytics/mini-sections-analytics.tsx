@@ -1,7 +1,9 @@
 // Level 3: Mini-Sections Analytics
 import PieChart, { PieChartColors20 } from '@/components/PieChart';
 import PieChartLegend, { LegendItem } from '@/components/PieChartLegend';
+import { getClientId } from '@/functions/clientId';
 import { getSection } from '@/functions/details';
+import { getProject } from '@/functions/project';
 import { formatCurrency } from '@/utils/analytics';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -21,6 +23,8 @@ interface MiniSectionExpense {
   _id: string;
   name: string;
   totalExpense: number;
+  usedMaterialsCost: number;
+  availableMaterialsCost: number;
 }
 
 const MiniSectionsAnalytics: React.FC = () => {
@@ -40,7 +44,7 @@ const MiniSectionsAnalytics: React.FC = () => {
 
   useEffect(() => {
     loadMiniSectionExpenses();
-  }, [sectionId, materialUsed]);
+  }, [sectionId, materialUsed, projectId]);
 
   const loadMiniSectionExpenses = async () => {
     try {
@@ -53,21 +57,96 @@ const MiniSectionsAnalytics: React.FC = () => {
         ? JSON.parse(Array.isArray(materialUsed) ? materialUsed[0] : materialUsed)
         : [];
 
+      // Get clientId and fetch project data to get MaterialAvailable
+      const clientId = await getClientId();
+      let projectMaterialsAvailable: any[] = [];
+      
+      if (clientId && projectId) {
+        try {
+          const projectData = await getProject(projectId, clientId);
+          projectMaterialsAvailable = projectData?.MaterialAvailable || [];
+          
+      // Debug logging
+      console.log('🔍 Project MaterialAvailable:', projectMaterialsAvailable.length, 'items');
+      if (projectMaterialsAvailable.length > 0) {
+        console.log('📋 Sample MaterialAvailable item:', projectMaterialsAvailable[0]);
+        console.log('🔑 Available fields in first material:', Object.keys(projectMaterialsAvailable[0]));
+      }
+      console.log('🎯 Looking for sectionId:', sectionId);
+      console.log('📍 Mini-sections:', miniSectionsData.map(ms => ({ id: ms._id, name: ms.name })));
+        } catch (error) {
+          console.error('Error fetching project data:', error);
+        }
+      }
+
       // Calculate expenses per mini-section
       const miniSectionExpenses: MiniSectionExpense[] = miniSectionsData.map((miniSection: any) => {
-        const miniSectionMaterials = parsedMaterialUsed.filter(
+        // Calculate used materials cost
+        const miniSectionUsedMaterials = parsedMaterialUsed.filter(
           (material: any) => material.miniSectionId === miniSection._id
         );
 
-        const totalExpense = miniSectionMaterials.reduce(
+        const usedMaterialsCost = miniSectionUsedMaterials.reduce(
           (sum: number, material: any) => sum + (material.totalCost || material.cost || 0),
           0
         );
+
+        // Calculate available materials cost for this mini-section
+        // Try different possible field names for mini-section association
+        let miniSectionAvailableMaterials = projectMaterialsAvailable.filter(
+          (material: any) => material.miniSectionId === miniSection._id
+        );
+
+        // If no materials found by miniSectionId, try sectionId
+        if (miniSectionAvailableMaterials.length === 0) {
+          miniSectionAvailableMaterials = projectMaterialsAvailable.filter(
+            (material: any) => material.sectionId === sectionId
+          );
+        }
+
+        // If still no materials found, check if materials are not assigned to specific mini-sections
+        // In that case, distribute them equally among all mini-sections in this section
+        if (miniSectionAvailableMaterials.length === 0) {
+          const unassignedMaterials = projectMaterialsAvailable.filter(
+            (material: any) => !material.miniSectionId && !material.sectionId
+          );
+          
+          if (unassignedMaterials.length > 0) {
+            // Distribute unassigned materials equally among mini-sections
+            const miniSectionCount = miniSectionsData.length;
+            miniSectionAvailableMaterials = unassignedMaterials.map(material => ({
+              ...material,
+              // Divide cost equally among mini-sections
+              cost: (material.cost || 0) / miniSectionCount,
+              totalCost: (material.totalCost || 0) / miniSectionCount,
+            }));
+          }
+        }
+
+        const availableMaterialsCost = miniSectionAvailableMaterials.reduce(
+          (sum: number, material: any) => {
+            const cost = material.totalCost || material.cost || 0;
+            console.log(`💰 Adding available material cost: ${material.name} = ${cost}`);
+            return sum + cost;
+          },
+          0
+        );
+
+        const totalExpense = usedMaterialsCost + availableMaterialsCost;
+
+        console.log(`📊 Mini-section ${miniSection.name}:`, {
+          usedMaterialsCost,
+          availableMaterialsCost,
+          totalExpense,
+          availableMaterialsCount: miniSectionAvailableMaterials.length
+        });
 
         return {
           _id: miniSection._id,
           name: miniSection.name,
           totalExpense,
+          usedMaterialsCost,
+          availableMaterialsCost,
         };
       });
 
@@ -89,6 +168,8 @@ const MiniSectionsAnalytics: React.FC = () => {
   };
 
   const totalExpense = miniSections.reduce((sum, ms) => sum + ms.totalExpense, 0);
+  const totalUsedMaterials = miniSections.reduce((sum, ms) => sum + ms.usedMaterialsCost, 0);
+  const totalAvailableMaterials = miniSections.reduce((sum, ms) => sum + ms.availableMaterialsCost, 0);
 
   // Transform to pie data
   const pieData = miniSections.map((miniSection, index) => ({
@@ -101,7 +182,7 @@ const MiniSectionsAnalytics: React.FC = () => {
     name: miniSection.name,
     formattedBudget: formatCurrency(miniSection.totalExpense),
     percentage: ((miniSection.totalExpense / totalExpense) * 100).toFixed(1),
-    description: `${miniSection.name} expenses`,
+    description: `${miniSection.name} expenses (Used: ${formatCurrency(miniSection.usedMaterialsCost)}, Available: ${formatCurrency(miniSection.availableMaterialsCost)})`,
   }));
 
   const legendData: LegendItem[] = pieData.map((item, index) => ({
@@ -163,6 +244,32 @@ const MiniSectionsAnalytics: React.FC = () => {
           </View>
         </View>
 
+        {/* Material Breakdown Stats */}
+        {(totalUsedMaterials > 0 || totalAvailableMaterials > 0) && (
+          <View style={styles.breakdownStatsSection}>
+            <View style={styles.breakdownStatBox}>
+              <View style={styles.breakdownStatItem}>
+                <View style={styles.breakdownStatIconContainer}>
+                  <Ionicons name="cube-outline" size={18} color="#8B5CF6" />
+                </View>
+                <View style={styles.breakdownStatInfo}>
+                  <Text style={styles.breakdownStatLabel}>Used Materials</Text>
+                  <Text style={styles.breakdownStatValue}>{formatCurrency(totalUsedMaterials)}</Text>
+                </View>
+              </View>
+              <View style={styles.breakdownStatItem}>
+                <View style={styles.breakdownStatIconContainer}>
+                  <Ionicons name="layers-outline" size={18} color="#10B981" />
+                </View>
+                <View style={styles.breakdownStatInfo}>
+                  <Text style={styles.breakdownStatLabel}>Available Materials</Text>
+                  <Text style={styles.breakdownStatValue}>{formatCurrency(totalAvailableMaterials)}</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
+
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#3B82F6" />
@@ -173,14 +280,14 @@ const MiniSectionsAnalytics: React.FC = () => {
             <Ionicons name="grid-outline" size={64} color="#CBD5E1" />
             <Text style={styles.emptyTitle}>No Mini-Section Data</Text>
             <Text style={styles.emptySubtitle}>
-              No materials have been used in any mini-sections yet
+              No materials have been used or made available in any mini-sections yet
             </Text>
           </View>
         ) : (
           <Animated.View style={[styles.card, { opacity: fadeAnim }]}>
             <View style={styles.heading}>
               <Text style={styles.title}>Mini-Section Expenses</Text>
-              <Text style={styles.subtitle}>Material Usage by Mini-Section</Text>
+              <Text style={styles.subtitle}>Material Costs by Mini-Section (Used + Available)</Text>
             </View>
 
             <View style={styles.chartContainer}>
@@ -276,71 +383,118 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   statsSection: {
-    marginTop: 10,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     paddingHorizontal: 20,
-    marginBottom: 10,
+    paddingVertical: 16,
+    gap: 12,
   },
   statBox: {
     backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 16,
+    padding: 20,
+    borderRadius: 12,
     alignItems: 'center',
     flex: 1,
-    marginHorizontal: 5,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.06,
-    shadowRadius: 15,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   statBoxPrimary: {
-    borderWidth: 3,
-    borderColor: '#5DADE2',
+    backgroundColor: '#F8FAFC',
+    borderColor: '#CBD5E1',
   },
   statBoxSecondary: {
-    borderWidth: 3,
-    borderColor: '#EC7063',
+    backgroundColor: '#FEF7F0',
+    borderColor: '#FED7AA',
   },
   statValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2C3E50',
-    marginBottom: 6,
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 4,
   },
   statLabel: {
-    fontSize: 11,
-    color: '#95A5A6',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
     textAlign: 'center',
+    lineHeight: 16,
+  },
+  breakdownStatsSection: {
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  breakdownStatBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  breakdownStatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  breakdownStatIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#F8FAFC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  breakdownStatInfo: {
+    flex: 1,
+  },
+  breakdownStatLabel: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  breakdownStatValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1E293B',
   },
   card: {
     backgroundColor: '#FFFFFF',
     margin: 20,
-    borderRadius: 24,
-    padding: 25,
+    borderRadius: 16,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.08,
-    shadowRadius: 25,
-    elevation: 12,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 3,
   },
   heading: {
     alignItems: 'center',
+    marginBottom: 8,
   },
   title: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: '700',
-    color: '#2C3E50',
-    letterSpacing: 1,
-    marginBottom: 8,
+    color: '#1E293B',
+    marginBottom: 4,
   },
   subtitle: {
     fontSize: 14,
-    color: '#95A5A6',
+    color: '#64748B',
     fontWeight: '500',
   },
   chartContainer: {

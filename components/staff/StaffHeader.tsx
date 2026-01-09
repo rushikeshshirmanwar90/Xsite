@@ -1,6 +1,5 @@
 // components/StaffHeader.tsx
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import {
     StyleSheet,
@@ -15,7 +14,6 @@ interface StaffHeaderProps {
     adminCount: number;
     searchQuery: string;
     onSearchChange: (query: string) => void;
-    onAddPress: () => void;
     onScanQRPress?: () => void;
     isAdmin?: boolean;
 }
@@ -25,7 +23,6 @@ const StaffHeader: React.FC<StaffHeaderProps> = ({
     adminCount,
     searchQuery,
     onSearchChange,
-    onAddPress,
     onScanQRPress,
     isAdmin = true,
 }) => {
@@ -53,37 +50,38 @@ const StaffHeader: React.FC<StaffHeaderProps> = ({
                 </View>
             </View>
 
-            {/* Add Staff Button - Full Width */}
-            {isAdmin && (
-                <View style={styles.buttonRow}>
-                    <TouchableOpacity
-                        style={styles.addButton}
-                        onPress={onAddPress}
-                        activeOpacity={0.8}
-                    >
-                        <LinearGradient
-                            colors={['#3B82F6', '#8B5CF6']}
-                            style={styles.addButtonGradient}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                        >
-                            <Ionicons name="add-circle" size={22} color="white" />
-                            <Text style={styles.addButtonText}>Add Staff</Text>
-                        </LinearGradient>
-                    </TouchableOpacity>
-
-                    {onScanQRPress && (
+            {/* Search Bar and Scan Button Row */}
+            <View style={styles.searchRow}>
+                <View style={styles.searchContainer}>
+                    <Ionicons name="search-outline" size={20} color="#64748B" style={styles.searchIcon} />
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="Search by name, email, or role..."
+                        placeholderTextColor="#94A3B8"
+                        value={searchQuery}
+                        onChangeText={onSearchChange}
+                    />
+                    {searchQuery.length > 0 && (
                         <TouchableOpacity
-                            style={styles.scanButton}
-                            onPress={onScanQRPress}
-                            activeOpacity={0.8}
+                            onPress={() => onSearchChange('')}
+                            style={styles.clearButton}
                         >
-                            <Ionicons name="qr-code-outline" size={22} color="#3B82F6" />
-                            <Text style={styles.scanButtonText}>Scan QR</Text>
+                            <Ionicons name="close-circle" size={20} color="#94A3B8" />
                         </TouchableOpacity>
                     )}
                 </View>
-            )}
+
+                {/* Scan QR Button */}
+                {isAdmin && onScanQRPress && (
+                    <TouchableOpacity
+                        style={styles.scanButton}
+                        onPress={onScanQRPress}
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons name="qr-code-outline" size={22} color="#3B82F6" />
+                    </TouchableOpacity>
+                )}
+            </View>
 
             {/* View-only message for non-admin */}
             {!isAdmin && (
@@ -92,26 +90,6 @@ const StaffHeader: React.FC<StaffHeaderProps> = ({
                     <Text style={styles.viewOnlyText}>View Only - Contact admin to add staff</Text>
                 </View>
             )}
-
-            {/* Search Bar */}
-            <View style={styles.searchContainer}>
-                <Ionicons name="search-outline" size={20} color="#64748B" style={styles.searchIcon} />
-                <TextInput
-                    style={styles.searchInput}
-                    placeholder="Search by name, email, or role..."
-                    placeholderTextColor="#94A3B8"
-                    value={searchQuery}
-                    onChangeText={onSearchChange}
-                />
-                {searchQuery.length > 0 && (
-                    <TouchableOpacity
-                        onPress={() => onSearchChange('')}
-                        style={styles.clearButton}
-                    >
-                        <Ionicons name="close-circle" size={20} color="#94A3B8" />
-                    </TouchableOpacity>
-                )}
-            </View>
         </View>
     );
 };
@@ -157,77 +135,14 @@ const styles = StyleSheet.create({
         color: '#1E293B',
         letterSpacing: -0.5,
     },
-    headerSubtitle: {
-        fontSize: 14,
-        color: '#64748B',
-        fontWeight: '500',
-    },
-    buttonRow: {
+    searchRow: {
         flexDirection: 'row',
+        alignItems: 'center',
         gap: 12,
-        marginBottom: 16,
-    },
-    addButton: {
-        flex: 1,
-        borderRadius: 12,
-        overflow: 'hidden',
-        shadowColor: '#3B82F6',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    addButtonGradient: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 14,
-        paddingHorizontal: 20,
-        gap: 10,
-    },
-    addButtonText: {
-        color: '#FFFFFF',
-        fontWeight: '600',
-        fontSize: 15,
-        letterSpacing: 0.3,
-    },
-    scanButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 14,
-        paddingHorizontal: 20,
-        gap: 8,
-        borderRadius: 12,
-        backgroundColor: '#EFF6FF',
-        borderWidth: 2,
-        borderColor: '#3B82F6',
-    },
-    scanButtonText: {
-        color: '#3B82F6',
-        fontWeight: '600',
-        fontSize: 15,
-        letterSpacing: 0.3,
-    },
-    viewOnlyBanner: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 16,
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        backgroundColor: '#F8FAFC',
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-        gap: 8,
-    },
-    viewOnlyText: {
-        fontSize: 13,
-        fontWeight: '500',
-        color: '#64748B',
+        marginBottom: 8,
     },
     searchContainer: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#F8FAFC',
@@ -248,6 +163,34 @@ const styles = StyleSheet.create({
     },
     clearButton: {
         padding: 4,
+    },
+    scanButton: {
+        width: 48,
+        height: 48,
+        borderRadius: 12,
+        backgroundColor: '#EFF6FF',
+        borderWidth: 2,
+        borderColor: '#3B82F6',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    viewOnlyBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 8,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        gap: 8,
+    },
+    viewOnlyText: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#64748B',
     },
 });
 

@@ -34,7 +34,7 @@ interface MaterialUsageFormProps {
     onClose: () => void;
     onSubmit: (miniSectionId: string, materialUsages: MaterialUsage[]) => void;
     availableMaterials: Material[];
-    miniSections: Array<{ _id: string; name: string }>;
+    miniSections: { _id: string; name: string }[];
 }
 
 const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({

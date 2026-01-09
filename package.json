@@ -61,7 +61,8 @@
     "react-native-web": "~0.21.0",
     "react-native-worklets": "0.5.1",
     "sonner-native": "^0.21.1",
-    "expo-image-manipulator": "~14.0.8"
+    "expo-image-manipulator": "~14.0.8",
+    "expo-intent-launcher": "~13.0.8"
   },
   "devDependencies": {
     "@types/axios": "^0.9.36",

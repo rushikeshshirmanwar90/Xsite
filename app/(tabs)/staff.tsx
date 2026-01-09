@@ -577,7 +577,6 @@ const StaffManagement: React.FC = () => {
                 adminCount={adminList.length}
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
-                onAddPress={() => setShowAddModal(true)}
                 onScanQRPress={() => setShowQRScanner(true)}
                 isAdmin={userIsAdmin}
             />

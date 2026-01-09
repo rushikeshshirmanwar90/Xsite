@@ -33,11 +33,11 @@ interface StaffRegistrationResponse {
         email: string;
         phoneNumber: string;
         role: Role;
-        clients: Array<{
+        clients: {
             clientId: string;
             clientName: string;
             assignedAt?: Date;
-        }>;
+        }[];
         [key: string]: any;
     };
     message?: string;

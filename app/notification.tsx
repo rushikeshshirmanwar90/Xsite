@@ -48,13 +48,13 @@ interface MaterialActivity {
     projectName?: string;
     sectionName?: string;
     miniSectionName?: string;
-    materials: Array<{
+    materials: {
         name: string;
         unit: string;
         specs?: Record<string, any>;
         qnt: number;
         cost: number;
-    }>;
+    }[];
     message?: string;
     activity: 'imported' | 'used';
     createdAt?: string;
@@ -171,7 +171,7 @@ const NotificationPage: React.FC = () => {
     }, []);
 
     // State for date-based pagination
-    const [dateGroups, setDateGroups] = useState<Array<{date: string, activities: any[], count: number}>>([]);
+    const [dateGroups, setDateGroups] = useState<{date: string, activities: any[], count: number}[]>([]);
     const [hasMoreDates, setHasMoreDates] = useState(false);
     const [nextDate, setNextDate] = useState<string | null>(null);
     const [loadingMore, setLoadingMore] = useState(false);
@@ -922,7 +922,7 @@ const NotificationPage: React.FC = () => {
     };
 
     const getCombinedActivities = () => {
-        const combined: Array<{ type: 'activity' | 'material'; data: Activity | MaterialActivity; timestamp: string }> = [];
+        const combined: { type: 'activity' | 'material'; data: Activity | MaterialActivity; timestamp: string }[] = [];
 
         // Safely iterate over activities (ensure it's an array)
         if (Array.isArray(activities)) {

@@ -205,27 +205,48 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
 
             const { activities, summary } = response.data.data!;
 
-            if (!activities || activities.length === 0) {
-                Alert.alert(
-                    'No Data Found',
-                    `No material activities found for the selected period (${formatDate(startDate)} to ${formatDate(endDate)}).`,
-                    [
-                        { text: 'OK' },
-                        {
-                            text: 'Extend Range',
-                            onPress: () => {
-                                // Extend date range to last 90 days
-                                const newStartDate = new Date();
-                                newStartDate.setDate(newStartDate.getDate() - 90);
-                                setStartDate(newStartDate);
-                            }
-                        }
-                    ]
-                );
-                return;
+            // Fetch labor data from project
+            console.log('🔍 Fetching labor data for project:', selectedProjectId);
+            let laborData: any[] = [];
+            
+            try {
+                const projectResponse = await axios.get<ApiResponse<any>>(`${domain}/api/project?id=${selectedProjectId}&clientId=${clientId}`);
+                if (projectResponse.data.success && projectResponse.data.data) {
+                    const project = projectResponse.data.data;
+                    laborData = project.Labors || [];
+                    console.log('✅ Labor data fetched:', laborData.length, 'entries');
+                } else {
+                    console.warn('⚠️ Could not fetch project labor data');
+                }
+            } catch (laborError) {
+                console.error('❌ Error fetching labor data:', laborError);
+                // Continue without labor data
             }
 
-            console.log('📄 Generating PDF with activities:', activities.length);
+            if (!activities || activities.length === 0) {
+                // Check if we have labor data even if no material activities
+                if (laborData.length === 0) {
+                    Alert.alert(
+                        'No Data Found',
+                        `No material activities or labor entries found for the selected period (${formatDate(startDate)} to ${formatDate(endDate)}).`,
+                        [
+                            { text: 'OK' },
+                            {
+                                text: 'Extend Range',
+                                onPress: () => {
+                                    // Extend date range to last 90 days
+                                    const newStartDate = new Date();
+                                    newStartDate.setDate(newStartDate.getDate() - 90);
+                                    setStartDate(newStartDate);
+                                }
+                            }
+                        ]
+                    );
+                    return;
+                }
+            }
+
+            console.log('📄 Generating PDF with activities:', activities.length, 'and labor entries:', laborData.length);
 
             // Get selected project name for PDF title
             const selectedProject = projects.find(p => p._id === selectedProjectId);
@@ -241,7 +262,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
             const pdfGenerator = new PDFReportGenerator(clientData, userData);
             
             console.log('📄 Calling generatePDF...');
-            await pdfGenerator.generatePDF(activities, projectName);
+            await pdfGenerator.generatePDF(activities || [], projectName, laborData);
             console.log('📄 generatePDF completed successfully');
 
             console.log('✅ PDF generation completed successfully');
@@ -304,7 +325,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                             </View>
                             <View>
                                 <Text style={styles.title}>Generate Report</Text>
-                                <Text style={styles.subtitle}>Material activity report</Text>
+                                <Text style={styles.subtitle}>Material & labor report</Text>
                             </View>
                         </View>
                         <TouchableOpacity onPress={onClose} style={styles.closeButton}>
@@ -508,7 +529,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                             <View style={styles.previewCard}>
                                 <View style={styles.previewHeader}>
                                     <Ionicons name="document-text-outline" size={24} color="#3B82F6" />
-                                    <Text style={styles.previewTitle}>Material Activity Report</Text>
+                                    <Text style={styles.previewTitle}>Material & Labor Report</Text>
                                 </View>
                                 <View style={styles.previewDetails}>
                                     <View style={styles.previewRow}>
@@ -522,6 +543,12 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                                         <Text style={styles.previewValue}>
                                             {activityFilter === 'all' ? 'All Types' : 
                                              activityFilter === 'imported' ? 'Imported Materials' : 'Used Materials'}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.previewRow}>
+                                        <Text style={styles.previewLabel}>Includes:</Text>
+                                        <Text style={styles.previewValue}>
+                                            Materials & Labor Costs
                                         </Text>
                                     </View>
                                     <View style={styles.previewRow}>
