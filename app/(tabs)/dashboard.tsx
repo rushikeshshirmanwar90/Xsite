@@ -2,6 +2,7 @@ import PieChart, { PieChartColors20 } from '@/components/PieChart';
 import PieChartLegend, { LegendItem } from '@/components/PieChartLegend';
 import { getClientId } from '@/functions/clientId';
 import { getProjectData } from '@/functions/project';
+import { useUser } from '@/hooks/useUser';
 import { Project } from '@/types/project';
 import { formatCurrency, transformProjectDataToPieSlices } from '@/utils/analytics';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const AnalyticsDashboard: React.FC = () => {
   const router = useRouter();
+  const { user } = useUser(); // Add user context for staff filtering
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const colors = PieChartColors20;
 
@@ -178,7 +180,18 @@ const AnalyticsDashboard: React.FC = () => {
         throw new Error('Client ID not found');
       }
 
-      const projectData = await getProjectData(clientId);
+      // Check if user is staff and pass staffId for filtering
+      const isStaff = user && 'role' in user;
+      const staffId = isStaff ? user._id : undefined;
+      
+      console.log('🔍 Dashboard fetching projects:', {
+        clientId,
+        isStaff,
+        staffId,
+        willFilter: !!staffId
+      });
+
+      const projectData = await getProjectData(clientId, 1, 1000, staffId); // Get all projects with staff filtering
       
       // Handle the correct response structure from getProjectData
       let projectsArray: Project[] = [];

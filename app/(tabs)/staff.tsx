@@ -24,6 +24,7 @@ import {
     View,
     TouchableOpacity,
     Alert,
+    RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -56,6 +57,7 @@ const StaffManagement: React.FC = () => {
     const [clientId, setClientId] = useState('');
     const [clientData, setClientData] = useState<ClientData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
     // Get user role for access control
     const { user } = useUser();
@@ -95,130 +97,155 @@ const StaffManagement: React.FC = () => {
             }
             
             setLoading(true);
-            try {
-                console.log('📡 Making API calls with clientId:', clientId);
-                console.log('📡 Domain:', domain);
-                
-                // ✅ Try new API first (using client's staffs array)
-                console.log('🔍 Trying new Staff API (client staffs array)...');
-                let staffUrl = `${domain}/api/clients/staff?clientId=${clientId}`;
-                console.log('📤 Staff URL:', staffUrl);
-                
-                let staffRes = await axios.get(staffUrl);
-                console.log('📥 Staff Response Status:', staffRes.status);
-                
-                let staffResponse = staffRes.data as { success?: boolean; data?: Staff[] };
-                let staffData = staffResponse?.success ? (staffResponse.data || []) : [];
-                
-                // ✅ Fallback to old API if new API returns empty
-                if (staffData.length === 0) {
-                    console.log('⚠️ New API returned empty, falling back to old API...');
-                    staffUrl = `${domain}/api/users/staff?clientId=${clientId}`;
-                    console.log('📤 Fallback Staff URL:', staffUrl);
-                    
-                    staffRes = await axios.get(staffUrl);
-                    console.log('📥 Fallback Response Status:', staffRes.status);
-                    
-                    staffResponse = staffRes.data as { success?: boolean; data?: Staff[] };
-                    staffData = staffResponse?.success ? (staffResponse.data || []) : [];
-                }
-                
-                console.log('✅ Staff data processed:', staffData.length, 'items');
-                console.log('📋 Staff data details:', staffData);
-                setStaffList(Array.isArray(staffData) ? staffData : []);
-                
-                console.log('🔍 Testing Admin API...');
-                const adminUrl = `${domain}/api/users/admin?clientId=${clientId}`;
-                console.log('📤 Admin URL:', adminUrl);
-                
-                const adminRes = await axios.get(adminUrl);
-                console.log('📥 Admin Response Status:', adminRes.status);
-                console.log('📥 Admin Response Data:', JSON.stringify(adminRes.data, null, 2));
-                
-                console.log('🔍 Testing Client API...');
-                const clientUrl = `${domain}/api/clients?id=${clientId}`;
-                console.log('📤 Client URL:', clientUrl);
-                
-                const clientRes = await axios.get(clientUrl);
-                console.log('📥 Client Response Status:', clientRes.status);
-                console.log('📥 Client Response Data:', JSON.stringify(clientRes.data, null, 2));
-                
-                // Handle admin data with proper typing
-                const adminResponse = adminRes.data as { success?: boolean; data?: Admin | Admin[] };
-                const adminData = adminResponse?.success ? adminResponse.data : null;
-                console.log('✅ Admin data processed:', adminData ? 'Found' : 'Not found');
-                console.log('📋 Admin data details:', adminData);
-                if (Array.isArray(adminData)) {
-                    setAdminList(adminData);
-                } else if (adminData) {
-                    setAdminList([adminData]);
-                } else {
-                    setAdminList([]);
-                }
-                
-                // Handle client data with proper typing
-                const clientResponse = clientRes.data as { success?: boolean; data?: ClientData };
-                const clientInfo = clientResponse?.success ? clientResponse.data : null;
-                console.log('✅ Client data processed:', clientInfo?.name || 'Unknown Company');
-                console.log('📋 Client data details:', clientInfo);
-                setClientData(clientInfo || null);
-                
-                // Show success message if at least one API worked
-                const staffSuccess = staffResponse?.success || false;
-                const adminSuccess = adminResponse?.success || false;
-                const clientSuccess = clientResponse?.success || false;
-                
-                if (staffSuccess || adminSuccess || clientSuccess) {
-                    console.log('✅ Data loading completed successfully');
-                } else {
-                    console.log('❌ All APIs failed');
-                    toast.error('Failed to load data. Please check your connection.');
-                }
-                
-            } catch (error) {
-                console.error('❌ Error fetching data:', error);
-                
-                // Handle specific error cases
-                if (error && typeof error === 'object' && 'response' in error) {
-                    const axiosError = error as any;
-                    console.error('❌ Error response:', axiosError.response?.data);
-                    console.error('❌ Error status:', axiosError.response?.status);
-                    console.error('❌ Error config:', axiosError.config);
-                    
-                    // Handle specific error cases
-                    if (axiosError.response?.status === 400) {
-                        console.error('❌ 400 Error - likely missing or invalid clientId');
-                        toast.error('Invalid client configuration. Please contact support.');
-                    } else if (axiosError.response?.status === 404) {
-                        console.error('❌ 404 Error - client or endpoint not found');
-                        const errorMessage = axiosError.response?.data?.message || 'Data not found';
-                        if (errorMessage.includes('Client not found')) {
-                            toast.error('Your account is not properly configured. Please contact support.');
-                        } else {
-                            toast.error('API endpoint not found. Please contact support.');
-                        }
-                    } else if (!axiosError.response) {
-                        console.error('❌ Network error - server might be down');
-                        toast.error('Unable to connect to server. Please check your connection.');
-                    } else {
-                        toast.error('Failed to load staff and admin data');
-                    }
-                } else {
-                    console.error('❌ Unknown error type:', error);
-                    toast.error('Failed to load staff and admin data');
-                }
-                
-                // Set empty arrays on error to prevent UI issues
-                setStaffList([]);
-                setAdminList([]);
-                setClientData(null);
-            } finally {
-                setLoading(false);
-            }
+            await fetchStaffAndAdminData();
         };
 
         fetchData();
     }, [clientId]); // Depend on clientId
+
+    // Extract data fetching logic into a separate function for reuse
+    const fetchStaffAndAdminData = async () => {
+        try {
+            console.log('📡 Making API calls with clientId:', clientId);
+            console.log('📡 Domain:', domain);
+            
+            // ✅ Try new API first (using client's staffs array)
+            console.log('🔍 Trying new Staff API (client staffs array)...');
+            let staffUrl = `${domain}/api/clients/staff?clientId=${clientId}`;
+            console.log('📤 Staff URL:', staffUrl);
+            
+            let staffRes = await axios.get(staffUrl);
+            console.log('📥 Staff Response Status:', staffRes.status);
+            
+            let staffResponse = staffRes.data as { success?: boolean; data?: Staff[] };
+            let staffData = staffResponse?.success ? (staffResponse.data || []) : [];
+            
+            // ✅ Fallback to old API if new API returns empty
+            if (staffData.length === 0) {
+                console.log('⚠️ New API returned empty, falling back to old API...');
+                staffUrl = `${domain}/api/users/staff?clientId=${clientId}`;
+                console.log('📤 Fallback Staff URL:', staffUrl);
+                
+                staffRes = await axios.get(staffUrl);
+                console.log('📥 Fallback Response Status:', staffRes.status);
+                
+                staffResponse = staffRes.data as { success?: boolean; data?: Staff[] };
+                staffData = staffResponse?.success ? (staffResponse.data || []) : [];
+            }
+            
+            console.log('✅ Staff data processed:', staffData.length, 'items');
+            console.log('📋 Staff data details:', staffData);
+            setStaffList(Array.isArray(staffData) ? staffData : []);
+            
+            console.log('🔍 Testing Admin API...');
+            const adminUrl = `${domain}/api/users/admin?clientId=${clientId}`;
+            console.log('📤 Admin URL:', adminUrl);
+            
+            const adminRes = await axios.get(adminUrl);
+            console.log('📥 Admin Response Status:', adminRes.status);
+            console.log('📥 Admin Response Data:', JSON.stringify(adminRes.data, null, 2));
+            
+            console.log('🔍 Testing Client API...');
+            const clientUrl = `${domain}/api/clients?id=${clientId}`;
+            console.log('📤 Client URL:', clientUrl);
+            
+            const clientRes = await axios.get(clientUrl);
+            console.log('📥 Client Response Status:', clientRes.status);
+            console.log('📥 Client Response Data:', JSON.stringify(clientRes.data, null, 2));
+            
+            // Handle admin data with proper typing
+            const adminResponse = adminRes.data as { success?: boolean; data?: Admin | Admin[] };
+            const adminData = adminResponse?.success ? adminResponse.data : null;
+            console.log('✅ Admin data processed:', adminData ? 'Found' : 'Not found');
+            console.log('📋 Admin data details:', adminData);
+            if (Array.isArray(adminData)) {
+                setAdminList(adminData);
+            } else if (adminData) {
+                setAdminList([adminData]);
+            } else {
+                setAdminList([]);
+            }
+            
+            // Handle client data with proper typing
+            const clientResponse = clientRes.data as { success?: boolean; data?: ClientData };
+            const clientInfo = clientResponse?.success ? clientResponse.data : null;
+            console.log('✅ Client data processed:', clientInfo?.name || 'Unknown Company');
+            console.log('📋 Client data details:', clientInfo);
+            setClientData(clientInfo || null);
+            
+            // Show success message if at least one API worked
+            const staffSuccess = staffResponse?.success || false;
+            const adminSuccess = adminResponse?.success || false;
+            const clientSuccess = clientResponse?.success || false;
+            
+            if (staffSuccess || adminSuccess || clientSuccess) {
+                console.log('✅ Data loading completed successfully');
+            } else {
+                console.log('❌ All APIs failed');
+                toast.error('Failed to load data. Please check your connection.');
+            }
+            
+        } catch (error) {
+            console.error('❌ Error fetching data:', error);
+            
+            // Handle specific error cases
+            if (error && typeof error === 'object' && 'response' in error) {
+                const axiosError = error as any;
+                console.error('❌ Error response:', axiosError.response?.data);
+                console.error('❌ Error status:', axiosError.response?.status);
+                console.error('❌ Error config:', axiosError.config);
+                
+                // Handle specific error cases
+                if (axiosError.response?.status === 400) {
+                    console.error('❌ 400 Error - likely missing or invalid clientId');
+                    toast.error('Invalid client configuration. Please contact support.');
+                } else if (axiosError.response?.status === 404) {
+                    console.error('❌ 404 Error - client or endpoint not found');
+                    const errorMessage = axiosError.response?.data?.message || 'Data not found';
+                    if (errorMessage.includes('Client not found')) {
+                        toast.error('Your account is not properly configured. Please contact support.');
+                    } else {
+                        toast.error('API endpoint not found. Please contact support.');
+                    }
+                } else if (!axiosError.response) {
+                    console.error('❌ Network error - server might be down');
+                    toast.error('Unable to connect to server. Please check your connection.');
+                } else {
+                    toast.error('Failed to load staff and admin data');
+                }
+            } else {
+                console.error('❌ Unknown error type:', error);
+                toast.error('Failed to load staff and admin data');
+            }
+            
+            // Set empty arrays on error to prevent UI issues
+            setStaffList([]);
+            setAdminList([]);
+            setClientData(null);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
+
+    // Pull-to-refresh handler
+    const onRefresh = async () => {
+        if (!clientId) {
+            toast.error('Client ID not available. Please try logging in again.');
+            return;
+        }
+
+        console.log('🔄 Pull-to-refresh triggered');
+        setRefreshing(true);
+        
+        try {
+            await fetchStaffAndAdminData();
+            toast.success('Data refreshed successfully');
+        } catch (error) {
+            console.error('❌ Error during pull-to-refresh:', error);
+            toast.error('Failed to refresh data');
+        }
+    };
 
     const sendWelcomeMessage = async (staffMember: Staff, companyName: string) => {
         try {
@@ -338,31 +365,11 @@ const StaffManagement: React.FC = () => {
                     console.log('🔄 Refreshing staff and admin data...');
                     setLoading(true);
                     try {
-                        const [staffRes, adminRes] = await Promise.all([
-                            axios.get(`${domain}/api/clients/staff?clientId=${clientId}`), // ✅ Use new API
-                            axios.get(`${domain}/api/users/admin?clientId=${clientId}`)
-                        ]);
-                        
-                        const staffResponse = staffRes.data as { success?: boolean; data?: Staff[] };
-                        const staffData = staffResponse?.data || [];
-                        
-                        const adminResponse = adminRes.data as { success?: boolean; data?: Admin | Admin[] };
-                        const adminData = adminResponse?.data;
-                        
-                        setStaffList(staffData);
-                        if (Array.isArray(adminData)) {
-                            setAdminList(adminData);
-                        } else if (adminData) {
-                            setAdminList([adminData]);
-                        } else {
-                            setAdminList([]);
-                        }
+                        await fetchStaffAndAdminData();
                         console.log('✅ Data refresh completed');
                     } catch (error) {
                         console.error('❌ Error refreshing data:', error);
                         toast.error('Failed to refresh data');
-                    } finally {
-                        setLoading(false);
                     }
                 };
                 refreshData();
@@ -426,6 +433,27 @@ const StaffManagement: React.FC = () => {
         console.log('Admin selected:', `${admin.firstName} ${admin.lastName}`);
         // You can add navigation to admin detail page here if needed
         toast.success(`Admin: ${admin.firstName} ${admin.lastName}`);
+    };
+
+    // Helper function to filter staff projects by current client
+    const filterStaffProjectsByClient = (staff: Staff) => {
+        if (!staff.assignedProjects || !Array.isArray(staff.assignedProjects)) {
+            console.log(`⚠️ Staff ${staff.firstName} ${staff.lastName} has no assignedProjects or invalid format`);
+            return [];
+        }
+
+        const filteredProjects = staff.assignedProjects.filter(
+            (project: any) => {
+                const matches = project.clientId === clientId;
+                if (!matches) {
+                    console.log(`🔍 Filtering out project "${project.projectName}" (clientId: ${project.clientId}) for staff ${staff.firstName} ${staff.lastName} - doesn't match current clientId: ${clientId}`);
+                }
+                return matches;
+            }
+        );
+
+        console.log(`📊 Staff ${staff.firstName} ${staff.lastName}: ${staff.assignedProjects.length} total projects, ${filteredProjects.length} for current client`);
+        return filteredProjects;
     };
 
     // Prepare data for single FlatList
@@ -515,7 +543,11 @@ const StaffManagement: React.FC = () => {
                 return (
                     <View style={styles.staffContainer}>
                         <StaffCard
-                            staff={item.data}
+                            staff={{
+                                ...item.data,
+                                // Filter assignedProjects to only show projects for current client
+                                assignedProjects: filterStaffProjectsByClient(item.data)
+                            }}
                             onPress={() => handleStaffPress(item.data)}
                         />
                     </View>
@@ -559,6 +591,16 @@ const StaffManagement: React.FC = () => {
                     renderItem={renderItem}
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={styles.listContainer}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            colors={['#3B82F6']} // Android
+                            tintColor="#3B82F6" // iOS
+                            title="Pull to refresh" // iOS
+                            titleColor="#64748B" // iOS
+                        />
+                    }
                 />
             )}
 
@@ -580,14 +622,9 @@ const StaffManagement: React.FC = () => {
                     setLoading(true);
                     try {
                         // ✅ Use new API to fetch staff
-                        const staffRes = await axios.get(`${domain}/api/clients/staff?clientId=${clientId}`);
-                        const staffResponse = staffRes.data as { success?: boolean; data?: Staff[] };
-                        const staffData = staffResponse?.data || [];
-                        setStaffList(staffData);
+                        await fetchStaffAndAdminData();
                     } catch (error) {
                         console.error('Error refreshing staff list:', error);
-                    } finally {
-                        setLoading(false);
                     }
                 }}
             />

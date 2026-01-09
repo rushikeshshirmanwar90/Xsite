@@ -35,14 +35,14 @@ function RootLayoutNav() {
       segments,
       hasUser: !!user,
       userRole: user?.role,
-      userClientIds: user?.clientIds
+      userClients: user?.clients
     });
 
     // Check if user is staff without clients
     const isStaffWithoutClients = user && 
       user.role && 
       ['site-engineer', 'supervisor', 'manager'].includes(user.role) &&
-      (!user.clientIds || user.clientIds.length === 0);
+      (!user.clients || user.clients.length === 0);
 
     console.log('🔍 Staff check in layout:', { isStaffWithoutClients });
 

@@ -1,16 +1,22 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { getClientId } from '@/functions/clientId';
 import { getProjectData } from '@/functions/project';
+import { useUser, isStaff } from '@/hooks/useUser';
 import { domain } from '@/lib/domain';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
+import QRCode from 'react-native-qrcode-svg';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
+import ViewShot from 'react-native-view-shot';
 import {
     Alert,
+    Modal,
     RefreshControl,
     ScrollView,
     StatusBar,
@@ -50,6 +56,7 @@ interface ProjectStats {
 
 const CompanyProfile: React.FC = () => {
     const { logout } = useAuth();
+    const { user, refreshUser } = useUser();
     const router = useRouter();
     const [userData, setUserData] = useState<UserData>({});
     const [clientData, setClientData] = useState<ClientData>({});
@@ -61,6 +68,15 @@ const CompanyProfile: React.FC = () => {
     const [loadingClient, setLoadingClient] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [showReportGenerator, setShowReportGenerator] = useState(false);
+    const [showQRCode, setShowQRCode] = useState(false);
+    const [isSharing, setIsSharing] = useState(false);
+
+    // Refs for capturing QR code views
+    const embeddedQRRef = useRef<ViewShot | null>(null);
+    const modalQRRef = useRef<ViewShot | null>(null);
+
+    // Check if current user is staff
+    const isCurrentUserStaff = isStaff(user);
 
     // Force refresh data every time the screen is focused (after login/logout)
     useFocusEffect(
@@ -77,9 +93,24 @@ const CompanyProfile: React.FC = () => {
             setLoading(true);
             setLoadingClient(true);
             
-            // Refetch everything fresh
-            fetchUserData();
-            fetchStats();
+            // For staff users, refresh user data first to get latest assignedProjects
+            const initializeData = async () => {
+                if (user && 'role' in user) {
+                    console.log('🔄 Staff user detected - refreshing user data to get latest assignedProjects');
+                    try {
+                        await refreshUser();
+                        console.log('✅ User data refreshed successfully');
+                    } catch (error) {
+                        console.error('❌ Failed to refresh user data:', error);
+                    }
+                }
+                
+                // Then fetch other data
+                fetchUserData();
+                fetchStats();
+            };
+            
+            initializeData();
         }, [])
     );
 
@@ -204,25 +235,80 @@ const CompanyProfile: React.FC = () => {
 
             // ✅ FIX: Properly destructure the response from getProjectData
             console.log('📊 Fetching project data for stats calculation...');
-            const projectData = await getProjectData(clientId);
-            console.log('📊 Raw project data response:', projectData);
             
-            // Handle both old and new response formats
+            // Check if user is staff and pass staffId for filtering
+            const isCurrentUserStaff = isStaff(user);
+            
+            console.log('🔍 Profile stats - fetching projects:', {
+                clientId,
+                isStaff: isCurrentUserStaff,
+                willFilter: !!isCurrentUserStaff
+            });
+            
+            // ✅ OPTIMIZED APPROACH: For staff users, fetch staff data with populated projects
             let projectsArray = [];
-            if (projectData && typeof projectData === 'object') {
-                if (Array.isArray(projectData)) {
-                    // Old format: direct array
-                    projectsArray = projectData;
-                } else if (projectData.projects && Array.isArray(projectData.projects)) {
-                    // New format: {projects, meta}
-                    projectsArray = projectData.projects;
-                } else {
-                    console.warn('⚠️ Unexpected project data format:', projectData);
+            if (isCurrentUserStaff && user) {
+                console.log('👤 Staff user - fetching staff data with populated projects for stats');
+                
+                try {
+                    // Fetch staff data with populated assignedProjects from ALL clients
+                    const response = await axios.get(`${domain}/api/users/staff?id=${user._id}&getAllProjects=true`);
+                    const responseData = response.data as any;
+                    
+                    if (responseData.success && responseData.data) {
+                        const staffData = responseData.data;
+                        
+                        // Extract populated project data from assignedProjects
+                        if (staffData.assignedProjects && Array.isArray(staffData.assignedProjects) && staffData.assignedProjects.length > 0) {
+                            projectsArray = staffData.assignedProjects
+                                .map((assignment: any) => {
+                                    const projectData = assignment.projectData || assignment.projectId;
+                                    if (projectData && projectData._id) {
+                                        // Add client information to the project data for consistency
+                                        return {
+                                            ...projectData,
+                                            clientName: assignment.clientName || 'Unknown Client',
+                                            clientId: assignment.clientId
+                                        };
+                                    }
+                                    return null;
+                                })
+                                .filter((project: any) => project !== null); // Filter out null/invalid projects
+                            
+                            console.log('📊 Populated projects for staff stats:', projectsArray.length, 'projects');
+                        } else {
+                            console.log('⚠️ Staff has no assigned projects for stats');
+                            projectsArray = [];
+                        }
+                    } else {
+                        console.log('❌ Failed to fetch staff data for stats');
+                        projectsArray = [];
+                    }
+                } catch (error) {
+                    console.error('❌ Error fetching staff data for stats:', error);
                     projectsArray = [];
+                }
+            } else {
+                // For non-staff users, get all client projects
+                const projectData = await getProjectData(clientId, 1, 1000);
+                console.log('📊 Raw project data response:', projectData);
+                
+                // Handle both old and new response formats
+                if (projectData && typeof projectData === 'object') {
+                    if (Array.isArray(projectData)) {
+                        // Old format: direct array
+                        projectsArray = projectData;
+                    } else if (projectData.projects && Array.isArray(projectData.projects)) {
+                        // New format: {projects, meta}
+                        projectsArray = projectData.projects;
+                    } else {
+                        console.warn('⚠️ Unexpected project data format:', projectData);
+                        projectsArray = [];
+                    }
                 }
             }
             
-            console.log('📊 Projects array for stats:', projectsArray.length, 'projects');
+            console.log('📊 Final projects array for stats:', projectsArray.length, 'projects');
 
             // Calculate stats from real data only
             let totalSpent = 0;
@@ -339,6 +425,62 @@ const CompanyProfile: React.FC = () => {
         );
     };
 
+    const shareQRCode = async (viewShotRef: React.RefObject<ViewShot | null>) => {
+        if (!viewShotRef.current || !user) {
+            Alert.alert('Error', 'QR code not ready for sharing. Please try again.');
+            return;
+        }
+
+        setIsSharing(true);
+        try {
+            console.log('📱 Starting QR code sharing process...');
+            
+            // Check if sharing is available
+            const isAvailable = await Sharing.isAvailableAsync();
+            if (!isAvailable) {
+                Alert.alert(
+                    'Sharing Not Available',
+                    'Sharing is not available on this device. Please take a screenshot instead.',
+                    [{ text: 'OK' }]
+                );
+                return;
+            }
+
+            // Capture the QR code view as image
+            console.log('📸 Capturing QR code view...');
+            const uri = await (viewShotRef.current as any)?.capture({
+                format: 'png',
+                quality: 1.0,
+            });
+
+            if (!uri) {
+                throw new Error('Failed to capture QR code image');
+            }
+
+            console.log('✅ QR code captured:', uri);
+
+            // Share the QR code image directly
+            console.log('🚀 Sharing QR code...');
+            await Sharing.shareAsync(uri, {
+                mimeType: 'image/png',
+                dialogTitle: 'Share Staff QR Code',
+                UTI: 'public.png',
+            });
+
+            console.log('✅ QR code shared successfully');
+
+        } catch (error) {
+            console.error('❌ Error sharing QR code:', error);
+            Alert.alert(
+                'Sharing Failed',
+                'Could not share QR code. Please try taking a screenshot instead.',
+                [{ text: 'OK' }]
+            );
+        } finally {
+            setIsSharing(false);
+        }
+    };
+
     const testClientFetch = async () => {
         const clientId = await getClientId();
         Alert.alert(
@@ -393,10 +535,20 @@ const CompanyProfile: React.FC = () => {
                     </View>
                     <Text style={styles.userName}>{userData.name || 'User'}</Text>
                     <Text style={styles.userEmail}>{userData.email || 'email@example.com'}</Text>
-                    {userData.company && (
+                    {userData.company && !isCurrentUserStaff && (
                         <View style={styles.companyBadge}>
                             <Ionicons name="business" size={14} color="#3B82F6" />
                             <Text style={styles.companyText}>{userData.company}</Text>
+                        </View>
+                    )}
+                    
+                    {/* Staff Role Badge */}
+                    {isCurrentUserStaff && user && 'role' in user && (
+                        <View style={styles.staffBadge}>
+                            <Ionicons name="person" size={14} color="#10B981" />
+                            <Text style={styles.staffBadgeText}>
+                                {user.role.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            </Text>
                         </View>
                     )}
                 </LinearGradient>
@@ -436,9 +588,82 @@ const CompanyProfile: React.FC = () => {
                     </View>
                 </View>
 
+                {/* QR Code Section - Priority for unassigned staff */}
+                {isCurrentUserStaff && user && !userData.clientId && (
+                    <View style={styles.section}>  
+                        <View style={[styles.infoCard, styles.shareCard]}>
+                            <View style={styles.shareHeader}>
+                                <View style={styles.shareIconContainer}>
+                                    <Ionicons name="qr-code-outline" size={24} color="#3B82F6" />
+                                </View>
+                                <View style={styles.shareContent}>
+                                    <Text style={styles.shareTitle}>Get Connected</Text>
+                                    <Text style={styles.shareSubtitle}>
+                                        Share your QR code with admin to join their organization
+                                    </Text>
+                                </View>
+                            </View>
+                            
+                            {/* QR Code displayed directly */}
+                            <ViewShot ref={embeddedQRRef} options={{ format: 'png', quality: 1.0 }}>
+                                <View style={styles.embeddedQrContainer}>
+                                    <QRCode
+                                        value={JSON.stringify({
+                                            staffId: user._id,
+                                            firstName: user.firstName || 'Staff',
+                                            lastName: user.lastName || 'Member',
+                                            email: user.email || '',
+                                            phoneNumber: user.phoneNumber || ('phone' in user ? user.phone : '') || '',
+                                            role: 'role' in user ? user.role : 'staff',
+                                            timestamp: new Date().toISOString()
+                                        })}
+                                        size={150}
+                                        color="#1E293B"
+                                        backgroundColor="#FFFFFF"
+                                    />
+                                    <View style={styles.qrCodeInfo}>
+                                        <Text style={styles.qrCodeTitle}>Staff QR Code</Text>
+                                        <Text style={styles.qrCodeSubtitle}>
+                                            {`${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Staff Member'}
+                                        </Text>
+                                        <Text style={styles.qrCodeId}>ID: {user._id}</Text>
+                                    </View>
+                                </View>
+                            </ViewShot>
+                            
+                            <View style={styles.embeddedQrInfo}>
+                                <Text style={styles.embeddedQrTitle}>Staff Assignment QR Code</Text>
+                                <Text style={styles.embeddedQrId}>{user._id}</Text>
+                                <Text style={styles.embeddedQrInstructions}>
+                                    Ask your admin to scan this QR code to assign you to their client organization and projects.
+                                </Text>
+                            </View>
+
+                            {/* Share Button */}
+                            <TouchableOpacity
+                                style={[styles.shareButton, isSharing && styles.shareButtonDisabled]}
+                                onPress={() => shareQRCode(embeddedQRRef)}
+                                activeOpacity={0.7}
+                                disabled={isSharing}
+                            >
+                                <Ionicons 
+                                    name={isSharing ? "hourglass-outline" : "share-outline"} 
+                                    size={20} 
+                                    color="#FFFFFF" 
+                                />
+                                <Text style={styles.shareButtonText}>
+                                    {isSharing ? 'Sharing...' : 'Share QR Code'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
+
                 {/* Client Details */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Client Information</Text>
+                    <Text style={styles.sectionTitle}>
+                        {isCurrentUserStaff ? 'Assigned Clients' : 'Client Information'}
+                    </Text>
                     <View style={styles.infoCard}>
                         {loadingClient ? (
                             <View style={styles.infoRow}>
@@ -452,90 +677,284 @@ const CompanyProfile: React.FC = () => {
                             </View>
                         ) : (
                             <>
-                                {clientData.companyName && (
-                                    <View style={styles.infoRow}>
-                                        <View style={styles.infoIconContainer}>
-                                            <Ionicons name="business-outline" size={20} color="#64748B" />
-                                        </View>
-                                        <View style={styles.infoContent}>
-                                            <Text style={styles.infoLabel}>Company Name</Text>
-                                            <Text style={styles.infoValue}>{clientData.companyName}</Text>
-                                        </View>
-                                    </View>
-                                )}
+                                {/* For Staff Users - Show all assigned clients */}
+                                {isCurrentUserStaff ? (
+                                    <>
+                                        {user && 'clients' in user && user.clients && user.clients.length > 0 ? (
+                                            <>
+                                                <View style={styles.infoRow}>
+                                                    <View style={styles.infoIconContainer}>
+                                                        <Ionicons name="business-outline" size={20} color="#10B981" />
+                                                    </View>
+                                                    <View style={styles.infoContent}>
+                                                        <Text style={styles.infoLabel}>
+                                                            Assigned Clients ({user.clients.length})
+                                                        </Text>
+                                                        <Text style={[styles.infoValue, { color: '#10B981', fontWeight: '700' }]}>
+                                                            Multiple clients assigned
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                                
+                                                {/* List all assigned clients */}
+                                                {user.clients.map((client: any, index: number) => (
+                                                    <View key={client.clientId || index} style={[styles.infoRow, { paddingLeft: 20 }]}>
+                                                        <View style={styles.infoIconContainer}>
+                                                            <Ionicons name="arrow-forward" size={16} color="#64748B" />
+                                                        </View>
+                                                        <View style={styles.infoContent}>
+                                                            <Text style={styles.infoLabel}>
+                                                                Client {index + 1}
+                                                                {client.assignedAt && (
+                                                                    <Text style={{ fontSize: 10, color: '#94A3B8' }}>
+                                                                        {' '}• Assigned {new Date(client.assignedAt).toLocaleDateString()}
+                                                                    </Text>
+                                                                )}
+                                                            </Text>
+                                                            <Text style={styles.infoValue}>
+                                                                {client.clientName || 'Unknown Client'}
+                                                            </Text>
+                                                            {client.clientId && (
+                                                                <Text style={[styles.infoLabel, { fontSize: 10, marginTop: 2 }]}>
+                                                                    ID: {client.clientId}
+                                                                </Text>
+                                                            )}
+                                                        </View>
+                                                    </View>
+                                                ))}
+                                            </>
+                                        ) : (
+                                            <View style={styles.infoRow}>
+                                                <View style={styles.infoIconContainer}>
+                                                    <Ionicons name="alert-circle-outline" size={20} color="#F59E0B" />
+                                                </View>
+                                                <View style={styles.infoContent}>
+                                                    <Text style={styles.infoLabel}>Assignment Status</Text>
+                                                    <Text style={[styles.infoValue, { color: '#F59E0B' }]}>
+                                                        Not assigned to any client yet
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                        )}
+                                    </>
+                                ) : (
+                                    /* For Non-Staff Users - Show full client information */
+                                    <>
+                                        {clientData.companyName && (
+                                            <View style={styles.infoRow}>
+                                                <View style={styles.infoIconContainer}>
+                                                    <Ionicons name="business-outline" size={20} color="#64748B" />
+                                                </View>
+                                                <View style={styles.infoContent}>
+                                                    <Text style={styles.infoLabel}>Company Name</Text>
+                                                    <Text style={styles.infoValue}>{clientData.companyName}</Text>
+                                                </View>
+                                            </View>
+                                        )}
 
-                                {clientData.email && (
-                                    <View style={styles.infoRow}>
-                                        <View style={styles.infoIconContainer}>
-                                            <Ionicons name="mail-outline" size={20} color="#64748B" />
-                                        </View>
-                                        <View style={styles.infoContent}>
-                                            <Text style={styles.infoLabel}>Email</Text>
-                                            <Text style={styles.infoValue}>{clientData.email}</Text>
-                                        </View>
-                                    </View>
-                                )}
+                                        {clientData.email && (
+                                            <View style={styles.infoRow}>
+                                                <View style={styles.infoIconContainer}>
+                                                    <Ionicons name="mail-outline" size={20} color="#64748B" />
+                                                </View>
+                                                <View style={styles.infoContent}>
+                                                    <Text style={styles.infoLabel}>Email</Text>
+                                                    <Text style={styles.infoValue}>{clientData.email}</Text>
+                                                </View>
+                                            </View>
+                                        )}
 
-                                {clientData.phone && (
-                                    <View style={styles.infoRow}>
-                                        <View style={styles.infoIconContainer}>
-                                            <Ionicons name="call-outline" size={20} color="#64748B" />
-                                        </View>
-                                        <View style={styles.infoContent}>
-                                            <Text style={styles.infoLabel}>Phone</Text>
-                                            <Text style={styles.infoValue}>{clientData.phone}</Text>
-                                        </View>
-                                    </View>
-                                )}
+                                        {clientData.phone && (
+                                            <View style={styles.infoRow}>
+                                                <View style={styles.infoIconContainer}>
+                                                    <Ionicons name="call-outline" size={20} color="#64748B" />
+                                                </View>
+                                                <View style={styles.infoContent}>
+                                                    <Text style={styles.infoLabel}>Phone</Text>
+                                                    <Text style={styles.infoValue}>{clientData.phone}</Text>
+                                                </View>
+                                            </View>
+                                        )}
 
-                                {clientData.gstNumber && (
-                                    <View style={styles.infoRow}>
-                                        <View style={styles.infoIconContainer}>
-                                            <Ionicons name="document-text-outline" size={20} color="#64748B" />
-                                        </View>
-                                        <View style={styles.infoContent}>
-                                            <Text style={styles.infoLabel}>GST Number</Text>
-                                            <Text style={styles.infoValue}>{clientData.gstNumber}</Text>
-                                        </View>
-                                    </View>
-                                )}
+                                        {clientData.gstNumber && (
+                                            <View style={styles.infoRow}>
+                                                <View style={styles.infoIconContainer}>
+                                                    <Ionicons name="document-text-outline" size={20} color="#64748B" />
+                                                </View>
+                                                <View style={styles.infoContent}>
+                                                    <Text style={styles.infoLabel}>GST Number</Text>
+                                                    <Text style={styles.infoValue}>{clientData.gstNumber}</Text>
+                                                </View>
+                                            </View>
+                                        )}
 
-                                {clientData.address && (
-                                    <View style={styles.infoRow}>
-                                        <View style={styles.infoIconContainer}>
-                                            <Ionicons name="location-outline" size={20} color="#64748B" />
-                                        </View>
-                                        <View style={styles.infoContent}>
-                                            <Text style={styles.infoLabel}>Address</Text>
-                                            <Text style={styles.infoValue}>
-                                                {clientData.address}
-                                                {clientData.city && `, ${clientData.city}`}
-                                                {clientData.state && `, ${clientData.state}`}
-                                                {clientData.country && `, ${clientData.country}`}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                )}
+                                        {clientData.address && (
+                                            <View style={styles.infoRow}>
+                                                <View style={styles.infoIconContainer}>
+                                                    <Ionicons name="location-outline" size={20} color="#64748B" />
+                                                </View>
+                                                <View style={styles.infoContent}>
+                                                    <Text style={styles.infoLabel}>Address</Text>
+                                                    <Text style={styles.infoValue}>
+                                                        {clientData.address}
+                                                        {clientData.city && `, ${clientData.city}`}
+                                                        {clientData.state && `, ${clientData.state}`}
+                                                        {clientData.country && `, ${clientData.country}`}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                        )}
 
-                                {!clientData.email && !clientData.phone && (
-                                    <View style={styles.infoRow}>
-                                        <View style={styles.infoIconContainer}>
-                                            <Ionicons name="alert-circle-outline" size={20} color="#F59E0B" />
-                                        </View>
-                                        <View style={styles.infoContent}>
-                                            <Text style={styles.infoLabel}>No Data</Text>
-                                            <Text style={styles.infoValue}>Client information not available</Text>
-                                        </View>
-                                    </View>
+                                        {!clientData.email && !clientData.phone && (
+                                            <View style={styles.infoRow}>
+                                                <View style={styles.infoIconContainer}>
+                                                    <Ionicons name="alert-circle-outline" size={20} color="#F59E0B" />
+                                                </View>
+                                                <View style={styles.infoContent}>
+                                                    <Text style={styles.infoLabel}>No Data</Text>
+                                                    <Text style={styles.infoValue}>Client information not available</Text>
+                                                </View>
+                                            </View>
+                                        )}
+                                    </>
                                 )}
                             </>
                         )}
                     </View>
                 </View>
 
+                {/* Assigned Projects Section - Only for Staff */}
+                {isCurrentUserStaff && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Assigned Projects</Text>
+                        <View style={styles.infoCard}>
+                            {user && 'assignedProjects' in user && user.assignedProjects && user.assignedProjects.length > 0 ? (
+                                <>
+                                    <View style={styles.infoRow}>
+                                        <View style={styles.infoIconContainer}>
+                                            <Ionicons name="folder-open-outline" size={20} color="#3B82F6" />
+                                        </View>
+                                        <View style={styles.infoContent}>
+                                            <Text style={styles.infoLabel}>
+                                                Total Projects ({user.assignedProjects.length})
+                                            </Text>
+                                            <Text style={[styles.infoValue, { color: '#3B82F6', fontWeight: '700' }]}>
+                                                Working on multiple projects
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    
+                                    {/* List all assigned projects */}
+                                    {user.assignedProjects.map((project: any, index: number) => (
+                                        <View key={project.projectId || index} style={[styles.infoRow, { paddingLeft: 20 }]}>
+                                            <View style={styles.infoIconContainer}>
+                                                <Ionicons 
+                                                    name={project.status === 'active' ? 'play-circle' : 
+                                                          project.status === 'completed' ? 'checkmark-circle' : 'pause-circle'} 
+                                                    size={16} 
+                                                    color={project.status === 'active' ? '#10B981' : 
+                                                           project.status === 'completed' ? '#3B82F6' : '#F59E0B'} 
+                                                />
+                                            </View>
+                                            <View style={styles.infoContent}>
+                                                <Text style={styles.infoLabel}>
+                                                    Project {index + 1}
+                                                    {project.assignedAt && (
+                                                        <Text style={{ fontSize: 10, color: '#94A3B8' }}>
+                                                            {' '}• Assigned {new Date(project.assignedAt).toLocaleDateString()}
+                                                        </Text>
+                                                    )}
+                                                    <Text style={{ 
+                                                        fontSize: 10, 
+                                                        color: project.status === 'active' ? '#10B981' : 
+                                                               project.status === 'completed' ? '#3B82F6' : '#F59E0B',
+                                                        fontWeight: '600',
+                                                        marginLeft: 8
+                                                    }}>
+                                                        • {project.status?.toUpperCase() || 'ACTIVE'}
+                                                    </Text>
+                                                </Text>
+                                                <Text style={styles.infoValue}>
+                                                    {project.projectName || 'Unknown Project'}
+                                                </Text>
+                                                <Text style={[styles.infoLabel, { fontSize: 11, marginTop: 2 }]}>
+                                                    Client: {project.clientName || 'Unknown Client'}
+                                                </Text>
+                                                {project.projectId && (
+                                                    <Text style={[styles.infoLabel, { fontSize: 10, marginTop: 1 }]}>
+                                                        ID: {project.projectId}
+                                                    </Text>
+                                                )}
+                                            </View>
+                                        </View>
+                                    ))}
+                                </>
+                            ) : (
+                                <View style={styles.infoRow}>
+                                    <View style={styles.infoIconContainer}>
+                                        <Ionicons name="folder-outline" size={20} color="#94A3B8" />
+                                    </View>
+                                    <View style={styles.infoContent}>
+                                        <Text style={styles.infoLabel}>Project Status</Text>
+                                        <Text style={[styles.infoValue, { color: '#94A3B8' }]}>
+                                            No projects assigned yet
+                                        </Text>
+                                    </View>
+                                </View>
+                            )}
+                        </View>
+                    </View>
+                )}
+
+                {/* QR Code Section - Only for assigned staff */}
+                {isCurrentUserStaff && user && userData.clientId && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>📱 Share Your QR Code</Text>
+                        
+                        <View style={styles.infoCard}>
+                            <TouchableOpacity
+                                style={styles.qrCodeButton}
+                                onPress={() => setShowQRCode(true)}
+                                activeOpacity={0.7}
+                            >
+                                <View style={styles.qrCodeButtonLeft}>
+                                    <View style={styles.qrCodeButtonIcon}>
+                                        <Ionicons name="qr-code-outline" size={22} color="#8B5CF6" />
+                                    </View>
+                                    <View style={styles.qrCodeButtonContent}>
+                                        <Text style={styles.qrCodeButtonTitle}>View QR Code</Text>
+                                        <Text style={styles.qrCodeButtonSubtitle}>
+                                            Show your QR code for project management
+                                        </Text>
+                                    </View>
+                                </View>
+                                <View style={styles.qrCodeButtonBadge}>
+                                    <Ionicons name="scan" size={16} color="#8B5CF6" />
+                                </View>
+                            </TouchableOpacity>
+
+                            {/* Share Button for assigned staff */}
+                            <TouchableOpacity
+                                style={[styles.shareButton, styles.shareButtonSecondary, isSharing && styles.shareButtonDisabled]}
+                                onPress={() => {
+                                    // First show the QR code modal, then allow sharing from there
+                                    setShowQRCode(true);
+                                }}
+                                activeOpacity={0.7}
+                                disabled={isSharing}
+                            >
+                                <Ionicons name="share-outline" size={18} color="#8B5CF6" />
+                                <Text style={styles.shareButtonSecondaryText}>Share QR Code</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
+
                 {/* Account Info */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Account Information</Text>
+                    <Text style={styles.sectionTitle}>
+                        {isCurrentUserStaff ? 'Staff Information' : 'Account Information'}
+                    </Text>
                     <View style={styles.infoCard}>
                         <View style={styles.infoRow}>
                             <View style={styles.infoIconContainer}>
@@ -561,7 +980,23 @@ const CompanyProfile: React.FC = () => {
                             </View>
                         )}
 
-                        {!loading && userData.clientId && (
+                        {/* Show role for staff users */}
+                        {isCurrentUserStaff && user && 'role' in user && (
+                            <View style={styles.infoRow}>
+                                <View style={styles.infoIconContainer}>
+                                    <Ionicons name="person-outline" size={20} color="#64748B" />
+                                </View>
+                                <View style={styles.infoContent}>
+                                    <Text style={styles.infoLabel}>Role</Text>
+                                    <Text style={styles.infoValue}>
+                                        {user.role.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                    </Text>
+                                </View>
+                            </View>
+                        )}
+
+                        {/* Show client ID for non-staff users */}
+                        {!isCurrentUserStaff && !loading && userData.clientId && (
                             <View style={styles.infoRow}>
                                 <View style={styles.infoIconContainer}>
                                     <Ionicons name="key-outline" size={20} color="#64748B" />
@@ -671,6 +1106,126 @@ const CompanyProfile: React.FC = () => {
                 clientData={clientData}
                 userData={userData}
             />
+
+            {/* QR Code Modal - Only for Staff with clients */}
+            {isCurrentUserStaff && user && userData.clientId && (
+                <Modal
+                    visible={showQRCode}
+                    transparent={true}
+                    animationType="fade"
+                    onRequestClose={() => setShowQRCode(false)}
+                >
+                    <View style={styles.qrModalOverlay}>
+                        <View style={styles.qrModalContainer}>
+                            <View style={styles.qrModalHeader}>
+                                <Text style={styles.qrModalTitle}>Staff QR Code</Text>
+                                <TouchableOpacity
+                                    style={styles.qrModalCloseButton}
+                                    onPress={() => setShowQRCode(false)}
+                                >
+                                    <Ionicons name="close" size={24} color="#64748B" />
+                                </TouchableOpacity>
+                            </View>
+                            
+                            <ViewShot ref={modalQRRef} options={{ format: 'png', quality: 1.0 }}>
+                                <View style={styles.qrCodeContainer}>
+                                    <QRCode
+                                        value={JSON.stringify({
+                                            staffId: user._id,
+                                            firstName: user.firstName || 'Staff',
+                                            lastName: user.lastName || 'Member',
+                                            email: user.email || '',
+                                            phoneNumber: user.phoneNumber || ('phone' in user ? user.phone : '') || '',
+                                            role: 'role' in user ? user.role : 'staff',
+                                            timestamp: new Date().toISOString()
+                                        })}
+                                        size={200}
+                                        color="#1E293B"
+                                        backgroundColor="#FFFFFF"
+                                    />
+                                    <View style={styles.modalQrCodeInfo}>
+                                        <Text style={styles.modalQrCodeTitle}>Staff QR Code</Text>
+                                        <Text style={styles.modalQrCodeSubtitle}>
+                                            {`${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Staff Member'}
+                                        </Text>
+                                        <Text style={styles.modalQrCodeId}>ID: {user._id}</Text>
+                                    </View>
+                                </View>
+                            </ViewShot>
+                            
+                            {/* Debug: Show QR Data */}
+                            <TouchableOpacity
+                                style={styles.debugButton}
+                                onPress={() => {
+                                    const qrData = JSON.stringify({
+                                        staffId: user._id,
+                                        firstName: user.firstName || 'Staff',
+                                        lastName: user.lastName || 'Member',
+                                        email: user.email || '',
+                                        phoneNumber: user.phoneNumber || ('phone' in user ? user.phone : '') || '',
+                                        role: 'role' in user ? user.role : 'staff',
+                                        timestamp: new Date().toISOString()
+                                    }, null, 2);
+                                    Alert.alert('QR Code Data', qrData);
+                                }}
+                            >
+                                <Text style={styles.debugButtonText}>Show QR Data</Text>
+                            </TouchableOpacity>
+                            
+                            <View style={styles.qrInfoContainer}>
+                                <Text style={styles.qrInfoTitle}>Staff Information</Text>
+                                <View style={styles.qrInfoRow}>
+                                    <Text style={styles.qrInfoLabel}>Name:</Text>
+                                    <Text style={styles.qrInfoValue}>
+                                        {`${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Staff Member'}
+                                    </Text>
+                                </View>
+                                <View style={styles.qrInfoRow}>
+                                    <Text style={styles.qrInfoLabel}>Role:</Text>
+                                    <Text style={styles.qrInfoValue}>
+                                        {'role' in user ? user.role?.replace('-', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 'Staff' : 'Staff'}
+                                    </Text>
+                                </View>
+                                <View style={styles.qrInfoRow}>
+                                    <Text style={styles.qrInfoLabel}>Staff ID:</Text>
+                                    <Text style={styles.qrInfoValue}>{user._id}</Text>
+                                </View>
+                                <View style={styles.qrInfoRow}>
+                                    <Text style={styles.qrInfoLabel}>Status:</Text>
+                                    <Text style={[styles.qrInfoValue, { 
+                                        color: userData.clientId ? '#10B981' : '#F59E0B' 
+                                    }]}>
+                                        {userData.clientId ? 'Assigned to Client' : 'Not Assigned'}
+                                    </Text>
+                                </View>
+                            </View>
+                            
+                            <Text style={styles.qrInstructions}>
+                                This QR code contains your complete staff information. {userData.clientId 
+                                    ? "Ask your admin to scan this to manage your project assignments."
+                                    : "Ask your admin to scan this to assign you to their client organization and projects."}
+                            </Text>
+
+                            {/* Share Button in Modal */}
+                            <TouchableOpacity
+                                style={[styles.modalShareButton, isSharing && styles.shareButtonDisabled]}
+                                onPress={() => shareQRCode(modalQRRef)}
+                                activeOpacity={0.7}
+                                disabled={isSharing}
+                            >
+                                <Ionicons 
+                                    name={isSharing ? "hourglass-outline" : "share-outline"} 
+                                    size={18} 
+                                    color="#3B82F6" 
+                                />
+                                <Text style={styles.modalShareButtonText}>
+                                    {isSharing ? 'Sharing...' : 'Share This QR Code'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </Modal>
+            )}
         </SafeAreaView>
     );
 };
@@ -732,6 +1287,22 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '600',
         color: '#3B82F6',
+    },
+    staffBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#ECFDF5',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
+        gap: 6,
+        borderWidth: 1,
+        borderColor: '#BBF7D0',
+    },
+    staffBadgeText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#10B981',
     },
     statsContainer: {
         padding: 16,
@@ -809,6 +1380,18 @@ const styles = StyleSheet.create({
         elevation: 1,
         borderWidth: 1,
         borderColor: '#F1F5F9',
+    },
+    urgentCard: {
+        borderColor: '#FED7AA',
+        backgroundColor: '#FFFBEB',
+        shadowColor: '#F59E0B',
+        shadowOpacity: 0.1,
+    },
+    shareCard: {
+        borderColor: '#DBEAFE',
+        backgroundColor: '#F8FAFC',
+        shadowColor: '#3B82F6',
+        shadowOpacity: 0.1,
     },
     infoRow: {
         flexDirection: 'row',
@@ -1011,6 +1594,333 @@ const styles = StyleSheet.create({
         backgroundColor: '#ECFDF5',
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    // QR Code button styles
+    qrCodeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
+        borderWidth: 1,
+        borderColor: '#E9D5FF',
+    },
+    qrCodeButtonLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    qrCodeButtonIcon: {
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: '#F3E8FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    qrCodeButtonContent: {
+        flex: 1,
+    },
+    qrCodeButtonTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1E293B',
+        marginBottom: 2,
+    },
+    qrCodeButtonSubtitle: {
+        fontSize: 13,
+        color: '#64748B',
+    },
+    qrCodeButtonBadge: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        backgroundColor: '#F3E8FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    // QR Code modal styles
+    qrModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    qrModalContainer: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 20,
+        padding: 24,
+        width: '100%',
+        maxWidth: 350,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.25,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    qrModalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        width: '100%',
+        marginBottom: 24,
+    },
+    qrModalTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#1E293B',
+    },
+    qrModalCloseButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#F8FAFC',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    qrCodeContainer: {
+        padding: 20,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        marginBottom: 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    qrInfoContainer: {
+        width: '100%',
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+    },
+    qrInfoTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#374151',
+        marginBottom: 12,
+        textAlign: 'center',
+    },
+    qrInfoRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    qrInfoLabel: {
+        fontSize: 13,
+        color: '#6B7280',
+        fontWeight: '500',
+    },
+    qrInfoValue: {
+        fontSize: 13,
+        color: '#1F2937',
+        fontWeight: '600',
+        flex: 1,
+        textAlign: 'right',
+        marginLeft: 12,
+    },
+    qrInstructions: {
+        fontSize: 12,
+        color: '#6B7280',
+        textAlign: 'center',
+        lineHeight: 18,
+        paddingHorizontal: 8,
+    },
+    // Debug button styles
+    debugButton: {
+        backgroundColor: '#F3F4F6',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 8,
+        marginTop: 12,
+        borderWidth: 1,
+        borderColor: '#D1D5DB',
+    },
+    debugButtonText: {
+        fontSize: 12,
+        color: '#6B7280',
+        textAlign: 'center',
+        fontWeight: '500',
+    },
+    // Embedded QR code styles for staff
+    embeddedQrContainer: {
+        alignItems: 'center',
+        padding: 20,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        marginBottom: 16,
+    },
+    embeddedQrInfo: {
+        alignItems: 'center',
+    },
+    embeddedQrTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#374151',
+        marginBottom: 4,
+    },
+    embeddedQrId: {
+        fontSize: 12,
+        fontFamily: 'monospace',
+        color: '#6B7280',
+        backgroundColor: '#F3F4F6',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+        marginBottom: 12,
+    },
+    embeddedQrInstructions: {
+        fontSize: 12,
+        color: '#6B7280',
+        textAlign: 'center',
+        lineHeight: 16,
+    },
+    // Share functionality styles
+    shareHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    shareIconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 12,
+        backgroundColor: '#EFF6FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    shareContent: {
+        flex: 1,
+    },
+    shareTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1E293B',
+        marginBottom: 2,
+    },
+    shareSubtitle: {
+        fontSize: 13,
+        color: '#64748B',
+    },
+    shareButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#3B82F6',
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 10,
+        marginTop: 16,
+        gap: 8,
+    },
+    shareButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#FFFFFF',
+    },
+    shareButtonSecondary: {
+        backgroundColor: '#F3E8FF',
+        borderWidth: 1,
+        borderColor: '#E9D5FF',
+        marginTop: 12,
+    },
+    shareButtonSecondaryText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#8B5CF6',
+    },
+    shareButtonDisabled: {
+        opacity: 0.6,
+    },
+    // QR Code info styles
+    qrCodeInfo: {
+        alignItems: 'center',
+        marginTop: 16,
+        paddingTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: '#E5E7EB',
+    },
+    qrCodeTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#374151',
+        marginBottom: 4,
+    },
+    qrCodeSubtitle: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#1F2937',
+        marginBottom: 2,
+    },
+    qrCodeId: {
+        fontSize: 11,
+        fontFamily: 'monospace',
+        color: '#6B7280',
+        backgroundColor: '#F3F4F6',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    // Modal QR Code info styles
+    modalQrCodeInfo: {
+        alignItems: 'center',
+        marginTop: 16,
+        paddingTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: '#E5E7EB',
+    },
+    modalQrCodeTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#374151',
+        marginBottom: 4,
+    },
+    modalQrCodeSubtitle: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#1F2937',
+        marginBottom: 4,
+    },
+    modalQrCodeId: {
+        fontSize: 12,
+        fontFamily: 'monospace',
+        color: '#6B7280',
+        backgroundColor: '#F3F4F6',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 4,
+    },
+    // Modal share button styles
+    modalShareButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#EFF6FF',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 8,
+        marginTop: 16,
+        gap: 6,
+        borderWidth: 1,
+        borderColor: '#DBEAFE',
+    },
+    modalShareButtonText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#3B82F6',
     },
 });
 

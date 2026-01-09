@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
+import axios from 'axios';
+import { domain } from '@/lib/domain';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -47,12 +49,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // Check if user is staff
             const isStaff = data.role && ['site-engineer', 'supervisor', 'manager'].includes(data.role);
             
-            // For staff users with clientIds array
+            // For staff users with clients array
             if (isStaff) {
               console.log('👷 Staff user detected');
               
-              // Allow staff to login even without clientIds (they'll see the QR screen)
-              if (!data.clientIds || data.clientIds.length === 0) {
+              // Allow staff to login even without clients (they'll see the QR screen)
+              if (!data.clients || data.clients.length === 0) {
                 console.log('⚠️ Staff user with no clients - allowing login to show QR screen');
                 setIsAuthenticated(true);
                 setUser(data);
@@ -61,8 +63,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 return;
               }
               
-              // Staff with clients - use first clientId
-              const extractedClientId = data.clientIds[0];
+              // Staff with clients - use first client's clientId
+              const extractedClientId = data.clients[0].clientId;
               console.log('👥 Staff user with clients, using first clientId:', extractedClientId);
               setIsAuthenticated(true);
               setUser(data);
@@ -191,9 +193,90 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => clearInterval(checkAuthInterval);
   }, []);
 
+  const fetchFreshUserData = async (userEmail: string, userType: string) => {
+    try {
+      console.log('🌐 Fetching fresh user data from server...');
+      console.log('   Email:', userEmail);
+      console.log('   UserType:', userType);
+
+      // Determine the correct endpoint based on userType
+      const endpoint = userType === 'staff' 
+        ? `${domain}/api/staff?email=${userEmail}`
+        : `${domain}/api/${userType}?email=${userEmail}`;
+
+      console.log('   URL:', endpoint);
+
+      const response = await axios.get(endpoint);
+      console.log('📦 Fresh data response status:', response.status);
+
+      if (response.status === 200) {
+        const freshUserData = response.data.data;
+        console.log('✅ Fresh user data received:', {
+          _id: freshUserData?._id,
+          email: freshUserData?.email,
+          clients: freshUserData?.clients,
+          clientsLength: freshUserData?.clients?.length || 0
+        });
+        return freshUserData;
+      }
+      return null;
+    } catch (error) {
+      console.error('❌ Failed to fetch fresh user data:', error);
+      return null;
+    }
+  };
+
   const forceRefresh = async () => {
-    console.log('🔄 Force refresh triggered from AuthContext...');
-    await checkAuthStatus();
+    console.log('🔄 Force refresh triggered - fetching fresh data from server...');
+    
+    try {
+      // Get current user data from storage
+      const userDetails = await AsyncStorage.getItem("user");
+      if (!userDetails) {
+        console.log('❌ No user data in storage to refresh');
+        return;
+      }
+
+      const currentUser = JSON.parse(userDetails);
+      if (!currentUser.email) {
+        console.log('❌ No email found in current user data');
+        return;
+      }
+
+      // Determine user type
+      const userType = currentUser.role ? 'staff' : (currentUser.userType || 'clients');
+      
+      // Fetch fresh data from server
+      const freshUserData = await fetchFreshUserData(currentUser.email, userType);
+      
+      if (freshUserData) {
+        // Merge fresh data with existing data, preserving important fields
+        const updatedUserData = {
+          ...currentUser,
+          ...freshUserData,
+          userType: userType // Ensure userType is preserved
+        };
+
+        console.log('💾 Updating storage with fresh data...');
+        console.log('   Old clients:', currentUser.clients);
+        console.log('   New clients:', freshUserData.clients);
+
+        // Update AsyncStorage with fresh data
+        await AsyncStorage.setItem('user', JSON.stringify(updatedUserData));
+        
+        // Update auth state by calling checkAuthStatus
+        await checkAuthStatus();
+        
+        console.log('✅ Force refresh completed with fresh server data');
+      } else {
+        console.log('⚠️ Could not fetch fresh data, falling back to local refresh');
+        await checkAuthStatus();
+      }
+    } catch (error) {
+      console.error('❌ Error during force refresh:', error);
+      // Fallback to local refresh
+      await checkAuthStatus();
+    }
   };
 
   const value: AuthContextType = {

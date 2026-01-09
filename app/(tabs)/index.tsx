@@ -43,11 +43,11 @@ const Index: React.FC = () => {
     const [itemsPerPage] = useState(10);
 
     // Get user role for access control
-    const { user } = useUser();
+    const { user, refreshUser } = useUser();
     const userIsAdmin = isAdmin(user);
     
     // Check if user is a client (has clientId but is not staff)
-    const isClient = user && user.clientId && !('role' in user);
+    const isClient = user && 'clientId' in user && !('role' in user);
     
     // Check if user is staff (has role field)
     const isStaff = user && 'role' in user;
@@ -58,6 +58,7 @@ const Index: React.FC = () => {
     // Performance optimization
     const isLoadingRef = React.useRef(false);
     const lastLoadTimeRef = React.useRef<number>(0);
+    const isInitializedRef = React.useRef(false);
     const DEBOUNCE_DELAY = 500;
 
     // Fetch project data function with pagination
@@ -76,6 +77,12 @@ const Index: React.FC = () => {
         }
         lastLoadTimeRef.current = now;
 
+        // Wait for user data to be available
+        if (!user) {
+            console.log('⏳ User data not available, skipping project fetch');
+            return;
+        }
+
         try {
             isLoadingRef.current = true;
             if (showLoadingState) {
@@ -86,9 +93,85 @@ const Index: React.FC = () => {
             const clientId = await getClientId();
             setClientId(clientId);
 
-            // ✅ Only fetch projects if clientId exists
-            if (clientId) {
-                const { projects: projectData, meta } = await getProjectData(clientId, page, itemsPerPage);
+            // ✅ Check if user is staff and handle assigned projects
+            const isStaff = user && 'role' in user;
+            
+            if (isStaff && user) {
+                console.log('👤 Staff user detected - fetching staff data with populated projects');
+                
+                try {
+                    // ✅ OPTIMIZED APPROACH: Fetch staff data with populated projects in one API call
+                    // For staff users, we need ALL their assigned projects from ALL clients, not just one client
+                    console.log('🔄 Fetching staff data with ALL populated assignedProjects...');
+                    const response = await axios.get(`${domain}/api/users/staff?id=${user._id}&getAllProjects=true`);
+                    const responseData = response.data as any;
+                    
+                    if (responseData.success && responseData.data) {
+                        const staffData = responseData.data;
+                        console.log('✅ Staff data fetched:', staffData);
+                        
+                        // Extract populated project data from assignedProjects
+                        if (staffData.assignedProjects && Array.isArray(staffData.assignedProjects) && staffData.assignedProjects.length > 0) {
+                            const populatedProjects = staffData.assignedProjects
+                                .map((assignment: any) => {
+                                    const projectData = assignment.projectData || assignment.projectId;
+                                    if (projectData && projectData._id) {
+                                        // Add client information to the project data
+                                        return {
+                                            ...projectData,
+                                            clientName: assignment.clientName || 'Unknown Client',
+                                            clientId: assignment.clientId
+                                        };
+                                    }
+                                    return null;
+                                })
+                                .filter((project: any) => project !== null); // Filter out null/invalid projects
+                            
+                            console.log(`📊 Found ${populatedProjects.length} populated projects for staff user`);
+                            
+                            if (populatedProjects.length > 0) {
+                                // ✅ Show ALL assigned projects for staff users
+                                console.log(`📄 Showing all ${populatedProjects.length} assigned projects for staff user`);
+                                
+                                setProjects(populatedProjects); // Show ALL assigned projects
+                                setCurrentPage(1); // Always page 1 for staff
+                                setTotalPages(1); // Only 1 page since we show all
+                                setTotalProjects(populatedProjects.length);
+                                setHasNextPage(false); // No pagination for staff
+                                setHasPrevPage(false); // No pagination for staff
+                                return;
+                            } else {
+                                console.log('❌ No valid populated projects found');
+                            }
+                        } else {
+                            console.log('⚠️ Staff has no assigned projects or assignedProjects is empty');
+                        }
+                    } else {
+                        console.log('❌ Failed to fetch staff data or invalid response structure');
+                    }
+                } catch (error) {
+                    console.error('❌ Error fetching staff data with populated projects:', error);
+                    setError('Failed to fetch assigned projects');
+                }
+                
+                // If we reach here, no projects were found
+                console.log('📭 No assigned projects found for staff user - showing empty state');
+                setProjects([]);
+                setCurrentPage(1);
+                setTotalPages(1);
+                setTotalProjects(0);
+                setHasNextPage(false);
+                setHasPrevPage(false);
+                
+            } else if (clientId) {
+                // For non-staff users (admin/client), fetch all client projects
+                console.log('👔 Admin/Client user detected - fetching all client projects');
+                
+                const { projects: projectData, meta } = await getProjectData(
+                    clientId, 
+                    page, 
+                    itemsPerPage
+                );
                 setProjects(Array.isArray(projectData) ? projectData : []);
 
                 // Update pagination state
@@ -101,7 +184,11 @@ const Index: React.FC = () => {
                 // No clientId - staff without clients
                 console.log('⚠️ No clientId - skipping project fetch');
                 setProjects([]);
-                setLoading(false);
+                setCurrentPage(1);
+                setTotalPages(1);
+                setTotalProjects(0);
+                setHasNextPage(false);
+                setHasPrevPage(false);
             }
         } catch (error) {
             console.error('Failed to fetch projects:', error);
@@ -161,8 +248,39 @@ const Index: React.FC = () => {
 
     // Initial data fetch
     useEffect(() => {
-        fetchProjectData(1);
-    }, []);
+        const initializeData = async () => {
+            // Prevent multiple initializations
+            if (isInitializedRef.current) {
+                console.log('⏸️ Already initialized, skipping...');
+                return;
+            }
+            
+            // Wait for user data to be available before fetching projects
+            if (!user) {
+                console.log('⏳ User data not available yet, waiting...');
+                return;
+            }
+            
+            console.log('🚀 Initializing data with user:', user);
+            isInitializedRef.current = true;
+            
+            // For staff users, refresh user data first to ensure we have latest assignedProjects
+            if (user && 'role' in user) {
+                console.log('🔄 Staff user detected - refreshing user data to get latest assignedProjects');
+                try {
+                    await refreshUser();
+                    console.log('✅ User data refreshed successfully');
+                } catch (error) {
+                    console.error('❌ Failed to refresh user data:', error);
+                }
+            }
+            
+            // Then fetch project data
+            fetchProjectData(1);
+        };
+        
+        initializeData();
+    }, [user?._id]); // Only depend on user ID to prevent infinite loops
 
     // Pull to refresh handler
     const onRefresh = async () => {
@@ -174,6 +292,7 @@ const Index: React.FC = () => {
         setRefreshing(true);
         try {
             setCurrentPage(1); // Reset to first page on refresh
+            isInitializedRef.current = false; // Reset initialization flag to allow fresh data fetch
             await fetchProjectData(1, false); // Don't show loading state during refresh
         } finally {
             setRefreshing(false);
@@ -385,8 +504,8 @@ const Index: React.FC = () => {
                                     </View>
                                 ))}
 
-                                {/* Pagination Controls */}
-                                {totalPages > 1 && (
+                                {/* Pagination Controls - Only show for admin/client users, not staff */}
+                                {totalPages > 1 && !isStaff && (
                                     <View style={styles.paginationContainer}>
                                         <View style={styles.paginationInfo}>
                                             <Text style={styles.paginationText}>

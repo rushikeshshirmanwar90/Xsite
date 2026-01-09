@@ -35,7 +35,15 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails }) => 
                     <View style={styles.badgeRow}>
                     </View>
                 </View>
-                <Text style={styles.projectTitle}>{project.name}</Text>
+                <View style={styles.projectTitleContainer}>
+                    <Text style={styles.projectTitle}>{project.name}</Text>
+                    {project.clientName && (
+                        <View style={styles.clientBadge}>
+                            <Ionicons name="business-outline" size={12} color="#6B7280" />
+                            <Text style={styles.clientName}>{project.clientName}</Text>
+                        </View>
+                    )}
+                </View>
             </View>
 
             <View style={styles.cardBody}>
@@ -374,6 +382,31 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#1F2937',
         letterSpacing: -0.3,
+        flex: 1,
+    },
+    projectTitleContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+    },
+    clientBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        gap: 4,
+    },
+    clientName: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#6B7280',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     overdueWarning: {
         flexDirection: 'row',

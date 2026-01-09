@@ -173,7 +173,7 @@ const AddStaffModalWithVerification: React.FC<AddStaffModalProps> = ({ visible, 
             phoneNumber: phoneNumber.trim(),
             email: email.trim().toLowerCase(),
             role,
-            assignedProjects: []
+            assignedProjects: [] // This will be an empty array of ProjectAssignment objects
         };
 
         console.log('✅ Adding verified staff:', newStaff);

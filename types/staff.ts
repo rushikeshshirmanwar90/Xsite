@@ -1,5 +1,15 @@
 import { Project } from "./project";
 
+// Project assignment interface to match backend structure
+export interface ProjectAssignment {
+  projectId: string;
+  projectName: string;
+  clientId: string;
+  clientName: string;
+  assignedAt: string;
+  status: "active" | "completed" | "paused";
+}
+
 // types/Staff.ts
 export interface Staff {
   _id?: string;
@@ -7,7 +17,7 @@ export interface Staff {
   lastName: string;
   phoneNumber: string;
   email: string;
-  assignedProjects: string[];
+  assignedProjects: ProjectAssignment[]; // Updated to match backend structure
   role: string;
   clientId?: string;
   emailVerified?: boolean;

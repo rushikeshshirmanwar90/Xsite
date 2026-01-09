@@ -15,13 +15,19 @@ export const getClientId = async () => {
         console.log('📝 Has _id?', !!userDetails?._id);
         console.log('📝 Has clientId?', !!userDetails?.clientId);
         console.log('📝 Has clientIds?', !!userDetails?.clientIds);
+        console.log('📝 Has clients?', !!userDetails?.clients);
 
-        // ✅ Handle both clientId (single) and clientIds (array) for staff users
+        // ✅ Handle both clientId (single) and clients (array) for staff users
         let clientId = '';
         
-        // For staff users with clientIds array, use the first one
-        if (userDetails?.clientIds && Array.isArray(userDetails.clientIds) && userDetails.clientIds.length > 0) {
-            console.log('👥 Staff user with clientIds array, using first clientId');
+        // For staff users with clients array, use the first one
+        if (userDetails?.clients && Array.isArray(userDetails.clients) && userDetails.clients.length > 0) {
+            console.log('👥 Staff user with clients array, using first clientId');
+            clientId = userDetails.clients[0].clientId;
+        } 
+        // Legacy support: For staff users with clientIds array (old format)
+        else if (userDetails?.clientIds && Array.isArray(userDetails.clientIds) && userDetails.clientIds.length > 0) {
+            console.log('👥 Staff user with legacy clientIds array, using first clientId');
             clientId = userDetails.clientIds[0];
         } 
         // For other users with single clientId

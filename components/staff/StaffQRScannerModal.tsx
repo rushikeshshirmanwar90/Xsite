@@ -8,15 +8,14 @@ import {
   Alert,
   ActivityIndicator,
   Dimensions,
-  Image,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import { X, QrCode, UserPlus, Upload, Camera } from 'lucide-react-native';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { X } from 'lucide-react-native';
 import axios from 'axios';
 import { domain } from '@/lib/domain';
 import { toast } from 'sonner-native';
-import jsQR from 'jsqr';
 
 interface StaffQRScannerModalProps {
   visible: boolean;
@@ -45,15 +44,11 @@ const StaffQRScannerModal: React.FC<StaffQRScannerModalProps> = ({
   const [scanned, setScanned] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
   const [scannedData, setScannedData] = useState<ScannedStaffData | null>(null);
-  const [showOptions, setShowOptions] = useState(true);
-  const [showCamera, setShowCamera] = useState(false);
 
   useEffect(() => {
     if (visible) {
       setScanned(false);
       setScannedData(null);
-      setShowOptions(true);
-      setShowCamera(false);
     }
   }, [visible]);
 
@@ -89,8 +84,6 @@ const StaffQRScannerModal: React.FC<StaffQRScannerModalProps> = ({
             onPress: () => {
               setScanned(false);
               setScannedData(null);
-              setShowOptions(true);
-              setShowCamera(false);
             },
           },
           {
@@ -110,8 +103,6 @@ const StaffQRScannerModal: React.FC<StaffQRScannerModalProps> = ({
             onPress: () => {
               setScanned(false);
               setScannedData(null);
-              setShowOptions(true);
-              setShowCamera(false);
             },
           },
         ]
@@ -121,115 +112,216 @@ const StaffQRScannerModal: React.FC<StaffQRScannerModalProps> = ({
 
   const handlePickImage = async () => {
     try {
+      console.log('📱 Starting image picker...');
+      
       // Request media library permissions
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       
       if (status !== 'granted') {
         Alert.alert(
           'Permission Required',
-          'Please grant media library permission to upload QR code images.'
+          'Please grant media library permission to upload QR code images.',
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+            {
+              text: 'Open Settings',
+              onPress: () => {
+                // On some platforms, you might want to open app settings
+                Alert.alert('Info', 'Please enable photo library access in your device settings.');
+              },
+            },
+          ]
         );
         return;
       }
 
-      // Launch image picker
+      console.log('✅ Media library permission granted');
+
+      // Launch image picker with optimized settings
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: false,
-        quality: 1,
+        quality: 0.8, // Reduce quality for faster processing
+        aspect: [1, 1], // Prefer square images for QR codes
+        allowsMultipleSelection: false,
       });
 
-      if (!result.canceled && result.assets[0]) {
-        setIsAssigning(true);
-        const imageUri = result.assets[0].uri;
-        console.log('📷 Image selected:', imageUri);
+      console.log('📷 Image picker result:', result);
 
-        // Decode QR code from image
-        await decodeQRFromImage(imageUri);
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+        const fileSize = result.assets[0].fileSize || 0;
+        
+        console.log('📷 Image selected:', imageUri);
+        console.log('� Filge size:', fileSize, 'bytes');
+        
+        // Check file size (limit to 10MB)
+        if (fileSize > 10 * 1024 * 1024) {
+          Alert.alert(
+            'File Too Large',
+            'Please select an image smaller than 10MB.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+        
+        setIsAssigning(true);
+        
+        // Add a small delay to show loading state
+        setTimeout(async () => {
+          try {
+            await decodeQRFromImage(imageUri);
+          } catch (error) {
+            console.error('❌ Error in decodeQRFromImage:', error);
+            setIsAssigning(false);
+          }
+        }, 100);
+        
+      } else {
+        console.log('📷 Image picker cancelled or no image selected');
       }
     } catch (error) {
       console.error('❌ Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
+      Alert.alert(
+        'Error',
+        'Failed to pick image. Please try again or use camera scanning instead.',
+        [{ text: 'OK' }]
+      );
       setIsAssigning(false);
     }
   };
 
   const decodeQRFromImage = async (imageUri: string) => {
     try {
-      // Create a canvas to read the image
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
+      console.log('📸 Starting QR code detection from image:', imageUri);
       
-      // Convert blob to base64
-      const reader = new FileReader();
-      reader.readAsDataURL(blob);
+      // Resize and optimize image for better QR detection using the new hook-based API
+      const manipulatedImage = await ImageManipulator.manipulateAsync(
+        imageUri,
+        [
+          { resize: { width: 800 } }, // Resize to reasonable size
+        ],
+        {
+          compress: 0.8,
+          format: ImageManipulator.SaveFormat.JPEG,
+          base64: true, // Get base64 for API upload
+        }
+      );
+
+      if (!manipulatedImage.base64) {
+        throw new Error('Failed to convert image to base64');
+      }
+
+      console.log('📸 Image processed, sending to QR detection API...');
+
+      // Use QR Server API for detection
+      const qrApiUrl = 'https://api.qrserver.com/v1/read-qr-code/';
       
-      reader.onloadend = () => {
-        const base64data = reader.result as string;
-        
-        // Create an image element
-        const img = new window.Image();
-        img.src = base64data;
-        
-        img.onload = () => {
-          // Create canvas
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          
-          if (!ctx) {
-            throw new Error('Could not get canvas context');
-          }
-          
-          canvas.width = img.width;
-          canvas.height = img.height;
-          ctx.drawImage(img, 0, 0);
-          
-          // Get image data
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          
-          // Decode QR code
-          const code = jsQR(imageData.data, imageData.width, imageData.height);
-          
-          setIsAssigning(false);
-          
-          if (code) {
-            console.log('✅ QR Code decoded from image:', code.data);
-            processQRData(code.data);
-          } else {
-            Alert.alert(
-              'No QR Code Found',
-              'Could not find a valid QR code in the selected image. Please try again with a clearer image.',
-              [
-                {
-                  text: 'OK',
-                  onPress: () => {
-                    setShowOptions(true);
-                    setShowCamera(false);
-                  },
-                },
-              ]
-            );
-          }
-        };
-        
-        img.onerror = () => {
-          setIsAssigning(false);
-          Alert.alert('Error', 'Failed to load image. Please try again.');
-        };
-      };
+      // Create form data for the API
+      const formData = new FormData();
+      formData.append('file', {
+        uri: manipulatedImage.uri,
+        type: 'image/jpeg',
+        name: 'qr-image.jpg',
+      } as any);
+
+      console.log('🌐 Sending request to QR detection API...');
       
-      reader.onerror = () => {
+      const response = await fetch(qrApiUrl, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`QR API request failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('📱 QR API response:', result);
+
+      // Check if QR code was detected
+      if (result && result[0] && result[0].symbol && result[0].symbol[0] && result[0].symbol[0].data) {
+        const qrData = result[0].symbol[0].data;
+        console.log('✅ QR code detected:', qrData);
+        
         setIsAssigning(false);
-        Alert.alert('Error', 'Failed to read image. Please try again.');
-      };
+        
+        // Process the detected QR data
+        processQRData(qrData);
+        
+      } else {
+        console.log('❌ No QR code detected in image');
+        throw new Error('No QR code found in the image');
+      }
+      
     } catch (error) {
       console.error('❌ Error decoding QR from image:', error);
       setIsAssigning(false);
+      
+      // Show helpful error message with options
       Alert.alert(
-        'Error',
-        'Failed to decode QR code from image. Please try scanning with camera instead.'
+        'QR Code Not Detected',
+        'Could not detect a QR code in the selected image. This could happen if:\n\n• The image quality is too low\n• The QR code is partially obscured\n• The image doesn\'t contain a QR code\n\nPlease try again with a clearer image or use the camera scanner.',
+        [
+          {
+            text: 'Try Another Image',
+            onPress: () => {
+              handlePickImage();
+            },
+          },
+          {
+            text: 'Manual Entry',
+            onPress: () => {
+              showManualEntryDialog();
+            },
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+        ]
       );
     }
+  };
+
+  const showManualEntryDialog = () => {
+    Alert.prompt(
+      'Manual Staff Entry',
+      'Please enter the Staff ID from the QR code:',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Submit',
+          onPress: (staffId?: string) => {
+            if (staffId && staffId.trim()) {
+              // Create a mock QR data structure
+              const mockQRData = JSON.stringify({
+                staffId: staffId.trim(),
+                firstName: 'Staff',
+                lastName: 'Member',
+                email: '',
+                phoneNumber: '',
+                role: 'staff',
+                timestamp: new Date().toISOString()
+              });
+              processQRData(mockQRData);
+            } else {
+              Alert.alert('Error', 'Please enter a valid Staff ID');
+            }
+          },
+        },
+      ],
+      'plain-text'
+    );
   };
 
   const assignStaffToClient = async (staffData: ScannedStaffData) => {
@@ -291,104 +383,12 @@ const StaffQRScannerModal: React.FC<StaffQRScannerModalProps> = ({
     if (!isAssigning) {
       setScanned(false);
       setScannedData(null);
-      setShowOptions(true);
-      setShowCamera(false);
       onClose();
     }
   };
 
-  const handleOpenCamera = async () => {
-    if (!permission?.granted) {
-      const result = await requestPermission();
-      if (!result.granted) {
-        Alert.alert(
-          'Permission Required',
-          'Please grant camera permission to scan QR codes.'
-        );
-        return;
-      }
-    }
-    setShowOptions(false);
-    setShowCamera(true);
-  };
-
-  // Show options screen first
-  if (showOptions && !showCamera) {
-    return (
-      <Modal visible={visible} animationType="slide" transparent={true}>
-        <View style={styles.overlay}>
-          <View style={styles.optionsContainer}>
-            {/* Header */}
-            <View style={styles.optionsHeader}>
-              <View style={styles.headerLeft}>
-                <QrCode size={24} color="#3B82F6" />
-                <Text style={styles.optionsHeaderTitle}>Scan QR Code</Text>
-              </View>
-              <TouchableOpacity
-                onPress={handleClose}
-                disabled={isAssigning}
-                style={styles.closeIconButton}
-              >
-                <X size={24} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Options */}
-            <View style={styles.optionsContent}>
-              <Text style={styles.optionsDescription}>
-                Choose how you want to scan the staff QR code
-              </Text>
-
-              {/* Camera Option */}
-              <TouchableOpacity
-                style={styles.optionButton}
-                onPress={handleOpenCamera}
-                disabled={isAssigning}
-              >
-                <View style={styles.optionIconContainer}>
-                  <Camera size={32} color="#3B82F6" />
-                </View>
-                <View style={styles.optionTextContainer}>
-                  <Text style={styles.optionTitle}>Scan with Camera</Text>
-                  <Text style={styles.optionDescription}>
-                    Use your device camera to scan QR code
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Upload Option */}
-              <TouchableOpacity
-                style={styles.optionButton}
-                onPress={handlePickImage}
-                disabled={isAssigning}
-              >
-                <View style={styles.optionIconContainer}>
-                  <Upload size={32} color="#8B5CF6" />
-                </View>
-                <View style={styles.optionTextContainer}>
-                  <Text style={styles.optionTitle}>Upload from Gallery</Text>
-                  <Text style={styles.optionDescription}>
-                    Select a QR code image from your device
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            </View>
-
-            {/* Loading overlay */}
-            {isAssigning && (
-              <View style={styles.loadingOverlayOptions}>
-                <ActivityIndicator size="large" color="#3B82F6" />
-                <Text style={styles.loadingText}>Processing QR code...</Text>
-              </View>
-            )}
-          </View>
-        </View>
-      </Modal>
-    );
-  }
-
   // Show loading while checking permissions
-  if (!permission && showCamera) {
+  if (!permission) {
     return (
       <Modal visible={visible} animationType="slide" transparent={false}>
         <View style={styles.container}>
@@ -400,12 +400,14 @@ const StaffQRScannerModal: React.FC<StaffQRScannerModalProps> = ({
   }
 
   // Show permission request screen
-  if (!permission?.granted && showCamera) {
+  if (!permission?.granted) {
     return (
       <Modal visible={visible} animationType="slide" transparent={false}>
         <View style={styles.container}>
           <View style={styles.permissionContainer}>
-            <QrCode size={64} color="#EF4444" />
+            <View style={styles.permissionIcon}>
+              <Text style={styles.permissionIconText}>📷</Text>
+            </View>
             <Text style={styles.permissionTitle}>Camera Permission Required</Text>
             <Text style={styles.permissionText}>
               Please grant camera permission to scan QR codes
@@ -436,18 +438,14 @@ const StaffQRScannerModal: React.FC<StaffQRScannerModalProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent={false}>
       <View style={styles.container}>
-        {/* Header */}
+        {/* Header with only close button */}
         <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <QrCode size={24} color="#FFFFFF" />
-            <Text style={styles.headerTitle}>Scan Staff QR Code</Text>
-          </View>
           <TouchableOpacity
             onPress={handleClose}
             disabled={isAssigning}
-            style={styles.closeIconButton}
+            style={styles.closeButtonHeader}
           >
-            <X size={24} color="#FFFFFF" />
+            <X size={28} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
 
@@ -462,23 +460,43 @@ const StaffQRScannerModal: React.FC<StaffQRScannerModalProps> = ({
             }}
           />
           
-          {/* Scanning overlay */}
+          {/* Scanning overlay with transparent center */}
           <View style={styles.scannerOverlay}>
-            <View style={styles.scanArea}>
-              <View style={[styles.corner, styles.topLeft]} />
-              <View style={[styles.corner, styles.topRight]} />
-              <View style={[styles.corner, styles.bottomLeft]} />
-              <View style={[styles.corner, styles.bottomRight]} />
+            {/* Top overlay */}
+            <View style={styles.overlayTop} />
+            
+            {/* Middle section with left, center (transparent), and right overlays */}
+            <View style={styles.overlayMiddle}>
+              <View style={styles.overlayLeft} />
+              <View style={styles.scanArea}>
+                {/* Top Left - Red */}
+                <View style={[styles.corner, styles.topLeft, { borderColor: '#FF6B6B' }]} />
+                {/* Top Right - Orange */}
+                <View style={[styles.corner, styles.topRight, { borderColor: '#FFB347' }]} />
+                {/* Bottom Left - Blue */}
+                <View style={[styles.corner, styles.bottomLeft, { borderColor: '#4DABF7' }]} />
+                {/* Bottom Right - Green */}
+                <View style={[styles.corner, styles.bottomRight, { borderColor: '#51CF66' }]} />
+              </View>
+              <View style={styles.overlayRight} />
             </View>
+            
+            {/* Bottom overlay */}
+            <View style={styles.overlayBottom} />
           </View>
 
-          {/* Instructions */}
-          <View style={styles.instructionsContainer}>
-            <Text style={styles.instructionsText}>
-              {scanned
-                ? 'Processing...'
-                : 'Position the QR code within the frame'}
-            </Text>
+          {/* Gallery Upload Button */}
+          <View style={styles.galleryButtonContainer}>
+            <TouchableOpacity
+              style={styles.galleryButton}
+              onPress={handlePickImage}
+              disabled={isAssigning || scanned}
+            >
+              <View style={styles.galleryIcon}>
+                <View style={styles.galleryIconInner} />
+              </View>
+              <Text style={styles.galleryButtonText}>Upload from gallery</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -487,7 +505,9 @@ const StaffQRScannerModal: React.FC<StaffQRScannerModalProps> = ({
           <View style={styles.loadingOverlay}>
             <View style={styles.loadingCard}>
               <ActivityIndicator size="large" color="#3B82F6" />
-              <Text style={styles.loadingCardText}>Assigning staff member...</Text>
+              <Text style={styles.loadingCardText}>
+                {scanned ? 'Assigning staff member...' : 'Detecting QR code...'}
+              </Text>
             </View>
           </View>
         )}
@@ -504,17 +524,6 @@ const StaffQRScannerModal: React.FC<StaffQRScannerModalProps> = ({
             >
               <Text style={styles.rescanButtonText}>Scan Again</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.rescanButton, styles.backButton]}
-              onPress={() => {
-                setScanned(false);
-                setScannedData(null);
-                setShowOptions(true);
-                setShowCamera(false);
-              }}
-            >
-              <Text style={styles.backButtonText}>Back to Options</Text>
-            </TouchableOpacity>
           </View>
         )}
       </View>
@@ -522,114 +531,30 @@ const StaffQRScannerModal: React.FC<StaffQRScannerModalProps> = ({
   );
 };
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 const scanAreaSize = width * 0.7;
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  optionsContainer: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '70%',
-  },
-  optionsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  optionsHeaderTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  optionsContent: {
-    padding: 20,
-  },
-  optionsDescription: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 24,
-    lineHeight: 20,
-  },
-  optionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    marginBottom: 16,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-  },
-  optionIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  optionTextContainer: {
-    flex: 1,
-  },
-  optionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  optionDescription: {
-    fontSize: 13,
-    color: '#6B7280',
-    lineHeight: 18,
-  },
-  loadingOverlayOptions: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-  },
   container: {
     flex: 1,
     backgroundColor: '#000000',
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
     paddingTop: 50,
-    backgroundColor: '#1F2937',
+    backgroundColor: 'transparent',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  closeIconButton: {
-    padding: 4,
+  closeButtonHeader: {
+    padding: 8,
   },
   scannerContainer: {
     flex: 1,
@@ -639,72 +564,150 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  overlayTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: (Dimensions.get('window').height - scanAreaSize) / 2,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
+  overlayMiddle: {
+    flexDirection: 'row',
+    width: '100%',
+    height: scanAreaSize,
+    position: 'absolute',
+    top: (Dimensions.get('window').height - scanAreaSize) / 2,
+  },
+  overlayLeft: {
+    width: (Dimensions.get('window').width - scanAreaSize) / 2,
+    height: scanAreaSize,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
+  overlayRight: {
+    width: (Dimensions.get('window').width - scanAreaSize) / 2,
+    height: scanAreaSize,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
+  overlayBottom: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: (Dimensions.get('window').height - scanAreaSize) / 2,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
   },
   scanArea: {
     width: scanAreaSize,
     height: scanAreaSize,
     position: 'relative',
+    backgroundColor: 'transparent',
   },
   corner: {
     position: 'absolute',
-    width: 40,
-    height: 40,
-    borderColor: '#3B82F6',
+    width: 50,
+    height: 50,
   },
   topLeft: {
     top: 0,
     left: 0,
-    borderTopWidth: 4,
-    borderLeftWidth: 4,
-    borderTopLeftRadius: 8,
+    borderTopWidth: 6,
+    borderLeftWidth: 6,
+    borderTopLeftRadius: 12,
   },
   topRight: {
     top: 0,
     right: 0,
-    borderTopWidth: 4,
-    borderRightWidth: 4,
-    borderTopRightRadius: 8,
+    borderTopWidth: 6,
+    borderRightWidth: 6,
+    borderTopRightRadius: 12,
   },
   bottomLeft: {
     bottom: 0,
     left: 0,
-    borderBottomWidth: 4,
-    borderLeftWidth: 4,
-    borderBottomLeftRadius: 8,
+    borderBottomWidth: 6,
+    borderLeftWidth: 6,
+    borderBottomLeftRadius: 12,
   },
   bottomRight: {
     bottom: 0,
     right: 0,
-    borderBottomWidth: 4,
-    borderRightWidth: 4,
-    borderBottomRightRadius: 8,
+    borderBottomWidth: 6,
+    borderRightWidth: 6,
+    borderBottomRightRadius: 12,
   },
-  instructionsContainer: {
+  galleryButtonContainer: {
     position: 'absolute',
     bottom: 100,
     left: 0,
     right: 0,
     alignItems: 'center',
   },
-  instructionsText: {
+  galleryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderRadius: 25,
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  galleryIcon: {
+    width: 24,
+    height: 20,
+    borderWidth: 2,
+    borderColor: '#666666',
+    borderRadius: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  galleryIconInner: {
+    width: 8,
+    height: 6,
+    backgroundColor: '#666666',
+    borderRadius: 1,
+  },
+  galleryButtonText: {
+    color: '#333333',
     fontSize: 16,
-    color: '#FFFFFF',
-    textAlign: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
+    fontWeight: '500',
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
     color: '#6B7280',
   },
+  loadingSubText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
+  },
   permissionContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     padding: 40,
+  },
+  permissionIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  permissionIconText: {
+    fontSize: 32,
   },
   permissionTitle: {
     fontSize: 20,
@@ -775,16 +778,6 @@ const styles = StyleSheet.create({
   },
   rescanButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  backButton: {
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-  },
-  backButtonText: {
-    color: '#374151',
     fontSize: 16,
     fontWeight: '600',
   },

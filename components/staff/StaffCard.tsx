@@ -97,7 +97,7 @@ const StaffCard: React.FC<StaffCardProps> = ({ staff, onPress }) => {
                             {staff.assignedProjects.slice(0, 2).map((project, index) => (
                                 <View key={index} style={styles.projectTag}>
                                     <Text style={styles.projectTagText} numberOfLines={1}>
-                                        {project}
+                                        {project.projectName}
                                     </Text>
                                 </View>
                             ))}

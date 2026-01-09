@@ -21,9 +21,20 @@ export interface StaffUser {
   phoneNumber: string;
   email: string;
   password?: string;
-  clientIds: string[]; // Changed from clientId to clientIds array
+  clients: Array<{
+    clientId: string;
+    clientName: string;
+    assignedAt?: Date;
+  }>; // Changed from clientIds to clients array with client details
   role: 'site-engineer' | 'supervisor' | 'manager';
-  assignedProjects?: string[];
+  assignedProjects?: Array<{
+    projectId: string;
+    projectName: string;
+    clientId: string;
+    clientName: string;
+    assignedAt: string;
+    status: "active" | "completed" | "paused";
+  }>;
 }
 
 export interface CustomerUser {

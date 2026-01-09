@@ -69,7 +69,7 @@ const AddStaffModal: React.FC<AddStaffModalProps> = ({ visible, onClose, onAdd }
             phoneNumber: phoneNumber.trim(),
             email: email.trim().toLowerCase(),
             role,
-            assignedProjects: []
+            assignedProjects: [] // This will be an empty array of ProjectAssignment objects
         };
 
         console.log(newStaff)

@@ -5,7 +5,8 @@ import axios from "axios";
 export const getProjectData = async (
   clientId: string,
   page: number = 1,
-  limit: number = 10
+  limit: number = 10,
+  staffId?: string // Add optional staffId parameter
 ) => {
   try {
     if (!clientId) {
@@ -18,11 +19,19 @@ export const getProjectData = async (
       "page:",
       page,
       "limit:",
-      limit
+      limit,
+      "staffId:",
+      staffId || "none"
     );
-    const res = await axios.get(
-      `${domain}/api/project?clientId=${clientId}&page=${page}&limit=${limit}`
-    );
+
+    // Build URL with optional staffId parameter
+    let url = `${domain}/api/project?clientId=${clientId}&page=${page}&limit=${limit}`;
+    if (staffId) {
+      url += `&staffId=${staffId}`;
+      console.log("🔍 Adding staff filtering to project request");
+    }
+
+    const res = await axios.get(url);
 
     console.log("📦 API Response:", JSON.stringify(res.data, null, 2));
 
@@ -42,7 +51,8 @@ export const getProjectData = async (
         "✅ Projects extracted:",
         projects.length,
         "Total:",
-        meta.total
+        meta.total,
+        staffId ? "(filtered for staff)" : "(all client projects)"
       );
       return { projects, meta };
     }

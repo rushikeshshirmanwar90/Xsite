@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { AlertCircle, QrCode, RefreshCw, LogOut, Copy } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
 import * as Clipboard from 'expo-clipboard';
+import { toast } from 'sonner-native';
 
 interface StaffNoClientScreenProps {
   staffData: any;
@@ -20,6 +21,28 @@ interface StaffNoClientScreenProps {
 const StaffNoClientScreen: React.FC<StaffNoClientScreenProps> = ({ staffData }) => {
   const { logout, forceRefresh } = useAuth();
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Auto-refresh every 30 seconds to check for assignment updates
+  useEffect(() => {
+    console.log('🔄 Setting up auto-refresh for staff assignment check...');
+    
+    const autoRefreshInterval = setInterval(async () => {
+      if (!isRefreshing) {
+        console.log('🔄 Auto-refresh: Checking for assignment updates...');
+        try {
+          await forceRefresh();
+        } catch (error) {
+          console.error('❌ Auto-refresh error:', error);
+        }
+      }
+    }, 30000); // Check every 30 seconds
+
+    // Cleanup interval on unmount
+    return () => {
+      console.log('🧹 Cleaning up auto-refresh interval');
+      clearInterval(autoRefreshInterval);
+    };
+  }, [forceRefresh, isRefreshing]);
 
   // Generate QR code data with staff details
   const qrData = JSON.stringify({
@@ -35,9 +58,20 @@ const StaffNoClientScreen: React.FC<StaffNoClientScreenProps> = ({ staffData }) 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
+      console.log('🔄 Staff refresh initiated...');
+      toast.info('Checking for assignment updates...');
+      
       await forceRefresh();
+      
+      // Add a small delay to ensure the auth context has time to update
+      setTimeout(() => {
+        console.log('✅ Staff refresh completed');
+        toast.success('Status updated successfully');
+      }, 1000);
+      
     } catch (error) {
       console.error('Error refreshing:', error);
+      toast.error('Failed to refresh status. Please try again.');
     } finally {
       setIsRefreshing(false);
     }
@@ -203,10 +237,13 @@ const StaffNoClientScreen: React.FC<StaffNoClientScreenProps> = ({ staffData }) 
           2. Wait for the administrator to assign you to a client
         </Text>
         <Text style={styles.instructionText}>
-          3. Use the "Refresh Status" button to check if you've been assigned
+          3. The app automatically checks for updates every 30 seconds
         </Text>
         <Text style={styles.instructionText}>
-          4. Once assigned, you'll automatically get access to the app
+          4. You can also use "Refresh Status" for immediate updates
+        </Text>
+        <Text style={styles.instructionText}>
+          5. Once assigned, you'll automatically get access to the app
         </Text>
       </View>
     </ScrollView>

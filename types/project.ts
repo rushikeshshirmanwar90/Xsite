@@ -13,6 +13,8 @@ export interface Project {
   section?: ProjectSection[];
   MaterialAvailable?: MaterialItem[];
   MaterialUsed?: MaterialItem[];
+  clientName?: string; // Added for staff users to show client name
+  clientId?: string; // Added for staff users to show client ID
 }
 
 export interface MaterialItem {

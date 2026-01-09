@@ -1,7 +1,8 @@
-import Loading from '@/components/Loading';
+import { useAuth } from '@/contexts/AuthContext';
 import { domain } from '@/lib/domain';
 import { generateOTP } from '@/lib/functions';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -23,8 +24,35 @@ import { toast } from 'sonner-native';
 
 type Role = 'site-engineer' | 'supervisor' | 'manager';
 
+interface StaffRegistrationResponse {
+    success?: boolean;
+    data?: {
+        _id: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+        phoneNumber: string;
+        role: Role;
+        clients: Array<{
+            clientId: string;
+            clientName: string;
+            assignedAt?: Date;
+        }>;
+        [key: string]: any;
+    };
+    message?: string;
+    [key: string]: any;
+}
+
+interface OTPResponse {
+    success?: boolean;
+    message?: string;
+    [key: string]: any;
+}
+
 export default function RegisterScreen() {
     const router = useRouter();
+    const { checkAuthStatus } = useAuth();
 
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
@@ -35,6 +63,7 @@ export default function RegisterScreen() {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [isNavigating, setIsNavigating] = useState(false);
     
     // Email verification states
     const [emailVerified, setEmailVerified] = useState(false);
@@ -63,7 +92,7 @@ export default function RegisterScreen() {
             setGeneratedOTP(OTP);
             
             // Send OTP via API
-            const response = await axios.post(`${domain}/api/otp`, {
+            const response = await axios.post<OTPResponse>(`${domain}/api/otp`, {
                 email: email.trim().toLowerCase(),
                 OTP: OTP,
             });
@@ -76,7 +105,11 @@ export default function RegisterScreen() {
             }
         } catch (error: any) {
             console.error('❌ Error sending OTP:', error);
-            toast.error('Failed to send OTP. Please try again.');
+            if (error?.response || error?.request) {
+                toast.error('Failed to send OTP. Please try again.');
+            } else {
+                toast.error('An unexpected error occurred');
+            }
         } finally {
             setSendingOtp(false);
         }
@@ -176,23 +209,67 @@ export default function RegisterScreen() {
         try {
             console.log('📝 Registering staff member...');
             console.log('Data:', { firstName, lastName, email, phoneNumber, role });
+            console.log('🔑 Password length:', password.trim().length);
+            console.log('🔑 Password provided:', !!password.trim());
+            console.log('🔑 Password validation check:');
+            console.log('  - Has uppercase:', /[A-Z]/.test(password));
+            console.log('  - Has lowercase:', /[a-z]/.test(password));
+            console.log('  - Has number:', /\d/.test(password));
+            console.log('  - Has special char:', /[@$!%*?&]/.test(password));
+            console.log('  - Length >= 8:', password.length >= 8);
 
-            const response = await axios.post(`${domain}/api/staff`, {
+            const payload = {
                 firstName: firstName.trim(),
                 lastName: lastName.trim(),
                 email: email.trim().toLowerCase(),
                 phoneNumber: phoneNumber.trim(),
                 role,
                 password: password.trim(),
-                clientIds: [], // Empty array - admin will assign clients later
-            });
+                clients: [], // Empty array - admin will assign clients later
+            };
+
+            console.log('📦 Complete payload:', { ...payload, password: `[${payload.password.length} chars]` });
+
+            const response = await axios.post<StaffRegistrationResponse>(`${domain}/api/staff`, payload);
 
             console.log('✅ Registration response:', response.data);
 
             if (response.status === 201) {
                 toast.success('Staff member registered successfully!');
-                toast.success('You can now login with your credentials');
                 
+                // Auto-login the user after successful registration
+                console.log('🔐 Auto-logging in user after registration...');
+                console.log('📦 Registration response:', response.data);
+                
+                // Extract staff data from response
+                const staffData = response.data.data || response.data;
+                
+                // Prepare user data for storage
+                const userData = {
+                    _id: staffData?._id || '',
+                    firstName: firstName.trim(),
+                    lastName: lastName.trim(),
+                    email: email.trim().toLowerCase(),
+                    phoneNumber: phoneNumber.trim(),
+                    role,
+                    clients: staffData?.clients || [], // Use clients from response
+                    userType: 'staff' as const // Add userType for navigation
+                };
+
+                console.log('💾 Storing user data:', userData);
+
+                // Clear any existing data and store new user data
+                await AsyncStorage.clear();
+                await AsyncStorage.setItem('user', JSON.stringify(userData));
+                await AsyncStorage.setItem('userType', 'staff');
+
+                // Show navigating state
+                setIsNavigating(true);
+                toast.success('Welcome! Redirecting to your dashboard...');
+
+                // Update auth context
+                await checkAuthStatus();
+
                 // Clear form
                 setFirstName('');
                 setLastName('');
@@ -204,19 +281,19 @@ export default function RegisterScreen() {
                 setOtp('');
                 setShowOtpInput(false);
                 
-                // Navigate back to login after a short delay
-                setTimeout(() => {
-                    router.replace('/login');
-                }, 2000);
+                // Let AuthContext handle navigation automatically
+                // The layout will detect the auth change and redirect to main app
+                setLoading(false);
+                setIsNavigating(false);
             }
         } catch (error: any) {
             console.error('❌ Registration error:', error);
             
-            if (error.response) {
+            if (error?.response) {
                 const errorMessage = error.response.data?.error || error.response.data?.message || 'Registration failed';
                 toast.error(errorMessage);
                 console.error('Error response:', error.response.data);
-            } else if (error.request) {
+            } else if (error?.request) {
                 toast.error('Network error. Please check your connection.');
             } else {
                 toast.error('An unexpected error occurred');
@@ -279,10 +356,10 @@ export default function RegisterScreen() {
                             </View>
 
                             {/* Email */}
-                            <View style={styles.inputContainer}>
-                                <MaterialIcons name="email" size={20} color="#666" style={styles.inputIcon} />
+                            <View style={[styles.inputContainer, emailVerified && styles.inputContainerVerified]}>
+                                <MaterialIcons name="email" size={20} color={emailVerified ? "#10B981" : "#666"} style={styles.inputIcon} />
                                 <TextInput
-                                    style={styles.input}
+                                    style={[styles.input, emailVerified && styles.inputDisabled]}
                                     placeholder="Email Address"
                                     value={email}
                                     onChangeText={(text) => {
@@ -303,6 +380,36 @@ export default function RegisterScreen() {
                                     <Ionicons name="checkmark-circle" size={24} color="#10B981" style={{ marginRight: 8 }} />
                                 )}
                             </View>
+
+                            {/* Verified Email Display */}
+                            {emailVerified && (
+                                <View style={styles.verifiedEmailContainer}>
+                                    <View style={styles.verifiedEmailContent}>
+                                        <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                                        <Text style={styles.verifiedEmailText}>
+                                            Email verified: {email}
+                                        </Text>
+                                    </View>
+                                </View>
+                            )}
+
+                            {/* Change Email Button - Always visible after verification */}
+                            {emailVerified && (
+                                <TouchableOpacity
+                                    style={styles.changeEmailButtonVerified}
+                                    onPress={() => {
+                                        setEmailVerified(false);
+                                        setShowOtpInput(false);
+                                        setOtp('');
+                                        setGeneratedOTP(0);
+                                        setEmail('');
+                                        toast.info('Email verification reset. You can now enter a different email address');
+                                    }}
+                                >
+                                    <Ionicons name="mail" size={16} color="#3b82f6" />
+                                    <Text style={styles.changeEmailButtonVerifiedText}>Change Email</Text>
+                                </TouchableOpacity>
+                            )}
 
                             {/* Email Verification Button */}
                             {!emailVerified && !showOtpInput && (
@@ -325,6 +432,14 @@ export default function RegisterScreen() {
                             {/* OTP Input */}
                             {showOtpInput && !emailVerified && (
                                 <View style={styles.otpContainer}>
+                                    {/* Email Display */}
+                                    <View style={styles.emailDisplayContainer}>
+                                        <MaterialIcons name="email" size={16} color="#3B82F6" />
+                                        <Text style={styles.emailDisplayText}>
+                                            Verifying: {email}
+                                        </Text>
+                                    </View>
+                                    
                                     <View style={styles.inputContainer}>
                                         <MaterialIcons name="lock" size={20} color="#666" style={styles.inputIcon} />
                                         <TextInput
@@ -351,6 +466,21 @@ export default function RegisterScreen() {
                                             <Text style={styles.resendButtonText}>Resend OTP</Text>
                                         </TouchableOpacity>
                                     </View>
+                                    
+                                    {/* Change Email Button */}
+                                    <TouchableOpacity
+                                        style={styles.changeEmailButton}
+                                        onPress={() => {
+                                            setShowOtpInput(false);
+                                            setOtp('');
+                                            setGeneratedOTP(0);
+                                            setEmail('');
+                                            toast.info('You can now enter a different email address');
+                                        }}
+                                    >
+                                        <Ionicons name="mail" size={16} color="#6B7280" />
+                                        <Text style={styles.changeEmailText}>Change Email</Text>
+                                    </TouchableOpacity>
                                 </View>
                             )}
 
@@ -454,6 +584,16 @@ export default function RegisterScreen() {
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
+
+            {/* Navigating Overlay */}
+            {isNavigating && (
+                <View style={styles.navigatingOverlay}>
+                    <View style={styles.navigatingContainer}>
+                        <ActivityIndicator size="large" color="#3b82f6" />
+                        <Text style={styles.navigatingText}>Setting up your account...</Text>
+                    </View>
+                </View>
+            )}
         </SafeAreaView>
     );
 }
@@ -523,6 +663,10 @@ const styles = StyleSheet.create({
         marginBottom: 16,
         padding: 4,
     },
+    inputContainerVerified: {
+        backgroundColor: '#F0FDF4',
+        borderColor: '#BBF7D0',
+    },
     inputIcon: {
         padding: 10,
     },
@@ -537,6 +681,10 @@ const styles = StyleSheet.create({
         paddingRight: 12,
         fontSize: 16,
         color: '#333',
+    },
+    inputDisabled: {
+        color: '#9CA3AF',
+        backgroundColor: 'transparent',
     },
     dropdownButton: {
         flex: 1,
@@ -634,6 +782,23 @@ const styles = StyleSheet.create({
     otpContainer: {
         marginBottom: 16,
     },
+    emailDisplayContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#EFF6FF',
+        borderRadius: 8,
+        padding: 12,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+    },
+    emailDisplayText: {
+        marginLeft: 8,
+        fontSize: 14,
+        color: '#1E40AF',
+        fontWeight: '500',
+        flex: 1,
+    },
     otpActions: {
         flexDirection: 'row',
         gap: 12,
@@ -664,5 +829,86 @@ const styles = StyleSheet.create({
         color: '#3b82f6',
         fontSize: 14,
         fontWeight: '600',
+    },
+    changeEmailButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'transparent',
+        borderWidth: 1,
+        borderColor: '#D1D5DB',
+        borderRadius: 12,
+        paddingVertical: 10,
+        marginTop: 12,
+        gap: 6,
+    },
+    changeEmailText: {
+        color: '#6B7280',
+        fontSize: 13,
+        fontWeight: '500',
+    },
+    changeEmailButtonVerified: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#EFF6FF',
+        borderWidth: 1,
+        borderColor: '#3b82f6',
+        borderRadius: 12,
+        paddingVertical: 10,
+        marginBottom: 16,
+        gap: 6,
+    },
+    changeEmailButtonVerifiedText: {
+        color: '#3b82f6',
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    verifiedEmailContainer: {
+        backgroundColor: '#F0FDF4',
+        borderWidth: 1,
+        borderColor: '#BBF7D0',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 12,
+    },
+    verifiedEmailContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    verifiedEmailText: {
+        flex: 1,
+        fontSize: 14,
+        color: '#166534',
+        fontWeight: '500',
+    },
+    navigatingOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1000,
+    },
+    navigatingContainer: {
+        backgroundColor: '#ffffff',
+        borderRadius: 16,
+        padding: 32,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 8,
+    },
+    navigatingText: {
+        marginTop: 16,
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#3b82f6',
     },
 });

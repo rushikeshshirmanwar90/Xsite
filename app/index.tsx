@@ -14,7 +14,7 @@ export default function Index() {
       isLoading, 
       hasUser: !!user,
       userRole: user?.role,
-      userClientIds: user?.clientIds,
+      userClients: user?.clients,
       userType: user?.userType
     });
     
@@ -59,9 +59,9 @@ export default function Index() {
     // Check if user is staff by role field
     const isStaff = user.role && ['site-engineer', 'supervisor', 'manager'].includes(user.role);
     
-    // Check if clientIds is empty or not present
-    const hasNoClients = !user.clientIds || 
-                        (Array.isArray(user.clientIds) && user.clientIds.length === 0);
+    // Check if clients array is empty or not present
+    const hasNoClients = !user.clients || 
+                        (Array.isArray(user.clients) && user.clients.length === 0);
     
     console.log('🎯 Staff check results:', { isStaff, hasNoClients });
     
@@ -73,7 +73,7 @@ export default function Index() {
         lastName: user.lastName,
         email: user.email,
         role: user.role,
-        clientIds: user.clientIds
+        clients: user.clients
       });
       return <StaffNoClientScreen staffData={user} />;
     }
