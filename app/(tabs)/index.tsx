@@ -63,20 +63,6 @@ const Index: React.FC = () => {
     // Get user name from user data
     const userName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'User';
 
-    // Debug logging for QR code condition
-    useEffect(() => {
-        if (user) {
-            console.log('🔍 Index.tsx - User data for QR code condition:', {
-                isStaff,
-                hasUser: !!user,
-                userId: user._id,
-                userRole: 'role' in user ? user.role : 'not-staff',
-                clientId,
-                shouldShowQR: isStaff && user && !clientId
-            });
-        }
-    }, [user, isStaff, clientId]);
-
     // Performance optimization
     const isLoadingRef = React.useRef(false);
     const lastLoadTimeRef = React.useRef<number>(0);
@@ -525,43 +511,8 @@ const Index: React.FC = () => {
                 </View>
             )}
 
-            {/* Debug Section - Remove after testing */}
-            {user && (
-                <View style={styles.section}>
-                    <View style={styles.infoCard}>
-                        <Text style={styles.sectionTitle}>Debug Info</Text>
-                        <Text>User ID: {user._id}</Text>
-                        <Text>Is Staff: {isStaff ? 'Yes' : 'No'}</Text>
-                        <Text>Has Role: {'role' in user ? 'Yes' : 'No'}</Text>
-                        <Text>Role: {'role' in user ? user.role : 'N/A'}</Text>
-                        <Text>Client ID: {clientId || 'null'}</Text>
-                        <Text>Should Show QR: {(isStaff && user && !clientId) ? 'Yes' : 'No'}</Text>
-                        <Text>Condition Check: isStaff={String(isStaff)}, user={String(!!user)}, !clientId={String(!clientId)}</Text>
-                    </View>
-                </View>
-            )}
-
-            {/* Test QR Code Section - Always show for staff users */}
-            {isStaff && user && (
-                <View style={styles.section}>
-                    <View style={styles.infoCard}>
-                        <Text style={styles.sectionTitle}>🧪 Test QR Code (Always Shows for Staff)</Text>
-                        <Text>This section should always show for staff users regardless of clientId</Text>
-                        <Text>ClientId status: {clientId ? 'HAS CLIENT' : 'NO CLIENT'}</Text>
-                    </View>
-                </View>
-            )}
-
             {/* QR Code Section - Priority for unassigned staff */}
-            {(() => {
-                console.log('🔍 QR Code condition check:', {
-                    isStaff,
-                    hasUser: !!user,
-                    clientId,
-                    shouldShow: isStaff && user && !clientId
-                });
-                return isStaff && user && !clientId;
-            })() && user && (
+            {isStaff && user && !clientId && (
                 <View style={styles.section}>  
                     <View style={[styles.qrCodeCard, styles.shareCard]}>
                         <View style={styles.shareHeader}>
