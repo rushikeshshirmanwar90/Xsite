@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import 'react-native-reanimated';
 import { Toaster } from "sonner-native";
+import OnboardingWrapper from '@/components/onboarding/OnboardingWrapper';
 
 export const unstable_settings = {
   initialRouteName: 'index',
@@ -78,17 +79,19 @@ function RootLayoutNav() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="login" options={{ headerShown: false }} />
-        <Stack.Screen name="register" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="details" options={{ headerShown: false }} />
-      </Stack>
-      <Toaster position="bottom-center" />
-      <StatusBar style="auto" />
-    </GestureHandlerRootView>
+    <OnboardingWrapper>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="login" options={{ headerShown: false }} />
+          <Stack.Screen name="register" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="details" options={{ headerShown: false }} />
+        </Stack>
+        <Toaster position="bottom-center" />
+        <StatusBar style="auto" />
+      </GestureHandlerRootView>
+    </OnboardingWrapper>
   );
 }
 
