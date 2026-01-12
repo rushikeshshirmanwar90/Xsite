@@ -89,6 +89,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                             value={projectName}
                             onChangeText={setProjectName}
                             placeholder="Enter project name"
+                            placeholderTextColor="#9CA3AF"
                         />
 
                         <Text style={styles.label}>Project Address *</Text>
@@ -97,6 +98,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                             value={projectAddress}
                             onChangeText={setProjectAddress}
                             placeholder="Enter project address"
+                            placeholderTextColor="#9CA3AF"
                             multiline
                             numberOfLines={2}
                         />
@@ -107,6 +109,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                             value={projectDescription}
                             onChangeText={setProjectDescription}
                             placeholder="Enter project description"
+                            placeholderTextColor="#9CA3AF"
                             multiline
                             numberOfLines={2}
                         />
@@ -117,6 +120,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                             value={estimatedBudget}
                             onChangeText={setEstimatedBudget}
                             placeholder="Enter estimated budget"
+                            placeholderTextColor="#9CA3AF"
                             keyboardType="numeric"
                         />
 

@@ -1,3 +1,4 @@
+import CustomTextInput from '@/components/common/CustomTextInput';
 import { useAuth } from '@/contexts/AuthContext';
 import { domain } from '@/lib/domain';
 import { generateOTP } from '@/lib/functions';
@@ -15,7 +16,6 @@ import {
     ScrollView,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
     View
 } from 'react-native';
@@ -332,54 +332,48 @@ export default function RegisterScreen() {
                             </Text>
 
                             {/* First Name */}
-                            <View style={styles.inputContainer}>
-                                <MaterialIcons name="person" size={20} color="#666" style={styles.inputIcon} />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="First Name"
-                                    value={firstName}
-                                    onChangeText={setFirstName}
-                                    autoCapitalize="words"
-                                />
-                            </View>
+                            <CustomTextInput
+                                icon="person"
+                                placeholder="First Name"
+                                value={firstName}
+                                onChangeText={setFirstName}
+                                autoCapitalize="words"
+                            />
 
                             {/* Last Name */}
-                            <View style={styles.inputContainer}>
-                                <MaterialIcons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Last Name"
-                                    value={lastName}
-                                    onChangeText={setLastName}
-                                    autoCapitalize="words"
-                                />
-                            </View>
+                            <CustomTextInput
+                                icon="person-outline"
+                                placeholder="Last Name"
+                                value={lastName}
+                                onChangeText={setLastName}
+                                autoCapitalize="words"
+                            />
 
                             {/* Email */}
-                            <View style={[styles.inputContainer, emailVerified && styles.inputContainerVerified]}>
-                                <MaterialIcons name="email" size={20} color={emailVerified ? "#10B981" : "#666"} style={styles.inputIcon} />
-                                <TextInput
-                                    style={[styles.input, emailVerified && styles.inputDisabled]}
-                                    placeholder="Email Address"
-                                    value={email}
-                                    onChangeText={(text) => {
-                                        setEmail(text);
-                                        // Reset verification if email changes
-                                        if (emailVerified) {
-                                            setEmailVerified(false);
-                                            setShowOtpInput(false);
-                                            setOtp('');
-                                        }
-                                    }}
-                                    keyboardType="email-address"
-                                    autoCapitalize="none"
-                                    autoComplete="email"
-                                    editable={!emailVerified}
-                                />
-                                {emailVerified && (
+                            <CustomTextInput
+                                icon="email"
+                                iconColor={emailVerified ? "#10B981" : "#666"}
+                                placeholder="Email Address"
+                                value={email}
+                                onChangeText={(text) => {
+                                    setEmail(text);
+                                    // Reset verification if email changes
+                                    if (emailVerified) {
+                                        setEmailVerified(false);
+                                        setShowOtpInput(false);
+                                        setOtp('');
+                                    }
+                                }}
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                autoComplete="email"
+                                editable={!emailVerified}
+                                containerStyle={emailVerified ? styles.inputContainerVerified : undefined}
+                                inputStyle={emailVerified ? styles.inputDisabled : undefined}
+                                rightElement={emailVerified ? (
                                     <Ionicons name="checkmark-circle" size={24} color="#10B981" style={{ marginRight: 8 }} />
-                                )}
-                            </View>
+                                ) : undefined}
+                            />
 
                             {/* Verified Email Display */}
                             {emailVerified && (
@@ -440,17 +434,14 @@ export default function RegisterScreen() {
                                         </Text>
                                     </View>
                                     
-                                    <View style={styles.inputContainer}>
-                                        <MaterialIcons name="lock" size={20} color="#666" style={styles.inputIcon} />
-                                        <TextInput
-                                            style={styles.input}
-                                            placeholder="Enter 6-digit OTP"
-                                            value={otp}
-                                            onChangeText={setOtp}
-                                            keyboardType="number-pad"
-                                            maxLength={6}
-                                        />
-                                    </View>
+                                    <CustomTextInput
+                                        icon="lock"
+                                        placeholder="Enter 6-digit OTP"
+                                        value={otp}
+                                        onChangeText={setOtp}
+                                        keyboardType="number-pad"
+                                        maxLength={6}
+                                    />
                                     <View style={styles.otpActions}>
                                         <TouchableOpacity
                                             style={styles.verifyOtpButton}
@@ -485,69 +476,38 @@ export default function RegisterScreen() {
                             )}
 
                             {/* Phone Number */}
-                            <View style={styles.inputContainer}>
-                                <MaterialIcons name="phone" size={20} color="#666" style={styles.inputIcon} />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Phone Number"
-                                    value={phoneNumber}
-                                    onChangeText={setPhoneNumber}
-                                    keyboardType="phone-pad"
-                                    maxLength={15}
-                                />
-                            </View>
+                            <CustomTextInput
+                                icon="phone"
+                                placeholder="Phone Number"
+                                value={phoneNumber}
+                                onChangeText={setPhoneNumber}
+                                keyboardType="phone-pad"
+                                maxLength={15}
+                            />
 
                             {/* Password */}
-                            <View style={styles.inputContainer}>
-                                <MaterialIcons name="lock" size={20} color="#666" style={styles.inputIcon} />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Password (8+ chars, A-z, 0-9, @$!%*?&)"
-                                    value={password}
-                                    onChangeText={setPassword}
-                                    secureTextEntry={!showPassword}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                />
-                                <TouchableOpacity
-                                    onPress={() => setShowPassword(!showPassword)}
-                                    style={styles.visibilityIcon}
-                                    activeOpacity={0.7}
-                                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                                >
-                                    <Ionicons
-                                        name={showPassword ? "eye-off" : "eye"}
-                                        size={24}
-                                        color="#3b82f6"
-                                    />
-                                </TouchableOpacity>
-                            </View>
+                            <CustomTextInput
+                                icon="lock"
+                                placeholder="Password (8+ chars, A-z, 0-9, @$!%*?&)"
+                                value={password}
+                                onChangeText={setPassword}
+                                isPassword={true}
+                                showPasswordToggle={true}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                            />
 
                             {/* Confirm Password */}
-                            <View style={styles.inputContainer}>
-                                <MaterialIcons name="lock-outline" size={20} color="#666" style={styles.inputIcon} />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Confirm Password"
-                                    value={confirmPassword}
-                                    onChangeText={setConfirmPassword}
-                                    secureTextEntry={!showConfirmPassword}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                />
-                                <TouchableOpacity
-                                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                                    style={styles.visibilityIcon}
-                                    activeOpacity={0.7}
-                                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                                >
-                                    <Ionicons
-                                        name={showConfirmPassword ? "eye-off" : "eye"}
-                                        size={24}
-                                        color="#3b82f6"
-                                    />
-                                </TouchableOpacity>
-                            </View>
+                            <CustomTextInput
+                                icon="lock-outline"
+                                placeholder="Confirm Password"
+                                value={confirmPassword}
+                                onChangeText={setConfirmPassword}
+                                isPassword={true}
+                                showPasswordToggle={true}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                            />
 
                             <Text style={styles.helperText}>
                                 * Password must be 8+ characters with uppercase, lowercase, number, and special character (@$!%*?&)

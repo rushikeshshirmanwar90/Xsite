@@ -93,6 +93,7 @@ const OTPVerificationModal: React.FC<OTPVerificationModalProps> = ({
                         <TextInput
                             style={styles.input}
                             placeholder="Enter 6-digit OTP"
+                            placeholderTextColor="#9CA3AF"
                             value={otp}
                             onChangeText={(text) => {
                                 setOtp(text.replace(/[^0-9]/g, ''));

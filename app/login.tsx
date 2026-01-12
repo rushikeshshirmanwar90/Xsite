@@ -1,4 +1,5 @@
 import Loading from '@/components/Loading';
+import CustomTextInput from '@/components/common/CustomTextInput';
 import { useAuth } from '@/contexts/AuthContext';
 import { addPassword, confirmMail, findUserType, forgetPassword, getUser, login, sendOtp } from '@/functions/login';
 import { generateOTP } from '@/lib/functions';
@@ -15,7 +16,6 @@ import {
     ScrollView,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
     View
 } from 'react-native';
@@ -389,23 +389,20 @@ export default function LoginScreen() {
                         <Text style={styles.stepDescription}>
                             thank you for giving us a chance to solve your problem
                         </Text>
-                        <View style={styles.inputContainer}>
-                            <MaterialIcons name="email" size={20} color="#666" style={styles.inputIcon} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Email address"
-                                value={email}
-                                onChangeText={setEmail}
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                                autoComplete="email"
-                                onFocus={() => {
-                                    setTimeout(() => {
-                                        scrollViewRef.current?.scrollToEnd({ animated: true });
-                                    }, 100);
-                                }}
-                            />
-                        </View>
+                        <CustomTextInput
+                            icon="email"
+                            placeholder="Email address"
+                            value={email}
+                            onChangeText={setEmail}
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                            autoComplete="email"
+                            onFocus={() => {
+                                setTimeout(() => {
+                                    scrollViewRef.current?.scrollToEnd({ animated: true });
+                                }, 100);
+                            }}
+                        />
                         <TouchableOpacity
                             style={styles.button}
                             onPress={handleGenerateOTP}
@@ -435,22 +432,19 @@ export default function LoginScreen() {
                         <Text style={styles.stepDescription}>
                             Please enter the 6-digit code sent to {email}
                         </Text>
-                        <View style={styles.inputContainer}>
-                            <MaterialIcons name="lock" size={20} color="#666" style={styles.inputIcon} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="6-digit OTP"
-                                value={otp}
-                                onChangeText={setOtp}
-                                keyboardType="number-pad"
-                                maxLength={6}
-                                onFocus={() => {
-                                    setTimeout(() => {
-                                        scrollViewRef.current?.scrollToEnd({ animated: true });
-                                    }, 100);
-                                }}
-                            />
-                        </View>
+                        <CustomTextInput
+                            icon="lock"
+                            placeholder="6-digit OTP"
+                            value={otp}
+                            onChangeText={setOtp}
+                            keyboardType="number-pad"
+                            maxLength={6}
+                            onFocus={() => {
+                                setTimeout(() => {
+                                    scrollViewRef.current?.scrollToEnd({ animated: true });
+                                }, 100);
+                            }}
+                        />
                         <TouchableOpacity
                             style={styles.button}
                             onPress={handleVerifyOTP}
@@ -510,41 +504,22 @@ export default function LoginScreen() {
                             }
                         </Text>
 
-                        <View style={styles.inputContainer}>
-                            <MaterialIcons name="lock" size={20} color="#666" style={styles.inputIcon} />
-                            <TextInput
-                                key={`password-${showPassword}`}
-                                style={styles.input}
-                                placeholder="Password (8+ chars, A-z, 0-9, @$!%*?&)"
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry={!showPassword}
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                                textContentType="password"
-                                onFocus={() => {
-                                    setTimeout(() => {
-                                        scrollViewRef.current?.scrollToEnd({ animated: true });
-                                    }, 100);
-                                }}
-                            />
-                            <TouchableOpacity
-                                onPress={() => {
-                                    const newValue = !showPassword;
-                                    console.log('👁️ Toggle password - showPassword:', showPassword, '→', newValue);
-                                    setShowPassword(newValue);
-                                }}
-                                style={styles.visibilityIcon}
-                                activeOpacity={0.7}
-                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                            >
-                                <Ionicons
-                                    name={showPassword ? "eye-off" : "eye"}
-                                    size={24}
-                                    color="#3b82f6"
-                                />
-                            </TouchableOpacity>
-                        </View>
+                        <CustomTextInput
+                            icon="lock"
+                            placeholder="Password (8+ chars, A-z, 0-9, @$!%*?&)"
+                            value={password}
+                            onChangeText={setPassword}
+                            isPassword={true}
+                            showPasswordToggle={true}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            textContentType="password"
+                            onFocus={() => {
+                                setTimeout(() => {
+                                    scrollViewRef.current?.scrollToEnd({ animated: true });
+                                }, 100);
+                            }}
+                        />
 
                         {/* Forget Password - Only show when user is verified (login mode) */}
                         {isVerified && (

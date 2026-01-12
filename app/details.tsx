@@ -1287,6 +1287,73 @@ const Details = () => {
         toast.error('Please use the "Add Usage" button at the top to add material usage');
     };
 
+    const handleTransferMaterial = async (
+        materialName: string,
+        unit: string,
+        variantId: string,
+        quantity: number,
+        specs: Record<string, any>,
+        targetProjectId: string
+    ) => {
+        console.log('=== MATERIAL TRANSFER ===');
+        console.log('Material:', materialName);
+        console.log('Unit:', unit);
+        console.log('Variant ID:', variantId);
+        console.log('Quantity:', quantity);
+        console.log('Specs:', specs);
+        console.log('From Project:', projectId);
+        console.log('To Project:', targetProjectId);
+        console.log('========================');
+
+        let loadingToast: any = null;
+        try {
+            loadingToast = toast.loading('Transferring material...');
+
+            // Get client ID
+            const { getClientId } = require('@/functions/clientId');
+            const clientId = await getClientId();
+
+            if (!clientId) {
+                throw new Error('Client ID not found');
+            }
+
+            // API call to transfer material
+            const transferPayload = {
+                fromProjectId: projectId,
+                toProjectId: targetProjectId,
+                materialName,
+                unit,
+                variantId,
+                quantity,
+                specs,
+                clientId
+            };
+
+            console.log('Transfer payload:', transferPayload);
+
+            const response = await axios.post(`${domain}/api/material/transfer`, transferPayload);
+            const responseData = response.data as any;
+
+            toast.dismiss(loadingToast);
+
+            if (responseData.success) {
+                toast.success(`Successfully transferred ${quantity} ${unit} of ${materialName}`);
+                
+                // Reload materials to reflect the transfer
+                await reloadProjectMaterials(true);
+            } else {
+                throw new Error(responseData.message || 'Transfer failed');
+            }
+
+        } catch (error: any) {
+            console.error('Transfer error:', error);
+            if (loadingToast) toast.dismiss(loadingToast);
+            
+            const errorMessage = error.response?.data?.message || error.message || 'Failed to transfer material';
+            toast.error(errorMessage);
+        }
+    };
+
     const handleAddSection = async () => {
         if (!newSectionName.trim()) {
             toast.error('Please enter a section name');
@@ -2062,6 +2129,8 @@ const Details = () => {
                                             animation={cardAnimations[dateIndex * 10 + index] || new Animated.Value(1)}
                                             activeTab={activeTab}
                                             onAddUsage={handleAddUsage}
+                                            onTransferMaterial={handleTransferMaterial}
+                                            currentProjectId={projectId}
                                             miniSections={miniSections}
                                             showMiniSectionLabel={!selectedMiniSection}
                                         />
@@ -2078,6 +2147,8 @@ const Details = () => {
                                 animation={cardAnimations[index] || new Animated.Value(1)}
                                 activeTab={activeTab}
                                 onAddUsage={handleAddUsage}
+                                onTransferMaterial={handleTransferMaterial}
+                                currentProjectId={projectId}
                                 miniSections={miniSections}
                                 showMiniSectionLabel={false}
                             />
