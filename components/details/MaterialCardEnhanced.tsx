@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { Animated, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { domain } from '@/lib/domain';
 
