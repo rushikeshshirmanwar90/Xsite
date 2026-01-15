@@ -51,6 +51,10 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [currentStep, setCurrentStep] = useState<'selection' | 'quantity'>('selection');
     
+    // Refs for tracking current state in swipe handlers
+    const selectedMaterialsRef = useRef<{ [materialId: string]: string }>({});
+    const selectedMiniSectionIdRef = useRef<string>('');
+    
     // Refs for quantity inputs to enable keyboard navigation
     const quantityInputRefs = useRef<{ [materialId: string]: TextInput | null }>({});
 
@@ -82,7 +86,15 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
     }, [visible, availableMaterials, miniSections]);
 
     const handleSubmit = () => {
-        if (!selectedMiniSectionId) {
+        // Use refs for current values to avoid stale state
+        const currentSelectedMiniSectionId = selectedMiniSectionIdRef.current;
+        const currentSelectedMaterials = selectedMaterialsRef.current;
+        
+        console.log('🚀 handleSubmit called with refs:');
+        console.log('  - currentSelectedMiniSectionId:', currentSelectedMiniSectionId);
+        console.log('  - currentSelectedMaterials keys:', Object.keys(currentSelectedMaterials));
+        
+        if (!currentSelectedMiniSectionId) {
             alert('Please select a mini-section');
             return;
         }
@@ -90,8 +102,8 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
         const materialUsages: MaterialUsage[] = [];
         let hasErrors = false;
 
-        // Validate all selected materials
-        Object.entries(selectedMaterials).forEach(([materialId, quantity]) => {
+        // Validate all selected materials using ref
+        Object.entries(currentSelectedMaterials).forEach(([materialId, quantity]) => {
             const material = availableMaterials.find(m => m._id === materialId);
             const quantityNum = parseFloat(quantity);
 
@@ -124,7 +136,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
         console.log('📋 MATERIAL USAGE FORM - BATCH SUBMISSION');
         console.log('========================================');
         console.log('Form Values:');
-        console.log('  - Selected Mini-Section ID:', selectedMiniSectionId, '(type:', typeof selectedMiniSectionId, ')');
+        console.log('  - Selected Mini-Section ID:', currentSelectedMiniSectionId, '(type:', typeof currentSelectedMiniSectionId, ')');
         console.log('  - Number of materials:', materialUsages.length);
         console.log('\n--- Material Usages ---');
         materialUsages.forEach((usage, index) => {
@@ -136,12 +148,12 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
         });
         console.log('========================================');
         console.log('🚀 Calling onSubmit with:', {
-            miniSectionId: selectedMiniSectionId,
+            miniSectionId: currentSelectedMiniSectionId,
             materialUsages: materialUsages
         });
         console.log('========================================\n');
 
-        onSubmit(selectedMiniSectionId, materialUsages);
+        onSubmit(currentSelectedMiniSectionId, materialUsages);
         handleClose();
     };
 
@@ -155,6 +167,9 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
         // Reset swipe animation
         swipeAnimation.setValue(0);
         setIsSwipeComplete(false);
+        // Reset state refs
+        selectedMaterialsRef.current = {};
+        selectedMiniSectionIdRef.current = '';
         onClose();
     };
 
@@ -166,7 +181,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
 
     const handleSwipeMove = (gestureState: any) => {
         const { dx } = gestureState;
-        const maxSwipe = 200; // Maximum swipe distance to match new design
+        const maxSwipe = 200; // Maximum swipe distance to match LaborFormModal
         const progress = Math.max(0, Math.min(dx / maxSwipe, 1));
         
         swipeAnimation.setValue(progress);
@@ -179,10 +194,16 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
 
     const handleSwipeEnd = (gestureState: any) => {
         const { dx } = gestureState;
-        const maxSwipe = 200;
+        const maxSwipe = 200; // Maximum swipe distance to match LaborFormModal
         const progress = dx / maxSwipe;
         
-        console.log('Swipe ended, progress:', progress, 'selectedMaterials.length:', Object.keys(selectedMaterials).length);
+        // Use refs for current values to avoid stale state
+        const currentSelectedMaterials = selectedMaterialsRef.current;
+        const currentSelectedMiniSectionId = selectedMiniSectionIdRef.current;
+        
+        console.log('Swipe ended, progress:', progress);
+        console.log('currentSelectedMaterials keys:', Object.keys(currentSelectedMaterials));
+        console.log('currentSelectedMiniSectionId:', currentSelectedMiniSectionId);
         
         if (progress >= 0.7) {
             // Complete the swipe and submit
@@ -292,15 +313,23 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                 console.log(`New selection after select:`, Object.keys(newSelection));
             }
             
+            // Update ref to keep it in sync
+            selectedMaterialsRef.current = newSelection;
+            
             return newSelection;
         });
     };
 
     const updateMaterialQuantity = (materialId: string, quantity: string) => {
-        setSelectedMaterials(prev => ({
-            ...prev,
-            [materialId]: quantity
-        }));
+        setSelectedMaterials(prev => {
+            const newSelection = {
+                ...prev,
+                [materialId]: quantity
+            };
+            // Update ref to keep it in sync
+            selectedMaterialsRef.current = newSelection;
+            return newSelection;
+        });
     };
 
     const isMaterialSelected = (materialId: string) => {
@@ -438,7 +467,10 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                                             styles.sectionItem,
                                                             isSelected && styles.sectionItemSelected
                                                         ]}
-                                                        onPress={() => setSelectedMiniSectionId(section._id)}
+                                                        onPress={() => {
+                                                            setSelectedMiniSectionId(section._id);
+                                                            selectedMiniSectionIdRef.current = section._id;
+                                                        }}
                                                     >
                                                         <View style={styles.sectionItemLeft}>
                                                             <View style={styles.sectionIconBadge}>
@@ -571,7 +603,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                 {getSelectedMaterialsCount() > 0 && (
                                     <View style={styles.selectionPreview}>
                                         <Text style={styles.previewTitle}>
-                                            Selected Materials ({getSelectedMaterialsCount()})
+                                            Selected Materials
                                         </Text>
                                         <Text style={styles.previewSubtitle}>
                                             Tap materials above to add or remove from selection
@@ -604,6 +636,17 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                         ) : (
                             // STEP 2: QUANTITY INPUT
                             <>
+                                {/* Back to Edit Materials - Moved to top */}
+                                <View style={styles.step2BackHeader}>
+                                    <TouchableOpacity
+                                        style={styles.backButtonIcon}
+                                        onPress={handlePreviousStep}
+                                    >
+                                        <Ionicons name="arrow-back" size={24} color="#64748B" />
+                                    </TouchableOpacity>
+                                    <Text style={styles.backToEditText}>Back to Edit Materials</Text>
+                                </View>
+
                                 {/* Selected Section Info */}
                                 <View style={styles.sectionInfo}>
                                     <View style={styles.sectionInfoHeader}>
@@ -690,7 +733,6 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                                                 keyboardType="numeric"
                                                                 returnKeyType={isLastInput ? "done" : "next"}
                                                                 placeholderTextColor="#94A3B8"
-                                                                selectTextOnFocus={true}
                                                                 onSubmitEditing={() => {
                                                                     if (!isLastInput) {
                                                                         // Focus next input
@@ -794,30 +836,9 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                 </TouchableOpacity>
                             </>
                         ) : (
-                            // Step 2 Footer - Swipe to Submit
-                            <View style={styles.step2Footer}>
-                                <View style={styles.step2Header}>
-                                    <TouchableOpacity
-                                        style={styles.backButtonIcon}
-                                        onPress={handlePreviousStep}
-                                    >
-                                        <Ionicons name="arrow-back" size={24} color="#64748B" />
-                                    </TouchableOpacity>
-                                    <Text style={styles.backToEditText}>Back to Edit Materials</Text>
-                                </View>
-                                
+                            // Step 2 Footer - Swipe to Submit Only
+                            <View style={styles.step2FooterSimple}>
                                 <View style={styles.swipeContainer}>
-                                    {/* Grand Total */}
-                                    <View style={styles.grandTotalContainer}>
-                                        <View style={styles.grandTotalContent}>
-                                            <Text style={styles.grandTotalLabel}>Selected Materials</Text>
-                                            <View style={styles.grandTotalDivider} />
-                                            <Text style={styles.grandTotalValue}>
-                                                {getSelectedMaterialsCount()} Item{getSelectedMaterialsCount() > 1 ? 's' : ''}
-                                            </Text>
-                                        </View>
-                                    </View>
-
                                     {/* Swipe to Submit */}
                                     <View style={styles.swipeToSubmitContainer}>
                                         <View style={styles.swipeTrack} {...panResponder.panHandlers}>
@@ -829,7 +850,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                                         transform: [{
                                                             translateX: swipeAnimation.interpolate({
                                                                 inputRange: [0, 1],
-                                                                outputRange: [0, 200],
+                                                                outputRange: [0, 200], // Match the maxSwipe distance
                                                                 extrapolate: 'clamp',
                                                             })
                                                         }]
@@ -856,13 +877,14 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                                         }
                                                     ]}
                                                 >
-                                                    Swipe to Record Usage ({getSelectedMaterialsCount()})
+                                                    Swipe to Record Usage
                                                 </Animated.Text>
                                             </View>
                                         </View>
                                     </View>
                                 </View>
-                            </View>}
+                            </View>
+                        )}
                     </View>
                 </View>
             </View>
@@ -880,7 +902,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
-        maxHeight: '90%',
+        maxHeight: '95%', // Increased from 90% to 95% for more space
         paddingBottom: 20,
     },
     header: {
@@ -1699,6 +1721,22 @@ const styles = StyleSheet.create({
         paddingBottom: 20, // Reduced padding since we have proper header now
         borderTopWidth: 1,
         borderTopColor: '#F1F5F9',
+        gap: 12,
+    },
+    step2FooterSimple: {
+        paddingHorizontal: 20,
+        paddingTop: 12,
+        paddingBottom: 20,
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+    },
+    step2BackHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
         gap: 12,
     },
     step2Header: {
