@@ -73,7 +73,8 @@ const ProjectScreen: React.FC = () => {
                 setLoading(true);
             }
 
-            const clientId = await getClientId();
+            const fetchedClientId = await getClientId();
+            const clientId = fetchedClientId || '';
             setClientId(clientId);
 
             console.log('📝 Fetching projects for clientId:', clientId);

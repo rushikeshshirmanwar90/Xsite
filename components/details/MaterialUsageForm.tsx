@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from 'react';
 import {
+    Animated,
     Modal,
+    PanResponder,
     ScrollView,
     StyleSheet,
     Text,
@@ -51,6 +53,10 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
     
     // Refs for quantity inputs to enable keyboard navigation
     const quantityInputRefs = useRef<{ [materialId: string]: TextInput | null }>({});
+
+    // Animation values for swipe to submit
+    const swipeAnimation = useRef(new Animated.Value(0)).current;
+    const [isSwipeComplete, setIsSwipeComplete] = useState(false);
 
     // Log when form opens and materials are passed
     useEffect(() => {
@@ -146,8 +152,69 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
         setCurrentStep('selection');
         // Clear input refs
         quantityInputRefs.current = {};
+        // Reset swipe animation
+        swipeAnimation.setValue(0);
+        setIsSwipeComplete(false);
         onClose();
     };
+
+    // Swipe gesture handlers
+    const handleSwipeStart = () => {
+        // Reset swipe state
+        setIsSwipeComplete(false);
+    };
+
+    const handleSwipeMove = (gestureState: any) => {
+        const { dx } = gestureState;
+        const maxSwipe = 200; // Maximum swipe distance to match new design
+        const progress = Math.max(0, Math.min(dx / maxSwipe, 1));
+        
+        swipeAnimation.setValue(progress);
+        
+        // Check if swipe is complete (70% of the way)
+        if (progress >= 0.7 && !isSwipeComplete) {
+            setIsSwipeComplete(true);
+        }
+    };
+
+    const handleSwipeEnd = (gestureState: any) => {
+        const { dx } = gestureState;
+        const maxSwipe = 200;
+        const progress = dx / maxSwipe;
+        
+        console.log('Swipe ended, progress:', progress, 'selectedMaterials.length:', Object.keys(selectedMaterials).length);
+        
+        if (progress >= 0.7) {
+            // Complete the swipe and submit
+            Animated.timing(swipeAnimation, {
+                toValue: 1,
+                duration: 200,
+                useNativeDriver: false,
+            }).start(() => {
+                console.log('Animation completed, calling handleSubmit');
+                handleSubmit();
+            });
+        } else {
+            // Animate back to start
+            Animated.timing(swipeAnimation, {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: false,
+            }).start();
+            setIsSwipeComplete(false);
+        }
+    };
+
+    // Pan responder for swipe gesture
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: () => true,
+            onPanResponderGrant: handleSwipeStart,
+            onPanResponderMove: (_, gestureState) => handleSwipeMove(gestureState),
+            onPanResponderRelease: (_, gestureState) => handleSwipeEnd(gestureState),
+        })
+    ).current;
 
     // Filter materials based on search query
     const filteredMaterials = availableMaterials.filter(material => {
@@ -727,27 +794,75 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                 </TouchableOpacity>
                             </>
                         ) : (
-                            // Step 2 Footer
-                            <>
-                                <TouchableOpacity
-                                    style={styles.backButtonIcon}
-                                    onPress={handlePreviousStep}
-                                >
-                                    <Ionicons name="arrow-back" size={24} color="#64748B" />
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[
-                                        styles.submitButtonLarge,
-                                        !canSubmitForm() && styles.submitButtonDisabled
-                                    ]}
-                                    onPress={handleSubmit}
-                                    disabled={!canSubmitForm()}
-                                >
-                                    <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-                                    <Text style={styles.submitButtonText}>Record Usage</Text>
-                                </TouchableOpacity>
-                            </>
-                        )}
+                            // Step 2 Footer - Swipe to Submit
+                            <View style={styles.step2Footer}>
+                                <View style={styles.step2Header}>
+                                    <TouchableOpacity
+                                        style={styles.backButtonIcon}
+                                        onPress={handlePreviousStep}
+                                    >
+                                        <Ionicons name="arrow-back" size={24} color="#64748B" />
+                                    </TouchableOpacity>
+                                    <Text style={styles.backToEditText}>Back to Edit Materials</Text>
+                                </View>
+                                
+                                <View style={styles.swipeContainer}>
+                                    {/* Grand Total */}
+                                    <View style={styles.grandTotalContainer}>
+                                        <View style={styles.grandTotalContent}>
+                                            <Text style={styles.grandTotalLabel}>Selected Materials</Text>
+                                            <View style={styles.grandTotalDivider} />
+                                            <Text style={styles.grandTotalValue}>
+                                                {getSelectedMaterialsCount()} Item{getSelectedMaterialsCount() > 1 ? 's' : ''}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Swipe to Submit */}
+                                    <View style={styles.swipeToSubmitContainer}>
+                                        <View style={styles.swipeTrack} {...panResponder.panHandlers}>
+                                            {/* Swipe button with icon */}
+                                            <Animated.View 
+                                                style={[
+                                                    styles.swipeButton,
+                                                    {
+                                                        transform: [{
+                                                            translateX: swipeAnimation.interpolate({
+                                                                inputRange: [0, 1],
+                                                                outputRange: [0, 200],
+                                                                extrapolate: 'clamp',
+                                                            })
+                                                        }]
+                                                    }
+                                                ]}
+                                            >
+                                                <View style={styles.doubleChevron}>
+                                                    <Ionicons name="chevron-forward" size={20} color="#FFFFFF" style={styles.chevronFirst} />
+                                                    <Ionicons name="chevron-forward" size={20} color="#FFFFFF" style={styles.chevronSecond} />
+                                                </View>
+                                            </Animated.View>
+                                            
+                                            {/* Text */}
+                                            <View style={styles.swipeTextContainer}>
+                                                <Animated.Text 
+                                                    style={[
+                                                        styles.swipeText,
+                                                        {
+                                                            opacity: swipeAnimation.interpolate({
+                                                                inputRange: [0, 0.3],
+                                                                outputRange: [1, 0],
+                                                                extrapolate: 'clamp',
+                                                            })
+                                                        }
+                                                    ]}
+                                                >
+                                                    Swipe to Record Usage ({getSelectedMaterialsCount()})
+                                                </Animated.Text>
+                                            </View>
+                                        </View>
+                                    </View>
+                                </View>
+                            </View>}
                     </View>
                 </View>
             </View>
@@ -1575,6 +1690,124 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '500',
         color: '#3B82F6',
+    },
+    // Step 2 Footer Styles
+    step2Footer: {
+        flexDirection: 'column',
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        paddingBottom: 20, // Reduced padding since we have proper header now
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+        gap: 12,
+    },
+    step2Header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+        gap: 12,
+    },
+    backToEditText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#64748B',
+    },
+    swipeContainer: {
+        width: '100%',
+    },
+    // Grand Total Styles
+    grandTotalContainer: {
+        paddingVertical: 12,
+        marginBottom: 8,
+    },
+    grandTotalContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+    },
+    grandTotalLabel: {
+        fontSize: 18,
+        color: '#374151',
+        fontWeight: '600',
+        fontFamily: 'System',
+        letterSpacing: 0.3,
+        textTransform: 'uppercase',
+    },
+    grandTotalDivider: {
+        width: 2,
+        height: 24,
+        backgroundColor: '#D1D5DB',
+        borderRadius: 1,
+    },
+    grandTotalValue: {
+        fontSize: 28,
+        color: '#000000',
+        fontWeight: '800',
+        fontFamily: 'System',
+        letterSpacing: 0.8,
+        textShadowColor: 'rgba(0, 0, 0, 0.1)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 2,
+    },
+    // Swipe to Submit Styles
+    swipeToSubmitContainer: {
+        width: '100%',
+        paddingHorizontal: 4,
+    },
+    swipeTrack: {
+        backgroundColor: '#1E293B',
+        borderRadius: 35,
+        height: 70,
+        position: 'relative',
+        justifyContent: 'center',
+        alignItems: 'flex-start',
+        paddingLeft: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 8,
+    },
+    swipeButton: {
+        position: 'absolute',
+        left: 6,
+        top: 6,
+        width: 58,
+        height: 58,
+        backgroundColor: '#3B82F6',
+        borderRadius: 29,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 5,
+    },
+    doubleChevron: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    chevronFirst: {
+        marginRight: -8,
+    },
+    chevronSecond: {
+        marginLeft: -8,
+    },
+    swipeTextContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingLeft: 70,
+        paddingRight: 20,
+    },
+    swipeText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#FFFFFF',
+        letterSpacing: 0.5,
     },
 });
 

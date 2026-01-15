@@ -309,8 +309,22 @@ const ManageProject = () => {
                 
                 if (responseData && responseData.success && responseData.data) {
                     const building = responseData.data;
+                    
+                    // Calculate the correct totalFloors from the floors array
+                    // totalFloors should only count upper floors (floorNumber > 0)
+                    let calculatedTotalFloors = building.totalFloors || 0;
+                    if (building.floors && Array.isArray(building.floors)) {
+                        const upperFloorsCount = building.floors.filter((f: any) => f.floorNumber > 0).length;
+                        // If the database value doesn't match the actual count, use the actual count
+                        if (upperFloorsCount !== building.totalFloors) {
+                            console.log(`⚠️ Mismatch detected: DB has totalFloors=${building.totalFloors}, but actual upper floors=${upperFloorsCount}`);
+                            console.log('🔧 Using actual count from floors array');
+                            calculatedTotalFloors = upperFloorsCount;
+                        }
+                    }
+                    
                     const details = {
-                        totalFloors: building.totalFloors || 0,
+                        totalFloors: calculatedTotalFloors,
                         totalBookedUnits: building.totalBookedUnits || 0,
                         description: building.description || '',
                         hasBasement: building.hasBasement || false,
@@ -318,12 +332,16 @@ const ManageProject = () => {
                     };
                     setBuildingDetails(details);
                     
+                    console.log('✅ Building details loaded successfully');
+                    console.log('📊 Calculated totalFloors:', calculatedTotalFloors);
+                    console.log('📊 Has basement:', details.hasBasement);
+                    console.log('📊 Has ground floor:', details.hasGroundFloor);
+                    
                     // Check if data exists (at least one meaningful value)
                     const dataExists = details.totalFloors > 0 || details.description.trim() !== '' || 
                                       details.hasBasement || !details.hasGroundFloor;
                     setHasExistingData(dataExists);
                     
-                    console.log('✅ Building details loaded successfully');
                     console.log('Has existing data:', dataExists);
                 } else {
                     console.log('⚠️ No building data found, using defaults');
@@ -493,53 +511,9 @@ const ManageProject = () => {
             console.log('Section ID:', sectionId);
             console.log('Building details:', JSON.stringify(buildingDetails, null, 2));
             
-            // Create floors array
-            const floorsToCreate = [];
-
-            if (buildingDetails.hasBasement) {
-                floorsToCreate.push({
-                    floorNumber: -1,
-                    floorName: 'Basement',
-                    floorType: 'Parking',
-                    totalUnits: 0,
-                    totalBookedUnits: 0,
-                    description: 'Basement floor',
-                    isActive: true
-                });
-            }
-
-            if (buildingDetails.hasGroundFloor) {
-                floorsToCreate.push({
-                    floorNumber: 0,
-                    floorName: 'Ground Floor',
-                    floorType: 'Commercial',
-                    totalUnits: 0,
-                    totalBookedUnits: 0,
-                    description: 'Ground floor',
-                    isActive: true
-                });
-            }
-
-            for (let i = 1; i <= buildingDetails.totalFloors; i++) {
-                const floorName = i === 1 ? '1st Floor' : 
-                                 i === 2 ? '2nd Floor' : 
-                                 i === 3 ? '3rd Floor' : 
-                                 `${i}th Floor`;
-                
-                floorsToCreate.push({
-                    floorNumber: i,
-                    floorName: floorName,
-                    floorType: 'Residential',
-                    totalUnits: 0,
-                    totalBookedUnits: 0,
-                    description: `${floorName} - Residential units`,
-                    isActive: true
-                });
-            }
-
+            // First save the building details
             const payload = {
                 ...buildingDetails,
-                floors: floorsToCreate,
                 clientId: 'unknown'
             };
 
@@ -573,10 +547,106 @@ const ManageProject = () => {
 
             console.log('📥 API Response:', response.data);
 
+            // Now create floors automatically using bulk API
+            const floorsToCreate = [];
+
+            if (buildingDetails.hasBasement) {
+                floorsToCreate.push({
+                    floorNumber: -1,
+                    floorName: 'Basement',
+                    floorType: 'Parking',
+                    totalUnits: 0,
+                    description: 'Basement floor for parking'
+                });
+            }
+
+            if (buildingDetails.hasGroundFloor) {
+                floorsToCreate.push({
+                    floorNumber: 0,
+                    floorName: 'Ground Floor',
+                    floorType: 'Commercial',
+                    totalUnits: 0,
+                    description: 'Ground floor for commercial use'
+                });
+            }
+
+            for (let i = 1; i <= buildingDetails.totalFloors; i++) {
+                const floorName = i === 1 ? '1st Floor' : 
+                                 i === 2 ? '2nd Floor' : 
+                                 i === 3 ? '3rd Floor' : 
+                                 `${i}th Floor`;
+                
+                floorsToCreate.push({
+                    floorNumber: i,
+                    floorName: floorName,
+                    floorType: 'Residential',
+                    totalUnits: 0,
+                    description: `${floorName} - Residential units`
+                });
+            }
+
+            // Check for existing floors and filter out duplicates
+            let createdFloorsCount = 0;
+            if (floorsToCreate.length > 0) {
+                let existingFloors: any[] = [];
+                try {
+                    const existingFloorsResponse = await axios.get(`${domain}/api/floors?buildingId=${sectionId}`);
+                    existingFloors = (existingFloorsResponse.data as any)?.data || [];
+                    console.log(`📋 Found ${existingFloors.length} existing floors`);
+                } catch (error) {
+                    console.log('No existing floors found or error fetching them');
+                    existingFloors = [];
+                }
+
+                // Filter out floors that already exist
+                const newFloorsToCreate = floorsToCreate.filter(floor => {
+                    const exists = existingFloors.some((f: any) => f.floorNumber === floor.floorNumber);
+                    if (exists) {
+                        console.log(`⏭️ Floor ${floor.floorName} already exists, skipping`);
+                    } else {
+                        console.log(`🔄 Creating floor: ${floor.floorName} (${floor.floorNumber})`);
+                    }
+                    return !exists;
+                });
+
+                console.log(`📋 Floors to create: ${newFloorsToCreate.length}`);
+
+                // Create all new floors in bulk (single API call)
+                if (newFloorsToCreate.length > 0) {
+                    try {
+                        console.log('🔄 Creating all floors in bulk...');
+                        console.log('Bulk payload:', JSON.stringify({
+                            buildingId: sectionId,
+                            floors: newFloorsToCreate
+                        }, null, 2));
+
+                        const bulkResponse = await axios.post(`${domain}/api/floors`, {
+                            buildingId: sectionId,
+                            floors: newFloorsToCreate
+                        });
+                        
+                        console.log('✅ Bulk floor creation response:', bulkResponse.data);
+                        const responseData = bulkResponse.data as any;
+                        createdFloorsCount = responseData?.data?.createdCount || newFloorsToCreate.length;
+                        console.log(`📊 Floor creation summary: ${createdFloorsCount} created successfully`);
+                    } catch (floorError: any) {
+                        console.error('❌ Failed to create floors in bulk:', floorError);
+                        console.error('Error details:', floorError?.response?.data);
+                        // Continue even if floor creation fails
+                    }
+                } else {
+                    console.log('ℹ️ No new floors to create - all floors already exist');
+                }
+            }
+
             toast.dismiss(loadingToast);
 
             if (response.status === 200 || response.status === 201) {
-                toast.success(`Building details saved! Created ${floorsToCreate.length} floors automatically.`);
+                if (createdFloorsCount > 0) {
+                    toast.success(`Building details saved! Created ${createdFloorsCount} floors automatically.`);
+                } else {
+                    toast.success('Building details saved successfully!');
+                }
                 setIsEditMode(false);
                 setHasExistingData(true);
                 
@@ -609,11 +679,175 @@ const ManageProject = () => {
     };
 
     // Handle navigate to floors management
-    const handleManageFloors = () => {
+    const handleManageFloors = async () => {
         if (!selectedSection) return;
 
         const sectionId = selectedSection.sectionId || selectedSection._id;
         
+        let loadingToast: any = null;
+
+        try {
+            // First, check if building has details and create floors if needed
+            loadingToast = toast.loading('Preparing floors...');
+
+            // Fetch current building details to check if floors exist
+            let buildingData = null;
+            try {
+                const response = await axios.get(`${domain}/api/building?id=${sectionId}`);
+                const responseData = response.data as any;
+                if (responseData && responseData.success && responseData.data) {
+                    buildingData = responseData.data;
+                }
+            } catch (error: any) {
+                console.log('Building not found, will create floors based on current details');
+            }
+
+            // Check if building exists and get existing floors
+            let existingFloors: any[] = [];
+            if (buildingData) {
+                existingFloors = buildingData.floors || [];
+                console.log(`📋 Found ${existingFloors.length} existing floors`);
+                
+                // If floors already exist, just navigate without creating
+                if (existingFloors.length > 0) {
+                    console.log('✅ Floors already exist, skipping creation');
+                    console.log('Existing floors:', existingFloors.map((f: any) => `${f.floorName} (${f.floorNumber})`).join(', '));
+                    
+                    toast.dismiss(loadingToast);
+                    
+                    // Navigate directly to floors page
+                    setShowDetailsModal(false);
+                    setSelectedSection(null);
+                    
+                    router.push({
+                        pathname: '/building_floors/[id]',
+                        params: { 
+                            id: sectionId,
+                            buildingName: selectedSection.name 
+                        }
+                    });
+                    return; // Exit early - don't create floors
+                }
+            }
+
+            // Prepare floors to create based on building data or current state
+            const floorsToCreate = [];
+            // IMPORTANT: Always use buildingDetails from state if we're in edit mode or if building data is incomplete
+            // This ensures we use the latest values entered by the user even if not saved yet
+            let sourceData = buildingData;
+            
+            // If building data doesn't have floor configuration, use current state
+            if (!buildingData || (buildingData.totalFloors === 0 && !buildingData.hasBasement && buildingData.hasGroundFloor === undefined)) {
+                sourceData = buildingDetails;
+                console.log('⚠️ Building data incomplete or missing, using current state');
+            } else if (buildingDetails.totalFloors > 0 || buildingDetails.hasBasement || !buildingDetails.hasGroundFloor) {
+                // If user has modified values in the form, prefer those over saved data
+                sourceData = buildingDetails;
+                console.log('📝 Using current form state (user may have made changes)');
+            }
+
+            if (sourceData) {
+                console.log('Building data source:', buildingData && sourceData === buildingData ? 'from API' : 'from state');
+                console.log('Source data:', JSON.stringify(sourceData, null, 2));
+                console.log('📊 Configuration: totalFloors=' + sourceData.totalFloors + ', hasBasement=' + sourceData.hasBasement + ', hasGroundFloor=' + sourceData.hasGroundFloor);
+
+                // Create basement if enabled
+                if (sourceData.hasBasement) {
+                    floorsToCreate.push({
+                        floorNumber: -1,
+                        floorName: 'Basement',
+                        floorType: 'Parking',
+                        totalUnits: 0,
+                        description: 'Basement floor for parking'
+                    });
+                    console.log('🔄 Creating floor: Basement (-1)');
+                }
+
+                // Create ground floor if enabled
+                if (sourceData.hasGroundFloor) {
+                    floorsToCreate.push({
+                        floorNumber: 0,
+                        floorName: 'Ground Floor',
+                        floorType: 'Commercial',
+                        totalUnits: 0,
+                        description: 'Ground floor for commercial use'
+                    });
+                    console.log('🔄 Creating floor: Ground Floor (0)');
+                }
+
+                // Create upper floors
+                const totalFloors = sourceData.totalFloors || 0;
+                for (let i = 1; i <= totalFloors; i++) {
+                    const floorName = i === 1 ? '1st Floor' : 
+                                     i === 2 ? '2nd Floor' : 
+                                     i === 3 ? '3rd Floor' : 
+                                     `${i}th Floor`;
+                    
+                    floorsToCreate.push({
+                        floorNumber: i,
+                        floorName: floorName,
+                        floorType: 'Residential',
+                        totalUnits: 0,
+                        description: `${floorName} - Residential units`
+                    });
+                    console.log(`🔄 Creating floor: ${floorName} (${i})`);
+                }
+
+                console.log(`📋 Floors to create: ${floorsToCreate.length}`);
+                if (floorsToCreate.length > 0) {
+                    console.log('Floors list:', floorsToCreate.map(f => `${f.floorName} (${f.floorNumber})`).join(', '));
+                }
+
+                // Create all floors using bulk API (single request)
+                if (floorsToCreate.length > 0) {
+                    try {
+                        console.log('🔄 Creating all floors in bulk...');
+                        console.log('Bulk payload:', JSON.stringify({
+                            buildingId: sectionId,
+                            floors: floorsToCreate
+                        }, null, 2));
+
+                        const bulkResponse = await axios.post(`${domain}/api/floors`, {
+                            buildingId: sectionId,
+                            floors: floorsToCreate
+                        });
+                        
+                        console.log('✅ Bulk floor creation response:', bulkResponse.data);
+                        
+                        const responseData = bulkResponse.data as any;
+                        const createdCount = responseData?.data?.createdCount || floorsToCreate.length;
+                        
+                        toast.dismiss(loadingToast);
+                        toast.success(`Created ${createdCount} floors automatically!`);
+                        
+                        console.log(`📊 Floor creation summary: ${createdCount} created successfully`);
+                    } catch (error: any) {
+                        console.error('❌ Failed to create floors in bulk:', error);
+                        console.error('Error details:', error?.response?.data);
+                        console.error('Error status:', error?.response?.status);
+                        console.error('Error message:', error?.message);
+                        
+                        toast.dismiss(loadingToast);
+                        toast.error('Failed to create floors. Please try again.');
+                    }
+                } else {
+                    toast.dismiss(loadingToast);
+                    console.log('ℹ️ No new floors to create - all floors already exist');
+                }
+            } else {
+                toast.dismiss(loadingToast);
+                console.log('⚠️ No building data available to create floors');
+            }
+
+        } catch (error: any) {
+            if (loadingToast) {
+                toast.dismiss(loadingToast);
+            }
+            console.error('Error preparing floors:', error);
+            // Continue to floors page even if floor creation fails
+        }
+
+        // Navigate to floors management page
         setShowDetailsModal(false);
         setSelectedSection(null);
         
@@ -840,13 +1074,21 @@ const ManageProject = () => {
             </View>
 
             {/* Manage Floors Button */}
-            <TouchableOpacity
-                style={styles.manageFloorsButton}
-                onPress={handleManageFloors}
-            >
-                <Ionicons name="layers-outline" size={20} color="#FFFFFF" />
-                <Text style={styles.manageFloorsText}>Manage Floors & Units</Text>
-            </TouchableOpacity>
+            <View style={styles.manageFloorsSection}>
+                <View style={styles.manageFloorsInfo}>
+                    <Ionicons name="information-circle-outline" size={16} color="#3B82F6" />
+                    <Text style={styles.manageFloorsInfoText}>
+                        Floors will be created automatically based on your configuration above
+                    </Text>
+                </View>
+                <TouchableOpacity
+                    style={styles.manageFloorsButton}
+                    onPress={handleManageFloors}
+                >
+                    <Ionicons name="layers-outline" size={20} color="#FFFFFF" />
+                    <Text style={styles.manageFloorsText}>Manage Floors & Units</Text>
+                </TouchableOpacity>
+            </View>
         </ScrollView>
     );
 
@@ -858,6 +1100,16 @@ const ManageProject = () => {
             style={{ flex: 1 }}
             bounces={true}
         >
+            {/* Info message for new buildings */}
+            {!hasExistingData && (
+                <View style={styles.infoMessage}>
+                    <Ionicons name="information-circle-outline" size={20} color="#3B82F6" />
+                    <Text style={styles.infoMessageText}>
+                        Configure your building details below, or skip to directly manage floors and units.
+                    </Text>
+                </View>
+            )}
+
             {/* Floor Configuration */}
             <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Floor Configuration</Text>
@@ -955,6 +1207,23 @@ const ManageProject = () => {
                     multiline
                     numberOfLines={4}
                 />
+            </View>
+
+            {/* Manage Floors Button - Also available in edit mode */}
+            <View style={styles.manageFloorsSection}>
+                <View style={styles.manageFloorsInfo}>
+                    <Ionicons name="information-circle-outline" size={16} color="#3B82F6" />
+                    <Text style={styles.manageFloorsInfoText}>
+                        Floors will be created automatically when you save or navigate to floor management
+                    </Text>
+                </View>
+                <TouchableOpacity
+                    style={styles.manageFloorsButton}
+                    onPress={handleManageFloors}
+                >
+                    <Ionicons name="layers-outline" size={20} color="#FFFFFF" />
+                    <Text style={styles.manageFloorsText}>Manage Floors & Units</Text>
+                </TouchableOpacity>
             </View>
         </ScrollView>
     );
@@ -1221,6 +1490,15 @@ const ManageProject = () => {
                                         {hasExistingData ? 'Cancel' : 'Close'}
                                     </Text>
                                 </TouchableOpacity>
+
+                                {!hasExistingData && (
+                                    <TouchableOpacity
+                                        style={styles.skipButton}
+                                        onPress={handleManageFloors}
+                                    >
+                                        <Text style={styles.skipButtonText}>Skip & Manage Floors</Text>
+                                    </TouchableOpacity>
+                                )}
 
                                 <TouchableOpacity
                                     style={styles.saveButton}
@@ -1623,6 +1901,54 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: '600',
         color: '#FFFFFF',
+    },
+    skipButton: {
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 8,
+        backgroundColor: '#10B981',
+    },
+    skipButtonText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#FFFFFF',
+    },
+    infoMessage: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        backgroundColor: '#EFF6FF',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#DBEAFE',
+        gap: 8,
+    },
+    infoMessageText: {
+        flex: 1,
+        fontSize: 14,
+        color: '#1E40AF',
+        lineHeight: 18,
+    },
+    manageFloorsSection: {
+        marginTop: 16,
+    },
+    manageFloorsInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#EFF6FF',
+        padding: 10,
+        borderRadius: 8,
+        marginBottom: 12,
+        gap: 8,
+        borderWidth: 1,
+        borderColor: '#DBEAFE',
+    },
+    manageFloorsInfoText: {
+        flex: 1,
+        fontSize: 13,
+        color: '#1E40AF',
+        lineHeight: 16,
     },
     comingSoonContainer: {
         alignItems: 'center',

@@ -142,7 +142,7 @@ const ReviewPurposeStep: React.FC<ReviewPurposeStepProps> = ({
         </View>
 
         {/* Extra padding at bottom for floating button */}
-        <View style={{ height: 100 }} />
+        <View style={{ height: 140 }} />
       </ScrollView>
     </View>
   );

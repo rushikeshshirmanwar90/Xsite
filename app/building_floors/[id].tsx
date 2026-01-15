@@ -36,11 +36,12 @@ interface Unit {
     area: number;
     price?: number;
     status: string;
+    sold?: boolean; // New field
     customerInfo?: {
-        name?: string;
-        phone?: string;
-        email?: string;
-    };
+        name?: string | null;
+        phone?: string | null;
+        email?: string | null;
+    } | null; // Can be null now
     bookingDate?: string;
     description?: string;
 }
@@ -78,6 +79,7 @@ const BuildingFloorsPage = () => {
         type: '1BHK',
         area: 0,
         status: 'Available',
+        sold: false,
         description: '',
         customerInfo: {
             name: '',
@@ -92,6 +94,7 @@ const BuildingFloorsPage = () => {
         type: '1BHK',
         area: 0,
         status: 'Available',
+        sold: false,
         description: '',
         customerInfo: {
             name: '',
@@ -119,16 +122,30 @@ const BuildingFloorsPage = () => {
                 setLoading(true);
             }
 
+            console.log('🔍 Fetching floors for building:', buildingId);
             const response = await axios.get(`${domain}/api/floors?buildingId=${buildingId}`);
             const responseData = response.data as any;
             
+            console.log('📦 Floors API Response:', JSON.stringify(responseData, null, 2));
+            
             if (responseData && responseData.success) {
-                setFloors(responseData.data || []);
+                const floorsData = responseData.data || [];
+                console.log(`✅ Found ${floorsData.length} floors`);
+                
+                // Sort floors by floor number (basement first, then ground, then upper floors)
+                const sortedFloors = floorsData.sort((a: Floor, b: Floor) => a.floorNumber - b.floorNumber);
+                console.log('📊 Sorted floors:', sortedFloors.map((f: Floor) => `${f.floorName} (${f.floorNumber})`).join(', '));
+                
+                setFloors(sortedFloors);
             } else {
+                console.warn('⚠️ No success flag in response');
                 setFloors([]);
             }
         } catch (error: any) {
-            console.error('Error fetching floors:', error);
+            console.error('❌ Error fetching floors:', error);
+            console.error('Error response:', error?.response?.data);
+            console.error('Error status:', error?.response?.status);
+            
             if (error?.response?.status !== 404) {
                 toast.error('Failed to load floors');
             }
@@ -140,8 +157,14 @@ const BuildingFloorsPage = () => {
 
     // Initialize data
     useEffect(() => {
+        console.log('🚀 Building Floors Page Initialized');
+        console.log('Building ID:', buildingId);
+        console.log('Building Name:', buildingName);
+        
         if (buildingId) {
             fetchFloors();
+        } else {
+            console.error('❌ No building ID provided!');
         }
     }, [buildingId]);
 
@@ -331,12 +354,25 @@ const BuildingFloorsPage = () => {
         try {
             loadingToast = toast.loading('Adding unit...');
 
+            // Prepare customerInfo - only include if at least one field has a value
+            const hasCustomerInfo = newUnit.customerInfo.name.trim() || 
+                                   newUnit.customerInfo.phone.trim() || 
+                                   newUnit.customerInfo.email.trim();
+
             const payload = {
                 buildingId,
                 floorId: selectedFloor._id,
-                ...newUnit,
                 unitNumber: newUnit.unitNumber.trim(),
-                area: Number(newUnit.area)
+                type: newUnit.type,
+                area: Number(newUnit.area),
+                status: newUnit.status,
+                sold: newUnit.sold,
+                description: newUnit.description,
+                customerInfo: hasCustomerInfo ? {
+                    name: newUnit.customerInfo.name.trim() || null,
+                    phone: newUnit.customerInfo.phone.trim() || null,
+                    email: newUnit.customerInfo.email.trim() || null
+                } : null
             };
 
             const response = await axios.post(`${domain}/api/building/units`, payload);
@@ -351,6 +387,7 @@ const BuildingFloorsPage = () => {
                     type: '1BHK',
                     area: 0,
                     status: 'Available',
+                    sold: false,
                     description: '',
                     customerInfo: {
                         name: '',
@@ -425,6 +462,7 @@ const BuildingFloorsPage = () => {
             type: unit.type,
             area: unit.area,
             status: unit.status,
+            sold: unit.sold || false,
             description: unit.description || '',
             customerInfo: {
                 name: unit.customerInfo?.name || '',
@@ -454,10 +492,23 @@ const BuildingFloorsPage = () => {
         try {
             loadingToast = toast.loading('Updating unit...');
 
+            // Prepare customerInfo - only include if at least one field has a value
+            const hasCustomerInfo = editUnit.customerInfo.name.trim() || 
+                                   editUnit.customerInfo.phone.trim() || 
+                                   editUnit.customerInfo.email.trim();
+
             const payload = {
-                ...editUnit,
                 unitNumber: editUnit.unitNumber.trim(),
-                area: Number(editUnit.area)
+                type: editUnit.type,
+                area: Number(editUnit.area),
+                status: editUnit.status,
+                sold: editUnit.sold,
+                description: editUnit.description,
+                customerInfo: hasCustomerInfo ? {
+                    name: editUnit.customerInfo.name.trim() || null,
+                    phone: editUnit.customerInfo.phone.trim() || null,
+                    email: editUnit.customerInfo.email.trim() || null
+                } : null
             };
 
             const response = await axios.put(
@@ -476,6 +527,7 @@ const BuildingFloorsPage = () => {
                     type: '1BHK',
                     area: 0,
                     status: 'Available',
+                    sold: false,
                     description: '',
                     customerInfo: {
                         name: '',

@@ -5,6 +5,7 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   StyleSheet,
   Text,
@@ -13,6 +14,7 @@ import {
   View,
   ViewStyle
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 import AddMaterialsStep from './AddMaterialsStep';
@@ -54,6 +56,10 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   const [editingMaterialIndex, setEditingMaterialIndex] = useState<number | null>(null);
   const [purposeMessage, setPurposeMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Animation values for swipe to submit
+  const swipeAnimation = useRef(new Animated.Value(0)).current;
+  const [isSwipeComplete, setIsSwipeComplete] = useState(false);
 
   const handleTemplateSelect = (templateKey: string) => {
     const template = MATERIAL_TEMPLATES[templateKey];
@@ -261,6 +267,64 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     }
   };
 
+  // Swipe gesture handlers
+  const handleSwipeStart = () => {
+    // Reset swipe state
+    setIsSwipeComplete(false);
+  };
+
+  const handleSwipeMove = (gestureState: any) => {
+    const { dx } = gestureState;
+    const maxSwipe = 200; // Maximum swipe distance to match new design
+    const progress = Math.max(0, Math.min(dx / maxSwipe, 1));
+    
+    swipeAnimation.setValue(progress);
+    
+    // Check if swipe is complete (70% of the way)
+    if (progress >= 0.7 && !isSwipeComplete) {
+      setIsSwipeComplete(true);
+    }
+  };
+
+  const handleSwipeEnd = (gestureState: any) => {
+    const { dx } = gestureState;
+    const maxSwipe = 200;
+    const progress = dx / maxSwipe;
+    
+    console.log('Swipe ended, progress:', progress, 'addedMaterials.length:', addedMaterials.length);
+    
+    if (progress >= 0.7) {
+      // Complete the swipe and submit
+      Animated.timing(swipeAnimation, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: false,
+      }).start(() => {
+        console.log('Animation completed, calling handleSendRequest');
+        handleSendRequest();
+      });
+    } else {
+      // Animate back to start
+      Animated.timing(swipeAnimation, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+      setIsSwipeComplete(false);
+    }
+  };
+
+  // Pan responder for swipe gesture
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: handleSwipeStart,
+      onPanResponderMove: (_, gestureState) => handleSwipeMove(gestureState),
+      onPanResponderRelease: (_, gestureState) => handleSwipeEnd(gestureState),
+    })
+  ).current;
+
   const resetForm = () => {
     setFormData({
       name: '',
@@ -284,6 +348,8 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       resetForm();
       setCurrentStep(0);
       slideAnim.setValue(0);
+      swipeAnimation.setValue(0);
+      setIsSwipeComplete(false);
       onClose();
       return;
     }
@@ -307,6 +373,8 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               resetForm();
               setCurrentStep(0);
               slideAnim.setValue(0);
+              swipeAnimation.setValue(0);
+              setIsSwipeComplete(false);
               onClose();
             },
           },
@@ -318,6 +386,8 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       resetForm();
       setCurrentStep(0);
       slideAnim.setValue(0);
+      swipeAnimation.setValue(0);
+      setIsSwipeComplete(false);
       onClose();
     }
   };
@@ -435,30 +505,60 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
 
           {currentStep === 1 && (
             <View style={styles.floatingButtonContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.floatingSendButton,
-                  isSubmitting && styles.floatingSendButtonDisabled
-                ]}
-                onPress={handleSendRequest}
-                activeOpacity={0.8}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <View style={styles.loadingContainer}>
-                    <Animated.View style={styles.loadingSpinner}>
-                      <Text style={styles.loadingText}>⏳</Text>
-                    </Animated.View>
-                    <Text style={styles.floatingSendButtonText}>
-                      Sending Request...
-                    </Text>
-                  </View>
-                ) : (
-                  <Text style={styles.floatingSendButtonText}>
-                    📤 Send Material Request
+              {/* Grand Total */}
+              <View style={styles.grandTotalContainer}>
+                <View style={styles.grandTotalContent}>
+                  <Text style={styles.grandTotalLabel}>Total Materials</Text>
+                  <View style={styles.grandTotalDivider} />
+                  <Text style={styles.grandTotalValue}>
+                    {addedMaterials.length} Item{addedMaterials.length > 1 ? 's' : ''}
                   </Text>
-                )}
-              </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Swipe to Submit */}
+              <View style={styles.swipeToSubmitContainer}>
+                <View style={styles.swipeTrack} {...panResponder.panHandlers}>
+                  {/* Swipe button with icon */}
+                  <Animated.View 
+                    style={[
+                      styles.swipeButton,
+                      {
+                        transform: [{
+                          translateX: swipeAnimation.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0, 200],
+                            extrapolate: 'clamp',
+                          })
+                        }]
+                      }
+                    ]}
+                  >
+                    <View style={styles.doubleChevron}>
+                      <Ionicons name="chevron-forward" size={20} color="#FFFFFF" style={styles.chevronFirst} />
+                      <Ionicons name="chevron-forward" size={20} color="#FFFFFF" style={styles.chevronSecond} />
+                    </View>
+                  </Animated.View>
+                  
+                  {/* Text */}
+                  <View style={styles.swipeTextContainer}>
+                    <Animated.Text 
+                      style={[
+                        styles.swipeText,
+                        {
+                          opacity: swipeAnimation.interpolate({
+                            inputRange: [0, 0.3],
+                            outputRange: [1, 0],
+                            extrapolate: 'clamp',
+                          })
+                        }
+                      ]}
+                    >
+                      Swipe to Add Materials ({addedMaterials.length})
+                    </Animated.Text>
+                  </View>
+                </View>
+              </View>
             </View>
           )}
         </KeyboardAvoidingView>
@@ -544,6 +644,100 @@ const styles = StyleSheet.create<Styles>({
   },
   loadingText: {
     fontSize: 20,
+  },
+  // Grand Total Styles
+  grandTotalContainer: {
+    paddingVertical: 12,
+    marginBottom: 8,
+  },
+  grandTotalContent: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 12,
+  },
+  grandTotalLabel: {
+    fontSize: 18,
+    color: '#374151',
+    fontWeight: '600' as const,
+    fontFamily: 'System',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase' as const,
+  },
+  grandTotalDivider: {
+    width: 2,
+    height: 24,
+    backgroundColor: '#D1D5DB',
+    borderRadius: 1,
+  },
+  grandTotalValue: {
+    fontSize: 28,
+    color: '#000000',
+    fontWeight: '800' as const,
+    fontFamily: 'System',
+    letterSpacing: 0.8,
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  // Swipe to Submit Styles
+  swipeToSubmitContainer: {
+    width: '100%',
+    paddingHorizontal: 4,
+  },
+  swipeTrack: {
+    backgroundColor: '#1E293B',
+    borderRadius: 35,
+    height: 70,
+    position: 'relative' as const,
+    justifyContent: 'center' as const,
+    alignItems: 'flex-start' as const,
+    paddingLeft: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  swipeButton: {
+    position: 'absolute' as const,
+    left: 6,
+    top: 6,
+    width: 58,
+    height: 58,
+    backgroundColor: '#3B82F6',
+    borderRadius: 29,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  doubleChevron: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  chevronFirst: {
+    marginRight: -8,
+  },
+  chevronSecond: {
+    marginLeft: -8,
+  },
+  swipeTextContainer: {
+    flex: 1,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    paddingLeft: 70,
+    paddingRight: 20,
+  },
+  swipeText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
 });
 

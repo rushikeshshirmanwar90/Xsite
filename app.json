@@ -5,7 +5,7 @@
     "owner": "codewithrushi",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/logo.jpg",
+    "icon": "./assets/images/icon.png",
     "scheme": "siteex",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -17,7 +17,7 @@
       "package": "com.codewithrushi.xsite",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/logo.jpg",
+        "foregroundImage": "./assets/images/icon.png",
         "backgroundImage": "./assets/images/images/splash.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
