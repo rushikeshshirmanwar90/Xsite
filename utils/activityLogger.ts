@@ -382,13 +382,21 @@ export const logMiniSectionCreated = async (
     activityType: "mini_section_created",
     category: "mini_section",
     action: "create",
-    description: `Created mini-section "${miniSectionName}" in "${sectionName}"`,
+    description: `Created mini-section "${miniSectionName}" in ${projectName} → ${sectionName}`,
     projectId,
     projectName,
     sectionId,
     sectionName,
     miniSectionId,
     miniSectionName,
+    metadata: {
+      locationHierarchy: {
+        projectName,
+        sectionName,
+        miniSectionName,
+        fullPath: `${projectName} → ${sectionName} → ${miniSectionName}`
+      }
+    },
   });
 };
 
@@ -402,11 +410,43 @@ export const logMiniSectionUpdated = async (
   changedData?: Array<{ field: string; oldValue: any; newValue: any }>,
   message?: string
 ) => {
+  // Create a detailed description based on what changed
+  let description = `Updated mini-section "${miniSectionName}" in ${projectName} → ${sectionName}`;
+  
+  if (changedData && changedData.length > 0) {
+    const changes = changedData.map(change => {
+      switch (change.field) {
+        case 'name':
+          return `name from "${change.oldValue}" to "${change.newValue}"`;
+        case 'description':
+          return `description`;
+        default:
+          return `${change.field}`;
+      }
+    });
+    
+    if (changes.length === 1) {
+      // Single change - show specific details
+      const nameChange = changedData.find(c => c.field === 'name');
+      if (nameChange) {
+        description = `Updated mini-section ${changes[0]} in ${projectName} → ${sectionName}`;
+      } else {
+        description = `Updated mini-section "${miniSectionName}" ${changes[0]} in ${projectName} → ${sectionName}`;
+      }
+    } else if (changes.length === 2) {
+      // Two changes - show both
+      description = `Updated mini-section "${miniSectionName}" ${changes.join(' and ')} in ${projectName} → ${sectionName}`;
+    } else {
+      // Multiple changes - show summary
+      description = `Updated mini-section "${miniSectionName}" (${changes.length} changes) in ${projectName} → ${sectionName}`;
+    }
+  }
+
   await logActivity({
     activityType: "mini_section_updated",
     category: "mini_section",
     action: "update",
-    description: `Updated mini-section "${miniSectionName}" in "${sectionName}"`,
+    description,
     projectId,
     projectName,
     sectionId,
@@ -415,6 +455,16 @@ export const logMiniSectionUpdated = async (
     miniSectionName,
     changedData,
     message,
+    metadata: {
+      changesCount: changedData?.length || 0,
+      changesSummary: changedData?.map(c => c.field) || [],
+      locationHierarchy: {
+        projectName,
+        sectionName,
+        miniSectionName,
+        fullPath: `${projectName} → ${sectionName} → ${miniSectionName}`
+      }
+    },
   });
 };
 
@@ -430,13 +480,21 @@ export const logMiniSectionDeleted = async (
     activityType: "mini_section_deleted",
     category: "mini_section",
     action: "delete",
-    description: `Deleted mini-section "${miniSectionName}" from "${sectionName}"`,
+    description: `Deleted mini-section "${miniSectionName}" from ${projectName} → ${sectionName}`,
     projectId,
     projectName,
     sectionId,
     sectionName,
     miniSectionId,
     miniSectionName,
+    metadata: {
+      locationHierarchy: {
+        projectName,
+        sectionName,
+        miniSectionName,
+        fullPath: `${projectName} → ${sectionName} → ${miniSectionName}`
+      }
+    },
   });
 };
 

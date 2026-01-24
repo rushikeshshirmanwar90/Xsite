@@ -171,7 +171,7 @@ const ReviewPurposeStep: React.FC<ReviewPurposeStepProps> = ({
             onPress={onBack}
             activeOpacity={0.7}
           >
-            <ArrowLeft size={16} color="#3B82F6" />
+            <ArrowLeft size={16} color="#FFFFFF" />
             <Text style={styles.backButtonText}>Back to Edit Materials</Text>
           </TouchableOpacity>
         </View>
@@ -400,9 +400,13 @@ const styles = StyleSheet.create<Styles>({
     shadowRadius: 2,
     elevation: 1,
     fontWeight: '400',
+    // Fix text visibility issues
+    textAlignVertical: 'top',
+    includeFontPadding: false,
+    textDecorationLine: 'none',
   },
   backButton: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#3B82F6',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -412,13 +416,14 @@ const styles = StyleSheet.create<Styles>({
     justifyContent: 'center',
     gap: 8,
     shadowColor: '#3B82F6',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+    minHeight: 56,
   },
   backButtonText: {
-    color: '#3B82F6',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },

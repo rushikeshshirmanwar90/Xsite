@@ -4,6 +4,7 @@ import { Picker } from '@react-native-picker/picker';
 import React, { useEffect, useState } from 'react';
 import { Alert, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { toast } from 'sonner-native';
+import { logMiniSectionCreated, logMiniSectionUpdated, logMiniSectionDeleted } from '@/utils/activityLogger';
 
 type Section = {
   id: string;
@@ -108,6 +109,22 @@ const SectionManager: React.FC<SectionManagerProps> = ({
       };
       
       console.log('New section created:', newSection);
+
+      // Log mini-section creation activity
+      try {
+        await logMiniSectionCreated(
+          sectionData.projectDetails.projectId,
+          sectionData.projectDetails.projectName,
+          sectionData.mainSectionDetails.sectionId,
+          sectionData.mainSectionDetails.sectionName,
+          newSection.id,
+          newSection.name
+        );
+        console.log('✅ Mini-section creation activity logged successfully');
+      } catch (error) {
+        console.error('❌ Failed to log mini-section creation activity:', error);
+        // Don't break the flow if activity logging fails
+      }
       
       // Add the new section to the list
       const updatedSections = [...sections, newSection];
@@ -146,6 +163,11 @@ const SectionManager: React.FC<SectionManagerProps> = ({
       description: newSectionDesc.trim(),
     };
 
+    // Get the current section for logging
+    const currentSection = sections.find(s => s.id === editingSectionId);
+    const oldName = currentSection?.name || '';
+    const oldDescription = currentSection?.description || '';
+
     console.log('Updating section:', editingSectionId, updateData);
     const res: any = await updateSection(editingSectionId, updateData);
 
@@ -157,6 +179,40 @@ const SectionManager: React.FC<SectionManagerProps> = ({
 
     if (res && res.success) {
       toast.success("Section updated successfully");
+
+      // Log mini-section update activity
+      try {
+        const changedData = [];
+        if (oldName !== newSectionName.trim()) {
+          changedData.push({
+            field: 'name',
+            oldValue: oldName,
+            newValue: newSectionName.trim()
+          });
+        }
+        if (oldDescription !== newSectionDesc.trim()) {
+          changedData.push({
+            field: 'description',
+            oldValue: oldDescription,
+            newValue: newSectionDesc.trim()
+          });
+        }
+
+        await logMiniSectionUpdated(
+          projectDetails?.projectId || "1245",
+          projectDetails?.projectName || "projectname",
+          mainSectionDetails?.sectionId || "sec124",
+          mainSectionDetails?.sectionName || "tower A",
+          editingSectionId,
+          newSectionName.trim(),
+          changedData.length > 0 ? changedData : undefined,
+          changedData.length > 0 ? `Updated ${changedData.map(c => c.field).join(', ')}` : undefined
+        );
+        console.log('✅ Mini-section update activity logged successfully');
+      } catch (error) {
+        console.error('❌ Failed to log mini-section update activity:', error);
+        // Don't break the flow if activity logging fails
+      }
 
       // Update the section in local state
       const updatedSections = sections.map(s =>
@@ -212,6 +268,22 @@ const SectionManager: React.FC<SectionManagerProps> = ({
 
             if (res && res.success) {
               toast.success("Section deleted successfully");
+
+              // Log mini-section deletion activity
+              try {
+                await logMiniSectionDeleted(
+                  projectDetails?.projectId || "1245",
+                  projectDetails?.projectName || "projectname",
+                  mainSectionDetails?.sectionId || "sec124",
+                  mainSectionDetails?.sectionName || "tower A",
+                  section.id,
+                  section.name
+                );
+                console.log('✅ Mini-section deletion activity logged successfully');
+              } catch (error) {
+                console.error('❌ Failed to log mini-section deletion activity:', error);
+                // Don't break the flow if activity logging fails
+              }
 
               // Remove from local state
               const updatedSections = sections.filter(s => s.id !== section.id);

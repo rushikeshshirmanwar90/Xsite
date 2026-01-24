@@ -74,6 +74,10 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
     const swipeAnimation = useRef(new Animated.Value(0)).current;
     const [isSwipeComplete, setIsSwipeComplete] = useState(false);
 
+    // Loading animation states
+    const [isSubmittingUsage, setIsSubmittingUsage] = useState(false);
+    const loadingAnimation = useRef(new Animated.Value(0)).current;
+
     // Function to fetch ALL available materials (with proper pagination)
     const fetchAllAvailableMaterials = async () => {
         if (!projectId) {
@@ -244,6 +248,24 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
         return { icon: 'cube-outline' as keyof typeof import('@expo/vector-icons').Ionicons.glyphMap, color: '#6B7280' };
     };
 
+    // Loading animation functions
+    const startLoadingAnimation = () => {
+        setIsSubmittingUsage(true);
+        Animated.loop(
+            Animated.timing(loadingAnimation, {
+                toValue: 1,
+                duration: 1000,
+                useNativeDriver: true,
+            })
+        ).start();
+    };
+
+    const stopLoadingAnimation = () => {
+        setIsSubmittingUsage(false);
+        loadingAnimation.stopAnimation();
+        loadingAnimation.setValue(0);
+    };
+
     // Log when form opens and fetch all materials
     useEffect(() => {
         if (visible) {
@@ -270,7 +292,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
         }
     }, [visible, projectId, sectionId]);
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         // Use refs for current values to avoid stale state
         const currentSelectedMiniSectionId = selectedMiniSectionIdRef.current;
         const currentSelectedMaterials = selectedMaterialsRef.current;
@@ -338,8 +360,18 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
         });
         console.log('========================================\n');
 
-        onSubmit(currentSelectedMiniSectionId, materialUsages);
-        handleClose();
+        // Start loading animation
+        startLoadingAnimation();
+
+        try {
+            await onSubmit(currentSelectedMiniSectionId, materialUsages);
+            handleClose();
+        } catch (error) {
+            console.error('Error submitting material usage:', error);
+            // Handle error if needed
+        } finally {
+            stopLoadingAnimation();
+        }
     };
 
     const handleClose = () => {
@@ -377,7 +409,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
         }
     };
 
-    const handleSwipeEnd = (gestureState: any) => {
+    const handleSwipeEnd = async (gestureState: any) => {
         const { dx } = gestureState;
         const maxSwipe = 200; // Maximum swipe distance to match LaborFormModal
         const progress = dx / maxSwipe;
@@ -396,9 +428,9 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                 toValue: 1,
                 duration: 200,
                 useNativeDriver: false,
-            }).start(() => {
+            }).start(async () => {
                 console.log('Animation completed, calling handleSubmit');
-                handleSubmit();
+                await handleSubmit();
             });
         } else {
             // Animate back to start
@@ -1087,6 +1119,58 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                     </View>
                 </View>
             </View>
+
+            {/* Loading Overlay */}
+            {isSubmittingUsage && (
+                <View style={styles.loadingOverlay}>
+                    <View style={styles.loadingContainer}>
+                        <Animated.View
+                            style={[
+                                styles.loadingIconContainer,
+                                {
+                                    transform: [
+                                        {
+                                            rotate: loadingAnimation.interpolate({
+                                                inputRange: [0, 1],
+                                                outputRange: ['0deg', '360deg'],
+                                            }),
+                                        },
+                                    ],
+                                },
+                            ]}
+                        >
+                            <Ionicons name="arrow-forward-circle" size={48} color="#3B82F6" />
+                        </Animated.View>
+                        <Text style={styles.loadingTitle}>Recording Material Usage</Text>
+                        <Text style={styles.loadingSubtitle}>Please wait while we process your usage data</Text>
+                        <View style={styles.loadingDots}>
+                            <Animated.View style={[styles.loadingDot, { opacity: loadingAnimation }]} />
+                            <Animated.View
+                                style={[
+                                    styles.loadingDot,
+                                    {
+                                        opacity: loadingAnimation.interpolate({
+                                            inputRange: [0, 0.5, 1],
+                                            outputRange: [0.3, 1, 0.3],
+                                        }),
+                                    },
+                                ]}
+                            />
+                            <Animated.View
+                                style={[
+                                    styles.loadingDot,
+                                    {
+                                        opacity: loadingAnimation.interpolate({
+                                            inputRange: [0, 1],
+                                            outputRange: [1, 0.3],
+                                        }),
+                                    },
+                                ]}
+                            />
+                        </View>
+                    </View>
+                </View>
+            )}
         </Modal>
     );
 };
@@ -2083,6 +2167,56 @@ const styles = StyleSheet.create({
         color: '#7F1D1D',
         marginTop: 4,
         textAlign: 'center',
+    },
+    // Loading Overlay Styles
+    loadingOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1000,
+    },
+    loadingContainer: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 32,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 16,
+        elevation: 8,
+        minWidth: 200,
+    },
+    loadingIconContainer: {
+        marginBottom: 16,
+    },
+    loadingTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#1E293B',
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    loadingSubtitle: {
+        fontSize: 14,
+        color: '#64748B',
+        textAlign: 'center',
+        marginBottom: 20,
+    },
+    loadingDots: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    loadingDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#3B82F6',
     },
 });
 
