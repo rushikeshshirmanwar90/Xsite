@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { Animated, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Animated, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
 
 interface MaterialVariant {
     _id: string;
@@ -28,6 +28,12 @@ interface GroupedMaterial {
 interface MiniSection {
     _id: string;
     name: string;
+}
+
+interface Project {
+    _id: string;
+    name: string;
+    description?: string;
 }
 
 interface MaterialCardEnhancedProps {
@@ -62,7 +68,128 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
     const [usageQuantity, setUsageQuantity] = useState('');
     const [showVariantSelector, setShowVariantSelector] = useState(false);
     
-    // Transfer functionality states - REMOVED
+    // Transfer functionality states
+    const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+    const [showTransferModal, setShowTransferModal] = useState(false);
+    const [showProjectSelector, setShowProjectSelector] = useState(false);
+    const [selectedTransferVariant, setSelectedTransferVariant] = useState<MaterialVariant | null>(null);
+    const [transferQuantity, setTransferQuantity] = useState('');
+    const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+    const [availableProjects, setAvailableProjects] = useState<Project[]>([]);
+    const [loadingProjects, setLoadingProjects] = useState(false);
+    const [variantSelectionMode, setVariantSelectionMode] = useState<'usage' | 'transfer'>('usage');
+
+    // Transfer functionality functions
+    const fetchAvailableProjects = async () => {
+        try {
+            setLoadingProjects(true);
+            
+            // Get client ID
+            const { getClientId } = await import('@/functions/clientId');
+            const clientId = await getClientId();
+            
+            if (!clientId) {
+                throw new Error('Client ID not found');
+            }
+
+            // Import domain
+            const { domain } = await import('@/lib/domain');
+            
+            // Fetch projects from API
+            const response = await fetch(`${domain}/api/project?clientId=${clientId}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            const result = await response.json();
+            
+            if (result.success && result.data) {
+                // Filter out current project
+                const projects = (result.data.projects || result.projects || [])
+                    .filter((project: any) => project._id !== currentProjectId)
+                    .map((project: any) => ({
+                        _id: project._id,
+                        name: project.name,
+                        description: project.description
+                    }));
+                
+                setAvailableProjects(projects);
+            } else {
+                throw new Error('Failed to fetch projects');
+            }
+        } catch (error) {
+            console.error('Error fetching projects:', error);
+            Alert.alert('Error', 'Failed to load available projects');
+        } finally {
+            setLoadingProjects(false);
+        }
+    };
+
+    const handleOpenTransferModal = () => {
+        setShowOptionsMenu(false);
+        
+        if (material.variants.length === 1) {
+            setSelectedTransferVariant(material.variants[0]);
+            setTransferQuantity('');
+            fetchAvailableProjects();
+            setShowProjectSelector(true);
+        } else {
+            // Multiple variants, show selector first
+            setVariantSelectionMode('transfer');
+            setShowVariantSelector(true);
+        }
+    };
+
+    const handleSelectProject = (project: Project) => {
+        setSelectedProject(project);
+        setShowProjectSelector(false);
+        setShowTransferModal(true);
+    };
+
+    const handleTransferMaterial = () => {
+        if (!selectedTransferVariant || !selectedProject || !transferQuantity || parseFloat(transferQuantity) <= 0) {
+            Alert.alert('Error', 'Please fill in all required fields');
+            return;
+        }
+
+        const quantity = parseFloat(transferQuantity);
+        if (quantity > selectedTransferVariant.quantity) {
+            Alert.alert('Error', `Cannot transfer more than available quantity (${selectedTransferVariant.quantity} ${material.unit})`);
+            return;
+        }
+
+        Alert.alert(
+            'Confirm Transfer',
+            `Transfer ${quantity} ${material.unit} of ${material.name} to "${selectedProject.name}"?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Transfer',
+                    style: 'default',
+                    onPress: () => {
+                        if (onTransferMaterial) {
+                            onTransferMaterial(
+                                material.name,
+                                material.unit,
+                                selectedTransferVariant._id,
+                                quantity,
+                                selectedTransferVariant.specs,
+                                selectedProject._id
+                            );
+                        }
+                        
+                        // Reset states
+                        setShowTransferModal(false);
+                        setSelectedTransferVariant(null);
+                        setSelectedProject(null);
+                        setTransferQuantity('');
+                    }
+                }
+            ]
+        );
+    };
 
     // Get suggested quantity based on material type
     const getSuggestedQuantity = (materialName: string, unit: string): number => {
@@ -96,15 +223,24 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
             setShowUsageModal(true);
         } else {
             // Multiple variants, show selector first
+            setVariantSelectionMode('usage');
             setShowVariantSelector(true);
         }
     };
 
     const handleSelectVariant = (variant: MaterialVariant) => {
-        setSelectedVariant(variant);
-        setUsageQuantity(getSuggestedQuantity(material.name, material.unit).toString());
-        setShowVariantSelector(false);
-        setShowUsageModal(true);
+        if (variantSelectionMode === 'usage') {
+            setSelectedVariant(variant);
+            setUsageQuantity(getSuggestedQuantity(material.name, material.unit).toString());
+            setShowVariantSelector(false);
+            setShowUsageModal(true);
+        } else if (variantSelectionMode === 'transfer') {
+            setSelectedTransferVariant(variant);
+            setTransferQuantity('');
+            setShowVariantSelector(false);
+            fetchAvailableProjects();
+            setShowProjectSelector(true);
+        }
     };
 
     const handleAddUsage = () => {
@@ -196,8 +332,20 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 )}
                             </View>
                         </View>
-                        <View style={styles.dateContainer}>
-                            <Text style={styles.dateText}>{material.date}</Text>
+                        <View style={styles.headerActions}>
+                            <View style={styles.dateContainer}>
+                                <Text style={styles.dateText}>{material.date}</Text>
+                            </View>
+                            {/* Three-dot menu - Only show for imported materials */}
+                            {activeTab === 'imported' && onTransferMaterial && (
+                                <TouchableOpacity
+                                    style={styles.optionsButton}
+                                    onPress={() => setShowOptionsMenu(true)}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="ellipsis-vertical" size={20} color="#6B7280" />
+                                </TouchableOpacity>
+                            )}
                         </View>
                     </View>
                     
@@ -350,13 +498,18 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                         <TouchableOpacity onPress={() => setShowVariantSelector(false)}>
                             <Ionicons name="close" size={24} color="#374151" />
                         </TouchableOpacity>
-                        <Text style={styles.modalTitle}>Select Specification</Text>
+                        <Text style={styles.modalTitle}>
+                            {variantSelectionMode === 'usage' ? 'Select Specification' : 'Select Material to Transfer'}
+                        </Text>
                         <View style={{ width: 24 }} />
                     </View>
 
                     <ScrollView style={styles.modalContent}>
                         <Text style={styles.modalSubtitle}>
-                            Choose the specification of {material.name} you want to use:
+                            {variantSelectionMode === 'usage' 
+                                ? `Choose the specification of ${material.name} you want to use:`
+                                : `Choose the specification of ${material.name} you want to transfer:`
+                            }
                         </Text>
                         {material.variants.map((variant, index) => (
                             <TouchableOpacity
@@ -474,6 +627,202 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                 </View>
             </Modal>
 
+            {/* Options Menu Modal */}
+            <Modal
+                visible={showOptionsMenu}
+                animationType="fade"
+                transparent={true}
+                onRequestClose={() => setShowOptionsMenu(false)}
+            >
+                <TouchableOpacity
+                    style={styles.optionsOverlay}
+                    activeOpacity={1}
+                    onPress={() => setShowOptionsMenu(false)}
+                >
+                    <View style={styles.optionsMenu}>
+                        <TouchableOpacity
+                            style={styles.optionItem}
+                            onPress={handleOpenTransferModal}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons name="swap-horizontal" size={20} color="#3B82F6" />
+                            <Text style={styles.optionText}>Transfer Material</Text>
+                            <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+                        </TouchableOpacity>
+                    </View>
+                </TouchableOpacity>
+            </Modal>
+
+            {/* Project Selector Modal */}
+            <Modal
+                visible={showProjectSelector}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setShowProjectSelector(false)}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalHeader}>
+                        <TouchableOpacity onPress={() => setShowProjectSelector(false)}>
+                            <Ionicons name="close" size={24} color="#374151" />
+                        </TouchableOpacity>
+                        <Text style={styles.modalTitle}>Select Project</Text>
+                        <View style={{ width: 24 }} />
+                    </View>
+
+                    <ScrollView style={styles.modalContent}>
+                        <Text style={styles.modalSubtitle}>
+                            Choose the project to transfer {material.name} to:
+                        </Text>
+                        
+                        {loadingProjects ? (
+                            <View style={styles.loadingContainer}>
+                                <Ionicons name="sync" size={32} color="#3B82F6" />
+                                <Text style={styles.loadingText}>Loading projects...</Text>
+                            </View>
+                        ) : availableProjects.length > 0 ? (
+                            availableProjects.map((project) => (
+                                <TouchableOpacity
+                                    key={project._id}
+                                    style={styles.projectOption}
+                                    onPress={() => handleSelectProject(project)}
+                                    activeOpacity={0.7}
+                                >
+                                    <View style={styles.projectInfo}>
+                                        <View style={styles.projectIconContainer}>
+                                            <Ionicons name="folder" size={24} color="#3B82F6" />
+                                        </View>
+                                        <View style={styles.projectDetails}>
+                                            <Text style={styles.projectName}>{project.name}</Text>
+                                            {project.description && (
+                                                <Text style={styles.projectDescription}>{project.description}</Text>
+                                            )}
+                                        </View>
+                                    </View>
+                                    <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                                </TouchableOpacity>
+                            ))
+                        ) : (
+                            <View style={styles.emptyState}>
+                                <Ionicons name="folder-outline" size={48} color="#9CA3AF" />
+                                <Text style={styles.emptyStateTitle}>No Projects Available</Text>
+                                <Text style={styles.emptyStateDescription}>
+                                    No other projects found for material transfer.
+                                </Text>
+                            </View>
+                        )}
+                    </ScrollView>
+                </View>
+            </Modal>
+
+            {/* Transfer Quantity Modal */}
+            <Modal
+                visible={showTransferModal}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setShowTransferModal(false)}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalHeader}>
+                        <TouchableOpacity onPress={() => setShowTransferModal(false)}>
+                            <Ionicons name="close" size={24} color="#374151" />
+                        </TouchableOpacity>
+                        <Text style={styles.modalTitle}>Transfer Material</Text>
+                        <View style={{ width: 24 }} />
+                    </View>
+
+                    <ScrollView style={styles.modalContent}>
+                        {/* Transfer Summary */}
+                        <View style={styles.transferSummary}>
+                            <View style={styles.transferHeader}>
+                                <Ionicons name="swap-horizontal" size={24} color="#3B82F6" />
+                                <Text style={styles.transferTitle}>Material Transfer</Text>
+                            </View>
+                            
+                            <View style={styles.transferDetails}>
+                                <View style={styles.transferRow}>
+                                    <Text style={styles.transferLabel}>Material:</Text>
+                                    <Text style={styles.transferValue}>{material.name}</Text>
+                                </View>
+                                
+                                {selectedTransferVariant && (
+                                    <View style={styles.transferRow}>
+                                        <Text style={styles.transferLabel}>Specifications:</Text>
+                                        <Text style={styles.transferValue}>
+                                            {formatSpecs(selectedTransferVariant.specs)}
+                                        </Text>
+                                    </View>
+                                )}
+                                
+                                <View style={styles.transferRow}>
+                                    <Text style={styles.transferLabel}>Available:</Text>
+                                    <Text style={styles.transferValue}>
+                                        {selectedTransferVariant?.quantity || 0} {material.unit}
+                                    </Text>
+                                </View>
+                                
+                                <View style={styles.transferRow}>
+                                    <Text style={styles.transferLabel}>To Project:</Text>
+                                    <Text style={styles.transferValue}>{selectedProject?.name}</Text>
+                                </View>
+                            </View>
+                        </View>
+
+                        {/* Quantity Input */}
+                        <View style={styles.inputSection}>
+                            <Text style={styles.inputLabel}>Quantity to Transfer ({material.unit})</Text>
+                            <TextInput
+                                style={styles.quantityInput}
+                                value={transferQuantity}
+                                onChangeText={setTransferQuantity}
+                                keyboardType="decimal-pad"
+                                placeholder="Enter quantity"
+                                placeholderTextColor="#9CA3AF"
+                            />
+                        </View>
+
+                        {/* Quick Add Buttons */}
+                        <View style={styles.quickAddSection}>
+                            <Text style={styles.quickAddLabel}>Quick Select:</Text>
+                            <View style={styles.quickAddButtons}>
+                                {getQuickAddButtons().map((qty) => (
+                                    <TouchableOpacity
+                                        key={qty}
+                                        style={styles.quickAddButton}
+                                        onPress={() => setTransferQuantity(qty.toString())}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Text style={styles.quickAddButtonText}>{qty}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </View>
+
+                        {/* Transfer Button */}
+                        <TouchableOpacity
+                            style={[
+                                styles.transferButton,
+                                (!transferQuantity || parseFloat(transferQuantity) <= 0) && styles.transferButtonDisabled
+                            ]}
+                            onPress={handleTransferMaterial}
+                            activeOpacity={0.8}
+                            disabled={!transferQuantity || parseFloat(transferQuantity) <= 0}
+                        >
+                            <Ionicons
+                                name="swap-horizontal"
+                                size={20}
+                                color={transferQuantity && parseFloat(transferQuantity) > 0 ? "#FFFFFF" : "#9CA3AF"}
+                            />
+                            <Text style={[
+                                styles.transferButtonText,
+                                (!transferQuantity || parseFloat(transferQuantity) <= 0) && styles.transferButtonTextDisabled
+                            ]}>
+                                Transfer Material
+                            </Text>
+                        </TouchableOpacity>
+                    </ScrollView>
+                </View>
+            </Modal>
+
 
         </>
     );
@@ -571,6 +920,16 @@ const styles = StyleSheet.create({
     },
     dateContainer: {
         alignItems: 'flex-end',
+    },
+    headerActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    optionsButton: {
+        padding: 4,
+        borderRadius: 6,
+        backgroundColor: '#F3F4F6',
     },
     dateText: {
         fontSize: 12,
@@ -891,6 +1250,160 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
     },
     confirmButtonTextDisabled: {
+        color: '#9CA3AF',
+    },
+    // Options menu styles
+    optionsOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    optionsMenu: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 8,
+        minWidth: 200,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        elevation: 8,
+    },
+    optionItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        gap: 12,
+    },
+    optionText: {
+        flex: 1,
+        fontSize: 16,
+        fontWeight: '500',
+        color: '#1F2937',
+    },
+    // Project selector styles
+    loadingContainer: {
+        alignItems: 'center',
+        paddingVertical: 40,
+        gap: 12,
+    },
+    loadingText: {
+        fontSize: 16,
+        color: '#6B7280',
+    },
+    projectOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#F9FAFB',
+        padding: 16,
+        borderRadius: 12,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    projectInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    projectIconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 12,
+        backgroundColor: '#EFF6FF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    projectDetails: {
+        flex: 1,
+    },
+    projectName: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1F2937',
+        marginBottom: 2,
+    },
+    projectDescription: {
+        fontSize: 14,
+        color: '#6B7280',
+    },
+    emptyState: {
+        alignItems: 'center',
+        paddingVertical: 40,
+        gap: 12,
+    },
+    emptyStateTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#374151',
+    },
+    emptyStateDescription: {
+        fontSize: 14,
+        color: '#6B7280',
+        textAlign: 'center',
+    },
+    // Transfer modal styles
+    transferSummary: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 24,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    transferHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+        gap: 8,
+    },
+    transferTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#1F2937',
+    },
+    transferDetails: {
+        gap: 8,
+    },
+    transferRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    transferLabel: {
+        fontSize: 14,
+        color: '#6B7280',
+        fontWeight: '500',
+    },
+    transferValue: {
+        fontSize: 14,
+        color: '#1F2937',
+        fontWeight: '600',
+        flex: 1,
+        textAlign: 'right',
+    },
+    transferButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#3B82F6',
+        paddingVertical: 16,
+        borderRadius: 12,
+        gap: 8,
+    },
+    transferButtonDisabled: {
+        backgroundColor: '#F3F4F6',
+    },
+    transferButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#FFFFFF',
+    },
+    transferButtonTextDisabled: {
         color: '#9CA3AF',
     },
 
