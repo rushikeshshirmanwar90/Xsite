@@ -1,6 +1,7 @@
 import { domain } from "@/lib/domain";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
+import { getClientId as getClientIdFromFunction } from "@/functions/clientId";
 
 // Get user data from AsyncStorage
 const getUserData = async () => {
@@ -38,18 +39,10 @@ const getUserData = async () => {
   };
 };
 
-// Get client ID from AsyncStorage
+// Get client ID from AsyncStorage (use the same function as other parts of the app)
 const getClientId = async () => {
-  try {
-    const userDetailsString = await AsyncStorage.getItem("user");
-    if (userDetailsString) {
-      const userData = JSON.parse(userDetailsString);
-      return userData.clientId || "";
-    }
-  } catch (error) {
-    console.error("Error getting client ID:", error);
-  }
-  return "";
+  const clientId = await getClientIdFromFunction();
+  return clientId || "";
 };
 
 // Activity Types
@@ -253,15 +246,47 @@ export const logProjectUpdated = async (
   changedData?: Array<{ field: string; oldValue: any; newValue: any }>,
   message?: string
 ) => {
+  // Create a detailed description based on what changed
+  let description = `Updated project "${projectName}"`;
+  
+  if (changedData && changedData.length > 0) {
+    const changes = changedData.map(change => {
+      switch (change.field) {
+        case 'name':
+          return `renamed from "${change.oldValue}" to "${change.newValue}"`;
+        case 'budget':
+          return `budget changed from ₹${Number(change.oldValue).toLocaleString('en-IN')} to ₹${Number(change.newValue).toLocaleString('en-IN')}`;
+        case 'address':
+          return `address updated`;
+        case 'description':
+          return `description updated`;
+        default:
+          return `${change.field} changed`;
+      }
+    });
+    
+    if (changes.length === 1) {
+      description = `Updated project "${projectName}": ${changes[0]}`;
+    } else if (changes.length === 2) {
+      description = `Updated project "${projectName}": ${changes.join(' and ')}`;
+    } else {
+      description = `Updated project "${projectName}": ${changes.slice(0, 2).join(', ')} and ${changes.length - 2} more changes`;
+    }
+  }
+
   await logActivity({
     activityType: "project_updated",
     category: "project",
     action: "update",
-    description: `Updated project "${projectName}"`,
+    description,
     projectId,
     projectName,
     changedData,
     message,
+    metadata: {
+      changesCount: changedData?.length || 0,
+      changesSummary: changedData?.map(c => c.field) || [],
+    },
   });
 };
 
@@ -547,12 +572,28 @@ export const logLaborAdded = async (
   const totalLaborers = laborEntries.reduce((sum, entry) => sum + entry.count, 0);
   const totalCost = laborEntries.reduce((sum, entry) => sum + entry.totalCost, 0);
   const categories = [...new Set(laborEntries.map(entry => entry.category))];
+  const types = [...new Set(laborEntries.map(entry => entry.type))];
+
+  // Create a hierarchical location description: Project → Section → Mini-Section
+  const locationDescription = `${projectName} → ${sectionName} → ${miniSectionName}`;
+
+  // Create a more detailed description
+  let description = '';
+  if (laborEntries.length === 1) {
+    // Single entry - show specific details
+    const entry = laborEntries[0];
+    description = `Added ${entry.count} ${entry.type} (${entry.category}) to ${locationDescription}`;
+  } else {
+    // Multiple entries - show summary with types
+    const typesList = types.length > 3 ? `${types.slice(0, 3).join(', ')} and ${types.length - 3} more` : types.join(', ');
+    description = `Added ${totalLaborers} laborers: ${typesList} to ${locationDescription}`;
+  }
 
   await logActivity({
     activityType: "labor_added",
     category: "labor",
     action: "add",
-    description: `Added ${totalLaborers} laborer${totalLaborers > 1 ? 's' : ''} (${categories.length} categor${categories.length > 1 ? 'ies' : 'y'}) to "${miniSectionName || sectionName}"`,
+    description,
     projectId,
     projectName,
     sectionId,
@@ -565,7 +606,14 @@ export const logLaborAdded = async (
       totalLaborers,
       totalCost,
       categories,
+      types,
       entriesCount: laborEntries.length,
+      locationHierarchy: {
+        projectName,
+        sectionName,
+        miniSectionName,
+        fullPath: locationDescription
+      }
     },
   });
 };
@@ -585,11 +633,14 @@ export const logLaborUpdated = async (
   newCost: number,
   message?: string
 ) => {
+  // Create a hierarchical location description: Project → Section → Mini-Section
+  const locationDescription = `${projectName} → ${sectionName} → ${miniSectionName}`;
+
   await logActivity({
     activityType: "labor_updated",
     category: "labor",
     action: "update",
-    description: `Updated ${laborType} (${laborCategory}) in "${miniSectionName || sectionName}"`,
+    description: `Updated ${laborType} (${laborCategory}) in ${locationDescription}`,
     projectId,
     projectName,
     sectionId,
@@ -614,6 +665,12 @@ export const logLaborUpdated = async (
       laborCategory,
       countChange: newCount - oldCount,
       costChange: newCost - oldCost,
+      locationHierarchy: {
+        projectName,
+        sectionName,
+        miniSectionName,
+        fullPath: locationDescription
+      }
     },
   });
 };
@@ -631,11 +688,14 @@ export const logLaborRemoved = async (
   totalCost: number,
   message?: string
 ) => {
+  // Create a hierarchical location description: Project → Section → Mini-Section
+  const locationDescription = `${projectName} → ${sectionName} → ${miniSectionName}`;
+
   await logActivity({
     activityType: "labor_removed",
     category: "labor",
     action: "remove",
-    description: `Removed ${count} ${laborType} (${laborCategory}) from "${miniSectionName || sectionName}"`,
+    description: `Removed ${count} ${laborType} (${laborCategory}) from ${locationDescription}`,
     projectId,
     projectName,
     sectionId,
@@ -648,6 +708,12 @@ export const logLaborRemoved = async (
       laborCategory,
       count,
       totalCost,
+      locationHierarchy: {
+        projectName,
+        sectionName,
+        miniSectionName,
+        fullPath: locationDescription
+      }
     },
   });
 };

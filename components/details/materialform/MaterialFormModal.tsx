@@ -29,7 +29,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 interface MaterialFormModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (materials: any[], message: string) => void;
+  onSubmit: (materials: any[], message: string) => Promise<void>;
 }
 
 const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
@@ -44,6 +44,29 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   const [addedMaterials, setAddedMaterials] = useState<InternalMaterial[]>([]);
   const slideAnim = useRef(new Animated.Value(0)).current;
   const scrollViewRef = useRef<any>(null);
+  
+  // Ref to store the latest addedMaterials to avoid closure issues
+  const addedMaterialsRef = useRef<InternalMaterial[]>([]);
+  
+  // Update ref whenever addedMaterials changes
+  React.useEffect(() => {
+    addedMaterialsRef.current = addedMaterials;
+  }, [addedMaterials]);
+  
+  // Ref to prevent infinite retry loops
+  const retryAttemptRef = useRef(0);
+  
+  // Ref to store loading toast ID
+  const loadingToastRef = useRef<any>(null);
+  
+  // Function to update loading toast message
+  const updateLoadingToast = (message: string) => {
+    if (loadingToastRef.current) {
+      toast.dismiss(loadingToastRef.current);
+    }
+    loadingToastRef.current = toast.loading(message);
+  };
+  
   const [formData, setFormData] = useState<MaterialFormData>({
     name: '',
     unit: '',
@@ -56,6 +79,52 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   const [editingMaterialIndex, setEditingMaterialIndex] = useState<number | null>(null);
   const [purposeMessage, setPurposeMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(true); // New state to control form visibility
+  
+  // Ref to store the latest purposeMessage value to avoid closure issues
+  const purposeMessageRef = useRef('');
+  
+  // Update ref whenever purposeMessage changes
+  React.useEffect(() => {
+    purposeMessageRef.current = purposeMessage;
+  }, [purposeMessage]);
+  
+  // Custom setter that updates both state and ref
+  const updatePurposeMessage = (message: string) => {
+    setPurposeMessage(message);
+    purposeMessageRef.current = message;
+  };
+
+  // Custom setter for addedMaterials that updates both state and ref
+  const updateAddedMaterials = (materials: InternalMaterial[]) => {
+    setAddedMaterials(materials);
+    addedMaterialsRef.current = materials;
+  };
+
+  // Function to get current materials (always returns latest value)
+  const getCurrentMaterials = (): InternalMaterial[] => {
+    const refValue = addedMaterialsRef.current;
+    const stateValue = addedMaterials;
+    
+    // Use ref value as it's always up to date
+    return refValue;
+  };
+
+  // Alternative validation: Check if we can proceed based on UI state
+  const canSubmitMaterials = (): boolean => {
+    const materials = getCurrentMaterials();
+    const hasValidMaterials = materials && materials.length > 0;
+    
+    return hasValidMaterials;
+  };
+
+  // Safety check: If we're on step 1 but have no materials, go back to step 0
+  React.useEffect(() => {
+    const currentMaterials = addedMaterialsRef.current;
+    if (currentStep === 1 && currentMaterials.length === 0) {
+      handlePreviousStep();
+    }
+  }, [currentStep]);
 
   // Animation values for swipe to submit
   const swipeAnimation = useRef(new Animated.Value(0)).current;
@@ -117,7 +186,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     }
 
     const quantity = parseFloat(formData.quantity);
-    const perUnitCost = parseFloat(formData.perUnitCost); // ✅ UPDATED: Use perUnitCost
+    const perUnitCost = parseFloat(formData.perUnitCost);
 
     if (isNaN(quantity) || quantity <= 0) {
       Alert.alert('Error', 'Please enter a valid quantity greater than 0');
@@ -129,8 +198,36 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       return;
     }
 
-    // Store per-unit cost, not total cost
-    // This is important for correct calculations when using materials later
+    // ✅ CLIENT-SIDE PRICE CONFLICT DETECTION
+    // Check if there's already a material with same name/unit/specs but different price
+    const existingSimilarMaterial = addedMaterials.find((existing) => {
+      const nameMatch = existing.name === formData.name;
+      const unitMatch = existing.unit === formData.unit;
+      const specsMatch = JSON.stringify(existing.specs || {}) === JSON.stringify(formData.specs || {});
+      const priceDifferent = Number(existing.perUnitCost || 0) !== Number(perUnitCost);
+      
+      return nameMatch && unitMatch && specsMatch && priceDifferent;
+    });
+
+    if (existingSimilarMaterial) {
+      Alert.alert(
+        'Price Conflict Detected',
+        `You already have "${formData.name}" with the same specifications but different price:\n\n` +
+        `Existing: ₹${existingSimilarMaterial.perUnitCost}/${formData.unit}\n` +
+        `New: ₹${perUnitCost}/${formData.unit}\n\n` +
+        `This will create separate entries. Continue?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Continue', onPress: () => proceedWithAddMaterial(quantity, perUnitCost) }
+        ]
+      );
+      return;
+    }
+
+    proceedWithAddMaterial(quantity, perUnitCost);
+  };
+
+  const proceedWithAddMaterial = (quantity: number, perUnitCost: number) => {
 
     if (editingMaterialIndex !== null) {
       const updatedMaterials = [...addedMaterials];
@@ -139,28 +236,35 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
         name: formData.name,
         unit: formData.unit,
         quantity,
-        perUnitCost: perUnitCost, // ✅ UPDATED: Store per-unit cost
+        perUnitCost: perUnitCost,
         specs: formData.specs,
       };
-      setAddedMaterials(updatedMaterials);
-      setEditingMaterialIndex(null);
+      updateAddedMaterials(updatedMaterials);
+      setEditingMaterialIndex(null); // Clear editing state
 
       // Show toast for update
       toast.success('Material updated successfully');
+      
+      // Hide form after updating
+      setShowAddForm(false);
     } else {
       const newEntry: InternalMaterial = {
         id: Date.now().toString(),
         name: formData.name,
         unit: formData.unit,
         quantity,
-        perUnitCost: perUnitCost, // ✅ UPDATED: Store per-unit cost
+        perUnitCost: perUnitCost,
         specs: formData.specs,
         date: new Date().toLocaleDateString('en-IN'),
       };
-      setAddedMaterials([...addedMaterials, newEntry]);
+      const newMaterials = [...addedMaterials, newEntry];
+      updateAddedMaterials(newMaterials);
 
       // Show toast for new material
       toast.success(`✓ ${formData.name} added to list`);
+
+      // Hide form after adding first material (or any material)
+      setShowAddForm(false);
 
       // Scroll to top to show the added material
       setTimeout(() => {
@@ -201,10 +305,30 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       setSelectedTemplateKey(null);
     }
 
+    // Show form when editing
+    setShowAddForm(true);
+
     // Scroll to top when editing
     if (currentStep === 1) {
       handlePreviousStep();
     }
+    
+    // Scroll to form when editing (small delay to ensure form is rendered)
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    }, 100);
+  };
+
+  const handleShowAddForm = () => {
+    setShowAddForm(true);
+    resetForm();
+    setEditingMaterialIndex(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMaterialIndex(null);
+    setShowAddForm(false);
+    resetForm();
   };
 
   const handleNextStep = () => {
@@ -217,8 +341,9 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       toValue: -SCREEN_WIDTH,
       duration: 300,
       useNativeDriver: true,
-    }).start();
-    setCurrentStep(1);
+    }).start(() => {
+      setCurrentStep(1);
+    });
   };
 
   const handlePreviousStep = () => {
@@ -231,8 +356,57 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   };
 
   const handleSendRequest = async () => {
-    if (!purposeMessage.trim()) {
-      Alert.alert('Error', 'Please describe what these materials are needed for');
+    const currentPurposeMessage = purposeMessageRef.current;
+    const currentAddedMaterials = getCurrentMaterials();
+    
+    // Check if materials are added first - use multiple validation approaches
+    const canSubmit = canSubmitMaterials();
+    if (!canSubmit) {
+      // Fallback: Check if we're on step 1 and the UI shows materials
+      // This might indicate a state sync issue
+      if (currentStep === 1 && retryAttemptRef.current < 2) {
+        retryAttemptRef.current += 1;
+        
+        // Force a state refresh and try again after a delay
+        setTimeout(() => {
+          const recoveredMaterials = getCurrentMaterials();
+          
+          if (recoveredMaterials && recoveredMaterials.length > 0) {
+            // Retry the submission with recovered materials
+            handleSendRequest();
+            return;
+          } else {
+            retryAttemptRef.current = 0; // Reset for next time
+            Alert.alert(
+              'No Materials Added',
+              'Please add at least one material before submitting. Go back to the first step to add materials.',
+              [
+                { text: 'Go Back', onPress: () => handlePreviousStep(), style: 'default' },
+                { text: 'Cancel', style: 'cancel' }
+              ]
+            );
+          }
+        }, 200);
+        return;
+      }
+      
+      Alert.alert(
+        'No Materials Added',
+        'Please add at least one material before submitting. Go back to the first step to add materials.',
+        [
+          { text: 'Go Back', onPress: () => handlePreviousStep(), style: 'default' },
+          { text: 'Cancel', style: 'cancel' }
+        ]
+      );
+      return;
+    }
+    
+    if (!currentPurposeMessage.trim()) {
+      Alert.alert(
+        'Purpose Required', 
+        'Please describe what these materials are needed for. This helps with project tracking and material management.',
+        [{ text: 'OK', style: 'default' }]
+      );
       return;
     }
 
@@ -240,28 +414,78 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       return; // Prevent double submission
     }
 
-    const formattedMaterials = addedMaterials.map((material) => ({
+    const formattedMaterials = currentAddedMaterials.map((material) => ({
       materialName: material.name,
       unit: material.unit,
       qnt: material.quantity,
       specs: material.specs || {},
-      perUnitCost: material.perUnitCost || 0, // ✅ UPDATED: Use perUnitCost instead of cost
+      perUnitCost: material.perUnitCost || 0,
       mergeIfExists: true,
     }));
 
-    console.log('=== MATERIAL REQUEST ===');
-    console.log('Purpose:', purposeMessage);
-    console.log('Materials:', JSON.stringify(formattedMaterials, null, 2));
-    console.log('========================');
+    // Final validation before API call
+    if (formattedMaterials.length === 0) {
+      Alert.alert(
+        'Error',
+        'No materials to submit. Please add materials first.',
+        [{ text: 'Go Back', onPress: () => handlePreviousStep() }]
+      );
+      return;
+    }
 
     try {
       setIsSubmitting(true);
-      // Call onSubmit and close immediately without showing discard confirmation
-      await onSubmit(formattedMaterials, purposeMessage);
-      handleClose(true); // Skip confirmation when successfully submitted
+      // Reset retry counter on successful attempt
+      retryAttemptRef.current = 0;
+      
+      // Show initial loading toast with material count
+      const materialCount = formattedMaterials.length;
+      loadingToastRef.current = toast.loading(
+        `Adding ${materialCount} material${materialCount > 1 ? 's' : ''}...`
+      );
+      
+      // Close the modal immediately to show the loading state
+      handleClose(true);
+      
+      // Update loading message for API call
+      updateLoadingToast(`Saving ${materialCount} material${materialCount > 1 ? 's' : ''} to database...`);
+      
+      // Call onSubmit and wait for it to complete (including material refresh)
+      await onSubmit(formattedMaterials, currentPurposeMessage);
+      
+      // Update loading message for UI refresh
+      updateLoadingToast('Refreshing materials list...');
+      
+      // Add a small delay to ensure UI has updated with new materials
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Final completion message
+      updateLoadingToast('Materials added successfully!');
+      
+      // Brief delay to show completion message
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Dismiss loading toast and show success only after everything is complete
+      if (loadingToastRef.current) {
+        toast.dismiss(loadingToastRef.current);
+        loadingToastRef.current = null;
+      }
+      
+      toast.success(
+        `✅ ${materialCount} material${materialCount > 1 ? 's' : ''} added successfully!`
+      );
+      
     } catch (error) {
       console.error('Error submitting materials:', error);
-      // Don't close the modal if there's an error
+      
+      // Dismiss loading toast and show error
+      if (loadingToastRef.current) {
+        toast.dismiss(loadingToastRef.current);
+        loadingToastRef.current = null;
+      }
+      
+      toast.error('Failed to add materials. Please try again.');
+      
     } finally {
       setIsSubmitting(false);
     }
@@ -291,8 +515,6 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     const maxSwipe = 200;
     const progress = dx / maxSwipe;
     
-    console.log('Swipe ended, progress:', progress, 'addedMaterials.length:', addedMaterials.length);
-    
     if (progress >= 0.7) {
       // Complete the swipe and submit
       Animated.timing(swipeAnimation, {
@@ -300,8 +522,10 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
         duration: 200,
         useNativeDriver: false,
       }).start(() => {
-        console.log('Animation completed, calling handleSendRequest');
-        handleSendRequest();
+        // Add a small delay to ensure all state updates are processed
+        setTimeout(() => {
+          handleSendRequest();
+        }, 100);
       });
     } else {
       // Animate back to start
@@ -317,11 +541,27 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   // Pan responder for swipe gesture
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => {
+        const currentMaterials = addedMaterialsRef.current;
+        return currentMaterials.length > 0;
+      },
+      onMoveShouldSetPanResponder: () => {
+        const currentMaterials = addedMaterialsRef.current;
+        return currentMaterials.length > 0;
+      },
       onPanResponderGrant: handleSwipeStart,
-      onPanResponderMove: (_, gestureState) => handleSwipeMove(gestureState),
-      onPanResponderRelease: (_, gestureState) => handleSwipeEnd(gestureState),
+      onPanResponderMove: (_, gestureState) => {
+        const currentMaterials = addedMaterialsRef.current;
+        if (currentMaterials.length > 0) {
+          handleSwipeMove(gestureState);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const currentMaterials = addedMaterialsRef.current;
+        if (currentMaterials.length > 0) {
+          handleSwipeEnd(gestureState);
+        }
+      },
     })
   ).current;
 
@@ -341,10 +581,18 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   };
 
   const handleClose = (skipConfirmation = false) => {
+    // Clean up loading toast if it exists
+    if (loadingToastRef.current) {
+      toast.dismiss(loadingToastRef.current);
+      loadingToastRef.current = null;
+    }
+    
     // If skipConfirmation is true (from successful submit), close immediately
     if (skipConfirmation) {
-      setAddedMaterials([]);
+      updateAddedMaterials([]);
       setPurposeMessage('');
+      purposeMessageRef.current = '';
+      setShowAddForm(true); // Reset form visibility
       resetForm();
       setCurrentStep(0);
       slideAnim.setValue(0);
@@ -368,8 +616,16 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
             text: 'Discard',
             style: 'destructive',
             onPress: () => {
-              setAddedMaterials([]);
+              // Clean up loading toast
+              if (loadingToastRef.current) {
+                toast.dismiss(loadingToastRef.current);
+                loadingToastRef.current = null;
+              }
+              
+              updateAddedMaterials([]);
               setPurposeMessage('');
+              purposeMessageRef.current = '';
+              setShowAddForm(true); // Reset form visibility
               resetForm();
               setCurrentStep(0);
               slideAnim.setValue(0);
@@ -381,8 +637,16 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
         ]
       );
     } else {
-      setAddedMaterials([]);
+      // Clean up loading toast
+      if (loadingToastRef.current) {
+        toast.dismiss(loadingToastRef.current);
+        loadingToastRef.current = null;
+      }
+      
+      updateAddedMaterials([]);
       setPurposeMessage('');
+      purposeMessageRef.current = '';
+      setShowAddForm(true); // Reset form visibility
       resetForm();
       setCurrentStep(0);
       slideAnim.setValue(0);
@@ -439,6 +703,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                 editingMaterialIndex={editingMaterialIndex}
                 showUnitDropdown={showUnitDropdown}
                 showSpecDropdown={showSpecDropdown}
+                showAddForm={showAddForm}
                 scrollViewRef={scrollViewRef}
                 onTemplateSelect={handleTemplateSelect}
                 onInputChange={handleInputChange}
@@ -451,9 +716,12 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                 onRemoveCustomSpec={handleRemoveCustomSpec}
                 onAddMaterial={handleAddMaterial}
                 onEditMaterial={handleEditMaterial}
-                onRemoveMaterial={(index) =>
-                  setAddedMaterials(addedMaterials.filter((_, i) => i !== index))
-                }
+                onRemoveMaterial={(index) => {
+                  const newMaterials = addedMaterials.filter((_, i) => i !== index);
+                  updateAddedMaterials(newMaterials);
+                }}
+                onShowAddForm={handleShowAddForm}
+                onCancelEdit={handleCancelEdit}
                 onClose={handleClose}
               />
             </Animated.View>
@@ -475,20 +743,21 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               <ReviewPurposeStep
                 addedMaterials={addedMaterials}
                 purposeMessage={purposeMessage}
-                onPurposeChange={setPurposeMessage}
+                onPurposeChange={updatePurposeMessage}
                 onBack={handlePreviousStep}
                 onClose={handleClose}
                 onEditMaterial={handleEditMaterial}
-                onRemoveMaterial={(index) =>
-                  setAddedMaterials(addedMaterials.filter((_, i) => i !== index))
-                }
+                onRemoveMaterial={(index) => {
+                  const newMaterials = addedMaterials.filter((_, i) => i !== index);
+                  updateAddedMaterials(newMaterials);
+                }}
                 onSubmit={handleSendRequest}
               />
             </Animated.View>
           </View>
 
           {/* Floating Action Buttons */}
-          {currentStep === 0 && addedMaterials.length > 0 && (
+          {currentStep === 0 && addedMaterials.length > 0 && editingMaterialIndex === null && (
             <View style={styles.floatingButtonContainer}>
               <TouchableOpacity
                 style={styles.floatingNextButton}
@@ -503,19 +772,8 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
             </View>
           )}
 
-          {currentStep === 1 && (
+          {currentStep === 1 && addedMaterials.length > 0 && (
             <View style={styles.floatingButtonContainer}>
-              {/* Grand Total */}
-              <View style={styles.grandTotalContainer}>
-                <View style={styles.grandTotalContent}>
-                  <Text style={styles.grandTotalLabel}>Total Materials</Text>
-                  <View style={styles.grandTotalDivider} />
-                  <Text style={styles.grandTotalValue}>
-                    {addedMaterials.length} Item{addedMaterials.length > 1 ? 's' : ''}
-                  </Text>
-                </View>
-              </View>
-
               {/* Swipe to Submit */}
               <View style={styles.swipeToSubmitContainer}>
                 <View style={styles.swipeTrack} {...panResponder.panHandlers}>
@@ -644,41 +902,6 @@ const styles = StyleSheet.create<Styles>({
   },
   loadingText: {
     fontSize: 20,
-  },
-  // Grand Total Styles
-  grandTotalContainer: {
-    paddingVertical: 12,
-    marginBottom: 8,
-  },
-  grandTotalContent: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    gap: 12,
-  },
-  grandTotalLabel: {
-    fontSize: 18,
-    color: '#374151',
-    fontWeight: '600' as const,
-    fontFamily: 'System',
-    letterSpacing: 0.3,
-    textTransform: 'uppercase' as const,
-  },
-  grandTotalDivider: {
-    width: 2,
-    height: 24,
-    backgroundColor: '#D1D5DB',
-    borderRadius: 1,
-  },
-  grandTotalValue: {
-    fontSize: 28,
-    color: '#000000',
-    fontWeight: '800' as const,
-    fontFamily: 'System',
-    letterSpacing: 0.8,
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
   // Swipe to Submit Styles
   swipeToSubmitContainer: {

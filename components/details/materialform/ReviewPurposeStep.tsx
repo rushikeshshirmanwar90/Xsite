@@ -25,6 +25,38 @@ const ReviewPurposeStep: React.FC<ReviewPurposeStepProps> = ({
   onRemoveMaterial,
   onSubmit,
 }) => {
+  // Safety check - if no materials, show error state
+  if (!addedMaterials || addedMaterials.length === 0) {
+    return (
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.headerContainer}>
+          <Text style={sharedStyles.formTitle}>Review & Purpose</Text>
+          <TouchableOpacity onPress={onClose} activeOpacity={0.7} style={styles.closeButtonContainer}>
+            <X size={24} color="#64748B" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Error State */}
+        <View style={styles.errorContainer}>
+          <Package size={64} color="#EF4444" />
+          <Text style={styles.errorTitle}>No Materials Added</Text>
+          <Text style={styles.errorDescription}>
+            You need to add at least one material before proceeding to review.
+          </Text>
+          <TouchableOpacity
+            style={styles.backToAddButton}
+            onPress={onBack}
+            activeOpacity={0.7}
+          >
+            <ArrowLeft size={16} color="#FFFFFF" />
+            <Text style={styles.backToAddButtonText}>Back to Add Materials</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -114,9 +146,9 @@ const ReviewPurposeStep: React.FC<ReviewPurposeStepProps> = ({
         <View style={styles.purposeSection}>
           <View style={styles.purposeTitleContainer}>
             <MessageSquare size={18} color="#1E293B" />
-            <Text style={styles.purposeTitle}>What are these materials needed for?</Text>
+            <Text style={styles.purposeTitle}>What are these materials needed for? *</Text>
           </View>
-          <Text style={styles.purposeSubtitle}>Please describe the purpose or project</Text>
+          <Text style={styles.purposeSubtitle}>Please describe the purpose or project (required)</Text>
           <TextInput
             style={styles.purposeInput}
             placeholder="e.g., Construction of residential building, Renovation project, etc."
@@ -126,6 +158,9 @@ const ReviewPurposeStep: React.FC<ReviewPurposeStepProps> = ({
             numberOfLines={4}
             textAlignVertical="top"
             placeholderTextColor="#94A3B8"
+            selectionColor="#3B82F6"
+            autoCorrect={true}
+            autoCapitalize="sentences"
           />
         </View>
 
@@ -136,7 +171,7 @@ const ReviewPurposeStep: React.FC<ReviewPurposeStepProps> = ({
             onPress={onBack}
             activeOpacity={0.7}
           >
-            <ArrowLeft size={16} color="#64748B" />
+            <ArrowLeft size={16} color="#3B82F6" />
             <Text style={styles.backButtonText}>Back to Edit Materials</Text>
           </TouchableOpacity>
         </View>
@@ -351,12 +386,12 @@ const styles = StyleSheet.create<Styles>({
     marginBottom: 16,
   },
   purposeInput: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
     borderColor: '#E2E8F0',
     borderRadius: 8,
-    padding: 14,
-    fontSize: 15,
+    padding: 16,
+    fontSize: 16,
     color: '#1E293B',
     minHeight: 120,
     shadowColor: '#000',
@@ -364,21 +399,68 @@ const styles = StyleSheet.create<Styles>({
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 1,
+    fontWeight: '400',
   },
   backButton: {
-    backgroundColor: '#F1F5F9',
-    borderRadius: 10,
-    padding: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderWidth: 2,
+    borderColor: '#3B82F6',
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 8,
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   backButtonText: {
+    color: '#3B82F6',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // Error state styles
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  errorTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#EF4444',
+    marginTop: 20,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  errorDescription: {
+    fontSize: 16,
     color: '#64748B',
-    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 32,
+  },
+  backToAddButton: {
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    padding: 16,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  backToAddButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '600',
   },
 });

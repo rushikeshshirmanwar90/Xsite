@@ -11,6 +11,9 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import axios from 'axios';
+import { getClientId } from '@/functions/clientId';
+import { domain } from '@/lib/domain';
 
 interface Material {
     _id?: string;
@@ -35,8 +38,10 @@ interface MaterialUsageFormProps {
     visible: boolean;
     onClose: () => void;
     onSubmit: (miniSectionId: string, materialUsages: MaterialUsage[]) => void;
-    availableMaterials: Material[];
+    availableMaterials: Material[]; // This will be used as fallback only
     miniSections: { _id: string; name: string }[];
+    projectId: string; // Add projectId to fetch all materials
+    sectionId: string; // Add sectionId for filtering
 }
 
 const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
@@ -44,12 +49,19 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
     onClose,
     onSubmit,
     availableMaterials,
-    miniSections
+    miniSections,
+    projectId,
+    sectionId
 }) => {
     const [selectedMiniSectionId, setSelectedMiniSectionId] = useState<string>('');
     const [selectedMaterials, setSelectedMaterials] = useState<{ [materialId: string]: string }>({});
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [currentStep, setCurrentStep] = useState<'selection' | 'quantity'>('selection');
+    
+    // State for fetching all materials
+    const [allAvailableMaterials, setAllAvailableMaterials] = useState<Material[]>([]);
+    const [isLoadingMaterials, setIsLoadingMaterials] = useState<boolean>(false);
+    const [materialsError, setMaterialsError] = useState<string>('');
     
     // Refs for tracking current state in swipe handlers
     const selectedMaterialsRef = useRef<{ [materialId: string]: string }>({});
@@ -62,28 +74,201 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
     const swipeAnimation = useRef(new Animated.Value(0)).current;
     const [isSwipeComplete, setIsSwipeComplete] = useState(false);
 
-    // Log when form opens and materials are passed
+    // Function to fetch ALL available materials (with proper pagination)
+    const fetchAllAvailableMaterials = async () => {
+        if (!projectId) {
+            console.error('❌ No projectId provided to fetch materials');
+            return;
+        }
+
+        setIsLoadingMaterials(true);
+        setMaterialsError('');
+
+        try {
+            console.log('\n========================================');
+            console.log('🔄 FETCHING ALL MATERIALS FOR USAGE FORM');
+            console.log('========================================');
+            console.log('Project ID:', projectId);
+            console.log('Section ID:', sectionId);
+
+            const clientId = await getClientId();
+            if (!clientId) {
+                throw new Error('Client ID not found');
+            }
+
+            let allMaterials: any[] = [];
+            let currentPage = 1;
+            const maxLimit = 100; // API maximum limit
+            let hasMorePages = true;
+
+            // Fetch all pages of materials
+            while (hasMorePages) {
+                const params = new URLSearchParams({
+                    projectId: projectId,
+                    clientId: clientId,
+                    page: currentPage.toString(),
+                    limit: maxLimit.toString(),
+                    sortBy: 'name',
+                    sortOrder: 'asc'
+                });
+
+                const apiUrl = `${domain}/api/material?${params.toString()}`;
+                console.log(`🌐 Fetching page ${currentPage}: ${apiUrl}`);
+
+                const response = await axios.get(apiUrl, {
+                    timeout: 15000, // 15 second timeout
+                });
+
+                console.log(`📦 Page ${currentPage} Response:`, response.status);
+                const data = response.data as any;
+
+                if (data.success && data.MaterialAvailable) {
+                    allMaterials = allMaterials.concat(data.MaterialAvailable);
+                    
+                    console.log(`✅ Page ${currentPage}:`, data.MaterialAvailable.length, 'materials');
+                    console.log('  - Pagination info:', data.pagination);
+                    
+                    // Check if there are more pages
+                    if (data.pagination && data.pagination.hasNextPage) {
+                        currentPage++;
+                        hasMorePages = true;
+                    } else {
+                        hasMorePages = false;
+                    }
+                } else {
+                    console.warn(`⚠️ Page ${currentPage} returned no materials or unsuccessful response`);
+                    hasMorePages = false;
+                }
+
+                // Safety check to prevent infinite loops
+                if (currentPage > 50) {
+                    console.warn('⚠️ Reached maximum page limit (50), stopping fetch');
+                    break;
+                }
+            }
+
+            console.log(`🎉 Fetched ${allMaterials.length} materials across ${currentPage} pages`);
+
+            if (allMaterials.length > 0) {
+                // Transform materials to match the expected format
+                const transformedMaterials = allMaterials.map((material: any) => {
+                    const { icon, color } = getMaterialIconAndColor(material.name);
+                    return {
+                        _id: material._id,
+                        id: material.id || Math.random(),
+                        name: material.name,
+                        unit: material.unit,
+                        specs: material.specs || {},
+                        quantity: material.qnt || 0,
+                        price: material.perUnitCost || 0,
+                        date: material.createdAt || new Date().toISOString(),
+                        icon: icon,
+                        color: color,
+                        sectionId: material.sectionId,
+                    };
+                });
+
+                // Filter materials for current section (same logic as parent component)
+                const filteredMaterials = transformedMaterials.filter((m: Material) => {
+                    const isAvailable = !m.sectionId || m.sectionId === sectionId;
+                    if (!isAvailable) {
+                        console.log(`🚫 Filtering out material: ${m.name} (sectionId: ${m.sectionId}, current: ${sectionId})`);
+                    }
+                    return isAvailable;
+                });
+
+                console.log('✅ Materials processed successfully:');
+                console.log('  - Total fetched:', transformedMaterials.length);
+                console.log('  - After section filtering:', filteredMaterials.length);
+
+                setAllAvailableMaterials(filteredMaterials);
+                setMaterialsError('');
+            } else {
+                console.warn('⚠️ No materials found across all pages');
+                setAllAvailableMaterials([]);
+                setMaterialsError('No materials found');
+            }
+
+        } catch (error) {
+            console.error('❌ Error fetching all materials:', error);
+            let errorMessage = 'Failed to fetch materials';
+            
+            if (error && typeof error === 'object' && 'response' in error) {
+                const axiosError = error as any;
+                if (axiosError.response?.status === 400) {
+                    errorMessage = 'Invalid request parameters';
+                } else if (axiosError.response?.status === 404) {
+                    errorMessage = 'Project not found';
+                } else if (axiosError.response?.status === 500) {
+                    errorMessage = 'Server error';
+                } else {
+                    errorMessage = `API Error: ${axiosError.response?.status || 'Unknown'}`;
+                }
+                console.error('API Error Details:', axiosError.response?.data);
+            } else if (error instanceof Error) {
+                errorMessage = error.message;
+            }
+            
+            setMaterialsError(errorMessage);
+            
+            // Fallback to provided materials if fetch fails
+            console.log('🔄 Using fallback materials from props:', availableMaterials.length);
+            setAllAvailableMaterials(availableMaterials);
+        } finally {
+            setIsLoadingMaterials(false);
+            console.log('========================================\n');
+        }
+    };
+
+    // Function to get material icon and color based on material name
+    const getMaterialIconAndColor = (materialName: string) => {
+        const materialMap: { [key: string]: { icon: keyof typeof import('@expo/vector-icons').Ionicons.glyphMap, color: string } } = {
+            'cement': { icon: 'cube-outline', color: '#8B5CF6' },
+            'brick': { icon: 'square-outline', color: '#EF4444' },
+            'steel': { icon: 'barbell-outline', color: '#6B7280' },
+            'sand': { icon: 'layers-outline', color: '#F59E0B' },
+            'gravel': { icon: 'diamond-outline', color: '#10B981' },
+            'concrete': { icon: 'cube', color: '#3B82F6' },
+            'wood': { icon: 'leaf-outline', color: '#84CC16' },
+            'paint': { icon: 'color-palette-outline', color: '#EC4899' },
+            'tile': { icon: 'grid-outline', color: '#06B6D4' },
+            'pipe': { icon: 'ellipse-outline', color: '#8B5CF6' },
+        };
+
+        const lowerName = materialName.toLowerCase();
+        for (const [key, value] of Object.entries(materialMap)) {
+            if (lowerName.includes(key)) {
+                return value;
+            }
+        }
+        return { icon: 'cube-outline' as keyof typeof import('@expo/vector-icons').Ionicons.glyphMap, color: '#6B7280' };
+    };
+
+    // Log when form opens and fetch all materials
     useEffect(() => {
         if (visible) {
             console.log('\n========================================');
             console.log('📝 MATERIAL USAGE FORM OPENED');
             console.log('========================================');
-            console.log('Available Materials Count:', availableMaterials.length);
+            console.log('Available Materials Count (from props):', availableMaterials.length);
             console.log('Mini Sections Count:', miniSections.length);
-            console.log('\n--- Available Materials ---');
-            availableMaterials.forEach((m, idx) => {
-                console.log(`  ${idx + 1}. ${m.name}:`);
-                console.log(`     _id: "${m._id}" (type: ${typeof m._id}, exists: ${!!m._id})`);
-                console.log(`     id: ${m.id} (type: ${typeof m.id})`);
-                console.log(`     quantity: ${m.quantity} ${m.unit}`);
-            });
+            console.log('Project ID:', projectId);
+            console.log('Section ID:', sectionId);
             console.log('\n--- Mini Sections ---');
             miniSections.forEach((s, idx) => {
                 console.log(`  ${idx + 1}. ${s.name} (_id: ${s._id})`);
             });
             console.log('========================================\n');
+
+            // Fetch all available materials when form opens
+            fetchAllAvailableMaterials();
+        } else {
+            // Reset state when form closes
+            setAllAvailableMaterials([]);
+            setIsLoadingMaterials(false);
+            setMaterialsError('');
         }
-    }, [visible, availableMaterials, miniSections]);
+    }, [visible, projectId, sectionId]);
 
     const handleSubmit = () => {
         // Use refs for current values to avoid stale state
@@ -104,7 +289,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
 
         // Validate all selected materials using ref
         Object.entries(currentSelectedMaterials).forEach(([materialId, quantity]) => {
-            const material = availableMaterials.find(m => m._id === materialId);
+            const material = allAvailableMaterials.find(m => m._id === materialId);
             const quantityNum = parseFloat(quantity);
 
             if (!quantity || quantity.trim() === '' || quantityNum <= 0) {
@@ -140,7 +325,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
         console.log('  - Number of materials:', materialUsages.length);
         console.log('\n--- Material Usages ---');
         materialUsages.forEach((usage, index) => {
-            const material = availableMaterials.find(m => m._id === usage.materialId);
+            const material = allAvailableMaterials.find(m => m._id === usage.materialId);
             console.log(`  ${index + 1}. ${material?.name || 'Unknown'}:`);
             console.log(`     Material ID: ${usage.materialId}`);
             console.log(`     Quantity: ${usage.quantity} ${material?.unit || ''}`);
@@ -238,7 +423,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
     ).current;
 
     // Filter materials based on search query
-    const filteredMaterials = availableMaterials.filter(material => {
+    const filteredMaterials = allAvailableMaterials.filter(material => {
         if (!searchQuery) return true;
         const query = searchQuery.toLowerCase();
         return material.name.toLowerCase().includes(query) ||
@@ -351,7 +536,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
         
         // Check if all selected materials have valid quantities
         return Object.entries(selectedMaterials).every(([materialId, quantity]) => {
-            const material = availableMaterials.find(m => m._id === materialId);
+            const material = allAvailableMaterials.find(m => m._id === materialId);
             const quantityNum = parseFloat(quantity);
             return quantity && quantity.trim() !== '' && quantityNum > 0 && (!material || quantityNum <= material.quantity);
         });
@@ -528,7 +713,21 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                         nestedScrollEnabled={true}
                                         showsVerticalScrollIndicator={true}
                                     >
-                                        {filteredMaterials.length > 0 ? (
+                                        {isLoadingMaterials ? (
+                                            <View style={styles.loadingState}>
+                                                <Text style={styles.loadingText}>Loading all materials...</Text>
+                                                <Text style={styles.loadingSubtext}>Fetching from all pages</Text>
+                                            </View>
+                                        ) : materialsError ? (
+                                            <View style={styles.errorState}>
+                                                <Text style={styles.loadingErrorText}>
+                                                    {materialsError}
+                                                </Text>
+                                                <Text style={styles.errorSubtext}>
+                                                    Using materials from current page only
+                                                </Text>
+                                            </View>
+                                        ) : filteredMaterials.length > 0 ? (
                                             filteredMaterials.map((material) => {
                                                 const isSelected = isMaterialSelected(material._id!);
                                                 
@@ -610,7 +809,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                         </Text>
                                         <View style={styles.previewList}>
                                             {Object.keys(selectedMaterials).map((materialId) => {
-                                                const material = availableMaterials.find(m => m._id === materialId);
+                                                const material = allAvailableMaterials.find(m => m._id === materialId);
                                                 if (!material) return null;
                                                 
                                                 return (
@@ -690,7 +889,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
 
                                     <View style={styles.quantitySection}>
                                         {Object.keys(selectedMaterials).map((materialId, index) => {
-                                            const material = availableMaterials.find(m => m._id === materialId);
+                                            const material = allAvailableMaterials.find(m => m._id === materialId);
                                             if (!material) return null;
                                             
                                             const currentQuantity = selectedMaterials[materialId] || '';
@@ -1846,6 +2045,44 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#FFFFFF',
         letterSpacing: 0.5,
+    },
+    // Loading and Error States
+    loadingState: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 40,
+    },
+    loadingText: {
+        fontSize: 14,
+        color: '#64748B',
+        marginTop: 12,
+    },
+    loadingSubtext: {
+        fontSize: 12,
+        color: '#94A3B8',
+        marginTop: 4,
+    },
+    errorState: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 40,
+        backgroundColor: '#FEF2F2',
+        borderRadius: 8,
+        margin: 8,
+        borderWidth: 1,
+        borderColor: '#FECACA',
+    },
+    loadingErrorText: {
+        fontSize: 14,
+        color: '#DC2626',
+        fontWeight: '600',
+        textAlign: 'center',
+    },
+    errorSubtext: {
+        fontSize: 12,
+        color: '#7F1D1D',
+        marginTop: 4,
+        textAlign: 'center',
     },
 });
 

@@ -419,18 +419,61 @@ const ProjectScreen: React.FC = () => {
                     email: userData.email || undefined,
                 };
             }
+
+            // Track changes for activity logging
+            const changedData: Array<{ field: string; oldValue: any; newValue: any }> = [];
+            
+            // Check for name change
+            if (editProjectName.trim() !== editingProject.name) {
+                changedData.push({
+                    field: 'name',
+                    oldValue: editingProject.name,
+                    newValue: editProjectName.trim()
+                });
+            }
+            
+            // Check for address change
+            if (editProjectAddress.trim() !== editingProject.address) {
+                changedData.push({
+                    field: 'address',
+                    oldValue: editingProject.address,
+                    newValue: editProjectAddress.trim()
+                });
+            }
+            
+            // Check for budget change
+            const newBudget = Number(editProjectBudget);
+            if (newBudget !== editingProject.budget) {
+                changedData.push({
+                    field: 'budget',
+                    oldValue: editingProject.budget,
+                    newValue: newBudget
+                });
+            }
+            
+            // Check for description change
+            const newDescription = editProjectDescription.trim();
+            const oldDescription = editingProject.description || '';
+            if (newDescription !== oldDescription) {
+                changedData.push({
+                    field: 'description',
+                    oldValue: oldDescription,
+                    newValue: newDescription
+                });
+            }
             
             const updatePayload = {
                 name: editProjectName.trim(),
                 address: editProjectAddress.trim(),
-                budget: Number(editProjectBudget),
-                description: editProjectDescription.trim(),
+                budget: newBudget,
+                description: newDescription,
                 assignedStaff: editAssignedStaff,
                 clientId,
                 user: userInfo // Include user info for activity logging
             };
 
             console.log('📝 Updating project:', editingProject._id, updatePayload);
+            console.log('📊 Detected changes:', changedData);
 
             const response = await axios.put(
                 `${domain}/api/project/${editingProject._id}`,
@@ -440,6 +483,28 @@ const ProjectScreen: React.FC = () => {
             console.log('✅ Project updated:', response.data);
 
             if (response.status === 200) {
+                // Log project update activity if there were changes
+                if (changedData.length > 0 && clientId && userInfo) {
+                    try {
+                        console.log('🔄 Logging project update activity...');
+                        
+                        // Import the activity logger
+                        const { logProjectUpdated } = await import('@/utils/activityLogger');
+                        
+                        await logProjectUpdated(
+                            editingProject._id,
+                            editProjectName.trim(), // Use new name
+                            changedData,
+                            `Project details updated by ${userInfo.fullName}`
+                        );
+                        
+                        console.log('✅ Project update activity logged successfully');
+                    } catch (activityError: any) {
+                        console.error('❌ Error logging project update activity:', activityError);
+                        // Don't fail the entire operation if activity logging fails
+                    }
+                }
+
                 // Log staff assignment changes
                 const originalStaff = editingProject.assignedStaff || [];
                 const newStaff = editAssignedStaff;
@@ -468,43 +533,30 @@ const ProjectScreen: React.FC = () => {
                     for (const staff of addedStaff) {
                         try {
                             console.log(`🔄 Logging staff assignment for: ${staff.fullName}`);
-                            console.log(`   - Client ID: ${clientId}`);
-                            console.log(`   - Project ID: ${editingProject._id}`);
-                            console.log(`   - User Info:`, userInfo);
 
                             const staffPayload = {
                                 user: userInfo,
                                 clientId,
                                 projectId: editingProject._id,
-                                projectName: editProjectName,
+                                projectName: editProjectName.trim(),
                                 activityType: 'staff_assigned',
                                 category: 'staff',
                                 action: 'assign',
-                                description: `Assigned ${staff.fullName} to project "${editProjectName}"`,
+                                description: `Assigned ${staff.fullName} to project "${editProjectName.trim()}"`,
                                 message: 'Assigned during project update',
                                 date: new Date().toISOString(),
                                 metadata: {
                                     staffName: staff.fullName,
+                                    staffId: staff._id,
+                                    assignedDuring: 'project_update'
                                 },
                             };
-
-                            console.log(`📝 Staff assignment payload:`, JSON.stringify(staffPayload, null, 2));
 
                             const response = await axios.post(`${domain}/api/activity`, staffPayload);
                             console.log(`✅ Staff assignment logged successfully: ${staff.fullName}`, response.status);
                         } catch (error: any) {
                             console.error(`❌ Error logging staff assignment for ${staff.fullName}:`, error);
-                            console.error(`❌ Error details:`, {
-                                message: error.message,
-                                status: error?.response?.status,
-                                statusText: error?.response?.statusText,
-                                data: error?.response?.data,
-                                url: error?.config?.url,
-                                method: error?.config?.method,
-                            });
-                            
                             // Don't fail the entire operation if activity logging fails
-                            console.warn(`⚠️ Continuing despite activity logging failure for ${staff.fullName}`);
                         }
                     }
 
@@ -512,43 +564,30 @@ const ProjectScreen: React.FC = () => {
                     for (const staff of removedStaff) {
                         try {
                             console.log(`🔄 Logging staff removal for: ${staff.fullName}`);
-                            console.log(`   - Client ID: ${clientId}`);
-                            console.log(`   - Project ID: ${editingProject._id}`);
-                            console.log(`   - User Info:`, userInfo);
 
                             const staffPayload = {
                                 user: userInfo,
                                 clientId,
                                 projectId: editingProject._id,
-                                projectName: editProjectName,
-                                activityType: 'staff_unassigned',
+                                projectName: editProjectName.trim(),
+                                activityType: 'staff_removed',
                                 category: 'staff',
-                                action: 'unassign',
-                                description: `Removed ${staff.fullName} from project "${editProjectName}"`,
+                                action: 'remove',
+                                description: `Removed ${staff.fullName} from project "${editProjectName.trim()}"`,
                                 message: 'Removed during project update',
                                 date: new Date().toISOString(),
                                 metadata: {
                                     staffName: staff.fullName,
+                                    staffId: staff._id,
+                                    removedDuring: 'project_update'
                                 },
                             };
-
-                            console.log(`📝 Staff removal payload:`, JSON.stringify(staffPayload, null, 2));
 
                             const response = await axios.post(`${domain}/api/activity`, staffPayload);
                             console.log(`✅ Staff removal logged successfully: ${staff.fullName}`, response.status);
                         } catch (error: any) {
                             console.error(`❌ Error logging staff removal for ${staff.fullName}:`, error);
-                            console.error(`❌ Error details:`, {
-                                message: error.message,
-                                status: error?.response?.status,
-                                statusText: error?.response?.statusText,
-                                data: error?.response?.data,
-                                url: error?.config?.url,
-                                method: error?.config?.method,
-                            });
-                            
                             // Don't fail the entire operation if activity logging fails
-                            console.warn(`⚠️ Continuing despite activity logging failure for ${staff.fullName}`);
                         }
                     }
                 }

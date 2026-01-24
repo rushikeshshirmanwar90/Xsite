@@ -61,7 +61,7 @@ interface MaterialActivity {
     date?: string; // Material activities use 'date' field instead of 'createdAt'
 }
 
-type TabType = 'all' | 'project' | 'material';
+type TabType = 'all' | 'project' | 'material' | 'labor';
 type MaterialSubTab = 'imported' | 'used';
 
 const NotificationPage: React.FC = () => {
@@ -664,6 +664,7 @@ const NotificationPage: React.FC = () => {
         if (category === 'section') return { name: 'layers', color: '#8B5CF6' };
         if (category === 'mini_section') return { name: 'grid', color: '#10B981' };
         if (category === 'staff') return { name: 'people', color: '#EF4444' };
+        if (category === 'labor') return { name: 'hammer', color: '#F59E0B' };
         return { name: 'information-circle', color: '#6B7280' };
     };
 
@@ -720,6 +721,30 @@ const NotificationPage: React.FC = () => {
             ? activity.user
             : currentUser || { userId: 'unknown', fullName: 'Unknown User' };
 
+        // Enhanced message for project updates with change details
+        let enhancedMessage = activity.message;
+        if (activity.activityType === 'project_updated' && activity.metadata?.changedData) {
+            const changes = activity.metadata.changedData;
+            if (Array.isArray(changes) && changes.length > 0) {
+                const changeDetails = changes.map((change: any) => {
+                    switch (change.field) {
+                        case 'name':
+                            return `Name: "${change.oldValue}" → "${change.newValue}"`;
+                        case 'budget':
+                            return `Budget: ₹${Number(change.oldValue).toLocaleString('en-IN')} → ₹${Number(change.newValue).toLocaleString('en-IN')}`;
+                        case 'address':
+                            return `Address updated`;
+                        case 'description':
+                            return `Description updated`;
+                        default:
+                            return `${change.field} changed`;
+                    }
+                }).join(' • ');
+                
+                enhancedMessage = `Changes: ${changeDetails}`;
+            }
+        }
+
         return (
             <View key={activity._id} style={styles.activityItemNew}>
                 <View style={[styles.iconContainerNew, { backgroundColor: icon.color }]}>
@@ -736,8 +761,8 @@ const NotificationPage: React.FC = () => {
                         </View>
                     </View>
 
-                    {activity.message && (
-                        <Text style={styles.activityMessageNew}>{activity.message}</Text>
+                    {enhancedMessage && (
+                        <Text style={styles.activityMessageNew}>{enhancedMessage}</Text>
                     )}
 
                     <View style={styles.activityFooterNew}>
@@ -781,9 +806,27 @@ const NotificationPage: React.FC = () => {
 
     const renderMaterialActivityItem = (activity: MaterialActivity) => {
         const icon = getMaterialActivityIcon(activity.activity);
-        const totalCost = activity.materials.reduce((sum, m) => sum + ((m.cost || 0) * (m.qnt || 0)), 0);
+        // Fix: Just sum up the cost field (which should already be the total cost per material)
+        // Don't multiply by quantity again since cost field already represents total cost
+        const totalCost = activity.materials.reduce((sum, m) => sum + (m.cost || 0), 0);
         const materialCount = activity.materials.length;
         const isImported = activity.activity === 'imported';
+
+        // Debug: Log the cost calculation to verify it's correct
+        if (__DEV__) {
+            console.log('Material Activity Cost Debug:', {
+                _id: activity._id,
+                materials: activity.materials.map(m => ({
+                    name: m.name,
+                    qnt: m.qnt,
+                    unit: m.unit,
+                    cost: m.cost,
+                    perUnitCost: (m as any).perUnitCost,
+                    totalCost: (m as any).totalCost,
+                })),
+                calculatedTotalCost: totalCost,
+            });
+        }
 
         // Debug: Log the date field to see what we're getting
         if (__DEV__) {
@@ -793,6 +836,7 @@ const NotificationPage: React.FC = () => {
                 createdAt: activity.createdAt,
                 dateType: typeof activity.date,
                 createdAtType: typeof activity.createdAt,
+                formattedTimeAgo: formatTimeAgo(activity.date || activity.createdAt),
             });
         }
 
@@ -905,7 +949,7 @@ const NotificationPage: React.FC = () => {
                         </View>
                     )}
 
-                    {/* Footer with user info */}
+                    {/* Footer with user info and time ago */}
                     <View style={styles.materialActivityFooter}>
                         <View style={styles.userInfo}>
                             <View style={styles.userAvatar}>
@@ -915,6 +959,10 @@ const NotificationPage: React.FC = () => {
                             </View>
                             <Text style={styles.userName}>{displayUser.fullName}</Text>
                         </View>
+                        {/* Add time ago display similar to regular activities */}
+                        <Text style={styles.activityTimeNew}>
+                            {formatTimeAgo(activity.date || activity.createdAt)}
+                        </Text>
                     </View>
                 </View>
             </View>
@@ -953,6 +1001,14 @@ const NotificationPage: React.FC = () => {
             // Safely map activities (ensure it's an array)
             if (Array.isArray(activities)) {
                 return activities.map(a => ({ type: 'activity' as const, data: a, timestamp: a.createdAt }));
+            }
+            return [];
+        } else if (activeTab === 'labor') {
+            // Filter activities to show only labor activities
+            if (Array.isArray(activities)) {
+                return activities
+                    .filter(a => a.category === 'labor')
+                    .map(a => ({ type: 'activity' as const, data: a, timestamp: a.createdAt }));
             }
             return [];
         } else if (activeTab === 'material') {
@@ -1002,6 +1058,12 @@ const NotificationPage: React.FC = () => {
                 if (activeTab === 'project') {
                     // Only show regular activities (not material activities)
                     filteredGroupActivities = group.activities.filter(item => item.type === 'activity');
+                } else if (activeTab === 'labor') {
+                    // Only show labor activities
+                    filteredGroupActivities = group.activities.filter(item => 
+                        item.type === 'activity' && 
+                        (item.data as Activity).category === 'labor'
+                    );
                 } else if (activeTab === 'material') {
                     // Only show material activities that match the sub-tab
                     filteredGroupActivities = group.activities.filter(item => 
@@ -1139,6 +1201,9 @@ const NotificationPage: React.FC = () => {
         dateGroups.forEach((group, index) => {
             const totalInGroup = group.activities.length;
             const activityCount = group.activities.filter(item => item.type === 'activity').length;
+            const laborCount = group.activities.filter(item => 
+                item.type === 'activity' && (item.data as Activity).category === 'labor'
+            ).length;
             const materialImportedCount = group.activities.filter(item => 
                 item.type === 'material' && (item.data as MaterialActivity).activity === 'imported'
             ).length;
@@ -1149,8 +1214,17 @@ const NotificationPage: React.FC = () => {
             console.log(`   Date ${group.date}:`);
             console.log(`     - Total: ${totalInGroup}`);
             console.log(`     - Activities: ${activityCount}`);
+            console.log(`     - Labor Activities: ${laborCount}`);
             console.log(`     - Materials (imported): ${materialImportedCount}`);
             console.log(`     - Materials (used): ${materialUsedCount}`);
+            
+            // Log individual activities for debugging
+            group.activities.forEach((item, actIndex) => {
+                if (item.type === 'activity') {
+                    const activity = item.data as Activity;
+                    console.log(`       Activity ${actIndex + 1}: ${activity.category} - ${activity.activityType} - ${activity.description}`);
+                }
+            });
         });
     }
 
@@ -1198,6 +1272,16 @@ const NotificationPage: React.FC = () => {
                         Projects
                     </Text>
                     {activeTab === 'project' && <View style={styles.tabIndicator} />}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={[styles.tab, activeTab === 'labor' && styles.tabActive]}
+                    onPress={() => setActiveTab('labor')}
+                >
+                    <Text style={[styles.tabText, activeTab === 'labor' && styles.tabTextActive]}>
+                        Labor
+                    </Text>
+                    {activeTab === 'labor' && <View style={styles.tabIndicator} />}
                 </TouchableOpacity>
 
                 <TouchableOpacity
