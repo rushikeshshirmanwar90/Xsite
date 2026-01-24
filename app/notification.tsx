@@ -56,13 +56,17 @@ interface MaterialActivity {
         cost: number;
     }[];
     message?: string;
-    activity: 'imported' | 'used';
+    activity: 'imported' | 'used' | 'transferred';
     createdAt?: string;
     date?: string; // Material activities use 'date' field instead of 'createdAt'
+    transferDetails?: {
+        fromProject: { id: string; name: string };
+        toProject: { id: string; name: string };
+    };
 }
 
 type TabType = 'all' | 'project' | 'material' | 'labor';
-type MaterialSubTab = 'imported' | 'used';
+type MaterialSubTab = 'imported' | 'used' | 'transferred';
 
 const NotificationPage: React.FC = () => {
     console.log('🏗️ NotificationPage component rendering/re-rendering');
@@ -669,10 +673,10 @@ const NotificationPage: React.FC = () => {
         return { name: 'information-circle', color: '#6B7280' };
     };
 
-    const getMaterialActivityIcon = (activity: 'imported' | 'used') => {
-        return activity === 'imported'
-            ? { name: 'download', color: '#10B981' }
-            : { name: 'arrow-forward', color: '#EF4444' };
+    const getMaterialActivityIcon = (activity: 'imported' | 'used' | 'transferred') => {
+        if (activity === 'imported') return { name: 'download', color: '#10B981' };
+        if (activity === 'used') return { name: 'arrow-forward', color: '#EF4444' };
+        return { name: 'swap-horizontal', color: '#3B82F6' }; // For transferred
     };
 
     const formatTimeAgo = (dateString: string | undefined | null) => {
@@ -812,6 +816,8 @@ const NotificationPage: React.FC = () => {
         const totalCost = activity.materials.reduce((sum, m) => sum + (m.cost || 0), 0);
         const materialCount = activity.materials.length;
         const isImported = activity.activity === 'imported';
+        const isUsed = activity.activity === 'used';
+        const isTransferred = activity.activity === 'transferred';
 
         // Debug: Log the cost calculation to verify it's correct
         if (__DEV__) {
@@ -854,8 +860,8 @@ const NotificationPage: React.FC = () => {
                         <View style={[
                             styles.activityBadge,
                             {
-                                backgroundColor: isImported ? '#10B981' : '#EF4444',
-                                shadowColor: isImported ? '#10B981' : '#EF4444',
+                                backgroundColor: isImported ? '#10B981' : isUsed ? '#EF4444' : '#3B82F6',
+                                shadowColor: isImported ? '#10B981' : isUsed ? '#EF4444' : '#3B82F6',
                                 shadowOffset: { width: 0, height: 2 },
                                 shadowOpacity: 0.3,
                                 shadowRadius: 4,
@@ -871,7 +877,7 @@ const NotificationPage: React.FC = () => {
                                 styles.activityBadgeText,
                                 { color: '#FFFFFF' }
                             ]}>
-                                {isImported ? 'IMPORTED' : 'USED'}
+                                {isImported ? 'IMPORTED' : isUsed ? 'USED' : 'TRANSFERRED'}
                             </Text>
                         </View>
                     </View>
@@ -897,6 +903,27 @@ const NotificationPage: React.FC = () => {
                                     <Text style={styles.projectInfoText}>{activity.miniSectionName}</Text>
                                 </View>
                             )}
+                        </View>
+                    )}
+
+                    {/* Transfer Details - Only show for transferred activities */}
+                    {isTransferred && activity.transferDetails && (
+                        <View style={styles.transferDetailsContainer}>
+                            <View style={styles.transferRoute}>
+                                <View style={styles.transferProject}>
+                                    <Ionicons name="folder" size={16} color="#3B82F6" />
+                                    <Text style={styles.transferProjectName}>
+                                        {activity.transferDetails.fromProject.name}
+                                    </Text>
+                                </View>
+                                <Ionicons name="arrow-forward" size={16} color="#64748B" />
+                                <View style={styles.transferProject}>
+                                    <Ionicons name="folder" size={16} color="#10B981" />
+                                    <Text style={styles.transferProjectName}>
+                                        {activity.transferDetails.toProject.name}
+                                    </Text>
+                                </View>
+                            </View>
                         </View>
                     )}
 
@@ -1347,6 +1374,20 @@ const NotificationPage: React.FC = () => {
                         />
                         <Text style={[styles.subTabText, materialSubTab === 'used' && styles.subTabTextActive]}>
                             Used
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.subTab, materialSubTab === 'transferred' && styles.subTabActive]}
+                        onPress={() => setMaterialSubTab('transferred')}
+                    >
+                        <Ionicons
+                            name="swap-horizontal-outline"
+                            size={16}
+                            color={materialSubTab === 'transferred' ? '#3B82F6' : '#64748B'}
+                        />
+                        <Text style={[styles.subTabText, materialSubTab === 'transferred' && styles.subTabTextActive]}>
+                            Transferred
                         </Text>
                     </TouchableOpacity>
                 </View>
@@ -2729,6 +2770,33 @@ const styles = StyleSheet.create({
     },
     dateBadgeLoading: {
         opacity: 0.9,
+    },
+    // Transfer details styles
+    transferDetailsContainer: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    transferRoute: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    transferProject: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        paddingHorizontal: 8,
+    },
+    transferProjectName: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#334155',
+        marginLeft: 6,
+        flex: 1,
     },
 });
 

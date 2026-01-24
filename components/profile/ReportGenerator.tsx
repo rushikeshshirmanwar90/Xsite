@@ -24,7 +24,7 @@ interface ReportGeneratorProps {
     userData: any;
 }
 
-type ActivityFilter = 'all' | 'imported' | 'used';
+type ActivityFilter = 'all' | 'imported' | 'used' | 'transferred';
 
 interface Project {
     _id: string;
@@ -411,9 +411,10 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                             
                             <View style={styles.filterButtons}>
                                 {[
-                                    { key: 'all' as ActivityFilter, label: 'All Activities', description: 'Both imported and used materials' },
+                                    { key: 'all' as ActivityFilter, label: 'All Activities', description: 'All material activities' },
                                     { key: 'imported' as ActivityFilter, label: 'Imported Only', description: 'Materials added to inventory' },
-                                    { key: 'used' as ActivityFilter, label: 'Used Only', description: 'Materials consumed in projects' }
+                                    { key: 'used' as ActivityFilter, label: 'Used Only', description: 'Materials consumed in projects' },
+                                    { key: 'transferred' as ActivityFilter, label: 'Transferred Only', description: 'Materials moved between projects' }
                                 ].map((filter) => (
                                     <TouchableOpacity
                                         key={filter.key}
@@ -542,7 +543,8 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                                         <Text style={styles.previewLabel}>Activities:</Text>
                                         <Text style={styles.previewValue}>
                                             {activityFilter === 'all' ? 'All Types' : 
-                                             activityFilter === 'imported' ? 'Imported Materials' : 'Used Materials'}
+                                             activityFilter === 'imported' ? 'Imported Materials' : 
+                                             activityFilter === 'used' ? 'Used Materials' : 'Transferred Materials'}
                                         </Text>
                                     </View>
                                     <View style={styles.previewRow}>

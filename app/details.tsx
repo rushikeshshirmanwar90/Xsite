@@ -1586,27 +1586,63 @@ const Details = () => {
         specs: Record<string, any>,
         targetProjectId: string
     ) => {
-        console.log('=== MATERIAL TRANSFER ===');
-        console.log('Material:', materialName);
-        console.log('Unit:', unit);
-        console.log('Variant ID:', variantId);
-        console.log('Quantity:', quantity);
-        console.log('Specs:', specs);
-        console.log('From Project:', projectId);
-        console.log('To Project:', targetProjectId);
-        console.log('========================');
+        console.log('\n========================================');
+        console.log('🔄 MATERIAL TRANSFER - COMPREHENSIVE DEBUG');
+        console.log('========================================');
+        console.log('📋 Transfer Parameters:');
+        console.log('  - Material Name:', materialName);
+        console.log('  - Unit:', unit);
+        console.log('  - Variant ID:', variantId);
+        console.log('  - Quantity:', quantity);
+        console.log('  - Specs:', specs);
+        console.log('  - From Project ID:', projectId);
+        console.log('  - From Project Name:', projectName);
+        console.log('  - To Project ID:', targetProjectId);
 
         let loadingToast: any = null;
         try {
             loadingToast = toast.loading('Transferring material...');
 
-            // Get client ID
+            // Get client ID and user data
             const { getClientId } = require('@/functions/clientId');
             const clientId = await getClientId();
+            const user = await getUserData();
 
             if (!clientId) {
                 throw new Error('Client ID not found');
             }
+
+            if (!user) {
+                throw new Error('User data not found');
+            }
+
+            console.log('👤 User Data:', user);
+            console.log('🏢 Client ID:', clientId);
+
+            // Get target project name for logging
+            let targetProjectName = 'Unknown Project';
+            try {
+                const targetProjectResponse = await axios.get(`${domain}/api/project/${targetProjectId}?clientId=${clientId}`);
+                if (targetProjectResponse.data?.success) {
+                    targetProjectName = targetProjectResponse.data.project?.name || 
+                                      targetProjectResponse.data.data?.name || 
+                                      targetProjectResponse.data.name || 
+                                      'Unknown Project';
+                }
+                console.log('🎯 Target Project Name:', targetProjectName);
+            } catch (projectError) {
+                console.warn('⚠️ Could not fetch target project name:', projectError);
+            }
+
+            // Find the material details for cost calculation
+            const sourceMaterial = availableMaterials.find(m => m._id === variantId);
+            const perUnitCost = sourceMaterial?.price || 0;
+            const totalTransferCost = perUnitCost * quantity;
+
+            console.log('💰 Cost Calculation:');
+            console.log('  - Per Unit Cost:', perUnitCost);
+            console.log('  - Transfer Quantity:', quantity);
+            console.log('  - Total Transfer Cost:', totalTransferCost);
 
             // API call to transfer material
             const transferPayload = {
@@ -1620,27 +1656,95 @@ const Details = () => {
                 clientId
             };
 
-            console.log('Transfer payload:', transferPayload);
+            console.log('\n📤 Transfer API Payload:');
+            console.log(JSON.stringify(transferPayload, null, 2));
 
             const response = await axios.post(`${domain}/api/material/transfer`, transferPayload);
             const responseData = response.data as any;
 
+            console.log('\n📥 Transfer API Response:');
+            console.log('  - Success:', responseData.success);
+            console.log('  - Message:', responseData.message);
+            console.log('  - Data:', responseData.data);
+
             toast.dismiss(loadingToast);
 
             if (responseData.success) {
-                toast.success(`Successfully transferred ${quantity} ${unit} of ${materialName}`);
+                // Log material transfer activity
+                console.log('\n🔔 LOGGING MATERIAL TRANSFER ACTIVITY...');
+                
+                try {
+                    const transferActivityPayload = {
+                        clientId,
+                        projectId, // Source project
+                        projectName, // Source project name
+                        sectionName,
+                        materials: [{
+                            name: materialName,
+                            unit: unit,
+                            specs: specs || {},
+                            qnt: quantity,
+                            perUnitCost: perUnitCost,
+                            totalCost: totalTransferCost,
+                            cost: totalTransferCost, // For notification compatibility
+                            transferDetails: {
+                                fromProject: {
+                                    id: projectId,
+                                    name: projectName
+                                },
+                                toProject: {
+                                    id: targetProjectId,
+                                    name: targetProjectName
+                                }
+                            }
+                        }],
+                        message: `Material transferred from "${projectName}" to "${targetProjectName}"`,
+                        activity: 'transferred', // New activity type for transfers
+                        user,
+                        date: new Date().toISOString(),
+                    };
+
+                    console.log('📦 Transfer Activity Payload:');
+                    console.log(JSON.stringify(transferActivityPayload, null, 2));
+
+                    const activityResponse = await axios.post(`${domain}/api/materialActivity`, transferActivityPayload);
+                    console.log('✅ Transfer activity logged successfully:', activityResponse.data);
+                } catch (activityError) {
+                    console.error('❌ Failed to log transfer activity:', activityError);
+                    // Don't fail the transfer if activity logging fails
+                }
+
+                toast.success(`Successfully transferred ${quantity} ${unit} of ${materialName} to ${targetProjectName}`);
                 
                 // Reload materials to reflect the transfer
+                console.log('\n🔄 Reloading materials after transfer...');
                 await reloadProjectMaterials(true);
+                
+                console.log('✅ MATERIAL TRANSFER COMPLETED SUCCESSFULLY');
+                console.log('========================================\n');
             } else {
-                throw new Error(responseData.message || 'Transfer failed');
+                throw new Error(responseData.error || responseData.message || 'Transfer failed');
             }
 
         } catch (error: any) {
-            console.error('Transfer error:', error);
+            console.error('\n❌ MATERIAL TRANSFER ERROR:');
+            console.error('Error Type:', error?.constructor?.name);
+            console.error('Error Message:', error?.message);
+            
+            if (error?.response) {
+                console.error('API Response Error:');
+                console.error('  - Status:', error.response.status);
+                console.error('  - Data:', JSON.stringify(error.response.data, null, 2));
+            }
+            
+            console.log('========================================\n');
+            
             if (loadingToast) toast.dismiss(loadingToast);
             
-            const errorMessage = error.response?.data?.message || error.message || 'Failed to transfer material';
+            const errorMessage = error.response?.data?.error || 
+                               error.response?.data?.message || 
+                               error.message || 
+                               'Failed to transfer material';
             toast.error(errorMessage);
         }
     };

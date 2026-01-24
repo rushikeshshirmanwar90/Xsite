@@ -37,10 +37,14 @@ interface MaterialActivity {
     projectId: string;
     materials: Material[];
     message?: string;
-    activity: 'imported' | 'used';
+    activity: 'imported' | 'used' | 'transferred';
     date?: string; // Material activities use 'date' field
     createdAt: string;
     updatedAt: string;
+    transferDetails?: {
+        fromProject: { id: string; name: string };
+        toProject: { id: string; name: string };
+    };
 }
 
 interface MaterialActivityNotificationsProps {
@@ -114,12 +118,16 @@ const MaterialActivityNotifications: React.FC<MaterialActivityNotificationsProps
         fetchActivities(true);
     };
 
-    const getActivityIcon = (activity: 'imported' | 'used') => {
-        return activity === 'imported' ? 'arrow-down-circle' : 'arrow-forward-circle';
+    const getActivityIcon = (activity: 'imported' | 'used' | 'transferred') => {
+        if (activity === 'imported') return 'arrow-down-circle';
+        if (activity === 'used') return 'arrow-forward-circle';
+        return 'swap-horizontal'; // For transferred
     };
 
-    const getActivityColor = (activity: 'imported' | 'used') => {
-        return activity === 'imported' ? '#10B981' : '#EF4444';
+    const getActivityColor = (activity: 'imported' | 'used' | 'transferred') => {
+        if (activity === 'imported') return '#10B981';
+        if (activity === 'used') return '#EF4444';
+        return '#3B82F6'; // For transferred
     };
 
     const formatDate = (dateString: string) => {
@@ -182,7 +190,11 @@ const MaterialActivityNotifications: React.FC<MaterialActivityNotificationsProps
                     </View>
                     <View style={styles.activityHeaderText}>
                         <Text style={styles.activityTitle}>
-                            Material {item.activity === 'imported' ? 'Imported' : 'Used'}
+                            Material {
+                                item.activity === 'imported' ? 'Imported' : 
+                                item.activity === 'used' ? 'Used' : 
+                                'Transferred'
+                            }
                         </Text>
                         <Text style={styles.activityTime}>
                             {formatDate(item.date || item.createdAt)}
@@ -312,7 +324,7 @@ const MaterialActivityNotifications: React.FC<MaterialActivityNotificationsProps
                             <Ionicons name="notifications-off-outline" size={64} color="#CBD5E1" />
                             <Text style={styles.emptyTitle}>No Activities Yet</Text>
                             <Text style={styles.emptyDescription}>
-                                Material activities will appear here when materials are imported or used.
+                                Material activities will appear here when materials are imported, used, or transferred.
                             </Text>
                         </View>
                     ) : (

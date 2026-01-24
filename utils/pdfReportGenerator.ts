@@ -25,8 +25,12 @@ interface MaterialActivity {
         cost?: number;       // ✅ LEGACY: Keep for backward compatibility
     }>;
     message?: string;
-    activity: 'imported' | 'used';
+    activity: 'imported' | 'used' | 'transferred';
     date: string;
+    transferDetails?: {
+        fromProject: { id: string; name: string };
+        toProject: { id: string; name: string };
+    };
 }
 
 interface GroupedActivities {
@@ -101,6 +105,8 @@ export class PDFReportGenerator {
         }, 0);
         
         const isImported = activity.activity === 'imported';
+        const isUsed = activity.activity === 'used';
+        const isTransferred = activity.activity === 'transferred';
         
         const materialsHTML = activity.materials.map(material => {
             let perUnitCost = 0;
@@ -158,11 +164,11 @@ export class PDFReportGenerator {
 
         return `
             <div style="margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-                <div style="background-color: ${isImported ? '#f0fdf4' : '#fef2f2'}; padding: 12px; border-bottom: 1px solid #e2e8f0;">
+                <div style="background-color: ${isImported ? '#f0fdf4' : isUsed ? '#fef2f2' : '#eff6ff'}; padding: 12px; border-bottom: 1px solid #e2e8f0;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div>
-                            <span style="background-color: ${isImported ? '#10B981' : '#EF4444'}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
-                                ${isImported ? 'IMPORTED' : 'USED'}
+                            <span style="background-color: ${isImported ? '#10B981' : isUsed ? '#EF4444' : '#3B82F6'}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
+                                ${isImported ? 'IMPORTED' : isUsed ? 'USED' : 'TRANSFERRED'}
                             </span>
                             <span style="margin-left: 10px; font-weight: 600; color: #374151;">
                                 ${activity.user.fullName}
@@ -177,6 +183,14 @@ export class PDFReportGenerator {
                         </div>
                     </div>
                     ${activity.message ? `<div style="margin-top: 8px; font-size: 13px; color: #6b7280; font-style: italic;">"${activity.message}"</div>` : ''}
+                    ${isTransferred && activity.transferDetails ? `
+                        <div style="margin-top: 8px; padding: 8px; background-color: rgba(59, 130, 246, 0.1); border-radius: 6px; border-left: 3px solid #3B82F6;">
+                            <div style="font-size: 12px; color: #374151; font-weight: 600;">Transfer Details:</div>
+                            <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">
+                                From: <strong>${activity.transferDetails.fromProject.name}</strong> → To: <strong>${activity.transferDetails.toProject.name}</strong>
+                            </div>
+                        </div>
+                    ` : ''}
                 </div>
                 
                 <table style="width: 100%; border-collapse: collapse;">
@@ -217,12 +231,14 @@ export class PDFReportGenerator {
         const totalActivities = activities.length;
         const importedCount = activities.filter(a => a.activity === 'imported').length;
         const usedCount = activities.filter(a => a.activity === 'used').length;
+        const transferredCount = activities.filter(a => a.activity === 'transferred').length;
         // ✅ FIXED: Only include IMPORTED materials in total cost calculation
         // Business Logic: We only spend money when importing materials, not when using them
+        // Transferred materials don't add to cost (they're just moved between projects)
         const totalMaterialCost = activities.reduce((sum, activity) => {
-            // ✅ CRITICAL: Only count imported materials, skip used materials
+            // ✅ CRITICAL: Only count imported materials, skip used and transferred materials
             if (activity.activity !== 'imported') {
-                return sum; // Skip used materials - they don't add to total cost
+                return sum; // Skip used and transferred materials - they don't add to total cost
             }
             
             return sum + activity.materials.reduce((matSum, material) => {
@@ -276,7 +292,7 @@ export class PDFReportGenerator {
                     </div>
                 </div>
                 <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
                         <div>
                             <div style="font-size: 18px; font-weight: bold; color: #10b981;">${importedCount}</div>
                             <div style="font-size: 12px; color: #6b7280;">Materials Imported</div>
@@ -285,6 +301,12 @@ export class PDFReportGenerator {
                             <div style="font-size: 18px; font-weight: bold; color: #ef4444;">${usedCount}</div>
                             <div style="font-size: 12px; color: #6b7280;">Materials Used</div>
                         </div>
+                        <div>
+                            <div style="font-size: 18px; font-weight: bold; color: #3b82f6;">${transferredCount}</div>
+                            <div style="font-size: 12px; color: #6b7280;">Materials Transferred</div>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 12px;">
                         <div>
                             <div style="font-size: 18px; font-weight: bold; color: #8b5cf6;">${(laborData || []).length}</div>
                             <div style="font-size: 12px; color: #6b7280;">Labor Entries</div>
