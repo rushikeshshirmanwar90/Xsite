@@ -1,7 +1,10 @@
 import { Project } from '@/types/project';
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View, Modal, Alert } from 'react-native';
+import { domain } from '@/lib/domain';
+import axios from 'axios';
+import { toast } from 'sonner-native';
 
 interface ProjectCardProps {
     project: Project;
@@ -9,6 +12,9 @@ interface ProjectCardProps {
 }
 
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails }) => {
+    const [showMenu, setShowMenu] = useState(false);
+    const [projectCompleted, setProjectCompleted] = useState(false);
+    const [isUpdatingCompletion, setIsUpdatingCompletion] = useState(false);
 
     const formatCurrency = (amount: number): string => {
         return new Intl.NumberFormat('en-IN', {
@@ -24,6 +30,88 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails }) => 
     const expectedBudget = project?.budget || 0;
     const budgetProgress = expectedBudget > 0 ? (totalExpenses / expectedBudget) * 100 : 0;
 
+    // Helper function to validate MongoDB ObjectId
+    const isValidMongoId = (id: string) => {
+        return /^[0-9a-fA-F]{24}$/.test(id);
+    };
+    
+    // Load project completion status on mount
+    useEffect(() => {
+        const loadProjectCompletionStatus = async () => {
+            if (!project._id || !isValidMongoId(project._id)) {
+                return;
+            }
+            
+            try {
+                const response = await axios.get(`${domain}/api/completion?updateType=project&id=${project._id}`);
+                const responseData = response.data as any;
+                if (responseData.success && responseData.data) {
+                    const isCompleted = Boolean(responseData.data.isCompleted);
+                    setProjectCompleted(isCompleted);
+                }
+            } catch (error) {
+                console.warn('Could not load project completion status:', error);
+            }
+        };
+        
+        loadProjectCompletionStatus();
+    }, [project._id]);
+    
+    // Function to toggle project completion
+    const toggleProjectCompletion = async () => {
+        if (isUpdatingCompletion) return;
+        
+        if (!project._id || !isValidMongoId(project._id)) {
+            toast.error('Invalid project ID.');
+            return;
+        }
+        
+        setIsUpdatingCompletion(true);
+        try {
+            const payload = {
+                updateType: 'project',
+                id: project._id
+            };
+            
+            const response = await axios.patch(`${domain}/api/completion`, payload, {
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                timeout: 10000
+            });
+
+            const responseData = response.data as any;
+            if (responseData.success) {
+                const newCompletionStatus = responseData.data?.isCompleted;
+                
+                if (typeof newCompletionStatus === 'boolean') {
+                    setProjectCompleted(newCompletionStatus);
+                    toast.success(`Project ${newCompletionStatus ? 'completed' : 'reopened'} successfully`);
+                } else {
+                    const toggledStatus = !projectCompleted;
+                    setProjectCompleted(toggledStatus);
+                    toast.success('Project completion updated successfully');
+                }
+            } else {
+                throw new Error(responseData.message || 'Failed to update project completion');
+            }
+        } catch (error: any) {
+            const errorMessage = error?.response?.data?.message || error?.message || 'Unknown error';
+            toast.error(`Failed to update project completion: ${errorMessage}`);
+        } finally {
+            setIsUpdatingCompletion(false);
+            setShowMenu(false);
+        }
+    };
+    
+    const handleMenuPress = () => {
+        setShowMenu(true);
+    };
+    
+    const handleCloseMenu = () => {
+        setShowMenu(false);
+    };
+
 
 
     // const statusColor = getStatusColor(project.status);
@@ -37,12 +125,27 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails }) => 
                 </View>
                 <View style={styles.projectTitleContainer}>
                     <Text style={styles.projectTitle}>{project.name}</Text>
-                    {project.clientName && (
-                        <View style={styles.clientBadge}>
-                            <Ionicons name="business-outline" size={12} color="#6B7280" />
-                            <Text style={styles.clientName}>{project.clientName}</Text>
-                        </View>
-                    )}
+                    <View style={styles.headerRight}>
+                        {projectCompleted && (
+                            <View style={styles.completedBadge}>
+                                <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                                <Text style={styles.completedText}>Complete</Text>
+                            </View>
+                        )}
+                        {project.clientName && (
+                            <View style={styles.clientBadge}>
+                                <Ionicons name="business-outline" size={12} color="#6B7280" />
+                                <Text style={styles.clientName}>{project.clientName}</Text>
+                            </View>
+                        )}
+                        <TouchableOpacity 
+                            style={styles.menuButton}
+                            onPress={handleMenuPress}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons name="ellipsis-vertical" size={20} color="#6B7280" />
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </View>
 
@@ -109,6 +212,59 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails }) => 
                     <Ionicons name="arrow-forward" size={16} color="white" />
                 </TouchableOpacity>
             </View>
+            
+            {/* Three-dot menu modal */}
+            <Modal
+                visible={showMenu}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={handleCloseMenu}
+            >
+                <TouchableOpacity 
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={handleCloseMenu}
+                >
+                    <View style={styles.menuContainer}>
+                        <TouchableOpacity
+                            style={[
+                                styles.menuItem,
+                                isUpdatingCompletion && styles.menuItemDisabled
+                            ]}
+                            onPress={toggleProjectCompletion}
+                            disabled={isUpdatingCompletion}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons 
+                                name={projectCompleted ? "checkmark-circle" : "ellipse-outline"} 
+                                size={20} 
+                                color={projectCompleted ? "#10B981" : "#6B7280"} 
+                            />
+                            <Text style={[
+                                styles.menuItemText,
+                                projectCompleted && styles.menuItemTextCompleted,
+                                isUpdatingCompletion && styles.menuItemTextDisabled
+                            ]}>
+                                {isUpdatingCompletion 
+                                    ? 'Updating...' 
+                                    : projectCompleted 
+                                        ? 'Mark Incomplete' 
+                                        : 'Mark Complete'
+                                }
+                            </Text>
+                        </TouchableOpacity>
+                        
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={handleCloseMenu}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons name="close" size={20} color="#6B7280" />
+                            <Text style={styles.menuItemText}>Cancel</Text>
+                        </TouchableOpacity>
+                    </View>
+                </TouchableOpacity>
+            </Modal>
         </View>
     );
 };
@@ -390,6 +546,33 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         gap: 12,
     },
+    headerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    completedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#ECFDF5',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#10B981',
+        gap: 4,
+    },
+    completedText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#059669',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    menuButton: {
+        padding: 4,
+        borderRadius: 4,
+    },
     clientBadge: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -576,5 +759,45 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         fontWeight: '400',
         letterSpacing: 0.3,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    menuContainer: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 8,
+        minWidth: 200,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 8,
+    },
+    menuItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        gap: 12,
+    },
+    menuItemDisabled: {
+        opacity: 0.6,
+    },
+    menuItemText: {
+        fontSize: 16,
+        color: '#1F2937',
+        fontWeight: '500',
+    },
+    menuItemTextCompleted: {
+        color: '#10B981',
+    },
+    menuItemTextDisabled: {
+        color: '#9CA3AF',
     },
 });

@@ -8,9 +8,11 @@ import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     Alert,
+    Animated,
+    FlatList,
     Modal,
     RefreshControl,
     ScrollView,
@@ -30,7 +32,12 @@ const ProjectScreen: React.FC = () => {
     const [staffMembers, setStaffMembers] = useState<StaffMembers[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
     const router = useRouter();
+    
+    // Loading animations for project operations
+    const projectLoadingAnimation = useRef(new Animated.Value(0)).current;
+    const deleteLoadingAnimation = useRef(new Animated.Value(0)).current;
     
     // Edit project state
     const [showEditModal, setShowEditModal] = useState(false);
@@ -50,6 +57,44 @@ const ProjectScreen: React.FC = () => {
     const isLoadingRef = React.useRef(false);
     const lastLoadTimeRef = React.useRef<number>(0);
     const DEBOUNCE_DELAY = 500;
+
+    // Function to start project loading animation
+    const startProjectLoadingAnimation = () => {
+        setAddingProject(true);
+        Animated.loop(
+            Animated.timing(projectLoadingAnimation, {
+                toValue: 1,
+                duration: 1000,
+                useNativeDriver: true,
+            })
+        ).start();
+    };
+
+    // Function to stop project loading animation
+    const stopProjectLoadingAnimation = () => {
+        setAddingProject(false);
+        projectLoadingAnimation.stopAnimation();
+        projectLoadingAnimation.setValue(0);
+    };
+
+    // Function to start delete loading animation
+    const startDeleteLoadingAnimation = (projectId: string) => {
+        setDeletingProjectId(projectId);
+        Animated.loop(
+            Animated.timing(deleteLoadingAnimation, {
+                toValue: 1,
+                duration: 1000,
+                useNativeDriver: true,
+            })
+        ).start();
+    };
+
+    // Function to stop delete loading animation
+    const stopDeleteLoadingAnimation = () => {
+        setDeletingProjectId(null);
+        deleteLoadingAnimation.stopAnimation();
+        deleteLoadingAnimation.setValue(0);
+    };
 
     // Fetch projects data function (extracted for reuse)
     const fetchProjectsData = async (showLoadingState = true) => {
@@ -144,7 +189,9 @@ const ProjectScreen: React.FC = () => {
     }, [clientId]);
     const handleAddProject = async (newProject: BaseProject) => {
         try {
-            setAddingProject(true);
+            // Start loading animation
+            startProjectLoadingAnimation();
+            
             const clientId = await getClientId();
             
             // Get user data from AsyncStorage for activity logging
@@ -181,13 +228,41 @@ const ProjectScreen: React.FC = () => {
                 const createdProject = res.data as any;
                 console.log('📦 Created project data:', createdProject);
 
-                // The API returns { project: { _id: ... } } so we need to access project._id
-                const projectData = createdProject?.project || createdProject;
-                const projectId = projectData?._id || projectData?.id || projectData?.projectId || createdProject?._id;
+                // Handle the actual API response structure: { success: true, data: { _id: ... } }
+                let projectId = null;
+                let projectData = null;
+
+                if (createdProject.success && createdProject.data) {
+                    // New API format: { success: true, data: { _id: ... } }
+                    projectData = createdProject.data;
+                    projectId = projectData._id;
+                    console.log('✅ Using new API response format');
+                } else if (createdProject.project) {
+                    // Alternative format: { project: { _id: ... } }
+                    projectData = createdProject.project;
+                    projectId = projectData._id;
+                    console.log('✅ Using project wrapper format');
+                } else if (createdProject._id) {
+                    // Direct format: { _id: ... }
+                    projectData = createdProject;
+                    projectId = createdProject._id;
+                    console.log('✅ Using direct format');
+                }
+
                 const projectName = newProject.name;
 
                 console.log('📦 Extracted project data:', projectData);
                 console.log('📦 Extracted project ID:', projectId);
+                console.log('📦 Project ID type:', typeof projectId);
+                console.log('📦 Project ID valid?', !!projectId);
+
+                // Validate project ID
+                if (!projectId) {
+                    console.error('❌ No project ID found in response');
+                    console.error('❌ Full response:', JSON.stringify(res.data, null, 2));
+                    Alert.alert('Error', 'Project created but ID not found. Please refresh and try again.');
+                    return;
+                }
 
                 console.log('📝 Logging project creation activity...');
                 console.log('   - Project ID:', projectId);
@@ -234,6 +309,7 @@ const ProjectScreen: React.FC = () => {
                                     address: newProject.address,
                                     budget: newProject.budget,
                                     description: newProject.description,
+                                    hasOnlyOneBuilding: newProject.hasOnlyOneBuilding,
                                 },
                             };
 
@@ -324,14 +400,140 @@ const ProjectScreen: React.FC = () => {
                     console.warn('⚠️ Checked fields: _id, id, projectId');
                 }
 
-                // Now update UI after activity logging is complete
+                // Handle single building creation if checkbox was checked
+                if (newProject.hasOnlyOneBuilding && projectId) {
+                    console.log('🏢 Creating single building for project...');
+                    
+                    try {
+                        const buildingPayload = {
+                            projectId: projectId,
+                            name: projectName, // Use same name as project
+                            clientId: clientId
+                        };
+
+                        console.log('📤 Building payload:', buildingPayload);
+
+                        const buildingResponse = await axios.post(`${domain}/api/building`, buildingPayload);
+                        
+                        console.log('✅ Building created successfully:', buildingResponse.data);
+
+                        // Verify building was created
+                        if (buildingResponse.status === 200 || buildingResponse.status === 201) {
+                            console.log('✅ Building creation confirmed');
+
+                            // Log building creation activity
+                            if (userInfo) {
+                                try {
+                                    const buildingActivityPayload = {
+                                        user: userInfo,
+                                        clientId,
+                                        projectId,
+                                        projectName,
+                                        activityType: 'section_created',
+                                        category: 'section',
+                                        action: 'create',
+                                        description: `Created building "${projectName}" automatically`,
+                                        message: 'Building created automatically for single-building project',
+                                        date: new Date().toISOString(),
+                                        metadata: {
+                                            sectionType: 'Buildings',
+                                            sectionName: projectName,
+                                            autoCreated: true,
+                                        },
+                                    };
+
+                                    await axios.post(`${domain}/api/activity`, buildingActivityPayload);
+                                    console.log('✅ Building creation activity logged');
+                                } catch (buildingActivityError: any) {
+                                    console.error('❌ Error logging building creation activity:', buildingActivityError);
+                                }
+                            }
+
+                            console.log('🏢 Single building created successfully');
+                            
+                            // Add a small delay to ensure database consistency
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                        } else {
+                            throw new Error(`Building creation failed with status: ${buildingResponse.status}`);
+                        }
+                    } catch (buildingError: any) {
+                        console.error('❌ Error creating single building:', buildingError);
+                        console.error('❌ Building error response:', buildingError?.response?.data);
+                        console.error('❌ Building error status:', buildingError?.response?.status);
+                        
+                        // Show error and don't navigate if building creation fails
+                        Alert.alert('Error', 'Failed to create building. Please try creating it manually from the project page.');
+                        
+                        // Still refresh the projects list and close modal
+                        console.log('🔄 Refreshing projects list...');
+                        await fetchProjectsData(false);
+                        console.log('✅ Projects list refreshed');
+                        setShowAddModal(false);
+                        return; // Exit early, don't navigate
+                    }
+                }
+
+                // Now update UI after all operations are complete
                 console.log('🔄 Refreshing projects list...');
                 await fetchProjectsData(false);
                 console.log('✅ Projects list refreshed');
 
-                // Close modal and show success message
+                // Close modal
                 setShowAddModal(false);
-                Alert.alert('Success', 'Project added successfully!');
+                
+                // Navigate based on checkbox state
+                if (newProject.hasOnlyOneBuilding) {
+                    // Navigate directly to manage project page for single building projects
+                    console.log('🔄 Navigating to manage project page...');
+                    console.log('   - Project ID:', projectId);
+                    console.log('   - Project Name:', projectName);
+                    console.log('   - Project ID type:', typeof projectId);
+                    console.log('   - Project ID length:', projectId?.length);
+                    console.log('   - Client ID:', clientId);
+                    
+                    // Ensure projectId is a string
+                    const projectIdString = String(projectId);
+                    
+                    Alert.alert('Success', 'Project and building created successfully!', [
+                        {
+                            text: 'OK',
+                            onPress: () => {
+                                console.log('🔄 Starting navigation...');
+                                console.log('   - Using Project ID:', projectIdString);
+                                console.log('   - Using Client ID:', clientId);
+                                
+                                try {
+                                    // Ensure we have both required parameters
+                                    if (!projectIdString || !clientId) {
+                                        console.error('❌ Missing required navigation parameters');
+                                        console.error('   - Project ID:', projectIdString);
+                                        console.error('   - Client ID:', clientId);
+                                        Alert.alert('Error', 'Missing required data for navigation. Please find your project in the list and tap "Add Details".');
+                                        return;
+                                    }
+
+                                    router.push({
+                                        pathname: '/manage_project/[id]',
+                                        params: {
+                                            id: projectIdString,
+                                            name: projectName,
+                                            sectionData: JSON.stringify([]), // Pass empty array to force fresh fetch
+                                            clientId: clientId, // Ensure clientId is passed
+                                            forceRefresh: 'true' // Add flag to indicate fresh data needed
+                                        }
+                                    });
+                                    console.log('✅ Navigation initiated successfully');
+                                } catch (navError) {
+                                    console.error('❌ Navigation error:', navError);
+                                    Alert.alert('Error', 'Failed to navigate to project page. Please find your project in the list and tap "Add Details".');
+                                }
+                            }
+                        }
+                    ]);
+                } else {
+                    // Show success message and stay on projects list for multi-section projects
+                    Alert.alert('Success', 'Project added successfully!');
+                }
             } else {
                 console.error('Failed to add project: Unexpected response status');
                 Alert.alert('Error', 'Failed to add project. Please try again.');
@@ -340,7 +542,8 @@ const ProjectScreen: React.FC = () => {
             console.error('Failed to add project:', error);
             Alert.alert('Error', 'Failed to add project. Please try again.');
         } finally {
-            setAddingProject(false);
+            // Stop loading animation
+            stopProjectLoadingAnimation();
         }
     };
 
@@ -358,7 +561,8 @@ const ProjectScreen: React.FC = () => {
             params: {
                 id: projectId,
                 name: name,
-                sectionData: JSON.stringify(sectionData || [])
+                sectionData: JSON.stringify(sectionData || []),
+                clientId: clientId // Ensure clientId is always passed
             }
         });
     };
@@ -484,7 +688,7 @@ const ProjectScreen: React.FC = () => {
 
             if (response.status === 200) {
                 // Log project update activity if there were changes
-                if (changedData.length > 0 && clientId && userInfo) {
+                if (changedData.length > 0 && clientId && userInfo && editingProject._id) {
                     try {
                         console.log('🔄 Logging project update activity...');
                         
@@ -492,7 +696,7 @@ const ProjectScreen: React.FC = () => {
                         const { logProjectUpdated } = await import('@/utils/activityLogger');
                         
                         await logProjectUpdated(
-                            editingProject._id,
+                            editingProject._id, // Now TypeScript knows this is not undefined
                             editProjectName.trim(), // Use new name
                             changedData,
                             `Project details updated by ${userInfo.fullName}`
@@ -528,6 +732,8 @@ const ProjectScreen: React.FC = () => {
                     console.error('❌ Cannot log activities: clientId is missing');
                 } else if (!userInfo) {
                     console.error('❌ Cannot log activities: userInfo is missing');
+                } else if (!editingProject._id) {
+                    console.error('❌ Cannot log activities: project ID is missing');
                 } else {
                     // Log staff assignments
                     for (const staff of addedStaff) {
@@ -537,7 +743,7 @@ const ProjectScreen: React.FC = () => {
                             const staffPayload = {
                                 user: userInfo,
                                 clientId,
-                                projectId: editingProject._id,
+                                projectId: editingProject._id, // Now TypeScript knows this is not undefined
                                 projectName: editProjectName.trim(),
                                 activityType: 'staff_assigned',
                                 category: 'staff',
@@ -568,7 +774,7 @@ const ProjectScreen: React.FC = () => {
                             const staffPayload = {
                                 user: userInfo,
                                 clientId,
-                                projectId: editingProject._id,
+                                projectId: editingProject._id, // Now TypeScript knows this is not undefined
                                 projectName: editProjectName.trim(),
                                 activityType: 'staff_removed',
                                 category: 'staff',
@@ -635,6 +841,9 @@ const ProjectScreen: React.FC = () => {
         try {
             console.log('🗑️ Deleting project:', project._id);
 
+            // Start delete loading animation
+            startDeleteLoadingAnimation(project._id!);
+
             const response = await axios.delete(`${domain}/api/project/${project._id}`);
 
             console.log('✅ Project deleted:', response.data);
@@ -648,6 +857,9 @@ const ProjectScreen: React.FC = () => {
         } catch (error: any) {
             console.error('❌ Error deleting project:', error);
             Alert.alert('Error', error?.response?.data?.message || 'Failed to delete project');
+        } finally {
+            // Stop delete loading animation
+            stopDeleteLoadingAnimation();
         }
     };
 
@@ -680,18 +892,36 @@ const ProjectScreen: React.FC = () => {
 
                 {userIsAdmin && (
                     <TouchableOpacity
-                        style={styles.addButton}
+                        style={[styles.addButton, addingProject && styles.addButtonDisabled]}
                         onPress={() => setShowAddModal(true)}
                         activeOpacity={0.8}
+                        disabled={addingProject}
                     >
                         <LinearGradient
-                            colors={['#3B82F6', '#8B5CF6']}
+                            colors={addingProject ? ['#9CA3AF', '#6B7280'] : ['#3B82F6', '#8B5CF6']}
                             style={styles.addButtonGradient}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                         >
-                            <Ionicons name="add-circle" size={22} color="white" />
-                            <Text style={styles.addButtonText}>Add New Project</Text>
+                            {addingProject ? (
+                                <Animated.View
+                                    style={{
+                                        transform: [{
+                                            rotate: projectLoadingAnimation.interpolate({
+                                                inputRange: [0, 1],
+                                                outputRange: ['0deg', '360deg']
+                                            })
+                                        }]
+                                    }}
+                                >
+                                    <Ionicons name="sync" size={22} color="white" />
+                                </Animated.View>
+                            ) : (
+                                <Ionicons name="add-circle" size={22} color="white" />
+                            )}
+                            <Text style={styles.addButtonText}>
+                                {addingProject ? 'Adding Project...' : 'Add New Project'}
+                            </Text>
                         </LinearGradient>
                     </TouchableOpacity>
                 )}
@@ -756,10 +986,29 @@ const ProjectScreen: React.FC = () => {
                                             <Ionicons name="create-outline" size={18} color="#059669" />
                                         </TouchableOpacity>
                                         <TouchableOpacity
-                                            style={styles.deleteButton}
+                                            style={[
+                                                styles.deleteButton,
+                                                deletingProjectId === project._id && styles.deleteButtonDisabled
+                                            ]}
                                             onPress={() => handleDeleteProject(project)}
+                                            disabled={deletingProjectId === project._id}
                                         >
-                                            <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                                            {deletingProjectId === project._id ? (
+                                                <Animated.View
+                                                    style={{
+                                                        transform: [{
+                                                            rotate: deleteLoadingAnimation.interpolate({
+                                                                inputRange: [0, 1],
+                                                                outputRange: ['0deg', '360deg']
+                                                            })
+                                                        }]
+                                                    }}
+                                                >
+                                                    <Ionicons name="sync" size={18} color="#9CA3AF" />
+                                                </Animated.View>
+                                            ) : (
+                                                <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                                            )}
                                         </TouchableOpacity>
                                     </View>
                                 )}
@@ -855,53 +1104,65 @@ const ProjectScreen: React.FC = () => {
 
                         {/* Staff Assignment */}
                         <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Assign Staff</Text>
-                            <View style={styles.staffContainer}>
-                                {staffMembers.map((staff: StaffMembers) => (
-                                    <TouchableOpacity
-                                        key={staff._id}
-                                        style={styles.staffItem}
-                                        onPress={() => handleEditStaffSelection(staff)}
-                                        activeOpacity={0.7}
-                                    >
-                                        <View style={styles.staffItemContent}>
-                                            <View style={[
-                                                styles.checkbox,
-                                                isEditStaffSelected(staff) && styles.checkboxSelected
-                                            ]}>
-                                                {isEditStaffSelected(staff) && (
-                                                    <Ionicons name="checkmark" size={18} color="#fff" />
-                                                )}
-                                            </View>
-                                            <View style={styles.staffInfo}>
-                                                <Text style={styles.staffName}>
-                                                    {staff.fullName}
-                                                </Text>
-                                                <Text style={styles.staffStatus}>
-                                                    {isEditStaffSelected(staff) ? 'Assigned' : 'Available'}
-                                                </Text>
-                                            </View>
-                                            <View style={[
-                                                styles.selectionIndicator,
-                                                isEditStaffSelected(staff) && styles.selectionIndicatorSelected
-                                            ]}>
-                                                <Ionicons
-                                                    name={isEditStaffSelected(staff) ? "checkmark-circle" : "ellipse-outline"}
-                                                    size={24}
-                                                    color={isEditStaffSelected(staff) ? "#10B981" : "#D1D5DB"}
-                                                />
-                                            </View>
+                            <Text style={styles.inputLabel}>Assign Staff ({editAssignedStaff.length} selected)</Text>
+                            <View style={styles.editStaffScrollableContainer}>
+                                <ScrollView 
+                                    style={styles.editStaffInnerScrollView}
+                                    showsVerticalScrollIndicator={true}
+                                    nestedScrollEnabled={true}
+                                >
+                                    {staffMembers.length > 0 ? (
+                                        staffMembers.map((staff, index) => (
+                                            <TouchableOpacity
+                                                key={`${staff._id}-${index}`}
+                                                style={styles.staffItem}
+                                                onPress={() => handleEditStaffSelection(staff)}
+                                                activeOpacity={0.7}
+                                            >
+                                                <View style={styles.staffItemContent}>
+                                                    <View style={[
+                                                        styles.checkbox,
+                                                        isEditStaffSelected(staff) && styles.checkboxSelected
+                                                    ]}>
+                                                        {isEditStaffSelected(staff) && (
+                                                            <Ionicons name="checkmark" size={18} color="#fff" />
+                                                        )}
+                                                    </View>
+                                                    <View style={styles.staffInfo}>
+                                                        <Text style={styles.staffName}>
+                                                            {staff.fullName}
+                                                        </Text>
+                                                        <Text style={styles.staffStatus}>
+                                                            {isEditStaffSelected(staff) ? 'Assigned' : 'Available'}
+                                                        </Text>
+                                                    </View>
+                                                    <View style={[
+                                                        styles.selectionIndicator,
+                                                        isEditStaffSelected(staff) && styles.selectionIndicatorSelected
+                                                    ]}>
+                                                        <Ionicons
+                                                            name={isEditStaffSelected(staff) ? "checkmark-circle" : "ellipse-outline"}
+                                                            size={24}
+                                                            color={isEditStaffSelected(staff) ? "#10B981" : "#D1D5DB"}
+                                                        />
+                                                    </View>
+                                                </View>
+                                            </TouchableOpacity>
+                                        ))
+                                    ) : (
+                                        <View style={styles.noStaffContainer}>
+                                            <Ionicons name="people-outline" size={32} color="#9CA3AF" />
+                                            <Text style={styles.noStaffText}>No staff members available</Text>
+                                            <Text style={styles.noStaffSubText}>Please add staff members first</Text>
                                         </View>
-                                    </TouchableOpacity>
-                                ))}
-                                {staffMembers.length === 0 && (
-                                    <View style={styles.noStaffContainer}>
-                                        <Ionicons name="people-outline" size={32} color="#9CA3AF" />
-                                        <Text style={styles.noStaffText}>No staff members available</Text>
-                                        <Text style={styles.noStaffSubText}>Please add staff members first</Text>
-                                    </View>
-                                )}
+                                    )}
+                                </ScrollView>
                             </View>
+                            {staffMembers.length > 3 && (
+                                <Text style={styles.scrollHint}>
+                                    Scroll to see all {staffMembers.length} staff members
+                                </Text>
+                            )}
                         </View>
                     </ScrollView>
 
@@ -966,6 +1227,10 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.2,
         shadowRadius: 8,
         elevation: 4,
+    },
+    addButtonDisabled: {
+        shadowOpacity: 0.1,
+        elevation: 2,
     },
     addButtonGradient: {
         flexDirection: 'row',
@@ -1083,6 +1348,10 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#FECACA',
     },
+    deleteButtonDisabled: {
+        backgroundColor: '#F3F4F6',
+        borderColor: '#E5E7EB',
+    },
     detailsButton: {
         backgroundColor: '#e0f2fe',
         paddingVertical: 8,
@@ -1116,6 +1385,18 @@ const styles = StyleSheet.create({
     modalContent: {
         flex: 1,
         padding: 16,
+    },
+    editStaffScrollableContainer: {
+        height: 200, // Fixed height for scrollable area
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        borderRadius: 12,
+        backgroundColor: '#FFFFFF',
+        marginTop: 8,
+        marginBottom: 8,
+    },
+    editStaffInnerScrollView: {
+        flex: 1,
     },
     inputGroup: {
         marginBottom: 20,
@@ -1178,15 +1459,19 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
     },
     // Staff Assignment Styles
-    staffContainer: {
-        gap: 8,
+    staffFlatListContent: {
+        paddingVertical: 8,
+        paddingHorizontal: 4,
+        flexGrow: 1,
     },
     staffItem: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 12,
+        backgroundColor: '#F9FAFB',
+        borderRadius: 8,
         borderWidth: 1,
         borderColor: '#E5E7EB',
         overflow: 'hidden',
+        marginVertical: 4,
+        marginHorizontal: 4,
     },
     staffItemContent: {
         flexDirection: 'row',
@@ -1251,6 +1536,13 @@ const styles = StyleSheet.create({
         color: '#9CA3AF',
         marginTop: 4,
         textAlign: 'center',
+    },
+    scrollHint: {
+        fontSize: 12,
+        color: '#6B7280',
+        textAlign: 'center',
+        marginTop: 8,
+        fontStyle: 'italic',
     },
 });
 

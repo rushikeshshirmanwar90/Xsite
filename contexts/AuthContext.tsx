@@ -3,6 +3,7 @@ import React, { createContext, ReactNode, useContext, useEffect, useState } from
 import { AppState, AppStateStatus } from 'react-native';
 import axios from 'axios';
 import { domain } from '@/lib/domain';
+import PushTokenService from '@/services/pushTokenService';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -34,18 +35,70 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<any | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
 
+  // Initialize push token service when user is authenticated
+  const initializePushTokens = async (userData: any) => {
+    try {
+      console.log('🔔 Initializing push tokens for authenticated user...');
+      console.log('👤 User data for push tokens:', {
+        id: userData._id,
+        email: userData.email,
+        role: userData.role,
+        userType: userData.userType,
+        clientsCount: userData.clients?.length || 0
+      });
+      
+      const pushTokenService = PushTokenService.getInstance();
+      
+      // Initialize with user-friendly permission dialog
+      const success = await pushTokenService.initialize(true);
+      
+      if (success) {
+        console.log('✅ Push tokens initialized successfully');
+        
+        // Get the current token for verification
+        const currentToken = pushTokenService.getCurrentToken();
+        if (currentToken) {
+          console.log('🎫 Current push token:', currentToken.substring(0, 30) + '...');
+        }
+      } else {
+        console.log('⚠️ Push token initialization failed - user may not receive notifications');
+      }
+    } catch (error) {
+      console.error('❌ Error initializing push tokens:', error);
+    }
+  };
+
   const checkAuthStatus = async () => {
     try {
-      console.log('🔍 Checking auth status...');
+      console.log('🔍 Checking auth status with validation...');
+      
+      // PRODUCTION FIX: First validate the authentication state
+      const isValid = await validateAuthenticationState();
+      if (!isValid) {
+        console.log('❌ Authentication state invalid, user not authenticated');
+        setIsAuthenticated(false);
+        setUser(null);
+        setClientId(null);
+        setIsLoading(false);
+        return;
+      }
+      
       const userDetails = await AsyncStorage.getItem("user");
       console.log('📱 Raw user data from storage:', userDetails ? 'Found' : 'Not found');
       
-      if (userDetails && userDetails.trim() !== '') {
+      if (userDetails && userDetails.trim() !== '' && userDetails !== 'null' && userDetails !== 'undefined') {
         try {
           const data = JSON.parse(userDetails);
           console.log('📊 Parsed user data:', data ? 'Valid object' : 'Invalid');
           
-          if (data && typeof data === 'object' && Object.keys(data).length > 0) {
+          // Enhanced validation - check for valid object structure
+          if (data && 
+              typeof data === 'object' && 
+              Object.keys(data).length > 0 &&
+              data._id && 
+              data.email &&
+              data.email.includes('@')) {
+            
             // Check if user is staff
             const isStaff = data.role && ['site-engineer', 'supervisor', 'manager'].includes(data.role);
             
@@ -60,6 +113,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 setUser(data);
                 setClientId(null); // No client assigned yet
                 console.log('✅ Auth state updated for staff without clients');
+                
+                // Initialize push tokens for staff without clients
+                await initializePushTokens(data);
                 return;
               }
               
@@ -70,6 +126,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               setUser(data);
               setClientId(extractedClientId);
               console.log('✅ Auth state updated successfully');
+              
+              // Initialize push tokens for staff with clients
+              await initializePushTokens(data);
               return;
             }
             
@@ -86,84 +145,191 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               setClientId(typeof extractedClientId === 'string' ? extractedClientId : null);
               
               console.log('✅ Auth state updated successfully');
+              
+              // Initialize push tokens for non-staff users
+              await initializePushTokens(data);
             } else {
               console.warn('⚠️ No client ID found in stored user data');
-              await AsyncStorage.clear();
-              setIsAuthenticated(false);
-              setUser(null);
-              setClientId(null);
+              await clearCorruptedData();
             }
           } else {
-            console.warn('⚠️ Invalid user data structure');
-            await AsyncStorage.clear();
-            setIsAuthenticated(false);
-            setUser(null);
-            setClientId(null);
+            console.warn('⚠️ Invalid user data structure or missing required fields');
+            await clearCorruptedData();
           }
         } catch (parseError) {
           console.error('❌ Error parsing user data:', parseError);
-          await AsyncStorage.clear();
-          setIsAuthenticated(false);
-          setUser(null);
-          setClientId(null);
+          await clearCorruptedData();
         }
       } else {
-        console.log('📭 No user data found in storage');
+        console.log('📭 No valid user data found in storage');
         setIsAuthenticated(false);
         setUser(null);
         setClientId(null);
       }
     } catch (error) {
       console.error('❌ Error checking auth status:', error);
-      setIsAuthenticated(false);
-      setUser(null);
-      setClientId(null);
+      await clearCorruptedData();
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Helper function to clear corrupted data
+  const clearCorruptedData = async () => {
+    try {
+      console.log('🧹 Clearing corrupted auth data...');
+      await AsyncStorage.clear();
+      setIsAuthenticated(false);
+      setUser(null);
+      setClientId(null);
+    } catch (clearError) {
+      console.error('❌ Error clearing corrupted data:', clearError);
+      // Force reset state even if storage clear fails
+      setIsAuthenticated(false);
+      setUser(null);
+      setClientId(null);
+    }
+  };
+
+  // PRODUCTION FIX: Add authentication state validator
+  const validateAuthenticationState = async (): Promise<boolean> => {
+    try {
+      console.log('🔍 Validating authentication state...');
+      
+      const userDetails = await AsyncStorage.getItem("user");
+      
+      // Check for empty or invalid data
+      if (!userDetails || 
+          userDetails.trim() === '' || 
+          userDetails === 'null' || 
+          userDetails === 'undefined' ||
+          userDetails === '{}') {
+        console.log('❌ Invalid user data found, clearing...');
+        await AsyncStorage.clear();
+        return false;
+      }
+      
+      try {
+        const data = JSON.parse(userDetails);
+        
+        // Validate required fields
+        if (!data || 
+            typeof data !== 'object' || 
+            Object.keys(data).length === 0 ||
+            !data._id || 
+            !data.email ||
+            !data.email.includes('@')) {
+          console.log('❌ Corrupted user data structure, clearing...');
+          await AsyncStorage.clear();
+          return false;
+        }
+        
+        // Check if data is too old (optional - expire after 30 days)
+        const loginTimestamp = await AsyncStorage.getItem('loginTimestamp');
+        if (loginTimestamp) {
+          const loginTime = parseInt(loginTimestamp);
+          const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+          
+          if (loginTime < thirtyDaysAgo) {
+            console.log('❌ Authentication data expired, clearing...');
+            await AsyncStorage.clear();
+            return false;
+          }
+        }
+        
+        console.log('✅ Authentication state is valid');
+        return true;
+        
+      } catch (parseError) {
+        console.error('❌ Error parsing user data:', parseError);
+        await AsyncStorage.clear();
+        return false;
+      }
+      
+    } catch (error) {
+      console.error('❌ Error validating auth state:', error);
+      await AsyncStorage.clear();
+      return false;
+    }
+  };
+
   const logout = async () => {
     try {
-      console.log('🚪 Starting logout process...');
+      console.log('🚪 Starting enhanced logout process...');
       
-      // Clear ALL AsyncStorage data to ensure clean logout
-      console.log('🧹 Clearing all AsyncStorage data...');
+      // PRODUCTION FIX: Clear notification data first
+      try {
+        console.log('🔔 Clearing notification data...');
+        const NotificationManager = (await import('@/services/notificationManager')).default;
+        const notificationManager = NotificationManager.getInstance();
+        await notificationManager.cleanup();
+        await notificationManager.clearAllNotificationData();
+        console.log('✅ Notification data cleared successfully');
+      } catch (notificationError) {
+        console.error('⚠️ Error clearing notification data:', notificationError);
+        // Continue with logout even if notification cleanup fails
+      }
+      
+      // Unregister push tokens before clearing storage
+      try {
+        console.log('🔔 Unregistering push tokens...');
+        const pushTokenService = PushTokenService.getInstance();
+        await pushTokenService.unregisterPushToken();
+        console.log('✅ Push tokens unregistered successfully');
+      } catch (tokenError) {
+        console.error('⚠️ Error unregistering push tokens:', tokenError);
+        // Continue with logout even if token cleanup fails
+      }
+      
+      // ENHANCED: Clear ALL possible storage keys
+      console.log('🧹 Clearing all authentication data...');
+      
+      // Get all keys first
+      const allKeys = await AsyncStorage.getAllKeys();
+      console.log('📋 Found storage keys:', allKeys);
+      
+      // Clear everything
       await AsyncStorage.clear();
       
-      // Alternative approach: Remove specific keys if clear() fails
-      // await AsyncStorage.removeItem('user');
-      // await AsyncStorage.removeItem('userType');
-      // await AsyncStorage.removeItem('admin');
-      // await AsyncStorage.removeItem('staff');
+      // Double-check by explicitly removing known keys
+      const keysToRemove = [
+        'user', 'userType', 'admin', 'staff', 'client',
+        'pushToken', 'pushTokenRegistered', 'pushTokenRegistrationTime',
+        'notificationSetupChecked', 'notificationSetupResult', 
+        'notificationSetupTimestamp', 'local_notifications',
+        'authToken', 'sessionId', 'lastLoginTime', 'clientId',
+        'isAuthenticated', 'loginTimestamp', 'deviceId',
+        // Add any other keys your app might use
+      ];
       
-      console.log('✅ AsyncStorage cleared successfully');
+      await Promise.all(keysToRemove.map(key => 
+        AsyncStorage.removeItem(key).catch(err => 
+          console.warn(`⚠️ Failed to remove ${key}:`, err)
+        )
+      ));
+      
+      // PRODUCTION FIX: Force clear by setting empty values as fallback
+      await Promise.all(keysToRemove.map(key => 
+        AsyncStorage.setItem(key, '').catch(err => 
+          console.warn(`⚠️ Failed to set empty ${key}:`, err)
+        )
+      ));
+      
+      console.log('✅ All storage data cleared');
       
       // Reset all auth state
       setIsAuthenticated(false);
       setUser(null);
       setClientId(null);
       
-      console.log('✅ Logout completed - all data cleared');
+      // PRODUCTION FIX: Add small delay to ensure state is updated
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      console.log('✅ Enhanced logout completed - all data cleared');
     } catch (error) {
-      console.error('❌ Logout error:', error);
+      console.error('❌ Enhanced logout error:', error);
       
-      // Fallback: try to clear individual items if clear() fails
-      try {
-        console.log('🔄 Attempting fallback cleanup...');
-        await AsyncStorage.removeItem('user');
-        await AsyncStorage.removeItem('userType');
-        await AsyncStorage.removeItem('admin');
-        await AsyncStorage.removeItem('staff');
-        console.log('✅ Fallback cleanup completed');
-      } catch (fallbackError) {
-        console.error('❌ Fallback cleanup failed:', fallbackError);
-        // Last resort: set empty values
-        await AsyncStorage.setItem('user', '');
-        await AsyncStorage.setItem('userType', '');
-      }
-      
-      // Always reset auth state regardless of storage errors
+      // CRITICAL: Always reset auth state even if storage operations fail
       setIsAuthenticated(false);
       setUser(null);
       setClientId(null);

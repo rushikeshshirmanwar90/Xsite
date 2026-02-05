@@ -27,6 +27,9 @@ export const styles = StyleSheet.create({
     addButton: {
         alignSelf: 'flex-end',
     },
+    addButtonDisabled: {
+        opacity: 0.6,
+    },
     addButtonGradient: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -247,10 +250,16 @@ export const styles = StyleSheet.create({
         borderColor: '#D1D5DB',
         alignItems: 'center',
     },
+    cancelButtonDisabled: {
+        opacity: 0.5,
+    },
     cancelButtonText: {
         fontSize: 16,
         color: '#6B7280',
         fontWeight: '600',
+    },
+    cancelButtonTextDisabled: {
+        color: '#9CA3AF',
     },
     detailsHeader: {
         flexDirection: 'row',
@@ -413,6 +422,17 @@ export const styles = StyleSheet.create({
         backgroundColor: '#F9FAFB',
         maxHeight: 200,
     },
+    staffScrollableContainer: {
+        height: 200, // Fixed height for scrollable area
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        borderRadius: 12,
+        backgroundColor: '#F9FAFB',
+        marginBottom: 8,
+    },
+    staffInnerScrollView: {
+        flex: 1,
+    },
     staffItem: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -464,6 +484,50 @@ export const styles = StyleSheet.create({
         fontSize: 14,
         marginTop: 8,
         fontStyle: 'italic',
+    },
+
+    scrollHint: {
+        fontSize: 12,
+        color: '#6B7280',
+        textAlign: 'center',
+        marginTop: 8,
+        fontStyle: 'italic',
+    },
+
+    // Single Building Checkbox Styles - Fixed naming conflicts
+    singleBuildingSection: {
+        marginTop: 20,
+        marginBottom: 8,
+    },
+    singleBuildingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        padding: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    singleBuildingLabel: {
+        fontSize: 15,
+        fontWeight: '500',
+        color: '#1F2937',
+        marginLeft: 12,
+        flex: 1,
+    },
+    singleBuildingCheckboxBox: {
+        width: 20,
+        height: 20,
+        borderRadius: 4,
+        borderWidth: 2,
+        borderColor: '#D1D5DB',
+        backgroundColor: '#FFFFFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    singleBuildingCheckboxBoxSelected: {
+        backgroundColor: '#3B82F6',
+        borderColor: '#3B82F6',
     },
 
     // Centered container and state texts for loading/empty/error states

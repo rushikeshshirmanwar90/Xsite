@@ -16,6 +16,7 @@ export interface Project {
   Labors?: LaborItem[]; // Added for labor expense tracking
   clientName?: string; // Added for staff users to show client name
   clientId?: string; // Added for staff users to show client ID
+  hasOnlyOneBuilding?: boolean; // Added for single building projects
 }
 
 export interface MaterialItem {

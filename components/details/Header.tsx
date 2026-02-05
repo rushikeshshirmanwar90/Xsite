@@ -20,6 +20,10 @@ interface HeaderProps {
     onShowSectionPrompt?: () => void;
     onShowNotifications?: () => void;
     hideSection?: boolean;
+    // New props for section completion
+    sectionCompleted?: boolean;
+    onToggleSectionCompletion?: () => void;
+    isUpdatingCompletion?: boolean;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -35,6 +39,10 @@ const Header: React.FC<HeaderProps> = ({
     onShowSectionPrompt,
     onShowNotifications,
     hideSection = false,
+    // New props for section completion
+    sectionCompleted = false,
+    onToggleSectionCompletion,
+    isUpdatingCompletion = false,
 }) => {
     // State to store fetched sections
     const [sections, setSections] = useState<Section[]>([]);
@@ -132,44 +140,54 @@ const Header: React.FC<HeaderProps> = ({
                                 <Text style={styles.breadcrumbTextActive}>{sectionName}</Text>
                             </>
                         )}
-                        <Ionicons name="chevron-forward" size={14} color="#9CA3AF" style={styles.breadcrumbSeparator} />
-                        {!selectedSection && onShowSectionPrompt ? (
-                            <TouchableOpacity
-                                onPress={onShowSectionPrompt}
-                                style={styles.selectSectionButton}
-                                activeOpacity={0.7}
-                            >
-                                <Text style={styles.selectSectionText}>Select Mini-Section</Text>
-                                <Ionicons name="chevron-down" size={14} color="#3B82F6" />
-                            </TouchableOpacity>
-                        ) : (
-                            <Text style={styles.breadcrumbText}>{buildingName}</Text>
-                        )}
                     </View>
-
-                    {/* Section Dropdown - Only show if not hidden */}
-                    {!hideSection && (
-                        <View style={styles.sectionDropdownContainer}>
-                            <SectionManager
-                                onSectionSelect={onSectionSelect}
-                                selectedSection={selectedSection}
-                                sections={mappedSections}
-                                compact={true}
-                                projectDetails={{
-                                    projectName: projectName || "Villa Project",
-                                    projectId: projectId || "unknown"
-                                }}
-                                mainSectionDetails={{
-                                    sectionName: sectionName || "Main Section",
-                                    sectionId: sectionId || "unknown"
-                                }}
-                            />
-                        </View>
-                    )}
                 </View>
 
                 {/* Right side buttons */}
                 <View style={styles.headerActions}>
+                    {/* Section Completion Button */}
+                    {onToggleSectionCompletion && (
+                        <>
+                            {sectionCompleted ? (
+                                <View style={[
+                                    styles.completionButton,
+                                    { backgroundColor: '#ECFDF5', borderColor: '#10B981' }
+                                ]}>
+                                    <Ionicons 
+                                        name="checkmark-circle" 
+                                        size={16} 
+                                        color="#10B981" 
+                                    />
+                                    <Text style={[
+                                        styles.completionButtonText,
+                                        { color: '#059669' }
+                                    ]}>
+                                        Complete
+                                    </Text>
+                                </View>
+                            ) : (
+                                <TouchableOpacity
+                                    style={[
+                                        styles.completionButton,
+                                        isUpdatingCompletion && { opacity: 0.6 }
+                                    ]}
+                                    onPress={onToggleSectionCompletion}
+                                    disabled={isUpdatingCompletion}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons 
+                                        name="ellipse-outline" 
+                                        size={16} 
+                                        color="#6B7280" 
+                                    />
+                                    <Text style={styles.completionButtonText}>
+                                        {isUpdatingCompletion ? 'Updating...' : 'Mark Complete'}
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
+                        </>
+                    )}
+
                     {onShowNotifications && (
                         <TouchableOpacity
                             onPress={onShowNotifications}

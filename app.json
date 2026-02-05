@@ -6,12 +6,13 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "siteex",
+    "scheme": "xsite",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.codewithrushi.xsite"
+      "bundleIdentifier": "com.codewithrushi.xsite",
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "package": "com.codewithrushi.xsite",
@@ -26,7 +27,9 @@
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "useNextNotificationsApi": true,
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",
@@ -34,6 +37,14 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#3B82F6",
+          "sounds": []
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -57,7 +68,8 @@
         {
           "photosPermission": "Allow $(PRODUCT_NAME) to access your photos to upload QR code images."
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

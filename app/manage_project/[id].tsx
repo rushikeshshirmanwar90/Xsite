@@ -20,7 +20,7 @@ interface BuildingDetails {
 
 const ManageProject = () => {
     const params = useLocalSearchParams();
-    const { id, name, sectionData } = params;
+    const { id, name, sectionData, clientId: passedClientId, forceRefresh } = params;
 
     // State management
     const [sections, setSections] = useState<ProjectSection[]>([]);
@@ -51,20 +51,57 @@ const ManageProject = () => {
     const lastLoadTimeRef = React.useRef<number>(0);
     const DEBOUNCE_DELAY = 500;
 
-    // Initialize sections from params
+    // Initialize sections from params and fetch fresh data
     useEffect(() => {
-        try {
-            const parsedSections: ProjectSection[] = JSON.parse(
-                Array.isArray(sectionData) ? sectionData[0] : sectionData
-            );
-            setSections(parsedSections || []);
-        } catch (error) {
-            console.error('Error parsing section data:', error);
-            setSections([]);
-        } finally {
-            setLoading(false);
-        }
-    }, [sectionData]);
+        const initializeAndFetch = async () => {
+            try {
+                const parsedSections: ProjectSection[] = JSON.parse(
+                    Array.isArray(sectionData) ? sectionData[0] : sectionData
+                );
+                
+                // If forceRefresh is true or sections are empty, always fetch from server
+                if (forceRefresh === 'true' || !parsedSections || parsedSections.length === 0) {
+                    console.log('🔄 Force refresh requested or no sections found, fetching fresh data...');
+                    setSections([]); // Start with empty array
+                    
+                    // For newly created projects with buildings, try multiple times if needed
+                    if (forceRefresh === 'true') {
+                        let retryCount = 0;
+                        const maxRetries = 3;
+                        
+                        const fetchWithRetry = async () => {
+                            await fetchSections(true);
+                            
+                            // Check if we got sections, if not and we have retries left, try again
+                            setTimeout(() => {
+                                if (sections.length === 0 && retryCount < maxRetries) {
+                                    retryCount++;
+                                    console.log(`🔄 Retry ${retryCount}/${maxRetries} - No sections found, retrying...`);
+                                    fetchWithRetry();
+                                }
+                            }, 1500); // Wait 1.5 seconds between retries
+                        };
+                        
+                        fetchWithRetry();
+                    } else {
+                        fetchSections(true);
+                    }
+                } else {
+                    console.log('📋 Using sections from params, but also fetching fresh data...');
+                    setSections(parsedSections);
+                    // Still fetch fresh data to ensure we have the latest
+                    fetchSections(true);
+                }
+            } catch (error) {
+                console.error('Error parsing section data:', error);
+                setSections([]);
+                // Still fetch from server even if parsing fails
+                fetchSections(true);
+            }
+        };
+        
+        initializeAndFetch();
+    }, [sectionData, forceRefresh]);
 
     // Fetch sections from server
     const fetchSections = async (showLoadingState = true) => {
@@ -91,10 +128,24 @@ const ManageProject = () => {
             // Extract project ID if it's an array
             const projectId = Array.isArray(id) ? id[0] : id;
 
-            console.log('Fetching sections for project:', projectId);
-            console.log('API URL:', `${domain}/api/project/${projectId}`);
+            // Get client ID - use passed parameter first, then get from storage
+            let clientId = passedClientId;
+            if (!clientId) {
+                const { getClientId } = await import('@/functions/clientId');
+                clientId = await getClientId();
+            }
 
-            const res = await axios.get(`${domain}/api/project/${projectId}`);
+            // Handle array case for clientId
+            if (Array.isArray(clientId)) {
+                clientId = clientId[0];
+            }
+
+            console.log('Fetching sections for project:', projectId);
+            console.log('Using client ID:', clientId);
+            console.log('Client ID source:', passedClientId ? 'passed parameter' : 'from storage');
+            console.log('API URL:', `${domain}/api/project/${projectId}?clientId=${clientId}`);
+
+            const res = await axios.get(`${domain}/api/project/${projectId}?clientId=${clientId}`);
             const responseData = res.data as any;
 
             console.log('Project data received:', responseData);
@@ -114,16 +165,22 @@ const ManageProject = () => {
             if (projectData && projectData.section) {
                 console.log('Sections found:', projectData.section.length);
                 setSections(projectData.section);
+                setLoading(false); // Set loading to false when data is loaded
             } else if (projectData && Array.isArray(projectData)) {
                 // If the response is an array, find the project
                 const project = projectData.find((p: any) => p._id === projectId);
                 if (project && project.section) {
                     console.log('Sections found in array:', project.section.length);
                     setSections(project.section);
+                } else {
+                    console.warn('No sections found in project array');
+                    setSections([]);
                 }
+                setLoading(false);
             } else {
                 console.warn('No sections found in response');
                 setSections([]);
+                setLoading(false);
             }
         } catch (error: any) {
             console.error('Error fetching sections:', error);
@@ -136,9 +193,14 @@ const ManageProject = () => {
             } else {
                 console.warn('Project not found (404), keeping existing sections');
             }
+            
+            // Set loading to false even on error
+            setLoading(false);
         } finally {
             isLoadingRef.current = false;
-            setLoading(false);
+            if (!loading) { // Only set loading to false if it wasn't already false
+                setLoading(false);
+            }
         }
     };
 

@@ -12,6 +12,7 @@ import { domain } from '@/lib/domain';
 import { styles } from '@/style/details';
 import { Material, MaterialEntry, Section } from '@/types/details';
 import { logMaterialImported } from '@/utils/activityLogger';
+import { logSectionCompleted, logSectionReopened, logMiniSectionCompleted, logMiniSectionReopened } from '@/utils/activityLogger';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -52,6 +53,23 @@ const Details = () => {
     const [showNotifications, setShowNotifications] = useState(false);
     const [isAddingMaterial, setIsAddingMaterial] = useState(false);
     const [isAddingMaterialUsage, setIsAddingMaterialUsage] = useState(false);
+    const [sectionCompleted, setSectionCompleted] = useState(false);
+    const [miniSectionCompletions, setMiniSectionCompletions] = useState<{[key: string]: boolean}>({});
+    const [isUpdatingCompletion, setIsUpdatingCompletion] = useState(false);
+
+    // Reload mini-section completion status when mini-sections change
+    useEffect(() => {
+        if (miniSections.length > 0) {
+            console.log('� Mini-sections changed, reloading completion status...');
+            console.log('🔄 Mini-sections count:', miniSections.length);
+            
+            // Small delay to ensure mini-sections are properly set
+            setTimeout(() => {
+                loadMiniSectionCompletionStatus();
+            }, 200);
+        }
+    }, [miniSections]);
+
     const cardAnimations = useRef<Animated.Value[]>([]).current;
     const scrollViewRef = useRef<ScrollView>(null);
     
@@ -146,6 +164,574 @@ const Details = () => {
             userId: 'unknown',
             fullName: 'Unknown User',
         };
+    };
+
+    // Helper function to validate MongoDB ObjectId
+    const isValidMongoId = (id: string) => {
+        return /^[0-9a-fA-F]{24}$/.test(id);
+    };
+
+    // Function to toggle section completion
+    const toggleSectionCompletion = async () => {
+        if (isUpdatingCompletion) return;
+        
+        // Validate IDs first
+        if (!sectionId || !isValidMongoId(sectionId)) {
+            toast.error('Invalid section ID. Please refresh the page and try again.');
+            return;
+        }
+        
+        if (!projectId || !isValidMongoId(projectId)) {
+            toast.error('Invalid project ID. Please refresh the page and try again.');
+            return;
+        }
+        
+        setIsUpdatingCompletion(true);
+        try {
+            console.log('🎯 Toggling section completion...');
+            console.log('Current section completion status:', sectionCompleted);
+            console.log('Domain:', domain);
+            console.log('Section ID:', sectionId);
+            console.log('Project ID:', projectId);
+            console.log('API URL:', `${domain}/api/completion`);
+            
+            const payload = {
+                updateType: 'project-section',
+                id: sectionId,
+                projectId: projectId
+            };
+            
+            console.log('Payload:', JSON.stringify(payload, null, 2));
+            
+            const response = await axios.patch(`${domain}/api/completion`, payload, {
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                timeout: 10000 // 10 second timeout
+            });
+
+            console.log('Response status:', response.status);
+            console.log('Response data:', JSON.stringify(response.data, null, 2));
+
+            const responseData = response.data as any;
+            if (responseData.success) {
+                // Use the actual completion status from the API response instead of toggling
+                const newCompletionStatus = responseData.data?.isCompleted;
+                console.log('✅ New section completion status from API:', newCompletionStatus, typeof newCompletionStatus);
+                
+                if (typeof newCompletionStatus === 'boolean') {
+                    setSectionCompleted(newCompletionStatus);
+                    console.log('✅ Section completion state updated to:', newCompletionStatus);
+                    toast.success(responseData.message || `Section ${newCompletionStatus ? 'completed' : 'reopened'} successfully`);
+                    
+                    // 🔔 NEW: Log completion activity
+                    try {
+                        console.log('🔔 Logging section completion activity...');
+                        if (newCompletionStatus) {
+                            await logSectionCompleted(
+                                projectId,
+                                projectName,
+                                sectionId,
+                                sectionName,
+                                `Section marked as completed via details page`
+                            );
+                            console.log('✅ Section completion activity logged');
+                            
+                            // 🔔 Create local notification for completion
+                            try {
+                                const NotificationManager = (await import('../services/notificationManager')).default;
+                                const notificationManager = NotificationManager.getInstance();
+                                
+                                await notificationManager.scheduleLocalNotification(
+                                    `✅ Section Completed`,
+                                    `Section "${sectionName}" has been marked as completed in ${projectName}`,
+                                    {
+                                        category: 'section',
+                                        action: 'section_completed',
+                                        projectId,
+                                        projectName,
+                                        sectionId,
+                                        sectionName,
+                                        route: 'project',
+                                    }
+                                );
+                                
+                                console.log('✅ Local completion notification created');
+                            } catch (notificationError) {
+                                console.error('❌ Failed to create completion notification:', notificationError);
+                            }
+                        } else {
+                            await logSectionReopened(
+                                projectId,
+                                projectName,
+                                sectionId,
+                                sectionName,
+                                `Section reopened via details page`
+                            );
+                            console.log('✅ Section reopen activity logged');
+                            
+                            // 🔔 Create local notification for reopening
+                            try {
+                                const NotificationManager = (await import('../services/notificationManager')).default;
+                                const notificationManager = NotificationManager.getInstance();
+                                
+                                await notificationManager.scheduleLocalNotification(
+                                    `🔄 Section Reopened`,
+                                    `Section "${sectionName}" has been reopened in ${projectName}`,
+                                    {
+                                        category: 'section',
+                                        action: 'section_reopened',
+                                        projectId,
+                                        projectName,
+                                        sectionId,
+                                        sectionName,
+                                        route: 'project',
+                                    }
+                                );
+                                
+                                console.log('✅ Local reopen notification created');
+                            } catch (notificationError) {
+                                console.error('❌ Failed to create reopen notification:', notificationError);
+                            }
+                        }
+                    } catch (activityError) {
+                        console.error('❌ Failed to log section completion activity:', activityError);
+                        // Don't fail the completion operation if activity logging fails
+                    }
+                } else {
+                    // Fallback to toggle logic if API doesn't return the new status
+                    const toggledStatus = !sectionCompleted;
+                    setSectionCompleted(toggledStatus);
+                    console.log('⚠️ Fallback: Section completion toggled to:', toggledStatus);
+                    toast.success(responseData.message || `Section completion updated successfully`);
+                    
+                    // 🔔 NEW: Log completion activity (fallback)
+                    try {
+                        console.log('🔔 Logging section completion activity (fallback)...');
+                        if (toggledStatus) {
+                            await logSectionCompleted(
+                                projectId,
+                                projectName,
+                                sectionId,
+                                sectionName,
+                                `Section marked as completed via details page (fallback)`
+                            );
+                            console.log('✅ Section completion activity logged (fallback)');
+                            
+                            // 🔔 Create local notification for completion (fallback)
+                            try {
+                                const NotificationManager = (await import('../services/notificationManager')).default;
+                                const notificationManager = NotificationManager.getInstance();
+                                
+                                await notificationManager.scheduleLocalNotification(
+                                    `✅ Section Completed`,
+                                    `Section "${sectionName}" has been marked as completed in ${projectName}`,
+                                    {
+                                        category: 'section',
+                                        action: 'section_completed',
+                                        projectId,
+                                        projectName,
+                                        sectionId,
+                                        sectionName,
+                                        route: 'project',
+                                    }
+                                );
+                                
+                                console.log('✅ Local completion notification created (fallback)');
+                            } catch (notificationError) {
+                                console.error('❌ Failed to create completion notification (fallback):', notificationError);
+                            }
+                        } else {
+                            await logSectionReopened(
+                                projectId,
+                                projectName,
+                                sectionId,
+                                sectionName,
+                                `Section reopened via details page (fallback)`
+                            );
+                            console.log('✅ Section reopen activity logged (fallback)');
+                            
+                            // 🔔 Create local notification for reopening (fallback)
+                            try {
+                                const NotificationManager = (await import('../services/notificationManager')).default;
+                                const notificationManager = NotificationManager.getInstance();
+                                
+                                await notificationManager.scheduleLocalNotification(
+                                    `🔄 Section Reopened`,
+                                    `Section "${sectionName}" has been reopened in ${projectName}`,
+                                    {
+                                        category: 'section',
+                                        action: 'section_reopened',
+                                        projectId,
+                                        projectName,
+                                        sectionId,
+                                        sectionName,
+                                        route: 'project',
+                                    }
+                                );
+                                
+                                console.log('✅ Local reopen notification created (fallback)');
+                            } catch (notificationError) {
+                                console.error('❌ Failed to create reopen notification (fallback):', notificationError);
+                            }
+                        }
+                    } catch (activityError) {
+                        console.error('❌ Failed to log section completion activity (fallback):', activityError);
+                        // Don't fail the completion operation if activity logging fails
+                    }
+                }
+            } else {
+                throw new Error(responseData.message || 'Failed to update section completion');
+            }
+        } catch (error: any) {
+            console.error('❌ Error updating section completion:', error);
+            console.error('Error details:', {
+                message: error?.message,
+                status: error?.response?.status,
+                statusText: error?.response?.statusText,
+                data: error?.response?.data,
+                config: {
+                    url: error?.config?.url,
+                    method: error?.config?.method,
+                    data: error?.config?.data
+                }
+            });
+            
+            // Handle specific error cases
+            const errorMessage = error?.response?.data?.message || error?.message || 'Unknown error';
+            
+            if (errorMessage.includes('not found')) {
+                toast.error('Section not found in project. This section may not support completion tracking yet.');
+            } else if (error?.code === 'ECONNABORTED') {
+                toast.error('Request timeout. Please check your connection and try again.');
+            } else if (error?.response?.status === 404) {
+                toast.error('Completion feature not available for this section.');
+            } else {
+                toast.error(`Failed to update section completion: ${errorMessage}`);
+            }
+        } finally {
+            setIsUpdatingCompletion(false);
+        }
+    };
+
+    // Function to toggle mini-section completion
+    const toggleMiniSectionCompletionDirect = async (miniSectionId: string, miniSectionName: string) => {
+        if (isUpdatingCompletion) return;
+        
+        setIsUpdatingCompletion(true);
+        
+        try {
+            const payload = {
+                updateType: 'minisection',
+                id: miniSectionId
+            };
+            
+            const response = await axios.patch(`${domain}/api/completion`, payload, {
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 10000
+            });
+            
+            const responseData = response.data as any;
+            if (responseData.success) {
+                const newStatus = responseData.data?.isCompleted;
+                
+                if (typeof newStatus === 'boolean') {
+                    setMiniSectionCompletions(prev => ({
+                        ...prev,
+                        [miniSectionId]: newStatus
+                    }));
+                    
+                    toast.success(`${miniSectionName} ${newStatus ? 'completed' : 'reopened'} successfully`);
+                    
+                    // 🔔 NEW: Log mini-section completion activity
+                    try {
+                        console.log('🔔 Logging mini-section completion activity...');
+                        if (newStatus) {
+                            await logMiniSectionCompleted(
+                                projectId,
+                                projectName,
+                                sectionId,
+                                sectionName,
+                                miniSectionId,
+                                miniSectionName,
+                                `Mini-section marked as completed via details page`
+                            );
+                            console.log('✅ Mini-section completion activity logged');
+                            
+                            // 🔔 Create local notification for mini-section completion
+                            try {
+                                const NotificationManager = (await import('../services/notificationManager')).default;
+                                const notificationManager = NotificationManager.getInstance();
+                                
+                                await notificationManager.scheduleLocalNotification(
+                                    `✅ Mini-Section Completed`,
+                                    `Mini-section "${miniSectionName}" has been completed in ${projectName} → ${sectionName}`,
+                                    {
+                                        category: 'mini_section',
+                                        action: 'mini_section_completed',
+                                        projectId,
+                                        projectName,
+                                        sectionId,
+                                        sectionName,
+                                        miniSectionId,
+                                        miniSectionName,
+                                        route: 'project',
+                                    }
+                                );
+                                
+                                console.log('✅ Local mini-section completion notification created');
+                            } catch (notificationError) {
+                                console.error('❌ Failed to create mini-section completion notification:', notificationError);
+                            }
+                        } else {
+                            await logMiniSectionReopened(
+                                projectId,
+                                projectName,
+                                sectionId,
+                                sectionName,
+                                miniSectionId,
+                                miniSectionName,
+                                `Mini-section reopened via details page`
+                            );
+                            console.log('✅ Mini-section reopen activity logged');
+                            
+                            // 🔔 Create local notification for mini-section reopening
+                            try {
+                                const NotificationManager = (await import('../services/notificationManager')).default;
+                                const notificationManager = NotificationManager.getInstance();
+                                
+                                await notificationManager.scheduleLocalNotification(
+                                    `🔄 Mini-Section Reopened`,
+                                    `Mini-section "${miniSectionName}" has been reopened in ${projectName} → ${sectionName}`,
+                                    {
+                                        category: 'mini_section',
+                                        action: 'mini_section_reopened',
+                                        projectId,
+                                        projectName,
+                                        sectionId,
+                                        sectionName,
+                                        miniSectionId,
+                                        miniSectionName,
+                                        route: 'project',
+                                    }
+                                );
+                                
+                                console.log('✅ Local mini-section reopen notification created');
+                            } catch (notificationError) {
+                                console.error('❌ Failed to create mini-section reopen notification:', notificationError);
+                            }
+                        }
+                    } catch (activityError) {
+                        console.error('❌ Failed to log mini-section completion activity:', activityError);
+                        // Don't fail the completion operation if activity logging fails
+                    }
+                } else {
+                    // Fallback to toggle logic if API doesn't return the new status
+                    const currentStatus = miniSectionCompletions[miniSectionId] || false;
+                    const toggledStatus = !currentStatus;
+                    
+                    setMiniSectionCompletions(prev => ({
+                        ...prev,
+                        [miniSectionId]: toggledStatus
+                    }));
+                    
+                    toast.success(`${miniSectionName} completion updated`);
+                    
+                    // 🔔 NEW: Log mini-section completion activity (fallback)
+                    try {
+                        console.log('🔔 Logging mini-section completion activity (fallback)...');
+                        if (toggledStatus) {
+                            await logMiniSectionCompleted(
+                                projectId,
+                                projectName,
+                                sectionId,
+                                sectionName,
+                                miniSectionId,
+                                miniSectionName,
+                                `Mini-section marked as completed via details page (fallback)`
+                            );
+                            console.log('✅ Mini-section completion activity logged (fallback)');
+                            
+                            // 🔔 Create local notification for mini-section completion (fallback)
+                            try {
+                                const NotificationManager = (await import('../services/notificationManager')).default;
+                                const notificationManager = NotificationManager.getInstance();
+                                
+                                await notificationManager.scheduleLocalNotification(
+                                    `✅ Mini-Section Completed`,
+                                    `Mini-section "${miniSectionName}" has been completed in ${projectName} → ${sectionName}`,
+                                    {
+                                        category: 'mini_section',
+                                        action: 'mini_section_completed',
+                                        projectId,
+                                        projectName,
+                                        sectionId,
+                                        sectionName,
+                                        miniSectionId,
+                                        miniSectionName,
+                                        route: 'project',
+                                    }
+                                );
+                                
+                                console.log('✅ Local mini-section completion notification created (fallback)');
+                            } catch (notificationError) {
+                                console.error('❌ Failed to create mini-section completion notification (fallback):', notificationError);
+                            }
+                        } else {
+                            await logMiniSectionReopened(
+                                projectId,
+                                projectName,
+                                sectionId,
+                                sectionName,
+                                miniSectionId,
+                                miniSectionName,
+                                `Mini-section reopened via details page (fallback)`
+                            );
+                            console.log('✅ Mini-section reopen activity logged (fallback)');
+                            
+                            // 🔔 Create local notification for mini-section reopening (fallback)
+                            try {
+                                const NotificationManager = (await import('../services/notificationManager')).default;
+                                const notificationManager = NotificationManager.getInstance();
+                                
+                                await notificationManager.scheduleLocalNotification(
+                                    `🔄 Mini-Section Reopened`,
+                                    `Mini-section "${miniSectionName}" has been reopened in ${projectName} → ${sectionName}`,
+                                    {
+                                        category: 'mini_section',
+                                        action: 'mini_section_reopened',
+                                        projectId,
+                                        projectName,
+                                        sectionId,
+                                        sectionName,
+                                        miniSectionId,
+                                        miniSectionName,
+                                        route: 'project',
+                                    }
+                                );
+                                
+                                console.log('✅ Local mini-section reopen notification created (fallback)');
+                            } catch (notificationError) {
+                                console.error('❌ Failed to create mini-section reopen notification (fallback):', notificationError);
+                            }
+                        }
+                    } catch (activityError) {
+                        console.error('❌ Failed to log mini-section completion activity (fallback):', activityError);
+                        // Don't fail the completion operation if activity logging fails
+                    }
+                }
+            } else {
+                throw new Error(responseData.message || 'API returned success: false');
+            }
+            
+        } catch (error: any) {
+            console.error('Error updating mini-section completion:', error);
+            const errorMessage = error?.response?.data?.message || error?.message || 'Unknown error';
+            toast.error(`Failed to update ${miniSectionName}: ${errorMessage}`);
+        } finally {
+            setIsUpdatingCompletion(false);
+        }
+    };
+
+    // Enhanced function to load mini-section completion status
+    const loadMiniSectionCompletionStatus = async () => {
+        console.log('\n========================================');
+        console.log('🔍 ENHANCED: Loading mini-section completion status...');
+        console.log('========================================');
+        console.log('🔍 ENHANCED: sectionId:', sectionId);
+        console.log('🔍 ENHANCED: domain:', domain);
+        console.log('🔍 ENHANCED: miniSections.length:', miniSections.length);
+        
+        if (!sectionId) {
+            console.log('❌ ENHANCED: No sectionId available');
+            return;
+        }
+        
+        if (miniSections.length === 0) {
+            console.log('⚠️ ENHANCED: No mini-sections loaded yet, skipping completion load');
+            return;
+        }
+        
+        try {
+            console.log('� ENHANCED: Using existing mini-sections array instead of API call');
+            console.log('� ENHANCED: Mini-sections to process:', miniSections.map(s => ({ id: s._id, name: s.name })));
+            
+            // Step 2: Load completion status for each mini-section
+            const completionStates: {[key: string]: boolean} = {};
+            
+            for (const section of miniSections) {
+                console.log(`\n📡 ENHANCED: Loading completion for ${section.name} (${section._id})`);
+                
+                try {
+                    const completionUrl = `${domain}/api/completion?updateType=minisection&id=${section._id}`;
+                    console.log(`📡 ENHANCED: Completion URL: ${completionUrl}`);
+                    
+                    const completionResponse = await axios.get(completionUrl);
+                    console.log(`📊 ENHANCED: ${section.name} response status:`, completionResponse.status);
+                    console.log(`� ENHANCED: ${section.name} full response:`, JSON.stringify(completionResponse.data, null, 2));
+                    
+                    const completionData = completionResponse.data as any;
+                    if (completionData.success && completionData.data) {
+                        const isCompleted = completionData.data.isCompleted;
+                        const booleanCompleted = Boolean(isCompleted);
+                        completionStates[section._id] = booleanCompleted;
+                        
+                        console.log(`✅ ENHANCED: ${section.name} completion analysis:`);
+                        console.log(`   - Raw value: ${isCompleted}`);
+                        console.log(`   - Type: ${typeof isCompleted}`);
+                        console.log(`   - Boolean conversion: ${booleanCompleted}`);
+                        console.log(`   - State key: ${section._id}`);
+                        console.log(`   - State value: ${completionStates[section._id]}`);
+                        console.log(`   - UI should show: ${booleanCompleted ? 'GREEN COMPLETED ✅' : 'GRAY COMPLETE ○'}`);
+                    } else {
+                        completionStates[section._id] = false;
+                        console.log(`⚠️ ENHANCED: ${section.name} defaulted to false`);
+                        console.log(`⚠️ ENHANCED: Response analysis:`, {
+                            success: completionData.success,
+                            hasData: !!completionData.data,
+                            dataKeys: completionData.data ? Object.keys(completionData.data) : [],
+                            fullData: completionData.data
+                        });
+                    }
+                } catch (error: any) {
+                    console.log(`❌ ENHANCED: ${section.name} fetch failed:`, error.message);
+                    console.log(`❌ ENHANCED: Error details:`, {
+                        status: error.response?.status,
+                        statusText: error.response?.statusText,
+                        data: error.response?.data
+                    });
+                    completionStates[section._id] = false;
+                }
+            }
+            
+            // Step 3: Update state
+            console.log('\n🔄 ENHANCED: Updating miniSectionCompletions state...');
+            console.log('🔄 ENHANCED: New state object:', completionStates);
+            console.log('� ENHANCED: State entries:');
+            Object.entries(completionStates).forEach(([id, completed]) => {
+                const section = miniSections.find(s => s._id === id);
+                const sectionName = section ? section.name : 'Unknown';
+                console.log(`   - ${sectionName} (${id}): ${completed} -> UI: ${completed ? 'GREEN' : 'GRAY'}`);
+            });
+            
+            setMiniSectionCompletions(completionStates);
+            
+            // Step 4: Verify state update with a delay
+            setTimeout(() => {
+                console.log('\n🔍 ENHANCED: State verification after update...');
+                console.log('🔍 ENHANCED: Current miniSectionCompletions state should be:', completionStates);
+                
+                // This will be logged by the useEffect when the state actually changes
+                console.log('🔍 ENHANCED: Waiting for useEffect to log actual state change...');
+            }, 100);
+            
+            console.log('========================================\n');
+            
+        } catch (error: any) {
+            console.error('❌ ENHANCED: Failed to load completion status:', error);
+            console.error('❌ ENHANCED: Error details:', error.response?.data || error.message);
+            console.log('========================================\n');
+        }
     };
 
     // Helper function to get client ID from project
@@ -307,15 +893,15 @@ const Details = () => {
         }
     };
 
-    // Function to log material activity
+    // Enhanced Function to log material activity with multi-user notifications
     const logMaterialActivity = async (
         materials: any[],
-        activity: 'imported' | 'used',
+        activity: 'imported' | 'used' | 'transferred',
         message: string = ''
     ) => {
         try {
             console.log('\n========================================');
-            console.log('🔔 DETAILED MATERIAL ACTIVITY LOGGING');
+            console.log('🔔 ENHANCED MATERIAL ACTIVITY LOGGING');
             console.log('========================================');
             console.log('📋 Input Parameters:');
             console.log('   - Activity Type:', activity);
@@ -324,97 +910,81 @@ const Details = () => {
             console.log('   - Project ID:', projectId);
             console.log('   - Project Name:', projectName);
             console.log('   - Section Name:', sectionName);
-            console.log('   - Materials Details:');
-            materials.forEach((material, index) => {
-                console.log(`     ${index + 1}. ${material.name}:`);
-                console.log(`        - Quantity: ${material.qnt} ${material.unit}`);
-                console.log(`        - Per Unit Cost: ₹${material.perUnitCost || 0}`);
-                console.log(`        - Total Cost: ₹${material.totalCost || 0}`);
-                console.log(`        - Cost (for notifications): ₹${material.cost || 0}`);
-                console.log(`        - Specs:`, material.specs || {});
-            });
 
             const user = await getUserData();
-            console.log('👤 User Data:', user);
+            const clientId = await getClientIdFromStorage();
 
-            // Try to get clientId with comprehensive error handling
-            let clientId = null;
-            try {
-                clientId = await getClientIdFromStorage();
-                console.log('🏢 Client ID from storage:', clientId);
-            } catch (clientIdError) {
-                console.error('❌ Error getting clientId from storage:', clientIdError);
-            }
-
-            // If still no clientId, try alternative methods
-            if (!clientId) {
-                console.warn('⚠️ No clientId from storage, trying alternative methods...');
-                
-                // Try getting clientId directly from user data
-                try {
-                    const userDetailsString = await AsyncStorage.getItem("user");
-                    if (userDetailsString) {
-                        const userData = JSON.parse(userDetailsString);
-                        
-                        // For staff users, try to find the right clientId based on project
-                        if (userData?.clients && Array.isArray(userData.clients)) {
-                            console.log('👥 Staff user detected, searching for matching clientId...');
-                            // For now, use the first client as fallback
-                            clientId = userData.clients[0]?.clientId;
-                            console.log('🔄 Using first client as fallback:', clientId);
-                        } else if (userData?.clientId) {
-                            clientId = userData.clientId;
-                            console.log('🔄 Using user clientId:', clientId);
-                        } else if (userData?._id) {
-                            clientId = userData._id;
-                            console.log('🔄 Using user _id as clientId:', clientId);
-                        }
-                    }
-                } catch (fallbackError) {
-                    console.error('❌ Fallback clientId method failed:', fallbackError);
-                }
-            }
-
-            if (!clientId) {
-                console.error('❌ CRITICAL: Client ID not found after all attempts, skipping detailed material activity log');
-                console.error('❌ This means material activity notifications will not be generated');
-                console.error('❌ Please check user login status and project configuration');
+            if (!user || !clientId) {
+                console.error('❌ Missing user data or clientId:', { user, clientId });
                 return;
             }
 
-            console.log('✅ Final clientId to use:', clientId);
+            console.log('👤 User Data:', user);
+            console.log('🏢 Client ID:', clientId);
 
-            // Create activity payload with date and project information
+            // Step 1: Log the activity to backend (existing functionality)
             const activityPayload = {
                 clientId,
                 projectId,
-                projectName, // Add project name for notifications
-                sectionName, // Add section name for notifications  
+                projectName,
+                sectionName,
                 materials,
                 message,
                 activity,
                 user,
-                date: new Date().toISOString(), // Add ISO date string as required by API
+                date: new Date().toISOString(),
             };
 
-            console.log('📦 Material Activity Payload:');
-            console.log(JSON.stringify(activityPayload, null, 2));
-            console.log('🌐 API Endpoint:', `${domain}/api/materialActivity`);
-
-            console.log('⏳ Sending request to Material Activity API...');
+            console.log('📤 Logging activity to backend...');
             const response = await axios.post(`${domain}/api/materialActivity`, activityPayload);
             
             console.log('✅ Material Activity API Response:');
             console.log('   - Status:', response.status);
             console.log('   - Data:', JSON.stringify(response.data, null, 2));
-            console.log('🎉 DETAILED MATERIAL ACTIVITY LOGGED SUCCESSFULLY');
-            console.log('   - Staff and Admin should now see detailed material notifications');
-            console.log('   - Check notification page for material details');
+
+            const responseData = response.data as any;
+            if (!responseData.success) {
+                console.error('❌ Failed to log activity:', responseData.message);
+                return;
+            }
+
+            // Step 2: Enhanced notification logic
+            console.log('📱 Processing enhanced notifications...');
+            
+            try {
+                // Get notification recipients (admins and staff for this client)
+                const recipients = await getNotificationRecipients(clientId, projectId, user.userId, materials, activity, user);
+                
+                if (recipients.length > 0) {
+                    console.log(`🔔 Sending notifications to ${recipients.length} recipients...`);
+                    
+                    // Create notification payload
+                    const notificationPayload = createMaterialNotificationPayload(
+                        activity,
+                        materials,
+                        projectId,
+                        projectName,
+                        sectionName,
+                        user,
+                        recipients
+                    );
+
+                    // Send notifications
+                    await sendEnhancedNotifications(notificationPayload);
+                } else {
+                    console.log('ℹ️ No notification recipients found');
+                }
+            } catch (notificationError) {
+                console.error('❌ Enhanced notification error:', notificationError);
+                // Don't fail the entire operation if notifications fail
+            }
+
+            console.log('🎉 ENHANCED MATERIAL ACTIVITY LOGGED SUCCESSFULLY');
             console.log('========================================\n');
 
         } catch (error) {
             console.error('\n========================================');
-            console.error('❌ DETAILED MATERIAL ACTIVITY LOGGING FAILED');
+            console.error('❌ ENHANCED MATERIAL ACTIVITY LOGGING FAILED');
             console.error('========================================');
             console.error('Error Type:', error?.constructor?.name);
             console.error('Error Message:', (error as any)?.message);
@@ -422,18 +992,183 @@ const Details = () => {
             if ((error as any)?.response) {
                 console.error('API Response Error:');
                 console.error('   - Status:', (error as any).response.status);
-                console.error('   - Status Text:', (error as any).response.statusText);
-                console.error('   - Response Data:', JSON.stringify((error as any).response.data, null, 2));
-            } else if ((error as any)?.request) {
-                console.error('Network Error:');
-                console.error('   - Request was made but no response received');
-                console.error('   - Request:', (error as any).request);
-            } else {
-                console.error('Unknown Error:', error);
+                console.error('   - Data:', JSON.stringify((error as any).response.data, null, 2));
             }
             console.error('========================================\n');
+        }
+    };
+
+    // Helper function to get notification recipients
+    const getNotificationRecipients = async (
+        clientId: string, 
+        projectId: string, 
+        excludeUserId: string,
+        materials: any[],
+        activity: 'imported' | 'used' | 'transferred',
+        user: any
+    ) => {
+        try {
+            console.log('🔍 Getting notification recipients...');
+            console.log('   - Client ID:', clientId);
+            console.log('   - Project ID:', projectId);
+            console.log('   - Exclude User ID:', excludeUserId);
+
+            // Try to get recipients from backend
+            const response = await axios.get(`${domain}/api/notifications/recipients?clientId=${clientId}&projectId=${projectId}`);
             
-            // Don't throw error - activity logging is not critical, but we want to see the error
+            const responseData = response.data as any;
+            if (responseData.success) {
+                let recipients = responseData.recipients || [];
+                // Exclude the user who triggered the action
+                recipients = recipients.filter((r: any) => r.userId !== excludeUserId);
+                console.log(`✅ Found ${recipients.length} recipients from backend`);
+                return recipients;
+            }
+        } catch (error: any) {
+            console.warn('⚠️ Backend recipients API not available:', error?.response?.status);
+            
+            // If 404, the endpoint doesn't exist yet
+            if (error?.response?.status === 404) {
+                console.log('📝 Backend notification API not implemented yet - using fallback');
+            }
+        }
+
+        // Fallback: Create a local notification for testing
+        console.log('🔄 Using fallback notification method...');
+        try {
+            // Import and use the notification manager for local testing
+            const NotificationManager = (await import('../services/notificationManager')).default;
+            const notificationManager = NotificationManager.getInstance();
+            
+            // Create a test notification to show the system is working
+            const materialCount = materials.length;
+            const totalCost = materials.reduce((sum: number, m: any) => sum + (m.totalCost || m.cost || 0), 0);
+            
+            let title = '';
+            let body = '';
+            
+            switch (activity) {
+                case 'imported':
+                    title = `📦 Materials Imported`;
+                    body = `${user.fullName} imported ${materialCount} material${materialCount > 1 ? 's' : ''} (₹${totalCost.toLocaleString()}) in ${projectName}`;
+                    break;
+                case 'used':
+                    title = `🔧 Materials Used`;
+                    body = `${user.fullName} used ${materialCount} material${materialCount > 1 ? 's' : ''} (₹${totalCost.toLocaleString()}) in ${projectName} - ${sectionName}`;
+                    break;
+                case 'transferred':
+                    title = `↔️ Materials Transferred`;
+                    body = `${user.fullName} transferred ${materialCount} material${materialCount > 1 ? 's' : ''} (₹${totalCost.toLocaleString()}) from ${projectName}`;
+                    break;
+            }
+            
+            await notificationManager.scheduleLocalNotification(
+                title,
+                body,
+                {
+                    category: 'material',
+                    action: activity,
+                    projectId,
+                    projectName,
+                    sectionName,
+                    clientId,
+                    triggeredBy: user.fullName,
+                    route: 'notification',
+                }
+            );
+            
+            console.log('✅ Local fallback notification created');
+        } catch (fallbackError) {
+            console.error('❌ Local notification fallback failed:', fallbackError);
+        }
+
+        return []; // Return empty array for now
+    };
+
+    // Helper function to create notification payload
+    const createMaterialNotificationPayload = (
+        activity: 'imported' | 'used' | 'transferred',
+        materials: any[],
+        projectId: string,
+        projectName: string,
+        sectionName: string,
+        triggeredBy: any,
+        recipients: any[]
+    ) => {
+        const materialCount = materials.length;
+        const totalCost = materials.reduce((sum: number, m: any) => sum + (m.totalCost || m.cost || 0), 0);
+
+        let title = '';
+        let body = '';
+
+        switch (activity) {
+            case 'imported':
+                title = `📦 Materials Imported`;
+                body = `${triggeredBy.fullName} imported ${materialCount} material${materialCount > 1 ? 's' : ''} (₹${totalCost.toLocaleString()}) in ${projectName}`;
+                break;
+            case 'used':
+                title = `🔧 Materials Used`;
+                body = `${triggeredBy.fullName} used ${materialCount} material${materialCount > 1 ? 's' : ''} (₹${totalCost.toLocaleString()}) in ${projectName} - ${sectionName}`;
+                break;
+            case 'transferred':
+                title = `↔️ Materials Transferred`;
+                body = `${triggeredBy.fullName} transferred ${materialCount} material${materialCount > 1 ? 's' : ''} (₹${totalCost.toLocaleString()}) from ${projectName}`;
+                break;
+        }
+
+        return {
+            title,
+            body,
+            category: 'material',
+            action: activity,
+            data: {
+                projectId,
+                projectName,
+                sectionName,
+                clientId: triggeredBy.clientId || 'unknown',
+                triggeredBy: {
+                    userId: triggeredBy.userId,
+                    fullName: triggeredBy.fullName,
+                    userType: 'staff', // You might want to determine this properly
+                },
+                materials,
+                totalCost,
+                route: 'project',
+            },
+            recipients,
+            timestamp: new Date().toISOString(),
+        };
+    };
+
+    // Helper function to send enhanced notifications
+    const sendEnhancedNotifications = async (payload: any) => {
+        try {
+            console.log('📤 Attempting to send notifications via backend...');
+            console.log('   - Recipients:', payload.recipients.length);
+            console.log('   - Title:', payload.title);
+            
+            // Try to send via backend notification service
+            const response = await axios.post(`${domain}/api/notifications/send`, payload);
+            
+            const responseData = response.data as any;
+            if (responseData.success) {
+                console.log('✅ Server-side notifications sent successfully');
+                return true;
+            } else {
+                console.warn('⚠️ Server-side notifications failed:', responseData.message);
+                return false;
+            }
+        } catch (error: any) {
+            console.warn('⚠️ Backend notification service not available:', error?.response?.status);
+            
+            if (error?.response?.status === 404) {
+                console.log('📝 Backend notification API not implemented yet');
+                console.log('💡 Recommendation: Implement POST /api/notifications/send endpoint');
+            }
+            
+            // For now, we already created a local notification in the fallback
+            console.log('✅ Using local notification fallback (already created)');
+            return false;
         }
     };
 
@@ -1020,10 +1755,36 @@ const Details = () => {
         }
     };
 
+    // Load initial completion status for section and mini-sections
+    const loadInitialCompletionStatus = async () => {
+        try {
+            // Load section completion status
+            if (sectionId && isValidMongoId(sectionId) && projectId && isValidMongoId(projectId)) {
+                try {
+                    const sectionResponse = await axios.get(`${domain}/api/completion?updateType=project-section&id=${sectionId}&projectId=${projectId}`);
+                    const sectionData = sectionResponse.data as any;
+                    if (sectionData.success && sectionData.data) {
+                        const isSectionCompleted = Boolean(sectionData.data.isCompleted);
+                        setSectionCompleted(isSectionCompleted);
+                    }
+                } catch (error) {
+                    console.warn('Could not load section completion status:', error);
+                }
+            }
+
+            // Load mini-section completion status
+            await loadMiniSectionCompletionStatus();
+            
+        } catch (error) {
+            console.error('❌ Error loading initial completion status:', error);
+        }
+    };
+
     // Load project materials on mount
     useEffect(() => {
         isMountedRef.current = true;
         loadProjectMaterials();
+        loadInitialCompletionStatus(); // Load completion status on mount
 
         // Cleanup: Cancel any pending requests when component unmounts
         return () => {
@@ -1068,17 +1829,27 @@ const Details = () => {
             if (!sectionId) return;
 
             try {
+                console.log('🔄 Fetching mini-sections for sectionId:', sectionId);
                 const sections = await getSection(sectionId);
                 if (sections && Array.isArray(sections)) {
+                    console.log('✅ Mini-sections loaded:', sections.length);
+                    console.log('✅ Mini-sections:', sections.map(s => ({ id: s._id, name: s.name })));
+                    
                     setMiniSections(sections);
+                    
+                    // Load completion status after mini-sections are loaded with a longer delay
+                    setTimeout(async () => {
+                        console.log('🔄 Loading completion status after mini-sections are set...');
+                        await loadMiniSectionCompletionStatus();
+                    }, 500); // Increased delay to ensure state is updated
                 }
             } catch (error) {
-                // Silent error handling
+                console.error('❌ Error fetching mini-sections:', error);
             }
         };
 
         fetchMiniSections();
-    }, [sectionId]);
+    }, [sectionId, projectId]);
 
     // ✅ UPDATED: Group materials by name, unit, AND specifications for separate cards
     const groupMaterialsByName = (materials: Material[], isUsedTab: boolean = false) => {
@@ -1623,10 +2394,11 @@ const Details = () => {
             let targetProjectName = 'Unknown Project';
             try {
                 const targetProjectResponse = await axios.get(`${domain}/api/project/${targetProjectId}?clientId=${clientId}`);
-                if (targetProjectResponse.data?.success) {
-                    targetProjectName = targetProjectResponse.data.project?.name || 
-                                      targetProjectResponse.data.data?.name || 
-                                      targetProjectResponse.data.name || 
+                const targetProjectData = targetProjectResponse.data as any;
+                if (targetProjectData?.success) {
+                    targetProjectName = targetProjectData.project?.name || 
+                                      targetProjectData.data?.name || 
+                                      targetProjectData.name || 
                                       'Unknown Project';
                 }
                 console.log('🎯 Target Project Name:', targetProjectName);
@@ -2293,7 +3065,11 @@ const Details = () => {
                 projectId={projectId}
                 sectionId={sectionId}
                 onShowSectionPrompt={() => { }}
+                onShowNotifications={() => setShowNotifications(true)}
                 hideSection={true}
+                sectionCompleted={sectionCompleted}
+                onToggleSectionCompletion={toggleSectionCompletion}
+                isUpdatingCompletion={isUpdatingCompletion}
             />
 
             {/* Action Buttons - Sticky at top, visible to everyone in "imported" tab */}
@@ -2493,6 +3269,9 @@ const Details = () => {
                                             sectionName: sectionName,
                                             sectionId: sectionId
                                         }}
+                                        miniSectionCompletions={miniSectionCompletions}
+                                        onToggleMiniSectionCompletion={toggleMiniSectionCompletionDirect}
+                                        isUpdatingCompletion={isUpdatingCompletion}
                                     />
                                 </View>
                             ) : (
@@ -2523,6 +3302,9 @@ const Details = () => {
                                             sectionName: sectionName,
                                             sectionId: sectionId
                                         }}
+                                        miniSectionCompletions={miniSectionCompletions}
+                                        onToggleMiniSectionCompletion={toggleMiniSectionCompletionDirect}
+                                        isUpdatingCompletion={isUpdatingCompletion}
                                     />
                                 </View>
                             )}
@@ -3594,6 +4376,41 @@ const loadingStyles = StyleSheet.create({
         height: 8,
         borderRadius: 4,
         backgroundColor: '#3B82F6',
+    },
+});
+
+// Completion styles
+const completionStyles = StyleSheet.create({
+    miniSectionCompletionButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#CBD5E1',
+        marginTop: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    miniSectionCompletionButtonCompleted: {
+        backgroundColor: '#ECFDF5',
+        borderColor: '#10B981',
+        shadowColor: '#10B981',
+        shadowOpacity: 0.15,
+    },
+    miniSectionCompletionButtonText: {
+        marginLeft: 4,
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#64748B',
+    },
+    miniSectionCompletionButtonTextCompleted: {
+        color: '#059669',
     },
 });
 

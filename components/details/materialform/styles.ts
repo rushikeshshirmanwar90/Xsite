@@ -47,6 +47,8 @@ export const sharedStyles = StyleSheet.create<Styles>({
   },
   formGroup: {
     marginBottom: 16,
+    position: 'relative' as const,
+    zIndex: 1,
   },
   label: {
     fontSize: 14,
@@ -96,6 +98,9 @@ export const sharedStyles = StyleSheet.create<Styles>({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 5,
+    zIndex: 1000,
+    position: 'relative' as const,
+    overflow: 'hidden' as const,
   },
   dropdownItem: {
     padding: 12,

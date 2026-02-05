@@ -26,6 +26,15 @@ const ProjectSections = () => {
   const [newSectionName, setNewSectionName] = useState('');
   const [newSectionType, setNewSectionType] = useState('building');
   const [isAdding, setIsAdding] = useState(false);
+  const [projectCompleted, setProjectCompleted] = useState(false);
+  const [isUpdatingProjectCompletion, setIsUpdatingProjectCompletion] = useState(false);
+
+  // Debug state changes
+  useEffect(() => {
+    console.log('🔍 [DEBUG] projectCompleted state changed to:', projectCompleted);
+    console.log('🔍 [DEBUG] Button should show:', projectCompleted ? 'COMPLETED (green)' : 'COMPLETE (gray)');
+    console.log('🔍 [DEBUG] Button text should be:', `${name} Work ${projectCompleted ? 'Completed' : 'Complete'}`);
+  }, [projectCompleted, name]);
 
   useEffect(() => {
     if (sectionData) {
@@ -154,6 +163,173 @@ const ProjectSections = () => {
     }
   };
 
+  // Helper function to validate MongoDB ObjectId
+  const isValidMongoId = (id: string) => {
+    return /^[0-9a-fA-F]{24}$/.test(id);
+  };
+
+  // Function to toggle project completion
+  const toggleProjectCompletion = async () => {
+    if (isUpdatingProjectCompletion) return;
+    
+    // Validate project ID first
+    if (!id || !isValidMongoId(id as string)) {
+      toast.error('Invalid project ID. Please refresh the page and try again.');
+      return;
+    }
+    
+    setIsUpdatingProjectCompletion(true);
+    try {
+      console.log('🎯 Toggling project completion (from project-sections)...');
+      console.log('Domain:', domain);
+      console.log('Project ID:', id);
+      console.log('Project Name:', name);
+      console.log('API URL:', `${domain}/api/completion`);
+      
+      const payload = {
+        updateType: 'project',
+        id: id
+      };
+      
+      console.log('Payload:', JSON.stringify(payload, null, 2));
+      
+      const response = await axios.patch(`${domain}/api/completion`, payload, {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        timeout: 10000 // 10 second timeout
+      });
+
+      console.log('Response status:', response.status);
+      console.log('Response data:', JSON.stringify(response.data, null, 2));
+
+      if (response.data.success) {
+        // Use the actual completion status from the API response instead of toggling
+        const newCompletionStatus = response.data.data?.isCompleted;
+        if (typeof newCompletionStatus === 'boolean') {
+          setProjectCompleted(newCompletionStatus);
+          toast.success(response.data.message || `Project ${newCompletionStatus ? 'completed' : 'reopened'} successfully`);
+        } else {
+          // Fallback to toggle logic if API doesn't return the new status
+          setProjectCompleted(!projectCompleted);
+          toast.success(response.data.message || `Project completion updated successfully`);
+        }
+      } else {
+        throw new Error(response.data.message || 'Failed to update project completion');
+      }
+    } catch (error: any) {
+      console.error('❌ Error updating project completion:', error);
+      console.error('Error details:', {
+        message: error?.message,
+        status: error?.response?.status,
+        statusText: error?.response?.statusText,
+        data: error?.response?.data,
+        config: {
+          url: error?.config?.url,
+          method: error?.config?.method,
+          data: error?.config?.data
+        }
+      });
+      
+      // Handle specific error cases
+      const errorMessage = error?.response?.data?.message || error?.message || 'Unknown error';
+      
+      if (errorMessage.includes('not found')) {
+        toast.error('Project not found. This project may not support completion tracking yet.');
+      } else if (error?.code === 'ECONNABORTED') {
+        toast.error('Request timeout. Please check your connection and try again.');
+      } else if (error?.response?.status === 404) {
+        toast.error('Completion feature not available for this project.');
+      } else {
+        toast.error(`Failed to update project completion: ${errorMessage}`);
+      }
+    } finally {
+      setIsUpdatingProjectCompletion(false);
+    }
+  };
+
+  // Function to fetch project completion status
+  const fetchProjectCompletionStatus = async () => {
+    console.log('🔍 [DEBUG] fetchProjectCompletionStatus called');
+    console.log('🔍 [DEBUG] Project ID from params:', id);
+    console.log('🔍 [DEBUG] Project Name from params:', name);
+    
+    // Validate project ID first
+    if (!id || !isValidMongoId(id as string)) {
+      console.warn('⚠️ [DEBUG] Invalid project ID, skipping completion status fetch');
+      console.warn('⚠️ [DEBUG] ID value:', id);
+      console.warn('⚠️ [DEBUG] ID type:', typeof id);
+      setProjectCompleted(false);
+      return;
+    }
+    
+    try {
+      console.log('🔍 [DEBUG] Fetching project completion status (from project-sections)...');
+      console.log('🔍 [DEBUG] Domain:', domain);
+      console.log('🔍 [DEBUG] Project ID:', id);
+      
+      const projectUrl = `${domain}/api/completion?updateType=project&id=${id}`;
+      console.log('🔍 [DEBUG] Fetching from:', projectUrl);
+      
+      const response = await axios.get(projectUrl, {
+        timeout: 10000
+      });
+      
+      console.log('🔍 [DEBUG] Response status:', response.status);
+      console.log('🔍 [DEBUG] Response data:', JSON.stringify(response.data, null, 2));
+      
+      if (response.data.success && response.data.data) {
+        const completionStatus = response.data.data.isCompleted || false;
+        console.log('🔍 [DEBUG] Extracted completion status:', completionStatus);
+        console.log('🔍 [DEBUG] Setting projectCompleted to:', completionStatus);
+        
+        setProjectCompleted(completionStatus);
+        
+        console.log('✅ [DEBUG] Project completion status set to:', completionStatus);
+        console.log('✅ [DEBUG] UI should now show:', completionStatus ? 'COMPLETED (green)' : 'COMPLETE BUTTON (gray)');
+      } else {
+        console.log('⚠️ [DEBUG] Project completion status not found in response');
+        console.log('⚠️ [DEBUG] Response structure:', {
+          success: response.data.success,
+          hasData: !!response.data.data,
+          dataKeys: response.data.data ? Object.keys(response.data.data) : 'no data'
+        });
+        setProjectCompleted(false);
+      }
+    } catch (error: any) {
+      console.log('❌ [DEBUG] Project completion status fetch failed:', error?.response?.data || error.message);
+      console.log('❌ [DEBUG] Error details:', {
+        status: error?.response?.status,
+        statusText: error?.response?.statusText,
+        url: error?.config?.url,
+        method: error?.config?.method
+      });
+      
+      // Handle specific error cases gracefully
+      if (error?.response?.status === 404) {
+        console.log('ℹ️ [DEBUG] Project completion status not available yet (404) - defaulting to false');
+      } else if (error?.code === 'ECONNABORTED') {
+        console.log('⏰ [DEBUG] Request timeout - defaulting to false');
+      }
+      
+      setProjectCompleted(false);
+    }
+  };
+
+  // Fetch completion status when component mounts
+  useEffect(() => {
+    console.log('🔍 [DEBUG] useEffect triggered for fetchProjectCompletionStatus');
+    console.log('🔍 [DEBUG] Project ID dependency:', id);
+    console.log('🔍 [DEBUG] Project Name dependency:', name);
+    
+    if (id) {
+      console.log('🔍 [DEBUG] Calling fetchProjectCompletionStatus...');
+      fetchProjectCompletionStatus();
+    } else {
+      console.warn('⚠️ [DEBUG] No project ID available, skipping fetchProjectCompletionStatus');
+    }
+  }, [id]);
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -170,6 +346,40 @@ const ProjectSections = () => {
             <Text style={styles.projectSubtitle}>Project Sections</Text>
           </View>
         </View>
+        
+        {/* Project Completion Button */}
+        {(() => {
+          // Debug button rendering
+          console.log('🔍 [DEBUG] Rendering project completion button:');
+          console.log('🔍 [DEBUG] - projectCompleted:', projectCompleted);
+          console.log('🔍 [DEBUG] - isUpdatingProjectCompletion:', isUpdatingProjectCompletion);
+          console.log('🔍 [DEBUG] - name:', name);
+          console.log('🔍 [DEBUG] - Button text will be:', isUpdatingProjectCompletion ? 'Updating...' : `${name} Work ${projectCompleted ? 'Completed' : 'Complete'}`);
+          console.log('🔍 [DEBUG] - Icon will be:', projectCompleted ? "checkmark-circle (green)" : "ellipse-outline (gray)");
+          console.log('🔍 [DEBUG] - Style will be:', projectCompleted ? 'COMPLETED (green background)' : 'INCOMPLETE (gray background)');
+          return null; // This is just for debugging, doesn't render anything
+        })()}
+        <TouchableOpacity
+          style={[
+            styles.projectCompletionButton,
+            projectCompleted && styles.projectCompletionButtonCompleted,
+            isUpdatingProjectCompletion && styles.projectCompletionButtonDisabled
+          ]}
+          onPress={toggleProjectCompletion}
+          disabled={isUpdatingProjectCompletion}
+        >
+          <Ionicons 
+            name={projectCompleted ? "checkmark-circle" : "ellipse-outline"} 
+            size={20} 
+            color={projectCompleted ? "#059669" : "#6B7280"} 
+          />
+          <Text style={[
+            styles.projectCompletionButtonText,
+            projectCompleted && styles.projectCompletionButtonTextCompleted
+          ]}>
+            {isUpdatingProjectCompletion ? 'Updating...' : `${name} Work ${projectCompleted ? 'Completed' : 'Complete'}`}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Sections List */}
@@ -370,6 +580,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -604,6 +816,32 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  projectCompletionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  projectCompletionButtonCompleted: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#059669',
+  },
+  projectCompletionButtonDisabled: {
+    opacity: 0.6,
+  },
+  projectCompletionButtonText: {
+    marginLeft: 6,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  projectCompletionButtonTextCompleted: {
+    color: '#059669',
   },
 });
 

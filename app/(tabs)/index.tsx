@@ -1,4 +1,3 @@
-// App.tsx
 import ProjectCard from '@/components/ProjectCard';
 import { getClientId } from '@/functions/clientId';
 import { getProjectData } from '@/functions/project';
@@ -15,6 +14,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import QRCode from 'react-native-qrcode-svg';
 import * as Sharing from 'expo-sharing';
 import ViewShot from 'react-native-view-shot';
+import PushTokenStatusIndicator from '@/components/PushTokenStatusIndicator';
+import NotificationPermissionFixer from '@/components/NotificationPermissionFixer';
 import {
     Alert,
     Image,
@@ -508,6 +509,9 @@ const Index: React.FC = () => {
                         <Ionicons name="notifications" size={22} color="#1F2937" />
                         {/* {projectStats.overdueProjects > 0 && <View style={styles.notificationDot} />} */}
                     </TouchableOpacity>
+                    
+                    {/* Push Token Status Indicator */}
+                     <PushTokenStatusIndicator showDetails={false} />
                 </View>
             )}
 
@@ -578,6 +582,9 @@ const Index: React.FC = () => {
                                 {isSharing ? 'Sharing...' : 'Share QR Code'}
                             </Text>
                         </TouchableOpacity>
+                        
+                        {/* Push Token Status for Staff */}
+                        <PushTokenStatusIndicator showDetails={true} />
                     </View>
                 </View>
             )}
@@ -744,6 +751,9 @@ const Index: React.FC = () => {
                         )}
                     </View>
                 )}
+                
+                {/* Notification Permission Fixer - Temporary for debugging */}
+                <NotificationPermissionFixer />
             </ScrollView>
         </SafeAreaView>
     );

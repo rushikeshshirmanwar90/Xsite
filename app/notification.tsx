@@ -19,6 +19,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useNotifications } from '../hooks/useNotifications';
+import NotificationBadge from '../components/NotificationBadge';
 
 interface Activity {
     _id: string;
@@ -72,6 +74,7 @@ const NotificationPage: React.FC = () => {
     console.log('🏗️ NotificationPage component rendering/re-rendering');
 
     const router = useRouter();
+    const { unreadCount } = useNotifications(); // Add notification hook
     const [activeTab, setActiveTab] = useState<TabType>('all');
     const [materialSubTab, setMaterialSubTab] = useState<MaterialSubTab>('imported');
     const [activitiesRaw, setActivitiesRaw] = useState<Activity[]>(() => {
@@ -1289,6 +1292,11 @@ const NotificationPage: React.FC = () => {
                 <View style={styles.headerContent}>
                     <View style={styles.headerTitleContainer}>
                         <Text style={styles.headerTitle}>Activity Feed</Text>
+                        {unreadCount > 0 && (
+                            <View style={styles.notificationBadgeContainer}>
+                                <NotificationBadge size="small" />
+                            </View>
+                        )}
                     </View>
                     <Text style={styles.headerSubtitle}>
                         {`${formatDateHeader(currentDate)} • ${groupedActivities.reduce((sum, group) => sum + group.activities.length, 0)} activities`}
@@ -1739,6 +1747,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
+    },
+    notificationBadgeContainer: {
+        marginLeft: 8,
     },
     headerTitle: {
         fontSize: 20,

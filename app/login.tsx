@@ -21,6 +21,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
+import NotificationManager from '@/services/notificationManager';
 
 type Step = 'email' | 'otp' | 'password';
 
@@ -40,6 +41,43 @@ export default function LoginScreen() {
     const [isVerified, setIsVerified] = useState(false);
     const [userType, setUserType] = useState('');
     const [isNavigating, setIsNavigating] = useState(false);
+
+    // Initialize notification manager
+    const notificationManager = NotificationManager.getInstance();
+
+    // Helper function to initialize notifications after successful login
+    const initializeNotificationsAfterLogin = async () => {
+        try {
+            console.log('🔔 Attempting to initialize notifications after login...');
+            
+            // PRODUCTION FIX: Always attempt initialization on fresh login
+            // Reset any previous setup status to ensure fresh attempt
+            await notificationManager.resetSetupStatus();
+            
+            // Initialize with user-friendly permission dialog
+            const success = await notificationManager.initializePushNotifications(true);
+            
+            if (success) {
+                console.log('✅ Notifications initialized successfully after login');
+            } else {
+                console.log('⚠️ Notification initialization failed or was declined');
+                
+                // Check the specific reason for failure
+                const setupStatus = await notificationManager.getSetupStatus();
+                console.log('📊 Setup status after failure:', setupStatus);
+                
+                if (setupStatus.result === 'permission_denied_permanently') {
+                    console.log('💡 User denied permissions permanently - they can enable in settings later');
+                } else if (setupStatus.result === 'device_not_supported') {
+                    console.log('💡 Device does not support push notifications');
+                } else {
+                    console.log('💡 Notification setup can be retried later');
+                }
+            }
+        } catch (error) {
+            console.error('❌ Error initializing notifications after login:', error);
+        }
+    };
 
     useEffect(() => {
         // Just check if we should show loading, don't navigate
@@ -204,6 +242,9 @@ export default function LoginScreen() {
                 console.log('🧹 Clearing existing data before login...');
                 await AsyncStorage.clear();
                 
+                // PRODUCTION FIX: Add login timestamp for validation
+                await AsyncStorage.setItem('loginTimestamp', Date.now().toString());
+                
                 // Store fresh user data in AsyncStorage
                 const jsonUser = JSON.stringify(user);
                 console.log('💾 Storing fresh user data:', jsonUser);
@@ -221,6 +262,11 @@ export default function LoginScreen() {
 
                 // Trigger auth context to update
                 await checkAuthStatus();
+
+                // Initialize notifications after successful login
+                setTimeout(() => {
+                    initializeNotificationsAfterLogin();
+                }, 1000); // Small delay to let the UI settle
 
                 // Let the AuthContext and _layout handle navigation automatically
                 // Don't manually navigate - the layout will detect auth change and redirect
@@ -286,6 +332,9 @@ export default function LoginScreen() {
                 console.log('🧹 Clearing existing data before login...');
                 await AsyncStorage.clear();
                 
+                // PRODUCTION FIX: Add login timestamp for validation
+                await AsyncStorage.setItem('loginTimestamp', Date.now().toString());
+                
                 // Store fresh user data in AsyncStorage
                 const jsonUser = JSON.stringify(user);
                 console.log('💾 Storing fresh user data:', jsonUser);
@@ -303,6 +352,11 @@ export default function LoginScreen() {
 
                 // Trigger auth context to update
                 await checkAuthStatus();
+
+                // Initialize notifications after successful login
+                setTimeout(() => {
+                    initializeNotificationsAfterLogin();
+                }, 1000); // Small delay to let the UI settle
 
                 // Let the AuthContext and _layout handle navigation automatically
                 // Don't manually navigate - the layout will detect auth change and redirect

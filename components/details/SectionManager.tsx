@@ -28,6 +28,9 @@ type SectionManagerProps = {
     sectionName: string;
     sectionId: string;
   };
+  miniSectionCompletions?: {[key: string]: boolean};
+  onToggleMiniSectionCompletion?: (miniSectionId: string, miniSectionName: string) => void;
+  isUpdatingCompletion?: boolean;
 };
 
 const SectionManager: React.FC<SectionManagerProps> = ({
@@ -38,7 +41,10 @@ const SectionManager: React.FC<SectionManagerProps> = ({
   style,
   compact = false,
   projectDetails,
-  mainSectionDetails
+  mainSectionDetails,
+  miniSectionCompletions = {},
+  onToggleMiniSectionCompletion,
+  isUpdatingCompletion = false
 }) => {
   const [sections, setSections] = useState<Section[]>(propSections || []);
   const [showAddSectionModal, setShowAddSectionModal] = useState(false);
@@ -391,6 +397,46 @@ const SectionManager: React.FC<SectionManagerProps> = ({
         </View>
       </View>
 
+      {/* Mini-Section Completion Button */}
+      {currentSection && 
+       currentSection.id !== 'all-sections' && 
+       currentSection.id !== 'default-section' && 
+       onToggleMiniSectionCompletion && (
+        <TouchableOpacity
+          style={[
+            styles.miniSectionCompletionButton,
+            miniSectionCompletions[currentSection.id] && styles.miniSectionCompletionButtonCompleted,
+            isUpdatingCompletion && styles.miniSectionCompletionButtonDisabled
+          ]}
+          onPress={() => {
+            console.log('🎯 SECTION_MANAGER: Button pressed for:', currentSection.name);
+            console.log('🎯 SECTION_MANAGER: currentSection.id:', currentSection.id);
+            console.log('🎯 SECTION_MANAGER: miniSectionCompletions:', miniSectionCompletions);
+            console.log('🎯 SECTION_MANAGER: miniSectionCompletions[currentSection.id]:', miniSectionCompletions[currentSection.id]);
+            console.log('🎯 SECTION_MANAGER: Should show completed?', !!miniSectionCompletions[currentSection.id]);
+            onToggleMiniSectionCompletion(currentSection.id, currentSection.name);
+          }}
+          disabled={isUpdatingCompletion}
+        >
+          <MaterialIcons 
+            name={miniSectionCompletions[currentSection.id] ? "check-circle" : "radio-button-unchecked"} 
+            size={16} 
+            color={miniSectionCompletions[currentSection.id] ? "#059669" : "#6B7280"} 
+          />
+          <Text style={[
+            styles.miniSectionCompletionButtonText,
+            miniSectionCompletions[currentSection.id] && styles.miniSectionCompletionButtonTextCompleted
+          ]}>
+            {(() => {
+              const isCompleted = miniSectionCompletions[currentSection.id];
+              const buttonText = isUpdatingCompletion ? 'Updating...' : `${currentSection.name} Work ${isCompleted ? 'Completed' : 'Complete'}`;
+              console.log(`🎨 SECTION_MANAGER: Rendering ${currentSection.name} - isCompleted: ${isCompleted}, text: "${buttonText}"`);
+              return buttonText;
+            })()}
+          </Text>
+        </TouchableOpacity>
+      )}
+
       {/* Add Section Modal */}
       <Modal
         visible={showAddSectionModal}
@@ -666,6 +712,33 @@ const styles = StyleSheet.create({
   },
   updateButton: {
     backgroundColor: '#10B981',
+  },
+  miniSectionCompletionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    marginTop: 8,
+  },
+  miniSectionCompletionButtonCompleted: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#059669',
+  },
+  miniSectionCompletionButtonDisabled: {
+    opacity: 0.6,
+  },
+  miniSectionCompletionButtonText: {
+    marginLeft: 4,
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  miniSectionCompletionButtonTextCompleted: {
+    color: '#059669',
   },
 });
 

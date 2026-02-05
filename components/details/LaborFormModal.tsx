@@ -11,6 +11,8 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Platform,
+  Dimensions,
 } from 'react-native';
 
 interface LaborFormModalProps {
@@ -184,6 +186,10 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
   onSubmit,
   miniSections = []
 }) => {
+  // Get screen dimensions and calculate safe bottom padding
+  const { height: screenHeight } = Dimensions.get('window');
+  const safeBottomPadding = Platform.OS === 'ios' ? 34 : 20; // iOS has home indicator, Android has navigation bar
+  
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedType, setSelectedType] = useState<string>('');
   const [count, setCount] = useState<string>('');
@@ -561,7 +567,10 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
             ref={scrollViewRef}
             style={styles.scrollContent} 
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContentContainer}
+            contentContainerStyle={[
+              styles.scrollContentContainer,
+              { paddingBottom: safeBottomPadding + 100 } // Add safe area + extra padding for buttons
+            ]}
           >
             {/* Compact Labor Entries Summary - Shown at Top */}
             {laborEntries.length > 0 && (
@@ -1080,7 +1089,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
 
           {/* Footer Actions - Show when form is visible and fields are filled */}
           {(laborEntries.length === 0 || showAddForm) && selectedType && selectedMiniSection && (
-            <View style={styles.modalActions}>
+            <View style={[styles.modalActions, { paddingBottom: safeBottomPadding + 8 }]}>
               <TouchableOpacity style={styles.submitButton} onPress={handleAddLabor}>
                 <View style={styles.submitButtonContainer}>
                   <Ionicons name={editingEntry ? "checkmark" : "add"} size={20} color="#10B981" />
@@ -1107,7 +1116,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
 
           {/* Swipe to Submit - Show when there are entries and form is not shown */}
           {laborEntries.length > 0 && !showAddForm && (
-            <View style={styles.modalActions}>
+            <View style={[styles.modalActions, { paddingBottom: safeBottomPadding + 8 }]}>
               <View style={styles.swipeToSubmitContainer}>
                 <View style={styles.swipeTrack} {...panResponder.panHandlers}>
                   {/* Swipe button with icon */}

@@ -799,16 +799,18 @@ const actionStyles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#EFF6FF',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
+        paddingVertical: 14,
+        paddingHorizontal: 32,
         borderRadius: 12,
         borderWidth: 1,
         borderColor: '#DBEAFE',
-        gap: 6,
+        gap: 8,
         justifyContent: 'center',
+        minWidth: 180, // Set minimum width for the button
+        flex: 0.8, // Take up more space in the container
     },
     addLaborButtonText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
         color: '#3B82F6',
     },

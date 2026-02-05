@@ -53,9 +53,13 @@ export type ActivityType =
   | "section_created"
   | "section_updated"
   | "section_deleted"
+  | "section_completed"
+  | "section_reopened"
   | "mini_section_created"
   | "mini_section_updated"
   | "mini_section_deleted"
+  | "mini_section_completed"
+  | "mini_section_reopened"
   | "staff_assigned"
   | "staff_removed"
   | "labor_added"
@@ -70,7 +74,8 @@ export type ActivityCategory =
   | "material"
   | "staff"
   | "other"
-  | "labor";
+  | "labor"
+  | "completion";
 
 export type ActivityAction =
   | "add"
@@ -80,7 +85,9 @@ export type ActivityAction =
   | "assign"
   | "remove"
   | "import"
-  | "use";
+  | "use"
+  | "complete"
+  | "reopen";
 
 interface ActivityLogParams {
   activityType: ActivityType;
@@ -766,6 +773,138 @@ export const logLaborRemoved = async (
       laborCategory,
       count,
       totalCost,
+      locationHierarchy: {
+        projectName,
+        sectionName,
+        miniSectionName,
+        fullPath: locationDescription
+      }
+    },
+  });
+};
+
+// ============================================
+// COMPLETION ACTIVITIES
+// ============================================
+
+export const logSectionCompleted = async (
+  projectId: string,
+  projectName: string,
+  sectionId: string,
+  sectionName: string,
+  message?: string
+) => {
+  await logActivity({
+    activityType: "section_completed",
+    category: "section",
+    action: "complete",
+    description: `Marked section "${sectionName}" as completed in project "${projectName}"`,
+    projectId,
+    projectName,
+    sectionId,
+    sectionName,
+    message,
+    metadata: {
+      completionTimestamp: new Date().toISOString(),
+      locationHierarchy: {
+        projectName,
+        sectionName,
+        fullPath: `${projectName} → ${sectionName}`
+      }
+    },
+  });
+};
+
+export const logSectionReopened = async (
+  projectId: string,
+  projectName: string,
+  sectionId: string,
+  sectionName: string,
+  message?: string
+) => {
+  await logActivity({
+    activityType: "section_reopened",
+    category: "section",
+    action: "reopen",
+    description: `Reopened section "${sectionName}" in project "${projectName}"`,
+    projectId,
+    projectName,
+    sectionId,
+    sectionName,
+    message,
+    metadata: {
+      reopenTimestamp: new Date().toISOString(),
+      locationHierarchy: {
+        projectName,
+        sectionName,
+        fullPath: `${projectName} → ${sectionName}`
+      }
+    },
+  });
+};
+
+export const logMiniSectionCompleted = async (
+  projectId: string,
+  projectName: string,
+  sectionId: string,
+  sectionName: string,
+  miniSectionId: string,
+  miniSectionName: string,
+  message?: string
+) => {
+  // Create a hierarchical location description: Project → Section → Mini-Section
+  const locationDescription = `${projectName} → ${sectionName} → ${miniSectionName}`;
+
+  await logActivity({
+    activityType: "mini_section_completed",
+    category: "mini_section",
+    action: "complete",
+    description: `Marked mini-section "${miniSectionName}" as completed in ${locationDescription}`,
+    projectId,
+    projectName,
+    sectionId,
+    sectionName,
+    miniSectionId,
+    miniSectionName,
+    message,
+    metadata: {
+      completionTimestamp: new Date().toISOString(),
+      locationHierarchy: {
+        projectName,
+        sectionName,
+        miniSectionName,
+        fullPath: locationDescription
+      }
+    },
+  });
+};
+
+export const logMiniSectionReopened = async (
+  projectId: string,
+  projectName: string,
+  sectionId: string,
+  sectionName: string,
+  miniSectionId: string,
+  miniSectionName: string,
+  message?: string
+) => {
+  // Create a hierarchical location description: Project → Section → Mini-Section
+  const locationDescription = `${projectName} → ${sectionName} → ${miniSectionName}`;
+
+  await logActivity({
+    activityType: "mini_section_reopened",
+    category: "mini_section",
+    action: "reopen",
+    description: `Reopened mini-section "${miniSectionName}" in ${locationDescription}`,
+    projectId,
+    projectName,
+    sectionId,
+    sectionName,
+    miniSectionId,
+    miniSectionName,
+    message,
+    metadata: {
+      reopenTimestamp: new Date().toISOString(),
       locationHierarchy: {
         projectName,
         sectionName,
