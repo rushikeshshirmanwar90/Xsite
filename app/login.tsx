@@ -115,27 +115,32 @@ export default function LoginScreen() {
 
             console.log(check);
             console.log(check.userType)
+            
+            // ✅ FIX: Check if user exists in database first
+            if (!check.isUser) {
+                toast.error('User not found with this email address');
+                return;
+            }
+            
             setUserType(check.userType)
             if (!check.verified) {
-                if (check) {
-                    const OTP = generateOTP();
-                    setGeneratedOTP(OTP);
-                    const sendMail = await sendOtp(email, OTP);
-                    if (sendMail) {
-                        toast.success('OTP sent to your email');
-                    } else {
-                        toast.error("something went wrong, can't send the OTP")
-                    }
+                // User exists but not verified - send OTP for password setup
+                const OTP = generateOTP();
+                setGeneratedOTP(OTP);
+                const sendMail = await sendOtp(email, OTP);
+                if (sendMail) {
+                    toast.success('OTP sent to your email');
+                    setCurrentStep('otp');
                 } else {
-                    toast.warning('user not found')
+                    toast.error("Something went wrong, can't send the OTP")
                 }
-                setCurrentStep('otp');
             } else {
+                // User exists and is verified - go to password login
                 setIsVerified(true);
                 setCurrentStep('password')
             }
         } catch (error) {
-            toast.error('user not found');
+            toast.error('User not found');
             console.log(error)
         } finally {
             setLoading(false);

@@ -118,25 +118,45 @@ const Index: React.FC = () => {
                     if (responseData.success && responseData.data) {
                         const staffData = responseData.data;
                         console.log('✅ Staff data fetched:', staffData);
+                        console.log('🔍 Staff assignedProjects structure:', staffData.assignedProjects);
                         
                         // Extract populated project data from assignedProjects
                         if (staffData.assignedProjects && Array.isArray(staffData.assignedProjects) && staffData.assignedProjects.length > 0) {
+                            console.log('🔍 Processing assignedProjects...');
+                            
                             const populatedProjects = staffData.assignedProjects
-                                .map((assignment: any) => {
+                                .map((assignment: any, index: number) => {
+                                    console.log(`🔍 Assignment ${index}:`, {
+                                        clientId: assignment.clientId,
+                                        clientName: assignment.clientName,
+                                        projectName: assignment.projectName,
+                                        projectData: assignment.projectData ? 'Present' : 'Missing'
+                                    });
+                                    
                                     const projectData = assignment.projectData || assignment.projectId;
                                     if (projectData && projectData._id) {
                                         // Add client information to the project data
-                                        return {
+                                        const finalProject = {
                                             ...projectData,
-                                            clientName: assignment.clientName || 'Unknown Client',
+                                            clientName: assignment.clientName || 'Unknown Client', // Get clientName from assignment
                                             clientId: assignment.clientId
                                         };
+                                        
+                                        console.log(`✅ Final project ${index}:`, {
+                                            name: finalProject.name,
+                                            clientName: finalProject.clientName,
+                                            clientId: finalProject.clientId
+                                        });
+                                        
+                                        return finalProject;
                                     }
+                                    console.log(`❌ Invalid project data for assignment ${index}`);
                                     return null;
                                 })
                                 .filter((project: any) => project !== null); // Filter out null/invalid projects
                             
                             console.log(`📊 Found ${populatedProjects.length} populated projects for staff user`);
+                            console.log('🔍 Sample project with client info:', populatedProjects[0]);
                             
                             if (populatedProjects.length > 0) {
                                 // ✅ Show ALL assigned projects for staff users
@@ -479,6 +499,29 @@ const Index: React.FC = () => {
         }
     };
 
+    // Temporary function to sync client names - can be removed after data is fixed
+    const syncClientNames = async () => {
+        try {
+            console.log('🔄 Starting client name sync...');
+            const response = await axios.post(`${domain}/api/users/staff?action=sync-client-names`, {});
+            const responseData = response.data as any;
+            
+            if (responseData.success) {
+                console.log('✅ Client name sync completed:', responseData.message);
+                Alert.alert('Success', `Sync completed. ${responseData.data?.updatedStaffCount || 0} staff members updated.`);
+                
+                // Refresh the project data after sync
+                await fetchProjectData(1, false);
+            } else {
+                console.error('❌ Sync failed:', responseData.message);
+                Alert.alert('Error', 'Failed to sync client names');
+            }
+        } catch (error) {
+            console.error('❌ Error during sync:', error);
+            Alert.alert('Error', 'Failed to sync client names');
+        }
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
@@ -511,7 +554,7 @@ const Index: React.FC = () => {
                     </TouchableOpacity>
                     
                     {/* Push Token Status Indicator */}
-                     <PushTokenStatusIndicator showDetails={false} />
+                     {/* <PushTokenStatusIndicator showDetails={false} /> */}
                 </View>
             )}
 
@@ -583,6 +626,16 @@ const Index: React.FC = () => {
                             </Text>
                         </TouchableOpacity>
                         
+                        {/* Temporary Sync Button - Remove after data is fixed */}
+                        <TouchableOpacity
+                            style={[styles.shareButton, { backgroundColor: '#F59E0B', marginTop: 8 }]}
+                            onPress={syncClientNames}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons name="sync" size={20} color="#FFFFFF" />
+                            <Text style={styles.shareButtonText}>Fix Client Names</Text>
+                        </TouchableOpacity>
+                        
                         {/* Push Token Status for Staff */}
                         <PushTokenStatusIndicator showDetails={true} />
                     </View>
@@ -642,6 +695,7 @@ const Index: React.FC = () => {
                                             key={project._id}
                                             project={project}
                                             onViewDetails={handleViewDetails}
+                                            userType={userIsAdmin ? 'admin' : (isStaff ? 'staff' : 'client')}
                                         />
                                     </View>
                                 ))}
@@ -753,7 +807,7 @@ const Index: React.FC = () => {
                 )}
                 
                 {/* Notification Permission Fixer - Temporary for debugging */}
-                <NotificationPermissionFixer />
+                {/* <NotificationPermissionFixer /> */}
             </ScrollView>
         </SafeAreaView>
     );

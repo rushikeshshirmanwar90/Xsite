@@ -4,7 +4,6 @@ import MaterialFormModal from '@/components/details/MaterialFormModel';
 import MaterialUsageForm from '@/components/details/MaterialUsageForm';
 import SectionManager from '@/components/details/SectionManager';
 import TabSelector from '@/components/details/TabSelector';
-import MaterialActivityNotifications from '@/components/notifications/MaterialActivityNotifications';
 import { predefinedSections } from '@/data/details';
 import { getSection } from '@/functions/details';
 import { getClientId } from '@/functions/clientId';
@@ -50,12 +49,29 @@ const Details = () => {
     const [showAddSectionModal, setShowAddSectionModal] = useState(false);
     const [newSectionName, setNewSectionName] = useState('');
     const [newSectionDesc, setNewSectionDesc] = useState('');
-    const [showNotifications, setShowNotifications] = useState(false);
     const [isAddingMaterial, setIsAddingMaterial] = useState(false);
     const [isAddingMaterialUsage, setIsAddingMaterialUsage] = useState(false);
     const [sectionCompleted, setSectionCompleted] = useState(false);
     const [miniSectionCompletions, setMiniSectionCompletions] = useState<{[key: string]: boolean}>({});
     const [isUpdatingCompletion, setIsUpdatingCompletion] = useState(false);
+    const [currentUserType, setCurrentUserType] = useState<string>('staff'); // Track current user type
+
+    // Log section completion status changes and button states
+    useEffect(() => {
+        console.log('🔒 Section completion status changed:', {
+            sectionCompleted,
+            buttonsDisabled: sectionCompleted,
+            projectId,
+            sectionId,
+            sectionName
+        });
+        
+        if (sectionCompleted) {
+            console.log('🚫 Add Material and Add Usage buttons are now DISABLED due to section completion');
+        } else {
+            console.log('✅ Add Material and Add Usage buttons are ENABLED');
+        }
+    }, [sectionCompleted]);
 
     // Reload mini-section completion status when mini-sections change
     useEffect(() => {
@@ -155,6 +171,7 @@ const Details = () => {
                 return {
                     userId: userData._id || userData.id || userData.clientId || 'unknown',
                     fullName: fullName,
+                    userType: userData.userType || 'staff', // Include userType, default to 'staff'
                 };
             }
         } catch (error) {
@@ -163,6 +180,7 @@ const Details = () => {
         return {
             userId: 'unknown',
             fullName: 'Unknown User',
+            userType: 'staff', // Default to 'staff'
         };
     };
 
@@ -1786,6 +1804,20 @@ const Details = () => {
         loadProjectMaterials();
         loadInitialCompletionStatus(); // Load completion status on mount
 
+        // Load current user type
+        const loadUserType = async () => {
+            try {
+                const userData = await getUserData();
+                setCurrentUserType(userData.userType);
+                console.log('🔍 Current user type loaded:', userData.userType);
+                console.log('🔍 Transfer button will be:', userData.userType === 'staff' ? 'HIDDEN' : 'VISIBLE');
+            } catch (error) {
+                console.error('Error loading user type:', error);
+                setCurrentUserType('staff'); // Default to staff
+            }
+        };
+        loadUserType();
+
         // Cleanup: Cancel any pending requests when component unmounts
         return () => {
             isMountedRef.current = false;
@@ -3065,7 +3097,6 @@ const Details = () => {
                 projectId={projectId}
                 sectionId={sectionId}
                 onShowSectionPrompt={() => { }}
-                onShowNotifications={() => setShowNotifications(true)}
                 hideSection={true}
                 sectionCompleted={sectionCompleted}
                 onToggleSectionCompletion={toggleSectionCompletion}
@@ -3074,15 +3105,33 @@ const Details = () => {
 
             {/* Action Buttons - Sticky at top, visible to everyone in "imported" tab */}
             {activeTab === 'imported' && (
-                <View style={actionStyles.stickyActionButtonsContainer}>
-                    <TouchableOpacity
+                <View style={{ marginHorizontal: 16, marginTop: 8, marginBottom: 8 }}>
+                    {/* Section Completed Info Banner */}
+                    {sectionCompleted && (
+                        <View style={actionStyles.sectionCompletedBanner}>
+                            <Ionicons name="checkmark-circle" size={16} color="#059669" />
+                            <Text style={actionStyles.sectionCompletedText}>
+                                This section is completed. Material operations are disabled.
+                            </Text>
+                        </View>
+                    )}
+                    
+                    {/* Action Buttons Container */}
+                    <View style={actionStyles.stickyActionButtonsContainer}>
+                        <TouchableOpacity
                         style={[
                             actionStyles.addMaterialButton,
-                            isAddingMaterial && actionStyles.addMaterialButtonDisabled
+                            (isAddingMaterial || sectionCompleted) && actionStyles.addMaterialButtonDisabled
                         ]}
-                        onPress={() => setShowMaterialForm(true)}
+                        onPress={() => {
+                            if (sectionCompleted) {
+                                toast.error('Cannot add materials to a completed section. Please reopen the section first.');
+                                return;
+                            }
+                            setShowMaterialForm(true);
+                        }}
                         activeOpacity={0.7}
-                        disabled={isAddingMaterial || isAddingMaterialUsage}
+                        disabled={isAddingMaterial || isAddingMaterialUsage || sectionCompleted}
                     >
                         {isAddingMaterial ? (
                             <Animated.View
@@ -3100,24 +3149,34 @@ const Details = () => {
                                 <Ionicons name="sync" size={20} color="#94A3B8" />
                             </Animated.View>
                         ) : (
-                            <Ionicons name="add-circle-outline" size={20} color="#059669" />
+                            <Ionicons 
+                                name={sectionCompleted ? "checkmark-circle" : "add-circle-outline"} 
+                                size={20} 
+                                color={sectionCompleted ? "#94A3B8" : "#059669"} 
+                            />
                         )}
                         <Text style={[
                             actionStyles.addMaterialButtonText,
-                            isAddingMaterial && actionStyles.addMaterialButtonTextDisabled
+                            (isAddingMaterial || sectionCompleted) && actionStyles.addMaterialButtonTextDisabled
                         ]}>
-                            {isAddingMaterial ? 'Adding...' : 'Add Material'}
+                            {isAddingMaterial ? 'Adding...' : sectionCompleted ? 'Section Completed' : 'Add Material'}
                         </Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
                         style={[
                             actionStyles.addUsageButton,
-                            isAddingMaterialUsage && actionStyles.addUsageButtonDisabled
+                            (isAddingMaterialUsage || sectionCompleted) && actionStyles.addUsageButtonDisabled
                         ]}
-                        onPress={() => setShowUsageForm(true)}
+                        onPress={() => {
+                            if (sectionCompleted) {
+                                toast.error('Cannot add material usage to a completed section. Please reopen the section first.');
+                                return;
+                            }
+                            setShowUsageForm(true);
+                        }}
                         activeOpacity={0.7}
-                        disabled={isAddingMaterial || isAddingMaterialUsage}
+                        disabled={isAddingMaterial || isAddingMaterialUsage || sectionCompleted}
                     >
                         {isAddingMaterialUsage ? (
                             <Animated.View
@@ -3135,24 +3194,23 @@ const Details = () => {
                                 <Ionicons name="sync" size={20} color="#94A3B8" />
                             </Animated.View>
                         ) : (
-                            <Ionicons name="arrow-forward-circle-outline" size={20} color="#DC2626" />
+                            <Ionicons 
+                                name={sectionCompleted ? "checkmark-circle" : "arrow-forward-circle-outline"} 
+                                size={20} 
+                                color={sectionCompleted ? "#94A3B8" : "#DC2626"} 
+                            />
                         )}
                         <Text style={[
                             actionStyles.addUsageButtonText,
-                            isAddingMaterialUsage && actionStyles.addUsageButtonTextDisabled
+                            (isAddingMaterialUsage || sectionCompleted) && actionStyles.addUsageButtonTextDisabled
                         ]}>
-                            {isAddingMaterialUsage ? 'Adding...' : 'Add Usage'}
+                            {isAddingMaterialUsage ? 'Adding...' : sectionCompleted ? 'Section Completed' : 'Add Usage'}
                         </Text>
                     </TouchableOpacity>
+                    </View>
                 </View>
             )}
 
-            {/* Material Activity Notifications Modal */}
-            <MaterialActivityNotifications
-                visible={showNotifications}
-                onClose={() => setShowNotifications(false)}
-                projectId={projectId}
-            />
             <MaterialFormModal
                 visible={showMaterialForm}
                 onClose={() => setShowMaterialForm(false)}
@@ -3182,6 +3240,7 @@ const Details = () => {
                 miniSections={miniSections}
                 projectId={projectId}
                 sectionId={sectionId}
+                miniSectionCompletions={miniSectionCompletions}
             />
 
             <ScrollView
@@ -3219,18 +3278,6 @@ const Details = () => {
                         </View>
                     </TouchableOpacity>
                 </View>
-
-                {/* Notification Button - Inside scroll view */}
-                {/* <View style={notificationStyles.notificationButtonContainer}>
-                    <TouchableOpacity
-                        style={notificationStyles.notificationButton}
-                        onPress={() => setShowNotifications(true)}
-                        activeOpacity={0.7}
-                    >
-                        <Ionicons name="notifications" size={20} color="#3B82F6" />
-                        <Text style={notificationStyles.notificationButtonText}>Activity Log</Text>
-                    </TouchableOpacity>
-                </View> */}
 
                 {/* Compact Filters - Only visible in "Used Materials" tab */}
                 {activeTab === 'used' && (
@@ -3454,6 +3501,7 @@ const Details = () => {
                                             currentProjectId={projectId}
                                             miniSections={miniSections}
                                             showMiniSectionLabel={!selectedMiniSection}
+                                            userType={currentUserType}
                                         />
                                     ))}
                                 </View>
@@ -3472,6 +3520,7 @@ const Details = () => {
                                 currentProjectId={projectId}
                                 miniSections={miniSections}
                                 showMiniSectionLabel={false}
+                                userType={currentUserType}
                             />
                         ))
                     ) : (
@@ -3992,6 +4041,24 @@ const actionStyles = StyleSheet.create({
     addUsageButtonTextDisabled: {
         color: '#94A3B8',
     },
+    sectionCompletedBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F0FDF4',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        marginBottom: 8,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#BBF7D0',
+        gap: 8,
+    },
+    sectionCompletedText: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: '#059669',
+        flex: 1,
+    },
 });
 
 const navigationStyles = StyleSheet.create({
@@ -4029,31 +4096,6 @@ const navigationStyles = StyleSheet.create({
     laborButtonSubtitle: {
         fontSize: 13,
         color: '#6B7280',
-    },
-});
-
-const notificationStyles = StyleSheet.create({
-    notificationButtonContainer: {
-        paddingHorizontal: 16,
-        paddingTop: 12,
-        paddingBottom: 8,
-    },
-    notificationButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#EFF6FF',
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-        borderRadius: 10,
-        gap: 8,
-        borderWidth: 1,
-        borderColor: '#BFDBFE',
-    },
-    notificationButtonText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#3B82F6',
     },
 });
 

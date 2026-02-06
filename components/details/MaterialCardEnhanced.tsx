@@ -45,6 +45,7 @@ interface MaterialCardEnhancedProps {
     miniSections?: MiniSection[];
     showMiniSectionLabel?: boolean;
     currentProjectId?: string;
+    userType?: string; // Add userType prop to control transfer button visibility
 }
 
 const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
@@ -56,6 +57,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
     miniSections = [],
     showMiniSectionLabel = false,
     currentProjectId,
+    userType = 'staff', // Default to 'staff' if not provided
 }) => {
     // Get mini-section name by ID
     const getMiniSectionName = (miniSectionId?: string): string => {
@@ -336,16 +338,23 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                             <View style={styles.dateContainer}>
                                 <Text style={styles.dateText}>{material.date}</Text>
                             </View>
-                            {/* Three-dot menu - Only show for imported materials */}
-                            {activeTab === 'imported' && onTransferMaterial && (
+                            {/* Three-dot menu - Only show for imported materials and non-staff users */}
+                            {activeTab === 'imported' && onTransferMaterial && !['staff', 'users'].includes(userType) && (
                                 <TouchableOpacity
                                     style={styles.optionsButton}
-                                    onPress={() => setShowOptionsMenu(true)}
+                                    onPress={() => {
+                                        console.log('🔍 Transfer button clicked - User type:', userType);
+                                        setShowOptionsMenu(true);
+                                    }}
                                     activeOpacity={0.7}
                                 >
                                     <Ionicons name="ellipsis-vertical" size={20} color="#6B7280" />
                                 </TouchableOpacity>
                             )}
+                            {/* Debug: Log when transfer button is hidden for staff */}
+                            {activeTab === 'imported' && onTransferMaterial && ['staff', 'users'].includes(userType) && 
+                                console.log('🚫 Transfer button hidden for user type:', userType, 'on material:', material.name)
+                            }
                         </View>
                     </View>
                     

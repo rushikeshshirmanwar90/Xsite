@@ -18,7 +18,6 @@ interface HeaderProps {
     projectId?: string;
     sectionId?: string;
     onShowSectionPrompt?: () => void;
-    onShowNotifications?: () => void;
     hideSection?: boolean;
     // New props for section completion
     sectionCompleted?: boolean;
@@ -37,7 +36,6 @@ const Header: React.FC<HeaderProps> = ({
     projectId,
     sectionId,
     onShowSectionPrompt,
-    onShowNotifications,
     hideSection = false,
     // New props for section completion
     sectionCompleted = false,
@@ -186,16 +184,6 @@ const Header: React.FC<HeaderProps> = ({
                                 </TouchableOpacity>
                             )}
                         </>
-                    )}
-
-                    {onShowNotifications && (
-                        <TouchableOpacity
-                            onPress={onShowNotifications}
-                            style={styles.notificationButton}
-                            activeOpacity={0.7}
-                        >
-                            <Ionicons name="notifications-outline" size={20} color="#1F2937" />
-                        </TouchableOpacity>
                     )}
                 </View>
             </View>

@@ -566,25 +566,28 @@ const CompanyProfile: React.FC = () => {
                             <Text style={styles.statLabel}>Total Projects</Text>
                         </View>
 
-                        <TouchableOpacity 
-                            style={[styles.statCard, styles.statCardDanger]}
-                            onPress={() => {
-                                console.log('📊 Navigating to dashboard from total spent card');
-                                router.push('/dashboard');
-                            }}
-                            activeOpacity={0.7}
-                        >
-                            <View style={styles.statIconContainer}>
-                                <Ionicons name="cash" size={24} color="#EF4444" />
-                            </View>
-                            <Text style={styles.statValue}>
-                                {loading ? '...' : formatCurrency(stats.totalSpent)}
-                            </Text>
-                            <Text style={styles.statLabel}>Total Spent</Text>
-                            <View style={styles.cardClickIndicator}>
-                                <Ionicons name="chevron-forward" size={16} color="#EF4444" />
-                            </View>
-                        </TouchableOpacity>
+                        {/* Only show Total Spent for non-staff users */}
+                        {!isCurrentUserStaff && (
+                            <TouchableOpacity 
+                                style={[styles.statCard, styles.statCardDanger]}
+                                onPress={() => {
+                                    console.log('📊 Navigating to dashboard from total spent card');
+                                    router.push('/dashboard');
+                                }}
+                                activeOpacity={0.7}
+                            >
+                                <View style={styles.statIconContainer}>
+                                    <Ionicons name="cash" size={24} color="#EF4444" />
+                                </View>
+                                <Text style={styles.statValue}>
+                                    {loading ? '...' : formatCurrency(stats.totalSpent)}
+                                </Text>
+                                <Text style={styles.statLabel}>Total Spent</Text>
+                                <View style={styles.cardClickIndicator}>
+                                    <Ionicons name="chevron-forward" size={16} color="#EF4444" />
+                                </View>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 </View>
 

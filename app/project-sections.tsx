@@ -1,3 +1,15 @@
+/**
+ * Project Sections Page
+ * 
+ * Features:
+ * - Displays all sections within a project
+ * - Shows completion status with green checkmark icons for completed sections
+ * - Project-level completion toggle button
+ * - Section completion status is fetched from the API and displayed with visual indicators
+ * - Completed sections show green checkmark icon instead of type-specific icons
+ * - Completed sections display a "Completed" badge next to the section name
+ */
+
 import { domain } from '@/lib/domain';
 import { ProjectSection } from '@/types/project';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,6 +40,8 @@ const ProjectSections = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [projectCompleted, setProjectCompleted] = useState(false);
   const [isUpdatingProjectCompletion, setIsUpdatingProjectCompletion] = useState(false);
+  const [sectionCompletions, setSectionCompletions] = useState<{[key: string]: boolean}>({});
+  const [isLoadingSectionCompletions, setIsLoadingSectionCompletions] = useState(false);
 
   // Debug state changes
   useEffect(() => {
@@ -35,6 +49,17 @@ const ProjectSections = () => {
     console.log('🔍 [DEBUG] Button should show:', projectCompleted ? 'COMPLETED (green)' : 'COMPLETE (gray)');
     console.log('🔍 [DEBUG] Button text should be:', `${name} Work ${projectCompleted ? 'Completed' : 'Complete'}`);
   }, [projectCompleted, name]);
+
+  // Debug section completion changes
+  useEffect(() => {
+    console.log('🔍 [DEBUG] sectionCompletions state changed:', sectionCompletions);
+    console.log('🔍 [DEBUG] Number of sections tracked:', Object.keys(sectionCompletions).length);
+    Object.entries(sectionCompletions).forEach(([sectionId, isCompleted]) => {
+      const section = sections.find(s => (s._id || s.sectionId) === sectionId);
+      const sectionName = section ? section.name : 'Unknown';
+      console.log(`🔍 [DEBUG] - ${sectionName} (${sectionId}): ${isCompleted ? 'COMPLETED ✅' : 'INCOMPLETE ○'}`);
+    });
+  }, [sectionCompletions, sections]);
 
   useEffect(() => {
     if (sectionData) {
@@ -48,6 +73,14 @@ const ProjectSections = () => {
     }
   }, [sectionData]);
 
+  // Fetch section completion status when sections are loaded
+  useEffect(() => {
+    if (sections && sections.length > 0 && id) {
+      console.log('🔄 Sections loaded, fetching completion status...');
+      fetchSectionCompletionStatus();
+    }
+  }, [sections, id]);
+
   useEffect(() => {
     console.log('Project sections received materials:', {
       materialAvailableCount: materialAvailable ? JSON.parse(Array.isArray(materialAvailable) ? materialAvailable[0] : materialAvailable).length : 0,
@@ -55,7 +88,13 @@ const ProjectSections = () => {
     });
   }, [materialAvailable, materialUsed]);
 
-  const getSectionIcon = (type: string) => {
+  const getSectionIcon = (type: string, isCompleted: boolean = false) => {
+    // If section is completed, always show checkmark
+    if (isCompleted) {
+      return 'checkmark-circle';
+    }
+    
+    // Otherwise, show type-specific icon
     switch (type?.toLowerCase()) {
       case 'building':
       case 'buildings':
@@ -65,6 +104,26 @@ const ProjectSections = () => {
       default:
         return 'grid';
     }
+  };
+
+  const getSectionIconColor = (type: string, isCompleted: boolean = false) => {
+    // If section is completed, always show green
+    if (isCompleted) {
+      return '#059669';
+    }
+    
+    // Otherwise, show default blue
+    return '#0EA5E9';
+  };
+
+  const getSectionIconBackgroundColor = (type: string, isCompleted: boolean = false) => {
+    // If section is completed, show light green background
+    if (isCompleted) {
+      return '#ECFDF5';
+    }
+    
+    // Otherwise, show default light blue
+    return '#E0F2FE';
   };
 
   const handleViewDetails = (section: ProjectSection) => {
@@ -161,6 +220,57 @@ const ProjectSections = () => {
     } finally {
       setIsAdding(false);
     }
+  };
+
+  // Function to fetch section completion status for all sections
+  const fetchSectionCompletionStatus = async () => {
+    if (!sections || sections.length === 0 || !id) {
+      console.log('⚠️ No sections or project ID available for completion status fetch');
+      return;
+    }
+
+    setIsLoadingSectionCompletions(true);
+    console.log('🔍 Fetching completion status for all sections...');
+    console.log('Project ID:', id);
+    console.log('Sections to check:', sections.length);
+
+    const completionStates: {[key: string]: boolean} = {};
+
+    for (const section of sections) {
+      const sectionId = section._id || section.sectionId;
+      if (!sectionId || !isValidMongoId(sectionId)) {
+        console.warn(`⚠️ Invalid section ID for ${section.name}:`, sectionId);
+        completionStates[sectionId] = false;
+        continue;
+      }
+
+      try {
+        console.log(`📡 Checking completion for section: ${section.name} (${sectionId})`);
+        
+        const completionUrl = `${domain}/api/completion?updateType=project-section&id=${sectionId}&projectId=${id}`;
+        const response = await axios.get(completionUrl, {
+          timeout: 10000
+        });
+
+        console.log(`📊 ${section.name} completion response:`, response.status, response.data);
+
+        if (response.data.success && response.data.data) {
+          const isCompleted = Boolean(response.data.data.isCompleted);
+          completionStates[sectionId] = isCompleted;
+          console.log(`✅ ${section.name} completion status: ${isCompleted ? 'COMPLETED ✓' : 'INCOMPLETE ○'}`);
+        } else {
+          completionStates[sectionId] = false;
+          console.log(`⚠️ ${section.name} completion status defaulted to false`);
+        }
+      } catch (error: any) {
+        console.log(`❌ ${section.name} completion fetch failed:`, error.message);
+        completionStates[sectionId] = false;
+      }
+    }
+
+    console.log('🔄 Updating section completion states:', completionStates);
+    setSectionCompletions(completionStates);
+    setIsLoadingSectionCompletions(false);
   };
 
   // Helper function to validate MongoDB ObjectId
@@ -389,28 +499,41 @@ const ProjectSections = () => {
         showsVerticalScrollIndicator={false}
       >
         {sections && sections.length > 0 ? (
-          sections.map((section, index) => (
-            <View key={section._id || index} style={styles.sectionCard}>
-              <View style={styles.sectionContent}>
-                <View style={styles.sectionIconContainer}>
-                  <Ionicons
-                    name={getSectionIcon(section.type)}
-                    size={24}
-                    color="#0EA5E9"
-                  />
+          sections.map((section, index) => {
+            const sectionId = section._id || section.sectionId;
+            const isCompleted = sectionCompletions[sectionId] || false;
+            const isLoadingCompletion = isLoadingSectionCompletions && !sectionCompletions.hasOwnProperty(sectionId);
+            
+            return (
+              <View key={section._id || index} style={styles.sectionCard}>
+                <View style={styles.sectionContent}>
+                  <View style={[
+                    styles.sectionIconContainer,
+                    { backgroundColor: getSectionIconBackgroundColor(section.type, isCompleted) }
+                  ]}>
+                    {isLoadingCompletion ? (
+                      <ActivityIndicator size="small" color="#94A3B8" />
+                    ) : (
+                      <Ionicons
+                        name={getSectionIcon(section.type, isCompleted)}
+                        size={24}
+                        color={getSectionIconColor(section.type, isCompleted)}
+                      />
+                    )}
+                  </View>
+                  <View style={styles.sectionInfo}>
+                    <Text style={styles.sectionName}>{section.name}</Text>
+                  </View>
                 </View>
-                <View style={styles.sectionInfo}>
-                  <Text style={styles.sectionName}>{section.name}</Text>
-                </View>
+                <TouchableOpacity
+                  style={styles.viewButton}
+                  onPress={() => handleViewDetails(section)}
+                >
+                  <Text style={styles.viewButtonText}>View Details</Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                style={styles.viewButton}
-                onPress={() => handleViewDetails(section)}
-              >
-                <Text style={styles.viewButtonText}>View Details</Text>
-              </TouchableOpacity>
-            </View>
-          ))
+            );
+          })
         ) : (
           <View style={styles.emptyContainer}>
             <Ionicons name="folder-open-outline" size={64} color="#CBD5E1" />

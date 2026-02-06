@@ -42,6 +42,7 @@ interface MaterialUsageFormProps {
     miniSections: { _id: string; name: string }[];
     projectId: string; // Add projectId to fetch all materials
     sectionId: string; // Add sectionId for filtering
+    miniSectionCompletions?: { [key: string]: boolean }; // Add completion status tracking
 }
 
 const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
@@ -51,7 +52,8 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
     availableMaterials,
     miniSections,
     projectId,
-    sectionId
+    sectionId,
+    miniSectionCompletions = {} // Default to empty object if not provided
 }) => {
     const [selectedMiniSectionId, setSelectedMiniSectionId] = useState<string>('');
     const [selectedMaterials, setSelectedMaterials] = useState<{ [materialId: string]: string }>({});
@@ -266,6 +268,15 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
         loadingAnimation.setValue(0);
     };
 
+    // Filter out completed mini-sections from the selection
+    const availableMiniSections = miniSections.filter(section => {
+        const isCompleted = miniSectionCompletions[section._id] || false;
+        if (isCompleted) {
+            console.log(`🚫 Filtering out completed mini-section: ${section.name} (${section._id})`);
+        }
+        return !isCompleted; // Only show incomplete mini-sections
+    });
+
     // Log when form opens and fetch all materials
     useEffect(() => {
         if (visible) {
@@ -273,11 +284,17 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
             console.log('📝 MATERIAL USAGE FORM OPENED');
             console.log('========================================');
             console.log('Available Materials Count (from props):', availableMaterials.length);
-            console.log('Mini Sections Count:', miniSections.length);
+            console.log('Total Mini Sections Count:', miniSections.length);
+            console.log('Available (Incomplete) Mini Sections Count:', availableMiniSections.length);
             console.log('Project ID:', projectId);
             console.log('Section ID:', sectionId);
-            console.log('\n--- Mini Sections ---');
+            console.log('\n--- All Mini Sections ---');
             miniSections.forEach((s, idx) => {
+                const isCompleted = miniSectionCompletions[s._id] || false;
+                console.log(`  ${idx + 1}. ${s.name} (_id: ${s._id}) - ${isCompleted ? '✅ COMPLETED (HIDDEN)' : '⏳ INCOMPLETE (AVAILABLE)'}`);
+            });
+            console.log('\n--- Available Mini Sections (for selection) ---');
+            availableMiniSections.forEach((s, idx) => {
                 console.log(`  ${idx + 1}. ${s.name} (_id: ${s._id})`);
             });
             console.log('========================================\n');
@@ -290,7 +307,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
             setIsLoadingMaterials(false);
             setMaterialsError('');
         }
-    }, [visible, projectId, sectionId]);
+    }, [visible, projectId, sectionId, miniSections.length, availableMiniSections.length]);
 
     const handleSubmit = async () => {
         // Use refs for current values to avoid stale state
@@ -671,11 +688,16 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                         <Text style={styles.label}>
                                             Where is this material being used? <Text style={styles.required}>*</Text>
                                         </Text>
-                                        <Text style={styles.labelHelper}>Select the work area or mini-section</Text>
+                                        <Text style={styles.labelHelper}>
+                                            Select the work area or mini-section
+                                            {miniSections.length > availableMiniSections.length && 
+                                                ` (${miniSections.length - availableMiniSections.length} completed section${miniSections.length - availableMiniSections.length > 1 ? 's' : ''} hidden)`
+                                            }
+                                        </Text>
                                     </View>
-                                    {miniSections.length > 0 ? (
+                                    {availableMiniSections.length > 0 ? (
                                         <View style={styles.sectionList}>
-                                            {miniSections.map((section) => {
+                                            {availableMiniSections.map((section) => {
                                                 const isSelected = selectedMiniSectionId === section._id;
                                                 return (
                                                     <TouchableOpacity
@@ -706,7 +728,10 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                         <View style={styles.noSectionsWarning}>
                                             <Ionicons name="alert-circle" size={20} color="#F59E0B" />
                                             <Text style={styles.helperText}>
-                                                No mini-sections available. Please create one first.
+                                                {miniSections.length === 0 
+                                                    ? 'No mini-sections available. Please create one first.'
+                                                    : 'All mini-sections are completed. No materials can be added to completed sections.'
+                                                }
                                             </Text>
                                         </View>
                                     )}
@@ -885,7 +910,9 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                         <Text style={styles.sectionInfoTitle}>Using materials in:</Text>
                                     </View>
                                     <Text style={styles.sectionInfoName}>
-                                        {miniSections.find(s => s._id === selectedMiniSectionId)?.name || 'Unknown Section'}
+                                        {availableMiniSections.find(s => s._id === selectedMiniSectionId)?.name || 
+                                         miniSections.find(s => s._id === selectedMiniSectionId)?.name || 
+                                         'Unknown Section'}
                                     </Text>
                                 </View>
 

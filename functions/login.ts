@@ -69,14 +69,24 @@ export const confirmMail = async (email: string): Promise<{ verified: boolean; i
     const data = res.data.isUser;
 
     if (res.status === 200) {
+      // User exists and is verified (has password)
       return { verified: true, isUser: true, userType: data.userType };
     } else if (res.status === 201) {
+      // User exists but not verified (no password set)
       return { verified: false, isUser: true, userType: data.userType };
     } else {
+      // Unexpected status
       return { verified: false, isUser: false, userType: "" };
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("❌ Failed to confirm mail:", error);
+    
+    // ✅ FIX: Handle 404 status (user not found) specifically
+    if (error.response?.status === 404) {
+      return { verified: false, isUser: false, userType: "" };
+    }
+    
+    // Other errors (network, server errors, etc.)
     return { verified: false, isUser: false, userType: "" };
   }
 };
@@ -188,6 +198,12 @@ export const findUserType = async (email: string): Promise<{ success: boolean; u
     }
   } catch (error: any) {
     console.error("Failed to find user type:", error);
+    
+    // ✅ FIX: Handle 404 status (user not found) specifically
+    if (error.response?.status === 404) {
+      return { success: false, userType: "" };
+    }
+    
     return { success: false, userType: "" };
   }
 };
