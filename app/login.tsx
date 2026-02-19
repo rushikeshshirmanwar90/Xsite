@@ -21,7 +21,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
-import NotificationManager from '@/services/notificationManager';
 
 type Step = 'email' | 'otp' | 'password';
 
@@ -41,43 +40,6 @@ export default function LoginScreen() {
     const [isVerified, setIsVerified] = useState(false);
     const [userType, setUserType] = useState('');
     const [isNavigating, setIsNavigating] = useState(false);
-
-    // Initialize notification manager
-    const notificationManager = NotificationManager.getInstance();
-
-    // Helper function to initialize notifications after successful login
-    const initializeNotificationsAfterLogin = async () => {
-        try {
-            console.log('🔔 Attempting to initialize notifications after login...');
-            
-            // PRODUCTION FIX: Always attempt initialization on fresh login
-            // Reset any previous setup status to ensure fresh attempt
-            await notificationManager.resetSetupStatus();
-            
-            // Initialize with user-friendly permission dialog
-            const success = await notificationManager.initializePushNotifications(true);
-            
-            if (success) {
-                console.log('✅ Notifications initialized successfully after login');
-            } else {
-                console.log('⚠️ Notification initialization failed or was declined');
-                
-                // Check the specific reason for failure
-                const setupStatus = await notificationManager.getSetupStatus();
-                console.log('📊 Setup status after failure:', setupStatus);
-                
-                if (setupStatus.result === 'permission_denied_permanently') {
-                    console.log('💡 User denied permissions permanently - they can enable in settings later');
-                } else if (setupStatus.result === 'device_not_supported') {
-                    console.log('💡 Device does not support push notifications');
-                } else {
-                    console.log('💡 Notification setup can be retried later');
-                }
-            }
-        } catch (error) {
-            console.error('❌ Error initializing notifications after login:', error);
-        }
-    };
 
     useEffect(() => {
         // Just check if we should show loading, don't navigate
@@ -243,6 +205,15 @@ export default function LoginScreen() {
                     console.log('✅ These should be DIFFERENT values!');
                 }
 
+                // ✅ PRODUCTION FIX: Store JWT token from password API response
+                if (res.token) {
+                    console.log('🔐 Storing JWT token from password API');
+                    await AsyncStorage.setItem('auth_token', res.token);
+                    console.log('✅ JWT token stored successfully');
+                } else {
+                    console.warn('⚠️ No JWT token received from password API');
+                }
+
                 // ✅ Clear any existing data before storing new data
                 console.log('🧹 Clearing existing data before login...');
                 await AsyncStorage.clear();
@@ -258,6 +229,25 @@ export default function LoginScreen() {
                 // Also store userType separately for reference
                 await AsyncStorage.setItem('userType', userType);
                 
+                // Re-store the JWT token after clearing (important!)
+                if (res.token) {
+                    console.log('🔐 Re-storing JWT token after clear...');
+                    await AsyncStorage.setItem('auth_token', res.token);
+                    console.log('✅ JWT token re-stored successfully');
+                    
+                    // DEBUG: Verify token was actually stored
+                    const verifyToken = await AsyncStorage.getItem('auth_token');
+                    if (verifyToken) {
+                        console.log('✅ VERIFIED: JWT token is in storage');
+                        console.log('📊 Token length:', verifyToken.length);
+                        console.log('📊 Token preview:', verifyToken.substring(0, 50) + '...');
+                    } else {
+                        console.error('❌ CRITICAL: JWT token NOT found after storage!');
+                    }
+                } else {
+                    console.error('❌ CRITICAL: No JWT token to re-store!');
+                }
+                
                 console.log('✅ Fresh login data stored successfully');
 
                 toast.success('Password set successfully');
@@ -268,10 +258,7 @@ export default function LoginScreen() {
                 // Trigger auth context to update
                 await checkAuthStatus();
 
-                // Initialize notifications after successful login
-                setTimeout(() => {
-                    initializeNotificationsAfterLogin();
-                }, 1000); // Small delay to let the UI settle
+                // Notifications will be initialized automatically by AuthContext
 
                 // Let the AuthContext and _layout handle navigation automatically
                 // Don't manually navigate - the layout will detect auth change and redirect
@@ -305,8 +292,25 @@ export default function LoginScreen() {
         try {
             const result = await login(email, password);
             console.log('Login result:', result);
+            console.log('🔍 DETAILED LOGIN RESULT:');
+            console.log('  - Success:', result.success);
+            console.log('  - Token exists:', !!result.token);
+            console.log('  - Token type:', typeof result.token);
+            console.log('  - Token length:', result.token ? result.token.length : 0);
+            console.log('  - Token preview:', result.token ? result.token.substring(0, 50) + '...' : 'NO TOKEN');
+            console.log('  - User exists:', !!result.user);
 
             if (result.success) {
+                // ✅ PRODUCTION FIX: Store JWT token from login API response
+                if (result.token) {
+                    console.log('🔐 Storing JWT token from login API');
+                    await AsyncStorage.setItem('auth_token', result.token);
+                    console.log('✅ JWT token stored successfully');
+                } else {
+                    console.warn('⚠️ No JWT token received from login API');
+                    console.warn('🔍 Full result object:', JSON.stringify(result, null, 2));
+                }
+
                 const user = await getUser(email, userType);
                 console.log('User data retrieved:', user);
 
@@ -348,6 +352,25 @@ export default function LoginScreen() {
                 // Also store userType separately for reference
                 await AsyncStorage.setItem('userType', userType);
                 
+                // Re-store the JWT token after clearing (important!)
+                if (result.token) {
+                    console.log('🔐 Re-storing JWT token after clear...');
+                    await AsyncStorage.setItem('auth_token', result.token);
+                    console.log('✅ JWT token re-stored successfully');
+                    
+                    // DEBUG: Verify token was actually stored
+                    const verifyToken = await AsyncStorage.getItem('auth_token');
+                    if (verifyToken) {
+                        console.log('✅ VERIFIED: JWT token is in storage');
+                        console.log('📊 Token length:', verifyToken.length);
+                        console.log('📊 Token preview:', verifyToken.substring(0, 50) + '...');
+                    } else {
+                        console.error('❌ CRITICAL: JWT token NOT found after storage!');
+                    }
+                } else {
+                    console.error('❌ CRITICAL: No JWT token to re-store!');
+                }
+                
                 console.log('✅ Fresh login data stored successfully');
 
                 toast.success("User logged in successfully");
@@ -358,10 +381,7 @@ export default function LoginScreen() {
                 // Trigger auth context to update
                 await checkAuthStatus();
 
-                // Initialize notifications after successful login
-                setTimeout(() => {
-                    initializeNotificationsAfterLogin();
-                }, 1000); // Small delay to let the UI settle
+                // Notifications will be initialized automatically by AuthContext
 
                 // Let the AuthContext and _layout handle navigation automatically
                 // Don't manually navigate - the layout will detect auth change and redirect

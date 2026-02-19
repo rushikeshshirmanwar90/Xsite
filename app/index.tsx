@@ -5,10 +5,27 @@ import { ActivityIndicator, View, Text } from 'react-native';
 import StaffNoClientScreen from '@/components/staff/StaffNoClientScreen';
 
 export default function Index() {
-  const { isAuthenticated, isLoading, user } = useAuth();
   const [isReady, setIsReady] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  // Safely get auth context with error handling
+  let authContext;
+  try {
+    authContext = useAuth();
+  } catch (error) {
+    console.error('❌ Error accessing auth context in index:', error);
+    setAuthError('Authentication context not available');
+  }
+
+  const { isAuthenticated, isLoading, user } = authContext || {
+    isAuthenticated: false,
+    isLoading: true,
+    user: null
+  };
 
   useEffect(() => {
+    if (authError) return;
+
     console.log('📍 Index page - Auth state:', { 
       isAuthenticated, 
       isLoading, 
@@ -30,7 +47,21 @@ export default function Index() {
     } else {
       setIsReady(false);
     }
-  }, [isAuthenticated, isLoading, user]);
+  }, [isAuthenticated, isLoading, user, authError]);
+
+  // Show error if auth context is not available
+  if (authError) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+        <Text style={{ color: '#EF4444', fontSize: 16, textAlign: 'center', paddingHorizontal: 20 }}>
+          {authError}
+        </Text>
+        <Text style={{ color: '#6B7280', fontSize: 14, textAlign: 'center', paddingHorizontal: 20, marginTop: 8 }}>
+          Please restart the app
+        </Text>
+      </View>
+    );
+  }
 
   // Show loading spinner while checking auth or waiting for data
   if (isLoading || !isReady) {

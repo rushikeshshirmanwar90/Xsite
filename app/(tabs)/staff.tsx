@@ -9,6 +9,7 @@ import ManualStaffAssignModal from '@/components/staff/ManualStaffAssignModal';
 import { getClientId } from '@/functions/clientId';
 import { addStaff } from '@/functions/staff';
 import { isAdmin, useUser } from '@/hooks/useUser';
+import { useSimpleNotifications } from '@/hooks/useSimpleNotifications';
 import { domain } from '@/lib/domain';
 import { Staff } from '@/types/staff';
 import { notificationService } from '@/services/notificationService';
@@ -62,6 +63,9 @@ const StaffManagement: React.FC = () => {
     // Get user role for access control
     const { user } = useUser();
     const userIsAdmin = isAdmin(user);
+    
+    // Initialize notification hook at component level
+    const { sendProjectNotification } = useSimpleNotifications();
     
     // Router for navigation
     const router = useRouter();
@@ -337,7 +341,7 @@ const StaffManagement: React.FC = () => {
             console.log('🚀 Starting staff addition process...');
             console.log('📋 Staff payload:', JSON.stringify(payload, null, 2));
             
-            const res = await addStaff(payload);
+            const res = await addStaff(payload, sendProjectNotification);
             console.log('📥 addStaff function result:', res);
 
             if (res) {

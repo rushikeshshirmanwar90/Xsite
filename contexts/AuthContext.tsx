@@ -3,7 +3,6 @@ import React, { createContext, ReactNode, useContext, useEffect, useState } from
 import { AppState, AppStateStatus } from 'react-native';
 import axios from 'axios';
 import { domain } from '@/lib/domain';
-import PushTokenService from '@/services/pushTokenService';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -38,7 +37,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Initialize push token service when user is authenticated
   const initializePushTokens = async (userData: any) => {
     try {
-      console.log('🔔 Initializing push tokens for authenticated user...');
+      console.log('🔔 Initializing simple push tokens for authenticated user...');
       console.log('👤 User data for push tokens:', {
         id: userData._id,
         email: userData.email,
@@ -47,24 +46,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         clientsCount: userData.clients?.length || 0
       });
       
-      const pushTokenService = PushTokenService.getInstance();
+      // ✅ FIX: Use SimpleNotificationService consistently
+      const { default: SimpleNotificationService } = await import('@/services/SimpleNotificationService');
+      const simpleNotificationService = SimpleNotificationService.getInstance();
       
-      // Initialize with user-friendly permission dialog
-      const success = await pushTokenService.initialize(true);
+      // Initialize with simple service
+      const initialized = await simpleNotificationService.initialize();
       
-      if (success) {
-        console.log('✅ Push tokens initialized successfully');
+      if (initialized) {
+        // Register token with user data
+        const registered = await simpleNotificationService.registerToken(userData);
         
-        // Get the current token for verification
-        const currentToken = pushTokenService.getCurrentToken();
-        if (currentToken) {
-          console.log('🎫 Current push token:', currentToken.substring(0, 30) + '...');
+        if (registered) {
+          console.log('✅ Simple push tokens initialized successfully');
+        } else {
+          console.log('⚠️ Push token registration failed - user may not receive notifications');
         }
       } else {
-        console.log('⚠️ Push token initialization failed - user may not receive notifications');
+        console.log('⚠️ Simple push token initialization failed - user may not receive notifications');
       }
     } catch (error) {
-      console.error('❌ Error initializing push tokens:', error);
+      console.error('❌ Error initializing simple push tokens:', error);
     }
   };
 
@@ -260,24 +262,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // PRODUCTION FIX: Clear notification data first
       try {
         console.log('🔔 Clearing notification data...');
-        const NotificationManager = (await import('@/services/notificationManager')).default;
-        const notificationManager = NotificationManager.getInstance();
-        await notificationManager.cleanup();
-        await notificationManager.clearAllNotificationData();
-        console.log('✅ Notification data cleared successfully');
+        const { default: SimpleNotificationService } = await import('@/services/SimpleNotificationService');
+        const simpleNotificationService = SimpleNotificationService.getInstance();
+        
+        // Clear any stored notification data
+        await AsyncStorage.removeItem('pushTokenRegistered');
+        await AsyncStorage.removeItem('registeredClientId');
+        
+        console.log('✅ Simple notification data cleared successfully');
       } catch (notificationError) {
-        console.error('⚠️ Error clearing notification data:', notificationError);
+        console.error('⚠️ Error clearing simple notification data:', notificationError);
         // Continue with logout even if notification cleanup fails
       }
       
       // Unregister push tokens before clearing storage
       try {
-        console.log('🔔 Unregistering push tokens...');
-        const pushTokenService = PushTokenService.getInstance();
-        await pushTokenService.unregisterPushToken();
-        console.log('✅ Push tokens unregistered successfully');
+        console.log('🔔 Clearing notification tokens...');
+        // Clear notification-related storage items
+        await AsyncStorage.removeItem('pushTokenRegistered');
+        await AsyncStorage.removeItem('registeredClientId');
+        await AsyncStorage.removeItem('pushToken');
+        console.log('✅ Notification tokens cleared successfully');
       } catch (tokenError) {
-        console.error('⚠️ Error unregistering push tokens:', tokenError);
+        console.error('⚠️ Error clearing notification tokens:', tokenError);
         // Continue with logout even if token cleanup fails
       }
       
@@ -376,7 +383,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('📦 Fresh data response status:', response.status);
 
       if (response.status === 200) {
-        const freshUserData = response.data.data;
+        const responseData = response.data as any;
+        const freshUserData = responseData?.data;
         console.log('✅ Fresh user data received:', {
           _id: freshUserData?._id,
           email: freshUserData?.email,

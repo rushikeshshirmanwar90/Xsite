@@ -1,6 +1,7 @@
 import AddProjectModal from '@/components/AddProjectModel';
 import { getClientId } from '@/functions/clientId';
 import { isAdmin, useUser } from '@/hooks/useUser';
+import { useSimpleNotifications } from '@/hooks/useSimpleNotifications';
 import { domain } from '@/lib/domain';
 import { Project as BaseProject, ProjectSection } from '@/types/project';
 import { StaffMembers } from '@/types/staff';
@@ -34,6 +35,9 @@ const ProjectScreen: React.FC = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
     const router = useRouter();
+    
+    // Notification service
+    const { sendProjectNotification } = useSimpleNotifications();
     
     // Loading animations for project operations
     const projectLoadingAnimation = useRef(new Animated.Value(0)).current;
@@ -473,6 +477,31 @@ const ProjectScreen: React.FC = () => {
                     }
                 }
 
+                // 🔔 Send project creation notification
+                try {
+                    console.log('🔔 Sending project creation notification...');
+                    const notificationSent = await sendProjectNotification({
+                        projectId: projectId,
+                        activityType: 'project_created',
+                        staffName: userInfo?.fullName || 'Admin',
+                        projectName: projectName,
+                        details: `Created new project "${projectName}"${newProject.budget ? ` with budget ₹${Number(newProject.budget).toLocaleString('en-IN')}` : ''}`,
+                        category: 'project',
+                        message: newProject.description || undefined,
+                    });
+
+                    console.log('🔔 Project creation notification result:', notificationSent);
+                    
+                    if (notificationSent) {
+                        console.log('✅ Project creation notification sent successfully');
+                    } else {
+                        console.log('⚠️ Project creation notification failed');
+                    }
+                } catch (notificationError: any) {
+                    console.error('❌ Error sending project creation notification:', notificationError);
+                    // Don't fail the whole operation if notification fails
+                }
+
                 // Now update UI after all operations are complete
                 console.log('🔄 Refreshing projects list...');
                 await fetchProjectsData(false);
@@ -798,6 +827,52 @@ const ProjectScreen: React.FC = () => {
                     }
                 }
 
+                // 🔔 Send project update notification
+                try {
+                    console.log('🔔 Sending project update notification...');
+                    
+                    // Create a summary of changes for the notification
+                    let changesSummary = '';
+                    if (changedData.length > 0) {
+                        const changeDescriptions = changedData.map(change => {
+                            switch (change.field) {
+                                case 'name':
+                                    return `Name: "${change.oldValue}" → "${change.newValue}"`;
+                                case 'budget':
+                                    return `Budget: ₹${Number(change.oldValue).toLocaleString('en-IN')} → ₹${Number(change.newValue).toLocaleString('en-IN')}`;
+                                case 'address':
+                                    return 'Address updated';
+                                case 'description':
+                                    return 'Description updated';
+                                default:
+                                    return `${change.field} changed`;
+                            }
+                        });
+                        changesSummary = changeDescriptions.join(', ');
+                    }
+
+                    const notificationSent = await sendProjectNotification({
+                        projectId: editingProject._id,
+                        activityType: 'project_updated',
+                        staffName: userInfo?.fullName || 'Admin',
+                        projectName: editProjectName.trim(),
+                        details: `Updated project "${editProjectName.trim()}"${changesSummary ? `: ${changesSummary}` : ''}`,
+                        category: 'project',
+                        message: changedData.length > 0 ? `${changedData.length} field${changedData.length > 1 ? 's' : ''} updated` : undefined,
+                    });
+
+                    console.log('🔔 Project update notification result:', notificationSent);
+                    
+                    if (notificationSent) {
+                        console.log('✅ Project update notification sent successfully');
+                    } else {
+                        console.log('⚠️ Project update notification failed');
+                    }
+                } catch (notificationError: any) {
+                    console.error('❌ Error sending project update notification:', notificationError);
+                    // Don't fail the whole operation if notification fails
+                }
+
                 Alert.alert('Success', 'Project updated successfully');
                 setShowEditModal(false);
                 await fetchProjectsData(false); // Refresh the list
@@ -849,6 +924,46 @@ const ProjectScreen: React.FC = () => {
             console.log('✅ Project deleted:', response.data);
 
             if (response.status === 200) {
+                // 🔔 Send project deletion notification
+                try {
+                    console.log('🔔 Sending project deletion notification...');
+                    
+                    // Get user data for notification
+                    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+                    const userString = await AsyncStorage.getItem('user');
+                    let userInfo = null;
+                    
+                    if (userString) {
+                        const userData = JSON.parse(userString);
+                        userInfo = {
+                            userId: userData._id || userData.id || userData.clientId || 'unknown',
+                            fullName: `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || userData.name || userData.username || 'Unknown User',
+                            email: userData.email || undefined,
+                        };
+                    }
+
+                    const notificationSent = await sendProjectNotification({
+                        projectId: project._id,
+                        activityType: 'project_deleted',
+                        staffName: userInfo?.fullName || 'Admin',
+                        projectName: project.name,
+                        details: `Deleted project "${project.name}"`,
+                        category: 'project',
+                        message: 'Project and all associated data have been permanently removed',
+                    });
+
+                    console.log('🔔 Project deletion notification result:', notificationSent);
+                    
+                    if (notificationSent) {
+                        console.log('✅ Project deletion notification sent successfully');
+                    } else {
+                        console.log('⚠️ Project deletion notification failed');
+                    }
+                } catch (notificationError: any) {
+                    console.error('❌ Error sending project deletion notification:', notificationError);
+                    // Don't fail the whole operation if notification fails
+                }
+
                 Alert.alert('Success', 'Project deleted successfully');
                 await fetchProjectsData(false); // Refresh the list
             } else {

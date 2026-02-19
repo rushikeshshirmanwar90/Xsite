@@ -16,9 +16,14 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
+import { useSimpleNotifications } from '@/hooks/useSimpleNotifications';
+import { useAuth } from '@/contexts/AuthContext';
 
 const LaborPage = () => {
     const params = useLocalSearchParams();
+    const { user } = useAuth();
+    const { sendProjectNotification } = useSimpleNotifications();
+    
     const projectId = params.projectId as string;
     const projectName = params.projectName as string;
     const sectionId = params.sectionId as string;
@@ -379,6 +384,42 @@ const LaborPage = () => {
                 stopLoadingAnimation();
                 toast.dismiss(); // Dismiss loading toast
                 toast.success(`✅ Successfully added ${laborEntries.length} labor ${laborEntries.length === 1 ? 'entry' : 'entries'}`);
+                
+                // 🔔 NEW: Send simple notification for labor addition
+                try {
+                    console.log('\n🔔 Sending simple notification for labor addition...');
+                    
+                    const staffName = user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Staff Member';
+                    const laborCount = laborEntries.length;
+                    const totalValue = laborEntries.reduce((sum, entry) => sum + (entry.count * entry.perLaborCost), 0);
+                    
+                    // Create a clean, professional notification message
+                    const notificationDetails = `Added ${laborCount} labor ${laborCount === 1 ? 'entry' : 'entries'} worth ₹${totalValue.toLocaleString()}`;
+                    
+                    console.log('📋 Labor notification details:');
+                    console.log('   - Staff Name:', staffName);
+                    console.log('   - Project ID:', projectId);
+                    console.log('   - Project Name:', projectName);
+                    console.log('   - Details:', notificationDetails);
+                    
+                    const notificationSent = await sendProjectNotification({
+                        projectId: projectId,
+                        activityType: 'labor_added',
+                        staffName: staffName,
+                        projectName: projectName,
+                        details: notificationDetails,
+                        recipientType: 'admins',
+                    });
+                    
+                    if (notificationSent) {
+                        console.log('✅ Labor notification sent successfully');
+                    } else {
+                        console.warn('⚠️ Labor notification failed to send');
+                    }
+                } catch (notificationError) {
+                    console.error('❌ Labor notification error:', notificationError);
+                    // Don't fail the whole operation if notification fails
+                }
             } else {
                 throw new Error(result.message || 'Failed to add labor entries');
             }

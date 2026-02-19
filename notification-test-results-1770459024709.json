@@ -1,0 +1,257 @@
+{
+  "summary": {
+    "passed": 13,
+    "failed": 9,
+    "warnings": 2,
+    "total": 24,
+    "successRate": "54.2",
+    "duration": "8.57"
+  },
+  "tests": [
+    {
+      "name": "Configuration Check",
+      "passed": null,
+      "message": "Missing environment variables: API_BASE_URL",
+      "details": {
+        "missing": [
+          "API_BASE_URL"
+        ],
+        "note": "Using default values"
+      },
+      "timestamp": "2026-02-07T10:10:16.140Z"
+    },
+    {
+      "name": "API Connectivity",
+      "passed": true,
+      "message": "API server is reachable",
+      "details": {
+        "status": 200,
+        "url": "https://real-estate-optimize-apis.vercel.app"
+      },
+      "timestamp": "2026-02-07T10:10:16.525Z"
+    },
+    {
+      "name": "No Auth Token Rejection",
+      "passed": false,
+      "message": "API should reject requests without auth token",
+      "details": {
+        "status": 200,
+        "expected": 401
+      },
+      "timestamp": "2026-02-07T10:10:16.876Z"
+    },
+    {
+      "name": "Invalid Auth Token Rejection",
+      "passed": false,
+      "message": "API should reject invalid auth tokens",
+      "details": {
+        "status": 200,
+        "expected": "401 or 403"
+      },
+      "timestamp": "2026-02-07T10:10:17.163Z"
+    },
+    {
+      "name": "Valid Auth Token Acceptance",
+      "passed": true,
+      "message": "API accepts valid auth tokens",
+      "details": {
+        "status": 200,
+        "message": "Push token updated successfully"
+      },
+      "timestamp": "2026-02-07T10:10:17.437Z"
+    },
+    {
+      "name": "Invalid User ID Format",
+      "passed": false,
+      "message": "Invalid input not properly rejected",
+      "details": {
+        "status": 200,
+        "expected": 400
+      },
+      "timestamp": "2026-02-07T10:10:17.720Z"
+    },
+    {
+      "name": "Invalid Token Format",
+      "passed": false,
+      "message": "Invalid input not properly rejected",
+      "details": {
+        "status": 200,
+        "expected": 400
+      },
+      "timestamp": "2026-02-07T10:10:18.008Z"
+    },
+    {
+      "name": "Invalid Platform",
+      "passed": true,
+      "message": "Invalid input correctly rejected",
+      "details": {
+        "status": 400,
+        "expected": 400
+      },
+      "timestamp": "2026-02-07T10:10:18.273Z"
+    },
+    {
+      "name": "XSS in User ID",
+      "passed": false,
+      "message": "Invalid input not properly rejected",
+      "details": {
+        "status": 200,
+        "expected": 400
+      },
+      "timestamp": "2026-02-07T10:10:18.548Z"
+    },
+    {
+      "name": "SQL Injection Attempt",
+      "passed": false,
+      "message": "Invalid input not properly rejected",
+      "details": {
+        "status": 200,
+        "expected": 400
+      },
+      "timestamp": "2026-02-07T10:10:18.826Z"
+    },
+    {
+      "name": "Rate Limiting",
+      "passed": null,
+      "message": "Rate limit not triggered (may not be implemented)",
+      "details": {
+        "requestCount": 15,
+        "rateLimitHit": false
+      },
+      "timestamp": "2026-02-07T10:10:24.615Z"
+    },
+    {
+      "name": "HTTPS Usage",
+      "passed": true,
+      "message": "API correctly uses HTTPS",
+      "details": {
+        "url": "https://real-estate-optimize-apis.vercel.app"
+      },
+      "timestamp": "2026-02-07T10:10:24.616Z"
+    },
+    {
+      "name": "HTTP to HTTPS Redirect",
+      "passed": true,
+      "message": "HTTP properly redirects to HTTPS",
+      "details": {
+        "status": 308,
+        "location": "https://real-estate-optimize-apis.vercel.app/"
+      },
+      "timestamp": "2026-02-07T10:10:24.700Z"
+    },
+    {
+      "name": "Token Encryption/Decryption",
+      "passed": true,
+      "message": "Token encryption working correctly",
+      "details": {
+        "originalLength": 35,
+        "encryptedLength": 96,
+        "matches": true
+      },
+      "timestamp": "2026-02-07T10:10:24.702Z"
+    },
+    {
+      "name": "Token Obfuscation",
+      "passed": true,
+      "message": "Token properly obfuscated when encrypted",
+      "details": {
+        "obfuscated": true
+      },
+      "timestamp": "2026-02-07T10:10:24.702Z"
+    },
+    {
+      "name": "Input Validation",
+      "passed": true,
+      "message": "All malicious inputs correctly identified",
+      "details": {
+        "tested": 5,
+        "blocked": 5
+      },
+      "timestamp": "2026-02-07T10:10:24.702Z"
+    },
+    {
+      "name": "Secure Service Implementation",
+      "passed": true,
+      "message": "SecureNotificationService file exists",
+      "details": {
+        "path": "C:\\app\\Xsite\\services\\secureNotificationService.ts"
+      },
+      "timestamp": "2026-02-07T10:10:24.703Z"
+    },
+    {
+      "name": "Security Feature: Token Encryption",
+      "passed": true,
+      "message": "Token Encryption implementation found",
+      "details": {
+        "implemented": true
+      },
+      "timestamp": "2026-02-07T10:10:24.703Z"
+    },
+    {
+      "name": "Security Feature: Input Validation",
+      "passed": true,
+      "message": "Input Validation implementation found",
+      "details": {
+        "implemented": true
+      },
+      "timestamp": "2026-02-07T10:10:24.703Z"
+    },
+    {
+      "name": "Security Feature: URL Validation",
+      "passed": true,
+      "message": "URL Validation implementation found",
+      "details": {
+        "implemented": true
+      },
+      "timestamp": "2026-02-07T10:10:24.704Z"
+    },
+    {
+      "name": "Security Feature: Content Sanitization",
+      "passed": true,
+      "message": "Content Sanitization implementation found",
+      "details": {
+        "implemented": true
+      },
+      "timestamp": "2026-02-07T10:10:24.704Z"
+    },
+    {
+      "name": "Secure Logging: services/pushTokenService.ts",
+      "passed": false,
+      "message": "Insecure token logging found",
+      "details": {
+        "file": "services/pushTokenService.ts",
+        "hasInsecureLogging": true
+      },
+      "timestamp": "2026-02-07T10:10:24.704Z"
+    },
+    {
+      "name": "Secure Logging: services/notificationManager.ts",
+      "passed": false,
+      "message": "Insecure token logging found",
+      "details": {
+        "file": "services/notificationManager.ts",
+        "hasInsecureLogging": true
+      },
+      "timestamp": "2026-02-07T10:10:24.705Z"
+    },
+    {
+      "name": "Secure Logging: contexts/AuthContext.tsx",
+      "passed": false,
+      "message": "Insecure token logging found",
+      "details": {
+        "file": "contexts/AuthContext.tsx",
+        "hasInsecureLogging": true
+      },
+      "timestamp": "2026-02-07T10:10:24.706Z"
+    }
+  ],
+  "config": {
+    "apiBaseUrl": "https://real-estate-optimize-apis.vercel.app",
+    "testUserId": "676b0b4b4c8c5b4d8e9f1234",
+    "authToken": "test-jwt-token",
+    "encryptionKey": "test-encryption-key-12345",
+    "timeout": 10000,
+    "retries": 3
+  },
+  "timestamp": "2026-02-07T10:10:24.709Z"
+}

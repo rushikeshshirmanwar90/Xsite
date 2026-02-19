@@ -2,6 +2,8 @@ import { Ionicons } from "@expo/vector-icons"
 import { Alert, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native"
 import { ScrollView } from "react-native-gesture-handler"
 import React from "react"
+import { useSimpleNotifications } from '@/hooks/useSimpleNotifications'
+import { useAuth } from '@/contexts/AuthContext'
 
 // Define the section type interface
 interface SectionType {
@@ -15,13 +17,18 @@ interface AddSectionModalProps {
   onClose: () => void;
   onAddSection: (type: string, title: string, totalHouses?: number) => Promise<void>;
   projectId: string;
+  projectName?: string; // Add project name for notifications
 }
 
-const AddSectionModal = ({ visible, onClose, onAddSection, projectId }: AddSectionModalProps) => {
+const AddSectionModal = ({ visible, onClose, onAddSection, projectId, projectName }: AddSectionModalProps) => {
     // State for section type selection
     const [selectedType, setSelectedType] = React.useState<string | null>(null);
     const [sectionTitle, setSectionTitle] = React.useState('');
     const [totalHouses, setTotalHouses] = React.useState('');
+
+    // Notification service
+    const { sendProjectNotification } = useSimpleNotifications();
+    const { user } = useAuth();
 
     // Section types
     const sectionTypes: SectionType[] = [
@@ -48,6 +55,33 @@ const AddSectionModal = ({ visible, onClose, onAddSection, projectId }: AddSecti
                 sectionTitle.trim(), 
                 selectedType === 'rowhouse' ? parseInt(totalHouses.trim()) : undefined
             );
+            
+            // 🔔 Send section creation notification
+            try {
+                console.log('🔔 Sending section creation notification...');
+                
+                const notificationSent = await sendProjectNotification({
+                    projectId: projectId,
+                    activityType: 'section_created',
+                    staffName: user?.firstName || user?.name || 'User',
+                    projectName: projectName || 'Project',
+                    sectionName: sectionTitle.trim(),
+                    details: `Created ${selectedType} section "${sectionTitle.trim()}"${selectedType === 'rowhouse' ? ` with ${totalHouses} houses` : ''}`,
+                    category: 'section',
+                    message: `Section type: ${selectedType}`,
+                });
+
+                console.log('🔔 Section creation notification result:', notificationSent);
+                
+                if (notificationSent) {
+                    console.log('✅ Section creation notification sent successfully');
+                } else {
+                    console.log('⚠️ Section creation notification failed');
+                }
+            } catch (notificationError: any) {
+                console.error('❌ Error sending section creation notification:', notificationError);
+                // Don't fail the whole operation if notification fails
+            }
             
             // Reset form
             resetForm();

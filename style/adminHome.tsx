@@ -991,4 +991,57 @@ export const styles = StyleSheet.create({
         textAlign: 'center',
         lineHeight: 16,
     },
+
+    // Quick Actions Bar Styles
+    quickActionsBar: {
+        flexDirection: 'row',
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        backgroundColor: '#FFFFFF',
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+        gap: 12,
+    },
+    quickActionButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        gap: 8,
+    },
+    quickActionText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#475569',
+    },
+
+    // Notification Status Bar Styles
+    notificationStatusBar: {
+        paddingHorizontal: 20,
+        paddingVertical: 8,
+        backgroundColor: '#F0FDF4',
+        borderBottomWidth: 1,
+        borderBottomColor: '#DCFCE7',
+    },
+    notificationStatusIndicator: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    notificationStatusDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#10B981',
+    },
+    notificationStatusText: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: '#059669',
+    },
 })

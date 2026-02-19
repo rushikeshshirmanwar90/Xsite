@@ -1,0 +1,115 @@
+{
+  "summary": {
+    "passed": 6,
+    "failed": 4,
+    "warnings": 0,
+    "total": 10,
+    "successRate": "60.0",
+    "duration": "0.01"
+  },
+  "tests": [
+    {
+      "name": "Token Encryption Test",
+      "passed": false,
+      "message": "Encryption test failed",
+      "details": {
+        "error": "crypto.createCipher is not a function"
+      },
+      "timestamp": "2026-02-07T10:03:35.894Z"
+    },
+    {
+      "name": "Input Validation",
+      "passed": true,
+      "message": "All malicious inputs correctly identified",
+      "details": {
+        "tested": 5,
+        "blocked": 5
+      },
+      "timestamp": "2026-02-07T10:03:35.894Z"
+    },
+    {
+      "name": "Secure Service Implementation",
+      "passed": true,
+      "message": "SecureNotificationService file exists",
+      "details": {
+        "path": "C:\\app\\Xsite\\services\\secureNotificationService.ts"
+      },
+      "timestamp": "2026-02-07T10:03:35.895Z"
+    },
+    {
+      "name": "Security Feature: Token Encryption",
+      "passed": true,
+      "message": "Token Encryption implementation found",
+      "details": {
+        "implemented": true
+      },
+      "timestamp": "2026-02-07T10:03:35.896Z"
+    },
+    {
+      "name": "Security Feature: Input Validation",
+      "passed": true,
+      "message": "Input Validation implementation found",
+      "details": {
+        "implemented": true
+      },
+      "timestamp": "2026-02-07T10:03:35.896Z"
+    },
+    {
+      "name": "Security Feature: URL Validation",
+      "passed": true,
+      "message": "URL Validation implementation found",
+      "details": {
+        "implemented": true
+      },
+      "timestamp": "2026-02-07T10:03:35.897Z"
+    },
+    {
+      "name": "Security Feature: Content Sanitization",
+      "passed": true,
+      "message": "Content Sanitization implementation found",
+      "details": {
+        "implemented": true
+      },
+      "timestamp": "2026-02-07T10:03:35.897Z"
+    },
+    {
+      "name": "Secure Logging: services/pushTokenService.ts",
+      "passed": false,
+      "message": "Insecure token logging found",
+      "details": {
+        "file": "services/pushTokenService.ts",
+        "hasInsecureLogging": true
+      },
+      "timestamp": "2026-02-07T10:03:35.898Z"
+    },
+    {
+      "name": "Secure Logging: services/notificationManager.ts",
+      "passed": false,
+      "message": "Insecure token logging found",
+      "details": {
+        "file": "services/notificationManager.ts",
+        "hasInsecureLogging": true
+      },
+      "timestamp": "2026-02-07T10:03:35.901Z"
+    },
+    {
+      "name": "Secure Logging: contexts/AuthContext.tsx",
+      "passed": false,
+      "message": "Insecure token logging found",
+      "details": {
+        "file": "contexts/AuthContext.tsx",
+        "hasInsecureLogging": true
+      },
+      "timestamp": "2026-02-07T10:03:35.902Z"
+    }
+  ],
+  "config": {
+    "apiBaseUrl": "https://real-estate-optimize-apis.vercel.app",
+    "testUserId": "676b0b4b4c8c5b4d8e9f1234",
+    "authToken": "test-jwt-token",
+    "encryptionKey": "test-encryption-key-12345",
+    "timeout": 10000,
+    "retries": 3
+  },
+  "timestamp": "2026-02-07T10:03:35.904Z"
+}

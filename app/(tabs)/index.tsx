@@ -55,9 +55,6 @@ const Index: React.FC = () => {
     const { user, refreshUser } = useUser();
     const userIsAdmin = isAdmin(user);
     
-    // Check if user is a client (has clientId but is not staff)
-    const isClient = user && 'clientId' in user && !('role' in user);
-    
     // Check if user is staff (has role field)
     const isStaff = user && 'role' in user;
     
@@ -547,10 +544,9 @@ const Index: React.FC = () => {
                         </View>
                     </View>
                     <TouchableOpacity style={styles.notificationButton}
-                        onPress={() => router.push('/notification')}
+                        onPress={() => router.push('/notification' as any)}
                     >
                         <Ionicons name="notifications" size={22} color="#1F2937" />
-                        {/* {projectStats.overdueProjects > 0 && <View style={styles.notificationDot} />} */}
                     </TouchableOpacity>
                     
                     {/* Push Token Status Indicator */}

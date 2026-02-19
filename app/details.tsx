@@ -21,10 +21,15 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
+import { useSimpleNotifications } from '@/hooks/useSimpleNotifications';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Details = () => {
     const params = useLocalSearchParams();
     const router = useRouter();
+    const { user } = useAuth();
+    const { sendProjectNotification } = useSimpleNotifications();
+    
     const projectId = params.projectId as string;
     const projectName = params.projectName as string;
     const sectionId = params.sectionId as string;
@@ -2238,6 +2243,42 @@ const Details = () => {
 
                     // Show success message with material count
                     toast.success(`✅ ${materialUsages.length} material usages recorded! Check the "Used Materials" tab.`);
+                    
+                    // 🔔 NEW: Send simple notification for material usage
+                    try {
+                        console.log('\n🔔 Sending simple notification for material usage...');
+                        
+                        const staffName = user?.fullName || 'Staff Member';
+                        const usageCount = materialUsages.length;
+                        const totalValue = responseData.data?.totalCostOfUsedMaterials || 0;
+                        
+                        // Create a clean, professional notification message
+                        const notificationDetails = `Used ${usageCount} material${usageCount > 1 ? 's' : ''} worth ₹${totalValue.toLocaleString()}`;
+                        
+                        console.log('📋 Usage notification details:');
+                        console.log('   - Staff Name:', staffName);
+                        console.log('   - Project ID:', projectId);
+                        console.log('   - Project Name:', projectName);
+                        console.log('   - Details:', notificationDetails);
+                        
+                        const notificationSent = await sendProjectNotification({
+                            projectId: projectId,
+                            activityType: 'usage_added',
+                            staffName: staffName,
+                            projectName: projectName,
+                            details: notificationDetails,
+                            recipientType: 'admins',
+                        });
+                        
+                        if (notificationSent) {
+                            console.log('✅ Usage notification sent successfully');
+                        } else {
+                            console.warn('⚠️ Usage notification failed to send');
+                        }
+                    } catch (notificationError) {
+                        console.error('❌ Usage notification error:', notificationError);
+                        // Don't fail the whole operation if notification fails
+                    }
                 }
             } else {
                 throw new Error(responseData.error || 'Failed to add material usages');
@@ -3035,6 +3076,42 @@ const Details = () => {
                         }
 
                         console.log('🎉 BOTH ACTIVITY TYPES LOGGED - Staff and Admin will see same notifications');
+                        
+                        // 🔔 NEW: Send simple notification for material addition
+                        try {
+                            console.log('\n🔔 STEP 3: Sending simple notification...');
+                            
+                            const staffName = user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Staff Member';
+                            const materialCount = successfulMaterials.length;
+                            const totalValue = successfulMaterials.reduce((sum: number, m: any) => sum + (m.totalCost || 0), 0);
+                            
+                            // Create a clean, professional notification message
+                            const notificationDetails = `Added ${materialCount} material${materialCount > 1 ? 's' : ''} worth ₹${totalValue.toLocaleString()}`;
+                            
+                            console.log('📋 Notification details:');
+                            console.log('   - Staff Name:', staffName);
+                            console.log('   - Project ID:', projectId);
+                            console.log('   - Project Name:', projectName);
+                            console.log('   - Details:', notificationDetails);
+                            
+                            const notificationSent = await sendProjectNotification({
+                                projectId: projectId,
+                                activityType: 'material_added',
+                                staffName: staffName,
+                                projectName: projectName,
+                                details: notificationDetails,
+                                recipientType: 'admins',
+                            });
+                            
+                            if (notificationSent) {
+                                console.log('✅ STEP 3 COMPLETED: Simple notification sent successfully');
+                            } else {
+                                console.warn('⚠️ STEP 3 WARNING: Simple notification failed to send');
+                            }
+                        } catch (notificationError) {
+                            console.error('❌ STEP 3 FAILED: Simple notification error:', notificationError);
+                            // Don't fail the whole operation if notification fails
+                        }
                     }
                 }
 

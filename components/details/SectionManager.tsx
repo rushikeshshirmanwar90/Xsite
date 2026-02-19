@@ -1,4 +1,5 @@
 import { addSection, deleteSection, updateSection } from '@/functions/details';
+import { useSimpleNotifications } from '@/hooks/useSimpleNotifications';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import React, { useEffect, useState } from 'react';
@@ -53,6 +54,9 @@ const SectionManager: React.FC<SectionManagerProps> = ({
   const [newSectionName, setNewSectionName] = useState('');
   const [newSectionDesc, setNewSectionDesc] = useState('');
 
+  // ✅ Add notification hook
+  const { sendProjectNotification } = useSimpleNotifications();
+
   // Use provided sections or add a default section if none exists
   useEffect(() => {
     if (propSections && propSections.length > 0) {
@@ -95,7 +99,8 @@ const SectionManager: React.FC<SectionManagerProps> = ({
     };
 
     console.log('Adding section:', sectionData);
-    const res: any = await addSection(sectionData);
+    // ✅ Pass notification callback to function
+    const res: any = await addSection(sectionData, sendProjectNotification);
     
     console.log('\n========================================');
     console.log('ADD SECTION - API RESPONSE');
@@ -175,7 +180,8 @@ const SectionManager: React.FC<SectionManagerProps> = ({
     const oldDescription = currentSection?.description || '';
 
     console.log('Updating section:', editingSectionId, updateData);
-    const res: any = await updateSection(editingSectionId, updateData);
+    // ✅ Pass notification callback to function
+    const res: any = await updateSection(editingSectionId, updateData, sendProjectNotification);
 
     console.log('\n========================================');
     console.log('UPDATE SECTION - API RESPONSE');
@@ -264,7 +270,16 @@ const SectionManager: React.FC<SectionManagerProps> = ({
           style: 'destructive',
           onPress: async () => {
             console.log('Deleting section:', section.id);
-            const res: any = await deleteSection(section.id);
+            
+            // ✅ Prepare section data for notification
+            const sectionData = {
+              name: section.name,
+              projectId: projectDetails?.projectId,
+              projectName: projectDetails?.projectName,
+            };
+            
+            // ✅ Pass notification callback to function
+            const res: any = await deleteSection(section.id, sectionData, sendProjectNotification);
 
             console.log('\n========================================');
             console.log('DELETE SECTION - API RESPONSE');

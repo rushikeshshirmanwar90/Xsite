@@ -17,7 +17,7 @@
     "android": {
       "package": "com.codewithrushi.xsite",
       "adaptiveIcon": {
-        "backgroundColor": "#fff",
+        "backgroundColor": "#ffffff",
         "foregroundImage": "./assets/images/icon.png",
         "backgroundImage": "./assets/images/images/splash.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -26,9 +26,10 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.SCHEDULE_EXACT_ALARM"
       ],
-      "useNextNotificationsApi": true,
       "googleServicesFile": "./google-services.json"
     },
     "web": {
@@ -42,7 +43,41 @@
         {
           "icon": "./assets/images/icon.png",
           "color": "#3B82F6",
-          "sounds": []
+          "sound": "default",
+          "androidMode": "default",
+          "androidCollapsedTitle": "#{unread_notifications} new notifications from Xsite",
+          "enableBackgroundRemoteNotifications": true,
+          "iosDisplayInForeground": true,
+          "androidNotificationChannels": [
+            {
+              "id": "default",
+              "name": "Default notifications",
+              "importance": 4,
+              "bypassDnd": false,
+              "description": "General app notifications",
+              "enableLights": true,
+              "enableVibration": true,
+              "lightColor": "#3B82F6",
+              "lockscreenVisibility": 1,
+              "showBadge": true,
+              "sound": "default",
+              "vibrationPattern": [0, 250, 250, 250]
+            },
+            {
+              "id": "project-updates",
+              "name": "Project Updates",
+              "importance": 4,
+              "bypassDnd": false,
+              "description": "Material, labor, and project activity notifications",
+              "enableLights": true,
+              "enableVibration": true,
+              "lightColor": "#10B981",
+              "lockscreenVisibility": 1,
+              "showBadge": true,
+              "sound": "default",
+              "vibrationPattern": [0, 250, 250, 250]
+            }
+          ]
         }
       ],
       [

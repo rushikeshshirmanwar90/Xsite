@@ -43,7 +43,8 @@ async function testPushTokenRegistration() {
         
         console.log(`   User ${userId.substring(0, 8)}...: ${userTokenResponse.data.success ? 'HAS TOKEN' : 'NO TOKEN'}`);
         if (userTokenResponse.data.data) {
-          console.log(`     Token: ${userTokenResponse.data.data.token.substring(0, 30)}...`);
+          // SECURITY FIX: Don't log actual token
+          console.log(`     Token length: ${userTokenResponse.data.data.token.length} characters`);
           console.log(`     Platform: ${userTokenResponse.data.data.platform}`);
           console.log(`     Active: ${userTokenResponse.data.data.isActive}`);
         }

@@ -137,8 +137,8 @@ class PushTokenService {
                         Constants.expoConfig?.projectId || 
                         '2fcc4ccc-b8b5-4ff4-ae3c-b195aa9eb32f';
 
-      console.log('📱 Getting Expo push token:', {
-        projectId,
+      console.log('📱 Getting Expo push notification data:', {
+        projectId: projectId.substring(0, 8) + '...',
         executionEnvironment: Constants.executionEnvironment,
         isExpoGo: Constants.executionEnvironment === 'storeClient'
       });
@@ -149,7 +149,10 @@ class PushTokenService {
       });
 
       const token = tokenData.data;
-      console.log('✅ Got Expo push token:', token.substring(0, 50) + '...');
+      // SECURITY FIX: Don't log actual token
+      console.log('✅ Got Expo push token successfully');
+      console.log(`📊 Token length: ${token.length} characters`);
+      console.log(`🔍 Token type: ${tokenData.type}`);
       
       this.currentToken = token;
       return token;
@@ -165,7 +168,9 @@ class PushTokenService {
         console.log('🔄 Trying alternative token generation method...');
         const tokenData = await Notifications.getExpoPushTokenAsync();
         const token = tokenData.data;
-        console.log('✅ Got push token (alternative method):', token.substring(0, 50) + '...');
+        // SECURITY FIX: Don't log actual token
+        console.log('✅ Got push token (alternative method) successfully');
+        console.log(`📊 Token length: ${token.length} characters`);
         this.currentToken = token;
         return token;
       } catch (alternativeError) {
@@ -289,47 +294,32 @@ class PushTokenService {
         appVersion: deviceInfo.appVersion
       };
 
-      console.log('📋 Push token registration payload:', {
+      console.log('📋 Push notification registration payload:', {
         userId: payload.userId,
         userType: payload.userType,
         platform: payload.platform,
         deviceId: payload.deviceId,
         deviceName: payload.deviceName,
         appVersion: payload.appVersion,
-        tokenPreview: token.substring(0, 50) + '...',
-        backendUrl: domain
+        // SECURITY FIX: Don't log actual token
+        tokenLength: token.length,
+        backendUrl: domain.substring(0, 30) + '...'
       });
 
-      // Send to backend with retry logic
-      let response;
-      let attempts = 0;
-      const maxAttempts = 3;
-
-      while (attempts < maxAttempts) {
-        try {
-          response = await axios.post(`${domain}/api/push-token`, payload, {
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            timeout: 15000 // Increased timeout for production
-          });
-          break; // Success, exit retry loop
-        } catch (error: any) {
-          attempts++;
-          console.error(`❌ Push token registration attempt ${attempts} failed:`, error.message);
-          
-          if (attempts < maxAttempts) {
-            console.log(`🔄 Retrying in ${attempts * 2} seconds...`);
-            await new Promise(resolve => setTimeout(resolve, attempts * 2000));
-          } else {
-            throw error; // Final attempt failed
-          }
-        }
-      }
+      // SECURITY FIX: Add authentication headers
+      const response = await axios.post(`${domain}/api/push-token`, payload, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await this.getAuthToken()}`,
+          'X-App-Version': Constants.expoConfig?.version || '1.0.0',
+          'X-Platform': Platform.OS,
+        },
+        timeout: 15000 // Increased timeout for production
+      });
 
       const responseData = response!.data as PushTokenResponse;
       if (responseData.success) {
-        console.log('✅ Push token registered successfully:', responseData.message);
+        console.log('✅ Push notification registered successfully:', responseData.message);
         
         // Store token locally for future reference
         await AsyncStorage.setItem('pushToken', token);
@@ -338,7 +328,7 @@ class PushTokenService {
         
         return true;
       } else {
-        console.log('❌ Push token registration failed:', responseData.message);
+        console.log('❌ Push notification registration failed:', responseData.message);
         return false;
       }
 
@@ -366,7 +356,9 @@ class PushTokenService {
     try {
       // Listen for token updates
       const subscription = Notifications.addPushTokenListener(async (tokenData: any) => {
-        console.log('🔄 Push token updated:', tokenData.data.substring(0, 50) + '...');
+        // SECURITY FIX: Don't log actual token
+        console.log('🔄 Push notification updated successfully');
+        console.log(`📊 New data length: ${tokenData.data.length} characters`);
         
         const userData = await this.getUserData();
         if (userData) {
@@ -378,6 +370,26 @@ class PushTokenService {
       return subscription;
     } catch (error) {
       console.error('❌ Error setting up token refresh listener:', error);
+    }
+  }
+
+  /**
+   * SECURITY FIX: Get authentication token
+   */
+  private async getAuthToken(): Promise<string> {
+    try {
+      const authToken = await AsyncStorage.getItem('auth_token') || 
+                       await AsyncStorage.getItem('userToken') ||
+                       await AsyncStorage.getItem('accessToken');
+      
+      if (!authToken) {
+        throw new Error('No authentication token found');
+      }
+      
+      return authToken;
+    } catch (error) {
+      console.error('❌ Failed to get auth token:', error);
+      throw new Error('Authentication required for push token registration');
     }
   }
 
@@ -396,6 +408,10 @@ class PushTokenService {
 
       // Deactivate token on backend
       const response = await axios.delete(`${domain}/api/push-token?userId=${userData._id}`, {
+        headers: {
+          'Authorization': `Bearer ${await this.getAuthToken()}`,
+          'Content-Type': 'application/json',
+        },
         timeout: 10000
       });
 
@@ -410,7 +426,7 @@ class PushTokenService {
         this.currentToken = null;
         return true;
       } else {
-        console.log('❌ Push token unregistration failed:', responseData.message);
+        console.log('❌ Push notification unregistration failed:', responseData.message);
         return false;
       }
 
@@ -504,10 +520,11 @@ class PushTokenService {
 
     if (hasPermission) {
       const token = await this.getPushToken();
-      console.log('🎫 Token available:', !!token);
+      console.log('🎫 Notification data available:', !!token);
       
       if (token) {
-        console.log('🎫 Token preview:', token.substring(0, 50) + '...');
+        // SECURITY FIX: Don't log actual token
+        console.log('🎫 Data length:', token.length, 'characters');
       }
     }
   }

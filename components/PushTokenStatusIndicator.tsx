@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import PushTokenService from '@/services/pushTokenService';
+import SecureNotificationService from '@/services/secureNotificationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface PushTokenStatusIndicatorProps {

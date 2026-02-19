@@ -19,8 +19,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useNotifications } from '../hooks/useNotifications';
-import NotificationBadge from '../components/NotificationBadge';
 
 interface Activity {
     _id: string;
@@ -38,6 +36,13 @@ interface Activity {
     description: string;
     message?: string;
     createdAt: string;
+    metadata?: {
+        changedData?: Array<{
+            field: string;
+            oldValue: any;
+            newValue: any;
+        }>;
+    };
 }
 
 interface MaterialActivity {
@@ -74,7 +79,6 @@ const NotificationPage: React.FC = () => {
     console.log('🏗️ NotificationPage component rendering/re-rendering');
 
     const router = useRouter();
-    const { unreadCount } = useNotifications(); // Add notification hook
     const [activeTab, setActiveTab] = useState<TabType>('all');
     const [materialSubTab, setMaterialSubTab] = useState<MaterialSubTab>('imported');
     const [activitiesRaw, setActivitiesRaw] = useState<Activity[]>(() => {
@@ -343,17 +347,17 @@ const NotificationPage: React.FC = () => {
             // DEBUG: Log full response structure
             console.log('\n--- FULL API RESPONSE DEBUG ---');
             console.log('Activity Response Structure:');
-            console.log('  - Status:', activityRes.status);
+            console.log('  - Status:', (activityRes as any).status);
             console.log('  - Data keys:', Object.keys(activityRes.data || {}));
             console.log('  - Success field:', activityRes.data.success);
-            console.log('  - Message field:', activityRes.data.message);
+            console.log('  - Message field:', (activityRes.data as any).message);
             console.log('  - Data field keys:', Object.keys(activityRes.data.data || {}));
             
             console.log('Material Activity Response Structure:');
-            console.log('  - Status:', materialActivityRes.status);
+            console.log('  - Status:', (materialActivityRes as any).status);
             console.log('  - Data keys:', Object.keys(materialActivityRes.data || {}));
             console.log('  - Success field:', materialActivityRes.data.success);
-            console.log('  - Message field:', materialActivityRes.data.message);
+            console.log('  - Message field:', (materialActivityRes.data as any).message);
             console.log('  - Data field keys:', Object.keys(materialActivityRes.data.data || {}));
             
             // Check if both APIs failed
@@ -381,11 +385,11 @@ const NotificationPage: React.FC = () => {
             // DEBUG: Log the actual date groups content
             console.log('\n--- DATE GROUPS CONTENT DEBUG ---');
             console.log('Activity Date Groups Content:');
-            activityDateGroups.forEach((group, index) => {
+            activityDateGroups.forEach((group: any, index: number) => {
                 console.log(`  Group ${index + 1}: Date=${group.date}, Count=${group.count}, Activities=${group.activities?.length || 0}`);
             });
             console.log('Material Date Groups Content:');
-            materialDateGroups.forEach((group, index) => {
+            materialDateGroups.forEach((group: any, index: number) => {
                 console.log(`  Group ${index + 1}: Date=${group.date}, Count=${group.count}, Activities=${group.activities?.length || 0}`);
             });
 
@@ -1029,7 +1033,7 @@ const NotificationPage: React.FC = () => {
         if (activeTab === 'all') {
             return getCombinedActivities();
         } else if (activeTab === 'project') {
-            // Safely map activities (ensure it's an array) - include both project and mini-section activities
+            // Safely map activities (ensure it's an array) - include project, section, and mini-section activities
             if (Array.isArray(activities)) {
                 return activities
                     .filter(a => a.category === 'project' || a.category === 'section' || a.category === 'mini_section')
@@ -1041,14 +1045,6 @@ const NotificationPage: React.FC = () => {
             if (Array.isArray(activities)) {
                 return activities
                     .filter(a => a.category === 'labor')
-                    .map(a => ({ type: 'activity' as const, data: a, timestamp: a.createdAt }));
-            }
-            return [];
-        } else if (activeTab === 'mini_section') {
-            // Filter activities to show only mini-section activities
-            if (Array.isArray(activities)) {
-                return activities
-                    .filter(a => a.category === 'mini_section')
                     .map(a => ({ type: 'activity' as const, data: a, timestamp: a.createdAt }));
             }
             return [];
@@ -1097,7 +1093,7 @@ const NotificationPage: React.FC = () => {
                 let filteredGroupActivities = group.activities;
                 
                 if (activeTab === 'project') {
-                    // Only show regular activities (not material activities) - include project, section, and mini-section
+                    // Only show regular activities (not material activities) - include project, section, and mini-section activities
                     filteredGroupActivities = group.activities.filter(item => 
                         item.type === 'activity' && 
                         ['project', 'section', 'mini_section'].includes((item.data as Activity).category)
@@ -1107,12 +1103,6 @@ const NotificationPage: React.FC = () => {
                     filteredGroupActivities = group.activities.filter(item => 
                         item.type === 'activity' && 
                         (item.data as Activity).category === 'labor'
-                    );
-                } else if (activeTab === 'mini_section') {
-                    // Only show mini-section activities
-                    filteredGroupActivities = group.activities.filter(item => 
-                        item.type === 'activity' && 
-                        (item.data as Activity).category === 'mini_section'
                     );
                 } else if (activeTab === 'material') {
                     // Only show material activities that match the sub-tab
@@ -1292,11 +1282,6 @@ const NotificationPage: React.FC = () => {
                 <View style={styles.headerContent}>
                     <View style={styles.headerTitleContainer}>
                         <Text style={styles.headerTitle}>Activity Feed</Text>
-                        {unreadCount > 0 && (
-                            <View style={styles.notificationBadgeContainer}>
-                                <NotificationBadge size="small" />
-                            </View>
-                        )}
                     </View>
                     <Text style={styles.headerSubtitle}>
                         {`${formatDateHeader(currentDate)} • ${groupedActivities.reduce((sum, group) => sum + group.activities.length, 0)} activities`}
@@ -1747,9 +1732,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-    },
-    notificationBadgeContainer: {
-        marginLeft: 8,
     },
     headerTitle: {
         fontSize: 20,

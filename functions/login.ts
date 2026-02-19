@@ -120,7 +120,7 @@ export const addPassword = async (
   email: string,
   password: string,
   userType: string
-): Promise<{ success: boolean; message?: string; error?: string }> => {
+): Promise<{ success: boolean; message?: string; error?: string; token?: string; user?: any }> => {
   try {
     console.log('🔐 ADD PASSWORD API CALL');
     console.log('📧 Email:', email);
@@ -137,7 +137,12 @@ export const addPassword = async (
     console.log('✅ Password API Response Data:', res.data);
 
     if (res.status === 200) {
-      return { success: true, message: res.data.message || 'Password set successfully' };
+      return { 
+        success: true, 
+        message: res.data.message || 'Password set successfully',
+        token: res.data.token,
+        user: res.data.user
+      };
     } else {
       return { success: false, error: res.data.message || 'Failed to set password' };
     }
@@ -158,15 +163,37 @@ export const addPassword = async (
   }
 };
 
-export const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+export const login = async (email: string, password: string): Promise<{ success: boolean; error?: string; token?: string; user?: any }> => {
   try {
+    console.log('🌐 LOGIN API CALL:');
+    console.log('  - Email:', email);
+    console.log('  - URL:', `${domain}/api/login`);
+    
     const res = await axios.post<ApiResponse>(`${domain}/api/login`, {
       email,
       password,
     });
 
+    console.log('📦 LOGIN API RESPONSE:');
+    console.log('  - Status:', res.status);
+    console.log('  - Data:', JSON.stringify(res.data, null, 2));
+    console.log('  - Token in data:', !!res.data.token);
+    console.log('  - Data.data.token:', !!res.data.data?.token);
+
     if (res.status === 200) {
-      return { success: true };
+      const responseData = res.data;
+      const token = responseData.token || responseData.data?.token;
+      const user = responseData.user || responseData.data?.user;
+      
+      console.log('✅ LOGIN SUCCESS:');
+      console.log('  - Token found:', !!token);
+      console.log('  - User found:', !!user);
+      
+      return { 
+        success: true,
+        token: token,
+        user: user
+      };
     } else {
       return {
         success: false,
@@ -175,7 +202,8 @@ export const login = async (email: string, password: string): Promise<{ success:
     }
   } catch (error: any) {
     console.log("Failed to login");
-    console.error(error.message);
+    console.error('❌ LOGIN ERROR:', error.message);
+    console.error('❌ ERROR RESPONSE:', error.response?.data);
     return {
       success: false,
       error:
