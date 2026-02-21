@@ -2,6 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     Animated,
+    Dimensions,
+    Easing,
     Modal,
     PanResponder,
     ScrollView,
@@ -58,7 +60,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
     const [selectedMiniSectionId, setSelectedMiniSectionId] = useState<string>('');
     const [selectedMaterials, setSelectedMaterials] = useState<{ [materialId: string]: string }>({});
     const [searchQuery, setSearchQuery] = useState<string>('');
-    const [currentStep, setCurrentStep] = useState<'selection' | 'quantity'>('selection');
+    const [currentStep, setCurrentStep] = useState<'workArea' | 'materialSelection' | 'quantity'>('workArea');
     
     // State for fetching all materials
     const [allAvailableMaterials, setAllAvailableMaterials] = useState<Material[]>([]);
@@ -75,6 +77,15 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
     // Animation values for swipe to submit
     const swipeAnimation = useRef(new Animated.Value(0)).current;
     const [isSwipeComplete, setIsSwipeComplete] = useState(false);
+    const pulseAnim = useRef(new Animated.Value(0)).current;
+    const shimmerAnim = useRef(new Animated.Value(0)).current;
+
+    // Calculate max swipe distance based on screen width
+    // Track has 20px padding on each side (footer paddingHorizontal) + 5px button inset on each side
+    const BUTTON_SIZE = 54;
+    const TRACK_HORIZONTAL_PADDING = 40; // 20px footer padding on each side
+    const BUTTON_INSET = 5;
+    const maxSwipeDistance = Dimensions.get('window').width - TRACK_HORIZONTAL_PADDING - BUTTON_SIZE - (BUTTON_INSET * 2);
 
     // Loading animation states
     const [isSubmittingUsage, setIsSubmittingUsage] = useState(false);
@@ -395,7 +406,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
         setSelectedMiniSectionId('');
         setSelectedMaterials({});
         setSearchQuery('');
-        setCurrentStep('selection');
+        setCurrentStep('workArea');
         // Clear input refs
         quantityInputRefs.current = {};
         // Reset swipe animation
@@ -407,6 +418,47 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
         onClose();
     };
 
+    // Start pulse animation when on step 3 (quantity)
+    useEffect(() => {
+        if (currentStep === 'quantity') {
+            // Pulse animation for the chevrons
+            const pulse = Animated.loop(
+                Animated.sequence([
+                    Animated.timing(pulseAnim, {
+                        toValue: 1,
+                        duration: 1200,
+                        easing: Easing.inOut(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(pulseAnim, {
+                        toValue: 0,
+                        duration: 1200,
+                        easing: Easing.inOut(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                ])
+            );
+
+            // Shimmer animation for the arrow hints
+            const shimmer = Animated.loop(
+                Animated.timing(shimmerAnim, {
+                    toValue: 1,
+                    duration: 2000,
+                    easing: Easing.linear,
+                    useNativeDriver: true,
+                })
+            );
+
+            pulse.start();
+            shimmer.start();
+
+            return () => {
+                pulse.stop();
+                shimmer.stop();
+            };
+        }
+    }, [currentStep]);
+
     // Swipe gesture handlers
     const handleSwipeStart = () => {
         // Reset swipe state
@@ -415,21 +467,21 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
 
     const handleSwipeMove = (gestureState: any) => {
         const { dx } = gestureState;
-        const maxSwipe = 200; // Maximum swipe distance to match LaborFormModal
-        const progress = Math.max(0, Math.min(dx / maxSwipe, 1));
+        const progress = Math.max(0, Math.min(dx / maxSwipeDistance, 1));
         
         swipeAnimation.setValue(progress);
         
         // Check if swipe is complete (70% of the way)
         if (progress >= 0.7 && !isSwipeComplete) {
             setIsSwipeComplete(true);
+        } else if (progress < 0.7 && isSwipeComplete) {
+            setIsSwipeComplete(false);
         }
     };
 
     const handleSwipeEnd = async (gestureState: any) => {
         const { dx } = gestureState;
-        const maxSwipe = 200; // Maximum swipe distance to match LaborFormModal
-        const progress = dx / maxSwipe;
+        const progress = dx / maxSwipeDistance;
         
         // Use refs for current values to avoid stale state
         const currentSelectedMaterials = selectedMaterialsRef.current;
@@ -440,20 +492,22 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
         console.log('currentSelectedMiniSectionId:', currentSelectedMiniSectionId);
         
         if (progress >= 0.7) {
-            // Complete the swipe and submit
-            Animated.timing(swipeAnimation, {
+            // Complete the swipe — snap to end
+            Animated.spring(swipeAnimation, {
                 toValue: 1,
-                duration: 200,
+                speed: 20,
+                bounciness: 2,
                 useNativeDriver: false,
             }).start(async () => {
                 console.log('Animation completed, calling handleSubmit');
                 await handleSubmit();
             });
         } else {
-            // Animate back to start
-            Animated.timing(swipeAnimation, {
+            // Animate back to start with spring physics
+            Animated.spring(swipeAnimation, {
                 toValue: 0,
-                duration: 300,
+                speed: 12,
+                bounciness: 8,
                 useNativeDriver: false,
             }).start();
             setIsSwipeComplete(false);
@@ -464,7 +518,10 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
     const panResponder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
-            onMoveShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: (_, gestureState) => {
+                // Only capture horizontal swipes
+                return Math.abs(gestureState.dx) > Math.abs(gestureState.dy * 2);
+            },
             onPanResponderGrant: handleSwipeStart,
             onPanResponderMove: (_, gestureState) => handleSwipeMove(gestureState),
             onPanResponderRelease: (_, gestureState) => handleSwipeEnd(gestureState),
@@ -592,7 +649,9 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
     };
 
     const handleNextStep = () => {
-        if (canProceedToQuantity()) {
+        if (currentStep === 'workArea' && selectedMiniSectionId) {
+            setCurrentStep('materialSelection');
+        } else if (currentStep === 'materialSelection' && getSelectedMaterialsCount() > 0) {
             setCurrentStep('quantity');
             // Focus on first quantity input after a short delay
             setTimeout(() => {
@@ -605,7 +664,11 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
     };
 
     const handlePreviousStep = () => {
-        setCurrentStep('selection');
+        if (currentStep === 'quantity') {
+            setCurrentStep('materialSelection');
+        } else if (currentStep === 'materialSelection') {
+            setCurrentStep('workArea');
+        }
     };
 
     return (
@@ -626,9 +689,11 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                             <View>
                                 <Text style={styles.title}>Record Material Usage</Text>
                                 <Text style={styles.subtitle}>
-                                    {currentStep === 'selection' 
-                                        ? 'Step 1: Select materials and location' 
-                                        : 'Step 2: Enter quantities'
+                                    {currentStep === 'workArea' 
+                                        ? 'Step 1: Select work area' 
+                                        : currentStep === 'materialSelection'
+                                        ? 'Step 2: Select materials'
+                                        : 'Step 3: Enter quantities'
                                     }
                                 </Text>
                             </View>
@@ -640,28 +705,74 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
 
                     {/* Step Indicator */}
                     <View style={styles.stepIndicator}>
-                        <View style={styles.stepContainer}>
+                        <TouchableOpacity 
+                            style={styles.stepContainer}
+                            onPress={() => setCurrentStep('workArea')}
+                            activeOpacity={0.7}
+                        >
                             <View style={[
                                 styles.stepCircle, 
-                                currentStep === 'selection' ? styles.stepCircleActive : styles.stepCircleCompleted
+                                currentStep === 'workArea' ? styles.stepCircleActive : styles.stepCircleCompleted
                             ]}>
                                 <Text style={[
                                     styles.stepNumber,
-                                    currentStep === 'selection' ? styles.stepNumberActive : styles.stepNumberCompleted
+                                    currentStep === 'workArea' ? styles.stepNumberActive : styles.stepNumberCompleted
                                 ]}>1</Text>
                             </View>
                             <Text style={[
                                 styles.stepLabel,
-                                currentStep === 'selection' ? styles.stepLabelActive : styles.stepLabelCompleted
-                            ]}>Select Materials</Text>
-                        </View>
+                                currentStep === 'workArea' ? styles.stepLabelActive : styles.stepLabelCompleted
+                            ]}>Work Area</Text>
+                        </TouchableOpacity>
                         
+                        <View style={[
+                            styles.stepConnector,
+                            (currentStep === 'materialSelection' || currentStep === 'quantity') ? styles.stepConnectorActive : styles.stepConnectorInactive
+                        ]} />
+                        
+                        <TouchableOpacity 
+                            style={styles.stepContainer}
+                            onPress={() => {
+                                if (selectedMiniSectionId) {
+                                    setCurrentStep('materialSelection');
+                                }
+                            }}
+                            disabled={!selectedMiniSectionId}
+                            activeOpacity={0.7}
+                        >
+                            <View style={[
+                                styles.stepCircle,
+                                currentStep === 'materialSelection' ? styles.stepCircleActive : 
+                                currentStep === 'quantity' ? styles.stepCircleCompleted : styles.stepCircleInactive
+                            ]}>
+                                <Text style={[
+                                    styles.stepNumber,
+                                    currentStep === 'materialSelection' ? styles.stepNumberActive : 
+                                    currentStep === 'quantity' ? styles.stepNumberCompleted : styles.stepNumberInactive
+                                ]}>2</Text>
+                            </View>
+                            <Text style={[
+                                styles.stepLabel,
+                                currentStep === 'materialSelection' ? styles.stepLabelActive : 
+                                currentStep === 'quantity' ? styles.stepLabelCompleted : styles.stepLabelInactive
+                            ]}>Materials</Text>
+                        </TouchableOpacity>
+
                         <View style={[
                             styles.stepConnector,
                             currentStep === 'quantity' ? styles.stepConnectorActive : styles.stepConnectorInactive
                         ]} />
                         
-                        <View style={styles.stepContainer}>
+                        <TouchableOpacity 
+                            style={styles.stepContainer}
+                            onPress={() => {
+                                if (selectedMiniSectionId && getSelectedMaterialsCount() > 0) {
+                                    setCurrentStep('quantity');
+                                }
+                            }}
+                            disabled={!selectedMiniSectionId || getSelectedMaterialsCount() === 0}
+                            activeOpacity={0.7}
+                        >
                             <View style={[
                                 styles.stepCircle,
                                 currentStep === 'quantity' ? styles.stepCircleActive : styles.stepCircleInactive
@@ -669,20 +780,19 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                 <Text style={[
                                     styles.stepNumber,
                                     currentStep === 'quantity' ? styles.stepNumberActive : styles.stepNumberInactive
-                                ]}>2</Text>
+                                ]}>3</Text>
                             </View>
                             <Text style={[
                                 styles.stepLabel,
                                 currentStep === 'quantity' ? styles.stepLabelActive : styles.stepLabelInactive
-                            ]}>Enter Quantities</Text>
-                        </View>
+                            ]}>Quantities</Text>
+                        </TouchableOpacity>
                     </View>
 
                     <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false}>
-                        {currentStep === 'selection' ? (
-                            // STEP 1: MATERIAL SELECTION
+                        {currentStep === 'workArea' ? (
+                            // STEP 1: WORK AREA SELECTION
                             <>
-                                {/* Mini-Section Selector */}
                                 <View style={styles.fieldContainer}>
                                     <View style={styles.labelWithHelper}>
                                         <Text style={styles.label}>
@@ -709,6 +819,10 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                                         onPress={() => {
                                                             setSelectedMiniSectionId(section._id);
                                                             selectedMiniSectionIdRef.current = section._id;
+                                                            // Auto-advance to next step
+                                                            setTimeout(() => {
+                                                                setCurrentStep('materialSelection');
+                                                            }, 300);
                                                         }}
                                                     >
                                                         <View style={styles.sectionItemLeft}>
@@ -736,18 +850,25 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                         </View>
                                     )}
                                 </View>
-
-                                {/* Material Selection */}
-                                <View style={styles.fieldContainer}>
-                                    <View style={styles.labelWithHelper}>
-                                        <Text style={styles.label}>
-                                            Which materials are you using? <Text style={styles.required}>*</Text>
+                            </>
+                        ) : currentStep === 'materialSelection' ? (
+                            // STEP 2: MATERIAL SELECTION
+                            <>
+                                {/* Header Row: Label Only (Back Button removed, use breadcrumbs) */}
+                                <View style={styles.step2HeaderRow}>
+                                    <View style={styles.headerLabelContainer}>
+                                        <Text style={styles.labelCompact}>
+                                            Select Materials <Text style={styles.required}>*</Text>
                                         </Text>
-                                        <Text style={styles.labelHelper}>
-                                            Search and select materials
-                                            {getSelectedMaterialsCount() > 0 && ` (${getSelectedMaterialsCount()} selected)`}
+                                        <Text style={styles.currentAreaText} numberOfLines={1}>
+                                            Area: {availableMiniSections.find(s => s._id === selectedMiniSectionId)?.name || 
+                                                  miniSections.find(s => s._id === selectedMiniSectionId)?.name || 'None'}
                                         </Text>
                                     </View>
+                                </View>
+
+                                {/* Search Section */}
+                                <View style={styles.fieldContainerCompact}>
                                     <View style={styles.searchContainer}>
                                         <Ionicons name="search" size={20} color="#94A3B8" style={styles.searchIcon} />
                                         <TextInput
@@ -890,18 +1011,8 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                 )}
                             </>
                         ) : (
-                            // STEP 2: QUANTITY INPUT
+                            // STEP 3: QUANTITY INPUT
                             <>
-                                {/* Back to Edit Materials - Moved to top */}
-                                <View style={styles.step2BackHeader}>
-                                    <TouchableOpacity
-                                        style={styles.backButtonIcon}
-                                        onPress={handlePreviousStep}
-                                    >
-                                        <Ionicons name="arrow-back" size={24} color="#64748B" />
-                                    </TouchableOpacity>
-                                    <Text style={styles.backToEditText}>Back to Edit Materials</Text>
-                                </View>
 
                                 {/* Selected Section Info */}
                                 <View style={styles.sectionInfo}>
@@ -1070,8 +1181,8 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
 
                     {/* Footer Buttons */}
                     <View style={styles.footer}>
-                        {currentStep === 'selection' ? (
-                            // Step 1 Footer
+                        {currentStep === 'workArea' ? (
+                            // Step 1 Footer (Work Area)
                             <>
                                 <TouchableOpacity
                                     style={styles.cancelButtonIcon}
@@ -1082,10 +1193,27 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                 <TouchableOpacity
                                     style={[
                                         styles.nextButtonLarge,
-                                        !canProceedToQuantity() && styles.nextButtonDisabled
+                                        !selectedMiniSectionId && styles.nextButtonDisabled
                                     ]}
                                     onPress={handleNextStep}
-                                    disabled={!canProceedToQuantity()}
+                                    disabled={!selectedMiniSectionId}
+                                >
+                                    <Text style={styles.nextButtonText}>
+                                        Next: Select Materials
+                                    </Text>
+                                    <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
+                                </TouchableOpacity>
+                            </>
+                        ) : currentStep === 'materialSelection' ? (
+                            // Step 2 Footer (Material Selection - Back button removed, use breadcrumbs)
+                            <>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.nextButtonLarge,
+                                        getSelectedMaterialsCount() === 0 && styles.nextButtonDisabled
+                                    ]}
+                                    onPress={handleNextStep}
+                                    disabled={getSelectedMaterialsCount() === 0}
                                 >
                                     <Text style={styles.nextButtonText}>
                                         Next: Enter Quantities
@@ -1094,50 +1222,135 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                 </TouchableOpacity>
                             </>
                         ) : (
-                            // Step 2 Footer - Swipe to Submit Only
+                            // Step 3 Footer (Quantity Swipe)
                             <View style={styles.step2FooterSimple}>
-                                <View style={styles.swipeContainer}>
-                                    {/* Swipe to Submit */}
-                                    <View style={styles.swipeToSubmitContainer}>
-                                        <View style={styles.swipeTrack} {...panResponder.panHandlers}>
-                                            {/* Swipe button with icon */}
-                                            <Animated.View 
-                                                style={[
-                                                    styles.swipeButton,
-                                                    {
-                                                        transform: [{
-                                                            translateX: swipeAnimation.interpolate({
-                                                                inputRange: [0, 1],
-                                                                outputRange: [0, 200], // Match the maxSwipe distance
-                                                                extrapolate: 'clamp',
-                                                            })
-                                                        }]
-                                                    }
-                                                ]}
+                                <View style={styles.swipeToSubmitContainer}>
+                                    <View style={styles.swipeTrack} {...panResponder.panHandlers}>
+                                        {/* Animated green fill behind the button */}
+                                        <Animated.View
+                                            style={[
+                                                styles.swipeFill,
+                                                {
+                                                    width: swipeAnimation.interpolate({
+                                                        inputRange: [0, 1],
+                                                        outputRange: ['0%', '100%'],
+                                                        extrapolate: 'clamp',
+                                                    }),
+                                                    backgroundColor: swipeAnimation.interpolate({
+                                                        inputRange: [0, 0.5, 0.7, 1],
+                                                        outputRange: ['rgba(59, 130, 246, 0.15)', 'rgba(59, 130, 246, 0.25)', 'rgba(16, 185, 129, 0.3)', 'rgba(16, 185, 129, 0.4)'],
+                                                        extrapolate: 'clamp',
+                                                    }),
+                                                }
+                                            ]}
+                                        />
+
+                                        {/* Shimmer arrow hints */}
+                                        <Animated.View
+                                            style={[
+                                                styles.shimmerContainer,
+                                                {
+                                                    opacity: swipeAnimation.interpolate({
+                                                        inputRange: [0, 0.15],
+                                                        outputRange: [1, 0],
+                                                        extrapolate: 'clamp',
+                                                    }),
+                                                }
+                                            ]}
+                                        >
+                                            {[0, 1, 2].map((i) => (
+                                                <Animated.View
+                                                    key={i}
+                                                    style={{
+                                                        opacity: shimmerAnim.interpolate({
+                                                            inputRange: [0, 0.33 * i, 0.33 * i + 0.15, 0.33 * i + 0.33, 1],
+                                                            outputRange: [0.15, 0.15, 0.5, 0.15, 0.15],
+                                                            extrapolate: 'clamp',
+                                                        }),
+                                                    }}
+                                                >
+                                                    <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.5)" />
+                                                </Animated.View>
+                                            ))}
+                                        </Animated.View>
+
+                                        {/* Swipe button with pulsing chevrons */}
+                                        <Animated.View 
+                                            style={[
+                                                styles.swipeButton,
+                                                {
+                                                    transform: [{
+                                                        translateX: swipeAnimation.interpolate({
+                                                            inputRange: [0, 1],
+                                                            outputRange: [0, maxSwipeDistance],
+                                                            extrapolate: 'clamp',
+                                                        })
+                                                    }],
+                                                    backgroundColor: swipeAnimation.interpolate({
+                                                        inputRange: [0, 0.65, 0.7, 1],
+                                                        outputRange: ['#3B82F6', '#3B82F6', '#10B981', '#10B981'],
+                                                        extrapolate: 'clamp',
+                                                    }),
+                                                }
+                                            ]}
+                                        >
+                                            <Animated.View
+                                                style={{
+                                                    transform: [{
+                                                        translateX: pulseAnim.interpolate({
+                                                            inputRange: [0, 1],
+                                                            outputRange: [-2, 4],
+                                                        }),
+                                                    }],
+                                                }}
                                             >
-                                                <View style={styles.doubleChevron}>
-                                                    <Ionicons name="chevron-forward" size={20} color="#FFFFFF" style={styles.chevronFirst} />
-                                                    <Ionicons name="chevron-forward" size={20} color="#FFFFFF" style={styles.chevronSecond} />
-                                                </View>
-                                            </Animated.View>
-                                            
-                                            {/* Text */}
-                                            <View style={styles.swipeTextContainer}>
-                                                <Animated.Text 
+                                                <Animated.View
+                                                    style={{
+                                                        opacity: swipeAnimation.interpolate({
+                                                            inputRange: [0, 0.7, 1],
+                                                            outputRange: [1, 1, 0],
+                                                            extrapolate: 'clamp',
+                                                        }),
+                                                    }}
+                                                >
+                                                    <View style={styles.doubleChevron}>
+                                                        <Ionicons name="chevron-forward" size={22} color="#FFFFFF" style={styles.chevronFirst} />
+                                                        <Ionicons name="chevron-forward" size={22} color="rgba(255,255,255,0.6)" style={styles.chevronSecond} />
+                                                    </View>
+                                                </Animated.View>
+                                                <Animated.View
                                                     style={[
-                                                        styles.swipeText,
+                                                        styles.checkmarkOverlay,
                                                         {
                                                             opacity: swipeAnimation.interpolate({
-                                                                inputRange: [0, 0.3],
-                                                                outputRange: [1, 0],
+                                                                inputRange: [0, 0.65, 0.7, 1],
+                                                                outputRange: [0, 0, 1, 1],
                                                                 extrapolate: 'clamp',
-                                                            })
+                                                            }),
                                                         }
                                                     ]}
                                                 >
-                                                    Swipe to Record Usage
-                                                </Animated.Text>
-                                            </View>
+                                                    <Ionicons name="checkmark" size={28} color="#FFFFFF" />
+                                                </Animated.View>
+                                            </Animated.View>
+                                        </Animated.View>
+                                        
+                                        {/* Text */}
+                                        <View style={styles.swipeTextContainer}>
+                                            <Animated.Text 
+                                                style={[
+                                                    styles.swipeText,
+                                                    {
+                                                        opacity: swipeAnimation.interpolate({
+                                                            inputRange: [0, 0.3],
+                                                            outputRange: [1, 0],
+                                                            extrapolate: 'clamp',
+                                                        }),
+                                                    }
+                                                ]}
+                                            >
+                                                Swipe to Record Usage
+                                            </Animated.Text>
                                         </View>
                                     </View>
                                 </View>
@@ -1455,6 +1668,57 @@ const styles = StyleSheet.create({
         color: '#92400E',
         flex: 1,
     },
+    step2HeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+        gap: 12,
+        paddingRight: 8,
+    },
+    compactBackButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        backgroundColor: '#EFF6FF',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+        gap: 4,
+    },
+    compactBackText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#3B82F6',
+    },
+    headerLabelContainer: {
+        flex: 1,
+    },
+    labelCompact: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#1E293B',
+    },
+    currentAreaText: {
+        fontSize: 12,
+        color: '#64748B',
+        marginTop: 1,
+    },
+    fieldContainerCompact: {
+        marginBottom: 16,
+    },
+    stepBackHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        gap: 10,
+    },
     errorText: {
         fontSize: 12,
         color: '#EF4444',
@@ -1505,6 +1769,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         paddingHorizontal: 20,
         paddingTop: 16,
+        paddingBottom: 8,
         gap: 12,
         borderTopWidth: 1,
         borderTopColor: '#F1F5F9',
@@ -1557,7 +1822,7 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
     },
     checkboxContainer: {
-        padding: 8,
+        padding: 0,
     },
     quantityInputContainer: {
         flexDirection: 'row',
@@ -2039,6 +2304,7 @@ const styles = StyleSheet.create({
         paddingBottom: 20,
         borderTopWidth: 1,
         borderTopColor: '#F1F5F9',
+        width: '100%',
     },
     step2BackHeader: {
         flexDirection: 'row',
@@ -2047,12 +2313,6 @@ const styles = StyleSheet.create({
         paddingBottom: 12,
         borderBottomWidth: 1,
         borderBottomColor: '#F1F5F9',
-        gap: 12,
-    },
-    step2Header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 8,
         gap: 12,
     },
     backToEditText: {
@@ -2101,37 +2361,54 @@ const styles = StyleSheet.create({
     // Swipe to Submit Styles
     swipeToSubmitContainer: {
         width: '100%',
-        paddingHorizontal: 4,
     },
     swipeTrack: {
         backgroundColor: '#1E293B',
-        borderRadius: 35,
-        height: 70,
+        borderRadius: 32,
+        height: 64,
         position: 'relative',
         justifyContent: 'center',
         alignItems: 'flex-start',
-        paddingLeft: 8,
+        overflow: 'hidden',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
+        shadowOpacity: 0.25,
         shadowRadius: 8,
         elevation: 8,
     },
+    swipeFill: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        borderRadius: 32,
+    },
+    shimmerContainer: {
+        position: 'absolute',
+        left: 68,
+        top: 0,
+        bottom: 0,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
+        zIndex: 1,
+    },
     swipeButton: {
         position: 'absolute',
-        left: 6,
-        top: 6,
-        width: 58,
-        height: 58,
-        backgroundColor: '#3B82F6',
-        borderRadius: 29,
+        left: 5,
+        top: 5,
+        width: 54,
+        height: 54,
+        borderRadius: 27,
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-        elevation: 5,
+        zIndex: 3,
+        shadowColor: '#3B82F6',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.5,
+        shadowRadius: 8,
+        elevation: 6,
+        overflow: 'hidden', // Added to handle the swipe completion overflow fix
     },
     doubleChevron: {
         flexDirection: 'row',
@@ -2144,18 +2421,27 @@ const styles = StyleSheet.create({
     chevronSecond: {
         marginLeft: -8,
     },
-    swipeTextContainer: {
-        flex: 1,
+    checkmarkOverlay: {
+        position: 'absolute',
         justifyContent: 'center',
         alignItems: 'center',
-        paddingLeft: 70,
-        paddingRight: 20,
+    },
+    swipeTextContainer: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1,
     },
     swipeText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#FFFFFF',
-        letterSpacing: 0.5,
+        fontSize: 14,
+        fontWeight: '700',
+        color: 'rgba(255, 255, 255, 0.7)',
+        letterSpacing: 1.5,
+        textTransform: 'uppercase',
     },
     // Loading and Error States
     loadingState: {

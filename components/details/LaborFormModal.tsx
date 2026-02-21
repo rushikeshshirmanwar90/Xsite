@@ -1,18 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
+  Dimensions,
+  Easing,
   Modal,
   PanResponder,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  Platform,
-  Dimensions,
 } from 'react-native';
 
 interface LaborFormModalProps {
@@ -204,6 +205,14 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
   // Animation values for swipe to submit
   const swipeAnimation = useRef(new Animated.Value(0)).current;
   const [isSwipeComplete, setIsSwipeComplete] = useState(false);
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
+
+  // Calculate max swipe distance based on screen width
+  const BUTTON_SIZE = 54;
+  const TRACK_HORIZONTAL_PADDING = 40; // 20px padding on each side
+  const BUTTON_INSET = 5;
+  const maxSwipeDistance = Dimensions.get('window').width - TRACK_HORIZONTAL_PADDING - BUTTON_SIZE - (BUTTON_INSET * 2);
 
   // Animation values
   const scrollViewRef = useRef<ScrollView>(null);
@@ -211,6 +220,45 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
   // Animation values for types section
   const typesSectionOpacity = useRef(new Animated.Value(0)).current;
   const typesSectionHeight = useRef(new Animated.Value(0)).current;
+
+  // Start pulse animation when swipe area is visible
+  useEffect(() => {
+    if (laborEntries.length > 0 && !showAddForm) {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1200,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 0,
+            duration: 1200,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+
+      const shimmer = Animated.loop(
+        Animated.timing(shimmerAnim, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      );
+
+      pulse.start();
+      shimmer.start();
+
+      return () => {
+        pulse.stop();
+        shimmer.stop();
+      };
+    }
+  }, [laborEntries.length, showAddForm]);
 
   // Swipe gesture handlers
   const handleSwipeStart = () => {
@@ -220,39 +268,41 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
 
   const handleSwipeMove = (gestureState: any) => {
     const { dx } = gestureState;
-    const maxSwipe = 200; // Maximum swipe distance to match new design
-    const progress = Math.max(0, Math.min(dx / maxSwipe, 1));
+    const progress = Math.max(0, Math.min(dx / maxSwipeDistance, 1));
     
     swipeAnimation.setValue(progress);
     
     // Check if swipe is complete (70% of the way)
     if (progress >= 0.7 && !isSwipeComplete) {
       setIsSwipeComplete(true);
+    } else if (progress < 0.7 && isSwipeComplete) {
+      setIsSwipeComplete(false);
     }
   };
 
   const handleSwipeEnd = (gestureState: any) => {
     const { dx } = gestureState;
-    const maxSwipe = 200;
-    const progress = dx / maxSwipe;
+    const progress = dx / maxSwipeDistance;
     
     console.log('Swipe ended, progress:', progress, 'laborEntries.length:', laborEntries.length);
     
     if (progress >= 0.7) {
-      // Complete the swipe and submit
-      Animated.timing(swipeAnimation, {
+      // Complete the swipe — snap to end
+      Animated.spring(swipeAnimation, {
         toValue: 1,
-        duration: 200,
+        speed: 20,
+        bounciness: 2,
         useNativeDriver: false,
       }).start(() => {
         console.log('Animation completed, calling handleFinalSubmit');
         handleFinalSubmit();
       });
     } else {
-      // Animate back to start
-      Animated.timing(swipeAnimation, {
+      // Animate back to start with spring physics
+      Animated.spring(swipeAnimation, {
         toValue: 0,
-        duration: 300,
+        speed: 12,
+        bounciness: 8,
         useNativeDriver: false,
       }).start();
       setIsSwipeComplete(false);
@@ -263,7 +313,9 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > Math.abs(gestureState.dy * 2);
+      },
       onPanResponderGrant: handleSwipeStart,
       onPanResponderMove: (_, gestureState) => handleSwipeMove(gestureState),
       onPanResponderRelease: (_, gestureState) => handleSwipeEnd(gestureState),
@@ -1116,10 +1168,58 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
 
           {/* Swipe to Submit - Show when there are entries and form is not shown */}
           {laborEntries.length > 0 && !showAddForm && (
-            <View style={[styles.modalActions, { paddingBottom: safeBottomPadding + 8 }]}>
+            <View style={[styles.swipeFooter, { paddingBottom: safeBottomPadding + 8 }]}>
               <View style={styles.swipeToSubmitContainer}>
                 <View style={styles.swipeTrack} {...panResponder.panHandlers}>
-                  {/* Swipe button with icon */}
+                  {/* Animated fill behind the button */}
+                  <Animated.View
+                    style={[
+                      styles.swipeFill,
+                      {
+                        width: swipeAnimation.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ['0%', '100%'],
+                          extrapolate: 'clamp',
+                        }),
+                        backgroundColor: swipeAnimation.interpolate({
+                          inputRange: [0, 0.5, 0.7, 1],
+                          outputRange: ['rgba(59, 130, 246, 0.15)', 'rgba(59, 130, 246, 0.25)', 'rgba(16, 185, 129, 0.3)', 'rgba(16, 185, 129, 0.4)'],
+                          extrapolate: 'clamp',
+                        }),
+                      }
+                    ]}
+                  />
+
+                  {/* Shimmer arrow hints */}
+                  <Animated.View
+                    style={[
+                      styles.shimmerContainer,
+                      {
+                        opacity: swipeAnimation.interpolate({
+                          inputRange: [0, 0.15],
+                          outputRange: [1, 0],
+                          extrapolate: 'clamp',
+                        }),
+                      }
+                    ]}
+                  >
+                    {[0, 1, 2].map((i) => (
+                      <Animated.View
+                        key={i}
+                        style={{
+                          opacity: shimmerAnim.interpolate({
+                            inputRange: [0, 0.33 * i, 0.33 * i + 0.15, 0.33 * i + 0.33, 1],
+                            outputRange: [0.15, 0.15, 0.5, 0.15, 0.15],
+                            extrapolate: 'clamp',
+                          }),
+                        }}
+                      >
+                        <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.5)" />
+                      </Animated.View>
+                    ))}
+                  </Animated.View>
+
+                  {/* Swipe button with pulsing chevrons */}
                   <Animated.View 
                     style={[
                       styles.swipeButton,
@@ -1127,17 +1227,57 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                         transform: [{
                           translateX: swipeAnimation.interpolate({
                             inputRange: [0, 1],
-                            outputRange: [0, 200],
+                            outputRange: [0, maxSwipeDistance],
                             extrapolate: 'clamp',
                           })
-                        }]
+                        }],
+                        backgroundColor: swipeAnimation.interpolate({
+                          inputRange: [0, 0.65, 0.7, 1],
+                          outputRange: ['#3B82F6', '#3B82F6', '#10B981', '#10B981'],
+                          extrapolate: 'clamp',
+                        }),
                       }
                     ]}
                   >
-                    <View style={styles.doubleChevron}>
-                      <Ionicons name="chevron-forward" size={20} color="#FFFFFF" style={styles.chevronFirst} />
-                      <Ionicons name="chevron-forward" size={20} color="#FFFFFF" style={styles.chevronSecond} />
-                    </View>
+                    <Animated.View
+                      style={{
+                        transform: [{
+                          translateX: pulseAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-2, 4],
+                          }),
+                        }],
+                      }}
+                    >
+                      <Animated.View
+                        style={{
+                          opacity: swipeAnimation.interpolate({
+                            inputRange: [0, 0.7, 1],
+                            outputRange: [1, 1, 0],
+                            extrapolate: 'clamp',
+                          }),
+                        }}
+                      >
+                        <View style={styles.doubleChevron}>
+                          <Ionicons name="chevron-forward" size={22} color="#FFFFFF" style={styles.chevronFirst} />
+                          <Ionicons name="chevron-forward" size={22} color="rgba(255,255,255,0.6)" style={styles.chevronSecond} />
+                        </View>
+                      </Animated.View>
+                      <Animated.View
+                        style={[
+                          styles.checkmarkOverlay,
+                          {
+                            opacity: swipeAnimation.interpolate({
+                              inputRange: [0, 0.65, 0.7, 1],
+                              outputRange: [0, 0, 1, 1],
+                              extrapolate: 'clamp',
+                            }),
+                          }
+                        ]}
+                      >
+                        <Ionicons name="checkmark" size={28} color="#FFFFFF" />
+                      </Animated.View>
+                    </Animated.View>
                   </Animated.View>
                   
                   {/* Text */}
@@ -1150,7 +1290,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                             inputRange: [0, 0.3],
                             outputRange: [1, 0],
                             extrapolate: 'clamp',
-                          })
+                          }),
                         }
                       ]}
                     >
@@ -2266,39 +2406,59 @@ const styles = StyleSheet.create({
     color: '#1E40AF',
   },
   // Swipe to Submit Styles
+  swipeFooter: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
   swipeToSubmitContainer: {
     width: '100%',
-    paddingHorizontal: 4,
   },
   swipeTrack: {
     backgroundColor: '#1E293B',
-    borderRadius: 35,
-    height: 70,
+    borderRadius: 32,
+    height: 64,
     position: 'relative',
     justifyContent: 'center',
     alignItems: 'flex-start',
-    paddingLeft: 8,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 8,
   },
+  swipeFill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    borderRadius: 32,
+  },
+  shimmerContainer: {
+    position: 'absolute',
+    left: 68,
+    top: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    zIndex: 1,
+  },
   swipeButton: {
     position: 'absolute',
-    left: 6,
-    top: 6,
-    width: 58,
-    height: 58,
-    backgroundColor: '#3B82F6',
-    borderRadius: 29,
+    left: 5,
+    top: 5,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    zIndex: 3,
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 6,
   },
   doubleChevron: {
     flexDirection: 'row',
@@ -2311,18 +2471,27 @@ const styles = StyleSheet.create({
   chevronSecond: {
     marginLeft: -8,
   },
-  swipeTextContainer: {
-    flex: 1,
+  checkmarkOverlay: {
+    position: 'absolute',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingLeft: 70,
-    paddingRight: 20,
+  },
+  swipeTextContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
   },
   swipeText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
+    fontSize: 14,
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.7)',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
   },
 });
 

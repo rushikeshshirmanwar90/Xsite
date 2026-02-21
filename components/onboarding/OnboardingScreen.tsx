@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
     View,
     Text,
@@ -33,9 +33,9 @@ const onboardingData: OnboardingSlide[] = [
         subtitle: "Construction Management Made Simple",
         description: "Your all-in-one solution for managing construction projects, tracking materials, and monitoring budgets in real-time.",
         icon: "construct-outline",
-        backgroundColor: '#F0F4FF', // Light blue background
-        iconColor: '#4F46E5', // Indigo
-        accentColor: '#6366F1', // Lighter indigo
+        backgroundColor: '#F0F4FF',
+        iconColor: '#4F46E5',
+        accentColor: '#6366F1',
         features: [
             "Manage multiple construction projects",
             "Real-time budget tracking",
@@ -49,9 +49,9 @@ const onboardingData: OnboardingSlide[] = [
         subtitle: "Stay on Top of Every Detail",
         description: "Organize projects into sections and mini-sections. Track materials from import to usage with comprehensive analytics.",
         icon: "analytics-outline",
-        backgroundColor: '#FDF2F8', // Light pink background
-        iconColor: '#EC4899', // Pink
-        accentColor: '#F472B6', // Lighter pink
+        backgroundColor: '#FDF2F8',
+        iconColor: '#EC4899',
+        accentColor: '#F472B6',
         features: [
             "Hierarchical project structure",
             "Material import & usage tracking",
@@ -65,9 +65,9 @@ const onboardingData: OnboardingSlide[] = [
         subtitle: "Collaborate Seamlessly",
         description: "Assign staff to projects with QR code technology. Different access levels for admins and staff members.",
         icon: "people-outline",
-        backgroundColor: '#F0FDFA', // Light teal background
-        iconColor: '#14B8A6', // Teal
-        accentColor: '#2DD4BF', // Lighter teal
+        backgroundColor: '#F0FDFA',
+        iconColor: '#14B8A6',
+        accentColor: '#2DD4BF',
         features: [
             "QR code staff assignment",
             "Role-based access control",
@@ -81,9 +81,9 @@ const onboardingData: OnboardingSlide[] = [
         subtitle: "Budget Like a Pro",
         description: "Monitor expenses with interactive dashboards. Track labor costs, material expenses, and project profitability.",
         icon: "cash-outline",
-        backgroundColor: '#F0FDF4', // Light green background
-        iconColor: '#22C55E', // Green
-        accentColor: '#4ADE80', // Lighter green
+        backgroundColor: '#F0FDF4',
+        iconColor: '#22C55E',
+        accentColor: '#4ADE80',
         features: [
             "Real-time expense tracking",
             "Interactive pie charts",
@@ -97,9 +97,9 @@ const onboardingData: OnboardingSlide[] = [
         subtitle: "Let's Get Started",
         description: "Join thousands of construction professionals who trust Xsite to manage their projects efficiently and profitably.",
         icon: "rocket-outline",
-        backgroundColor: '#FFFBEB', // Light amber background
-        iconColor: '#F59E0B', // Amber
-        accentColor: '#FBBF24', // Lighter amber
+        backgroundColor: '#FFFBEB',
+        iconColor: '#F59E0B',
+        accentColor: '#FBBF24',
         features: [
             "Complete audit trail",
             "Mobile-first design",
@@ -136,104 +136,157 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
         onComplete();
     };
 
-    const Slide = ({ item }: { item: OnboardingSlide }) => (
-        <View style={[styles.slide, { backgroundColor: item.backgroundColor }]}>
+    // Interpolate background color based on scroll position
+    const animatedBackgroundColor = scrollX.interpolate({
+        inputRange: onboardingData.map((_, i) => i * width),
+        outputRange: onboardingData.map((item) => item.backgroundColor),
+        extrapolate: 'clamp',
+    });
+
+    // Interpolate button color based on scroll position
+    const animatedButtonColor = scrollX.interpolate({
+        inputRange: onboardingData.map((_, i) => i * width),
+        outputRange: onboardingData.map((item) => item.iconColor),
+        extrapolate: 'clamp',
+    });
+
+    // Interpolate accent color for skip button
+    const animatedAccentColor = scrollX.interpolate({
+        inputRange: onboardingData.map((_, i) => i * width),
+        outputRange: onboardingData.map((item) => item.accentColor),
+        extrapolate: 'clamp',
+    });
+
+    // Content-only slide rendered inside the FlatList
+    const ContentSlide = useCallback(({ item }: { item: OnboardingSlide }) => (
+        <View style={styles.contentSlide}>
+            <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Icon Container */}
+                <View style={styles.iconContainer}>
+                    <View style={[styles.iconBackground, { backgroundColor: '#FFFFFF', borderColor: item.iconColor }]}>
+                        <Ionicons name={item.icon} size={80} color={item.iconColor} />
+                    </View>
+                </View>
+
+                {/* Text Content */}
+                <View style={styles.textContainer}>
+                    <Text style={[styles.title, { color: item.iconColor }]}>{item.title}</Text>
+                    <Text style={[styles.subtitle, { color: item.accentColor }]}>{item.subtitle}</Text>
+                    <Text style={styles.description}>{item.description}</Text>
+
+                    {/* Features List */}
+                    <View style={styles.featuresContainer}>
+                        {item.features.map((feature, index) => (
+                            <View key={index} style={styles.featureItem}>
+                                <View style={[styles.featureDot, { backgroundColor: item.iconColor }]} />
+                                <Text style={styles.featureText}>{feature}</Text>
+                            </View>
+                        ))}
+                    </View>
+                </View>
+            </ScrollView>
+        </View>
+    ), []);
+
+    return (
+        <Animated.View style={[styles.container, { backgroundColor: animatedBackgroundColor }]}>
             <SafeAreaView style={styles.safeArea}>
-                <StatusBar barStyle="dark-content" backgroundColor={item.backgroundColor} translucent />
-                
-                {/* Skip Button */}
+                <StatusBar barStyle="dark-content" translucent />
+
+                {/* Skip Button — fixed, not inside the FlatList */}
                 {currentIndex < onboardingData.length - 1 && (
-                    <TouchableOpacity style={[styles.skipButton, { backgroundColor: item.accentColor }]} onPress={skipToEnd}>
-                        <Text style={styles.skipText}>Skip</Text>
-                    </TouchableOpacity>
+                    <Animated.View style={[styles.skipButtonWrapper, { backgroundColor: animatedAccentColor }]}>
+                        <TouchableOpacity onPress={skipToEnd}>
+                            <Text style={styles.skipText}>Skip</Text>
+                        </TouchableOpacity>
+                    </Animated.View>
                 )}
 
-                <ScrollView 
-                    style={styles.scrollView}
-                    contentContainerStyle={styles.scrollContent}
-                    showsVerticalScrollIndicator={false}
-                >
-                    {/* Icon Container */}
-                    <View style={styles.iconContainer}>
-                        <View style={[styles.iconBackground, { backgroundColor: '#FFFFFF', borderColor: item.iconColor }]}>
-                            <Ionicons name={item.icon} size={80} color={item.iconColor} />
-                        </View>
-                    </View>
+                {/* Sliding content area */}
+                <Animated.FlatList
+                    ref={slidesRef}
+                    data={onboardingData}
+                    renderItem={({ item }) => <ContentSlide item={item} />}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    pagingEnabled
+                    bounces={false}
+                    keyExtractor={(item) => item.id.toString()}
+                    onScroll={Animated.event(
+                        [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+                        { useNativeDriver: false }
+                    )}
+                    onViewableItemsChanged={viewableItemsChanged}
+                    viewabilityConfig={viewConfig}
+                    scrollEventThrottle={32}
+                    style={styles.flatList}
+                />
 
-                    {/* Text Content */}
-                    <View style={styles.textContainer}>
-                        <Text style={[styles.title, { color: item.iconColor }]}>{item.title}</Text>
-                        <Text style={[styles.subtitle, { color: item.accentColor }]}>{item.subtitle}</Text>
-                        <Text style={styles.description}>{item.description}</Text>
-
-                        {/* Features List */}
-                        <View style={styles.featuresContainer}>
-                            {item.features.map((feature, index) => (
-                                <View key={index} style={styles.featureItem}>
-                                    <View style={[styles.featureDot, { backgroundColor: item.iconColor }]} />
-                                    <Text style={styles.featureText}>{feature}</Text>
-                                </View>
-                            ))}
-                        </View>
-                    </View>
-                </ScrollView>
-
-                {/* Bottom Section */}
+                {/* Bottom Section — fixed, not inside the FlatList */}
                 <View style={styles.bottomSection}>
                     {/* Pagination Dots */}
                     <View style={styles.pagination}>
-                        {onboardingData.map((_, index) => (
-                            <View
-                                key={index}
-                                style={[
-                                    styles.dot,
-                                    index === currentIndex 
-                                        ? [styles.activeDot, { backgroundColor: item.iconColor }]
-                                        : [styles.inactiveDot, { backgroundColor: item.accentColor + '40' }]
-                                ]}
-                            />
-                        ))}
+                        {onboardingData.map((_, index) => {
+                            const dotWidth = scrollX.interpolate({
+                                inputRange: [
+                                    (index - 1) * width,
+                                    index * width,
+                                    (index + 1) * width,
+                                ],
+                                outputRange: [10, 30, 10],
+                                extrapolate: 'clamp',
+                            });
+
+                            const dotOpacity = scrollX.interpolate({
+                                inputRange: [
+                                    (index - 1) * width,
+                                    index * width,
+                                    (index + 1) * width,
+                                ],
+                                outputRange: [0.3, 1, 0.3],
+                                extrapolate: 'clamp',
+                            });
+
+                            return (
+                                <Animated.View
+                                    key={index}
+                                    style={[
+                                        styles.dot,
+                                        {
+                                            width: dotWidth,
+                                            opacity: dotOpacity,
+                                            backgroundColor: animatedButtonColor,
+                                        },
+                                    ]}
+                                />
+                            );
+                        })}
                     </View>
 
                     {/* Next/Get Started Button */}
-                    <TouchableOpacity 
-                        style={[styles.nextButton, { backgroundColor: item.iconColor }]} 
+                    <TouchableOpacity
+                        style={styles.nextButton}
                         onPress={scrollTo}
+                        activeOpacity={0.8}
                     >
-                        <Text style={styles.nextButtonText}>
-                            {currentIndex === onboardingData.length - 1 ? 'Get Started' : 'Next'}
-                        </Text>
-                        <Ionicons 
-                            name={currentIndex === onboardingData.length - 1 ? 'checkmark' : 'arrow-forward'} 
-                            size={24} 
-                            color="#FFFFFF" 
-                        />
+                        <Animated.View style={[styles.nextButtonInner, { backgroundColor: animatedButtonColor }]}>
+                            <Text style={styles.nextButtonText}>
+                                {currentIndex === onboardingData.length - 1 ? 'Get Started' : 'Next'}
+                            </Text>
+                            <Ionicons
+                                name={currentIndex === onboardingData.length - 1 ? 'checkmark' : 'arrow-forward'}
+                                size={24}
+                                color="#FFFFFF"
+                            />
+                        </Animated.View>
                     </TouchableOpacity>
                 </View>
             </SafeAreaView>
-        </View>
-    );
-
-    return (
-        <View style={styles.container}>
-            <Animated.FlatList
-                ref={slidesRef}
-                data={onboardingData}
-                renderItem={({ item }) => <Slide item={item} />}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                pagingEnabled
-                bounces={false}
-                keyExtractor={(item) => item.id.toString()}
-                onScroll={Animated.event(
-                    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                    { useNativeDriver: false }
-                )}
-                onViewableItemsChanged={viewableItemsChanged}
-                viewabilityConfig={viewConfig}
-                scrollEventThrottle={32}
-            />
-        </View>
+        </Animated.View>
     );
 };
 
@@ -241,18 +294,14 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    slide: {
-        width,
-        height,
-    },
     safeArea: {
         flex: 1,
     },
-    skipButton: {
+    skipButtonWrapper: {
         position: 'absolute',
         top: 60,
         right: 20,
-        zIndex: 1,
+        zIndex: 10,
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 20,
@@ -267,18 +316,25 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
     },
+    flatList: {
+        flex: 1,
+    },
+    contentSlide: {
+        width,
+        flex: 1,
+    },
     scrollView: {
         flex: 1,
     },
     scrollContent: {
         flexGrow: 1,
         paddingHorizontal: 30,
-        paddingTop: 120,
+        paddingTop: 70,
         paddingBottom: 20,
     },
     iconContainer: {
         alignItems: 'center',
-        marginBottom: 40,
+        marginBottom: 20,
     },
     iconBackground: {
         width: 160,
@@ -308,14 +364,14 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '600',
         textAlign: 'center',
-        marginBottom: 20,
+        marginBottom: 10,
     },
     description: {
         fontSize: 16,
         color: '#6B7280',
         textAlign: 'center',
         lineHeight: 24,
-        marginBottom: 30,
+        marginBottom: 20,
         paddingHorizontal: 10,
     },
     featuresContainer: {
@@ -351,26 +407,23 @@ const styles = StyleSheet.create({
     bottomSection: {
         alignItems: 'center',
         paddingHorizontal: 30,
-        paddingBottom: 60, // Increased from 40 to push button lower
-        paddingTop: 20, // Added top padding for more spacing
+        paddingBottom: 40,
+        paddingTop: 20,
     },
     pagination: {
         flexDirection: 'row',
-        marginBottom: 40, // Increased from 30 for more space above button
+        marginBottom: 20,
     },
     dot: {
-        width: 10,
         height: 10,
         borderRadius: 5,
         marginHorizontal: 6,
     },
-    activeDot: {
-        width: 30,
-    },
-    inactiveDot: {
-        // backgroundColor set dynamically
-    },
     nextButton: {
+        width: '100%',
+        maxWidth: 280,
+    },
+    nextButtonInner: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
@@ -378,8 +431,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 32,
         borderRadius: 30,
         gap: 10,
-        width: '100%',
-        maxWidth: 280,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
