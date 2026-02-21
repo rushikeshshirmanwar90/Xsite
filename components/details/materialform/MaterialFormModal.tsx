@@ -1108,7 +1108,20 @@ const styles = StyleSheet.create<Styles>({
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     gap: 12,
+     backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center' as const,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+    minWidth: 200,
   },
+  //   loadingContainer: {
+   
+  // },
   loadingSpinner: {
     width: 24,
     height: 24,
@@ -1214,18 +1227,7 @@ const styles = StyleSheet.create<Styles>({
     alignItems: 'center' as const,
     zIndex: 1000,
   },
-  loadingContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 32,
-    alignItems: 'center' as const,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
-    minWidth: 200,
-  },
+
   loadingIconContainer: {
     marginBottom: 16,
   },

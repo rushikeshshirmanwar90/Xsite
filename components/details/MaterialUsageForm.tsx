@@ -1233,7 +1233,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                                 {
                                                     width: swipeAnimation.interpolate({
                                                         inputRange: [0, 1],
-                                                        outputRange: ['0%', '100%'],
+                                                        outputRange: [BUTTON_SIZE + BUTTON_INSET * 2, maxSwipeDistance + BUTTON_SIZE + BUTTON_INSET * 2],
                                                         extrapolate: 'clamp',
                                                     }),
                                                     backgroundColor: swipeAnimation.interpolate({
@@ -2408,7 +2408,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.5,
         shadowRadius: 8,
         elevation: 6,
-        overflow: 'hidden', // Added to handle the swipe completion overflow fix
+        overflow: 'hidden', // Ensure checkmark doesn't bleed out
     },
     doubleChevron: {
         flexDirection: 'row',
@@ -2423,6 +2423,10 @@ const styles = StyleSheet.create({
     },
     checkmarkOverlay: {
         position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
         justifyContent: 'center',
         alignItems: 'center',
     },
