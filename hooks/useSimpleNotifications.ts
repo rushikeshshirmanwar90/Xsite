@@ -72,6 +72,21 @@ const generateNotificationContent = (activityData: any) => {
       enhancedMessage = `${staffName} added labor entry in ${projectName}`;
       break;
       
+    // Equipment Activities
+    case 'equipment_added':
+      title = `Equipment Added`;
+      if (materials && materials.length > 0) {
+        const equipmentNames = materials.slice(0, 2).map((e: any) => e.name).join(', ');
+        const totalCost = materials.reduce((sum: number, e: any) => sum + (e.cost || 0), 0);
+        enhancedMessage = `${staffName} added ${materials.length} equipment ${materials.length > 1 ? 'entries' : 'entry'} (${equipmentNames}${materials.length > 2 ? '...' : ''}) to ${projectName}`;
+        if (totalCost > 0) {
+          enhancedMessage += ` - ₹${totalCost.toLocaleString('en-IN')}`;
+        }
+      } else {
+        enhancedMessage = `${staffName} added equipment to ${projectName}`;
+      }
+      break;
+      
     // Material Activities
     case 'material_added':
     case 'material_imported':
@@ -200,12 +215,13 @@ export const useSimpleNotifications = () => {
   const sendProjectNotification = async (activityData: {
     projectId?: string;
     clientId?: string; // Add clientId as a valid field
-    activityType: 'material_added' | 'usage_added' | 'labor_added' | 'admin_update' | 
+    activityType: 'material_added' | 'usage_added' | 'labor_added' | 'equipment_added' | 'admin_update' | 
                   'project_created' | 'project_updated' | 'project_deleted' |
                   'section_created' | 'section_updated' | 'section_deleted' |
                   'mini_section_created' | 'mini_section_updated' | 'mini_section_deleted' |
                   'staff_added' | 'staff_updated' | 'staff_removed' |
-                  'material_imported' | 'material_used' | 'material_transferred';
+                  'material_imported' | 'material_used' | 'material_transferred' |
+                  'equipment_updated' | 'equipment_removed';
     staffName: string;
     projectName?: string;
     sectionName?: string;
@@ -213,7 +229,7 @@ export const useSimpleNotifications = () => {
     details: string;
     staffId?: string; // ID of the user performing the action
     // Additional fields for different activity types
-    category?: 'project' | 'section' | 'mini_section' | 'staff' | 'labor' | 'material';
+    category?: 'project' | 'section' | 'mini_section' | 'staff' | 'labor' | 'material' | 'equipment';
     materials?: Array<{
       name: string;
       unit: string;
@@ -316,7 +332,7 @@ export const useSimpleNotifications = () => {
     projectId?: string;
     clientId?: string; // Add clientId support
     staffId?: string;
-    category?: 'project' | 'section' | 'mini_section' | 'staff' | 'labor' | 'material';
+    category?: 'project' | 'section' | 'mini_section' | 'staff' | 'labor' | 'material' | 'equipment';
     materials?: Array<{
       name: string;
       unit: string;
@@ -330,12 +346,13 @@ export const useSimpleNotifications = () => {
     message?: string;
   }) => {
     const validActivityTypes = [
-      'material_added', 'usage_added', 'labor_added', 'admin_update',
+      'material_added', 'usage_added', 'labor_added', 'equipment_added', 'admin_update',
       'project_created', 'project_updated', 'project_deleted',
       'section_created', 'section_updated', 'section_deleted',
       'mini_section_created', 'mini_section_updated', 'mini_section_deleted',
       'staff_added', 'staff_updated', 'staff_removed',
-      'material_imported', 'material_used', 'material_transferred'
+      'material_imported', 'material_used', 'material_transferred',
+      'equipment_updated', 'equipment_removed'
     ];
 
     if (!validActivityTypes.includes(activityType)) {

@@ -22,6 +22,7 @@ interface GroupedMaterial {
     totalCost: number;
     totalImported?: number; // Total quantity ever imported
     totalUsed?: number; // Total quantity used so far
+    currentlyAvailable?: number; // ✅ NEW: Currently available quantity
     miniSectionId?: string;
 }
 
@@ -366,7 +367,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                             <View style={styles.statItem}>
                                 <Text style={styles.statLabel}>Total Imported</Text>
                                 <Text style={styles.statValue}>
-                                    {material.totalImported || material.totalQuantity} {material.unit}
+                                    {material.totalImported || 0} {material.unit}
                                 </Text>
                             </View>
                             <View style={styles.statDivider} />
@@ -378,7 +379,10 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                     styles.statValue,
                                     activeTab === 'used' ? styles.statValueUsed : styles.statValueAvailable
                                 ]}>
-                                    {material.totalQuantity} {material.unit}
+                                    {activeTab === 'used' 
+                                        ? material.totalQuantity  // In used tab, totalQuantity = used quantity
+                                        : (material.currentlyAvailable || material.totalQuantity)  // In imported tab, show currently available
+                                    } {material.unit}
                                 </Text>
                             </View>
                             <View style={styles.statDivider} />
@@ -391,8 +395,8 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                     activeTab === 'used' ? styles.statValueAvailable : styles.statValueUsed
                                 ]}>
                                     {activeTab === 'used'
-                                        ? (material.totalImported ? material.totalImported - material.totalQuantity : 0)
-                                        : (material.totalUsed || 0)
+                                        ? (material.currentlyAvailable || 0)  // In used tab, show currently available
+                                        : (material.totalUsed || 0)  // In imported tab, show total used
                                     } {material.unit}
                                 </Text>
                             </View>
@@ -406,16 +410,16 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                         style={[
                                             styles.progressBarFill,
                                             {
-                                                width: material.totalImported
-                                                    ? `${Math.min((material.totalQuantity / material.totalImported) * 100, 100)}%`
+                                                width: material.totalImported && material.totalImported > 0
+                                                    ? `${Math.min(((material.currentlyAvailable || material.totalQuantity) / material.totalImported) * 100, 100)}%`
                                                     : '100%'
                                             }
                                         ]}
                                     />
                                 </View>
                                 <Text style={styles.progressPercentage}>
-                                    {material.totalImported
-                                        ? `${Math.round((material.totalQuantity / material.totalImported) * 100)}% remaining`
+                                    {material.totalImported && material.totalImported > 0
+                                        ? `${Math.round(((material.currentlyAvailable || material.totalQuantity) / material.totalImported) * 100)}% remaining`
                                         : '100% remaining'}
                                 </Text>
                             </View>

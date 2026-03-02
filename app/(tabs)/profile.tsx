@@ -47,6 +47,9 @@ interface ClientData {
     country?: string;
     companyName?: string;
     gstNumber?: string;
+    license?: number;
+    licenseExpiryDate?: string;
+    isLicenseActive?: boolean;
 }
 
 interface ProjectStats {
@@ -201,6 +204,9 @@ const CompanyProfile: React.FC = () => {
                     country: client.country, // Note: country might not exist in Client model
                     companyName: client.name, // ✅ FIX: Use name as company name
                     gstNumber: client.gstNumber, // This field might not exist in Client model
+                    license: client.license || 0,
+                    licenseExpiryDate: client.licenseExpiryDate,
+                    isLicenseActive: client.isLicenseActive || false,
                 });
                 console.log('✅ Client data set successfully:', client);
             } else {
@@ -381,6 +387,52 @@ const CompanyProfile: React.FC = () => {
 
     const formatCurrency = (amount: number) => {
         return `₹${amount.toLocaleString('en-IN')}`;
+    };
+
+    const getLicenseStatus = () => {
+        if (!clientData.license && clientData.license !== 0) {
+            return {
+                status: 'No License',
+                color: '#94A3B8',
+                bgColor: '#F8FAFC',
+                icon: 'alert-circle-outline'
+            };
+        }
+
+        if (clientData.license === -1) {
+            return {
+                status: 'Lifetime Access',
+                color: '#10B981',
+                bgColor: '#ECFDF5',
+                icon: 'infinite-outline'
+            };
+        }
+
+        if (clientData.license === 0) {
+            return {
+                status: 'License Expired',
+                color: '#EF4444',
+                bgColor: '#FEF2F2',
+                icon: 'close-circle-outline'
+            };
+        }
+
+        if (clientData.license > 0) {
+            const daysText = clientData.license === 1 ? 'day' : 'days';
+            return {
+                status: `${clientData.license} ${daysText} left`,
+                color: clientData.license <= 7 ? '#F59E0B' : '#3B82F6',
+                bgColor: clientData.license <= 7 ? '#FEF3C7' : '#EFF6FF',
+                icon: clientData.license <= 7 ? 'warning-outline' : 'time-outline'
+            };
+        }
+
+        return {
+            status: 'Unknown',
+            color: '#94A3B8',
+            bgColor: '#F8FAFC',
+            icon: 'help-circle-outline'
+        };
     };
 
     const onRefresh = async () => {
@@ -590,6 +642,110 @@ const CompanyProfile: React.FC = () => {
                         )}
                     </View>
                 </View>
+
+                {/* License Status Section - Only for non-staff users */}
+                {!isCurrentUserStaff && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>License Status</Text>
+                        <View style={[styles.infoCard, styles.licenseCard]}>
+                            {loadingClient ? (
+                                <View style={styles.infoRow}>
+                                    <View style={styles.infoIconContainer}>
+                                        <Ionicons name="hourglass-outline" size={20} color="#64748B" />
+                                    </View>
+                                    <View style={styles.infoContent}>
+                                        <Text style={styles.infoLabel}>Loading</Text>
+                                        <Text style={styles.infoValue}>Checking license status...</Text>
+                                    </View>
+                                </View>
+                            ) : (
+                                <>
+                                    <View style={styles.licenseHeader}>
+                                        <View style={[styles.licenseIconContainer, { backgroundColor: getLicenseStatus().bgColor }]}>
+                                            <Ionicons 
+                                                name={getLicenseStatus().icon as any} 
+                                                size={24} 
+                                                color={getLicenseStatus().color} 
+                                            />
+                                        </View>
+                                        <View style={styles.licenseContent}>
+                                            <Text style={styles.licenseTitle}>License Status</Text>
+                                            <Text style={[styles.licenseStatus, { color: getLicenseStatus().color }]}>
+                                                {getLicenseStatus().status}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* License Details */}
+                                    {clientData.license !== undefined && clientData.license !== null && (
+                                        <View style={styles.licenseDetails}>
+                                            <View style={styles.licenseDetailRow}>
+                                                <Text style={styles.licenseDetailLabel}>License Days:</Text>
+                                                <Text style={[styles.licenseDetailValue, { 
+                                                    color: clientData.license === -1 ? '#10B981' : 
+                                                           clientData.license === 0 ? '#EF4444' : 
+                                                           clientData.license <= 7 ? '#F59E0B' : '#3B82F6' 
+                                                }]}>
+                                                    {clientData.license === -1 ? 'Unlimited' : clientData.license}
+                                                </Text>
+                                            </View>
+
+                                            {clientData.licenseExpiryDate && clientData.license > 0 && (
+                                                <View style={styles.licenseDetailRow}>
+                                                    <Text style={styles.licenseDetailLabel}>Expires On:</Text>
+                                                    <Text style={styles.licenseDetailValue}>
+                                                        {new Date(clientData.licenseExpiryDate).toLocaleDateString('en-IN', {
+                                                            day: 'numeric',
+                                                            month: 'short',
+                                                            year: 'numeric'
+                                                        })}
+                                                    </Text>
+                                                </View>
+                                            )}
+
+                                            <View style={styles.licenseDetailRow}>
+                                                <Text style={styles.licenseDetailLabel}>Status:</Text>
+                                                <Text style={[styles.licenseDetailValue, { 
+                                                    color: clientData.isLicenseActive ? '#10B981' : '#EF4444' 
+                                                }]}>
+                                                    {clientData.isLicenseActive ? 'Active' : 'Inactive'}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    )}
+
+                                    {/* License Warning/Info Messages */}
+                                    {clientData.license === 0 && (
+                                        <View style={styles.licenseWarning}>
+                                            <Ionicons name="warning" size={16} color="#EF4444" />
+                                            <Text style={styles.licenseWarningText}>
+                                                Your license has expired. Please contact support to renew.
+                                            </Text>
+                                        </View>
+                                    )}
+
+                                    {clientData.license > 0 && clientData.license <= 7 && (
+                                        <View style={styles.licenseWarning}>
+                                            <Ionicons name="alert-circle" size={16} color="#F59E0B" />
+                                            <Text style={[styles.licenseWarningText, { color: '#F59E0B' }]}>
+                                                Your license expires soon. Consider renewing to avoid interruption.
+                                            </Text>
+                                        </View>
+                                    )}
+
+                                    {clientData.license === -1 && (
+                                        <View style={[styles.licenseWarning, { backgroundColor: '#ECFDF5', borderColor: '#BBF7D0' }]}>
+                                            <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                                            <Text style={[styles.licenseWarningText, { color: '#10B981' }]}>
+                                                You have lifetime access to all features.
+                                            </Text>
+                                        </View>
+                                    )}
+                                </>
+                            )}
+                        </View>
+                    </View>
+                )}
 
                 {/* QR Code Section - Priority for unassigned staff */}
                 {isCurrentUserStaff && user && !userData.clientId && (
@@ -1924,6 +2080,76 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '600',
         color: '#3B82F6',
+    },
+    // License card styles
+    licenseCard: {
+        borderColor: '#E0E7FF',
+        backgroundColor: '#FAFAFF',
+    },
+    licenseHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+        paddingBottom: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    licenseIconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    licenseContent: {
+        flex: 1,
+    },
+    licenseTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1E293B',
+        marginBottom: 2,
+    },
+    licenseStatus: {
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    licenseDetails: {
+        marginBottom: 16,
+    },
+    licenseDetailRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F8FAFC',
+    },
+    licenseDetailLabel: {
+        fontSize: 13,
+        color: '#64748B',
+        fontWeight: '500',
+    },
+    licenseDetailValue: {
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    licenseWarning: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FEF2F2',
+        borderColor: '#FECACA',
+        borderWidth: 1,
+        borderRadius: 8,
+        padding: 12,
+        gap: 8,
+    },
+    licenseWarningText: {
+        fontSize: 12,
+        color: '#EF4444',
+        flex: 1,
+        lineHeight: 16,
     },
 });
 

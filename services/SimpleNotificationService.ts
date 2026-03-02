@@ -205,12 +205,13 @@ export class SimpleNotificationService {
   async sendProjectNotification(activityData: {
     projectId?: string;
     clientId?: string; // Add clientId field
-    activityType: 'material_added' | 'usage_added' | 'labor_added' | 'admin_update' | 
+    activityType: 'material_added' | 'usage_added' | 'labor_added' | 'equipment_added' | 'admin_update' | 
                   'project_created' | 'project_updated' | 'project_deleted' |
                   'section_created' | 'section_updated' | 'section_deleted' |
                   'mini_section_created' | 'mini_section_updated' | 'mini_section_deleted' |
                   'staff_added' | 'staff_updated' | 'staff_removed' |
-                  'material_imported' | 'material_used' | 'material_transferred';
+                  'material_imported' | 'material_used' | 'material_transferred' |
+                  'equipment_updated' | 'equipment_removed';
     staffName: string;
     projectName?: string;
     sectionName?: string;
@@ -410,6 +411,14 @@ export class SimpleNotificationService {
       // Labor Activities
       case 'labor_added':
         return `Labor Added by ${staffName}`;
+        
+      // Equipment Activities
+      case 'equipment_added':
+        return `Equipment Added by ${staffName}`;
+      case 'equipment_updated':
+        return `Equipment Updated by ${staffName}`;
+      case 'equipment_removed':
+        return `Equipment Removed by ${staffName}`;
         
       // Project Activities
       case 'project_created':

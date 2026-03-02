@@ -677,6 +677,7 @@ const NotificationPage: React.FC = () => {
         if (category === 'staff') return { name: 'people', color: '#EF4444' };
         if (category === 'labor') return { name: 'hammer', color: '#F59E0B' };
         if (category === 'material') return { name: 'cube', color: '#06B6D4' };
+        if (category === 'equipment') return { name: 'construct', color: '#8B5CF6' };
         return { name: 'information-circle', color: '#6B7280' };
     };
 
@@ -1033,10 +1034,10 @@ const NotificationPage: React.FC = () => {
         if (activeTab === 'all') {
             return getCombinedActivities();
         } else if (activeTab === 'project') {
-            // Safely map activities (ensure it's an array) - include project, section, and mini-section activities
+            // Safely map activities (ensure it's an array) - include project, section, mini-section, and equipment activities
             if (Array.isArray(activities)) {
                 return activities
-                    .filter(a => a.category === 'project' || a.category === 'section' || a.category === 'mini_section')
+                    .filter(a => a.category === 'project' || a.category === 'section' || a.category === 'mini_section' || a.category === 'equipment')
                     .map(a => ({ type: 'activity' as const, data: a, timestamp: a.createdAt }));
             }
             return [];
@@ -1093,10 +1094,10 @@ const NotificationPage: React.FC = () => {
                 let filteredGroupActivities = group.activities;
                 
                 if (activeTab === 'project') {
-                    // Only show regular activities (not material activities) - include project, section, and mini-section activities
+                    // Only show regular activities (not material activities) - include project, section, mini-section, and equipment activities
                     filteredGroupActivities = group.activities.filter(item => 
                         item.type === 'activity' && 
-                        ['project', 'section', 'mini_section'].includes((item.data as Activity).category)
+                        ['project', 'section', 'mini_section', 'equipment'].includes((item.data as Activity).category)
                     );
                 } else if (activeTab === 'labor') {
                     // Only show labor activities
@@ -1245,7 +1246,7 @@ const NotificationPage: React.FC = () => {
                 item.type === 'activity' && (item.data as Activity).category === 'labor'
             ).length;
             const projectCount = group.activities.filter(item => 
-                item.type === 'activity' && ['project', 'section', 'mini_section'].includes((item.data as Activity).category)
+                item.type === 'activity' && ['project', 'section', 'mini_section', 'equipment'].includes((item.data as Activity).category)
             ).length;
             const materialImportedCount = group.activities.filter(item => 
                 item.type === 'material' && (item.data as MaterialActivity).activity === 'imported'
@@ -1258,7 +1259,7 @@ const NotificationPage: React.FC = () => {
             console.log(`     - Total: ${totalInGroup}`);
             console.log(`     - Activities: ${activityCount}`);
             console.log(`     - Labor Activities: ${laborCount}`);
-            console.log(`     - Project Activities (includes sections): ${projectCount}`);
+            console.log(`     - Project Activities (includes sections & equipment): ${projectCount}`);
             console.log(`     - Materials (imported): ${materialImportedCount}`);
             console.log(`     - Materials (used): ${materialUsedCount}`);
             

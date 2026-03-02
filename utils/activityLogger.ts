@@ -65,6 +65,9 @@ export type ActivityType =
   | "labor_added"
   | "labor_updated"
   | "labor_removed"
+  | "equipment_added"
+  | "equipment_updated"
+  | "equipment_removed"
   | "other";
 
 export type ActivityCategory =
@@ -75,6 +78,7 @@ export type ActivityCategory =
   | "staff"
   | "other"
   | "labor"
+  | "equipment"
   | "completion";
 
 export type ActivityAction =
@@ -916,3 +920,187 @@ export const logMiniSectionReopened = async (
 };
 
 
+
+// ============================================
+// EQUIPMENT ACTIVITIES
+// ============================================
+
+export const logEquipmentAdded = async (
+  projectId: string,
+  projectName: string,
+  sectionId: string,
+  sectionName: string,
+  miniSectionId?: string,
+  miniSectionName?: string,
+  equipmentEntries: Array<{
+    type: string;
+    category: string;
+    quantity: number;
+    perUnitCost: number;
+    totalCost: number;
+    costType?: string;
+    rentalPeriod?: string;
+    rentalDuration?: number;
+  }>,
+  message?: string
+) => {
+  const totalEquipment = equipmentEntries.reduce((sum, entry) => sum + entry.quantity, 0);
+  const totalCost = equipmentEntries.reduce((sum, entry) => sum + entry.totalCost, 0);
+  const categories = [...new Set(equipmentEntries.map(entry => entry.category))];
+  const types = [...new Set(equipmentEntries.map(entry => entry.type))];
+
+  // Create a hierarchical location description
+  let locationDescription = `${projectName} → ${sectionName}`;
+  if (miniSectionName) {
+    locationDescription += ` → ${miniSectionName}`;
+  }
+
+  // Create a more detailed description
+  let description = '';
+  if (equipmentEntries.length === 1) {
+    // Single entry - show specific details
+    const entry = equipmentEntries[0];
+    const costTypeInfo = entry.costType === 'rental' && entry.rentalPeriod && entry.rentalDuration 
+      ? ` (${entry.costType} - ${entry.rentalDuration} ${entry.rentalPeriod})` 
+      : entry.costType ? ` (${entry.costType})` : '';
+    description = `Added ${entry.quantity} ${entry.type}${costTypeInfo} to ${locationDescription}`;
+  } else {
+    // Multiple entries - show summary with types
+    const typesList = types.length > 3 ? `${types.slice(0, 3).join(', ')} and ${types.length - 3} more` : types.join(', ');
+    description = `Added ${totalEquipment} equipment items: ${typesList} to ${locationDescription}`;
+  }
+
+  await logActivity({
+    activityType: "equipment_added",
+    category: "equipment",
+    action: "add",
+    description,
+    projectId,
+    projectName,
+    sectionId,
+    sectionName,
+    miniSectionId,
+    miniSectionName,
+    message,
+    metadata: {
+      equipmentEntries,
+      totalEquipment,
+      totalCost,
+      categories,
+      types,
+      entriesCount: equipmentEntries.length,
+      locationHierarchy: {
+        projectName,
+        sectionName,
+        miniSectionName,
+        fullPath: locationDescription
+      }
+    },
+  });
+};
+
+export const logEquipmentUpdated = async (
+  projectId: string,
+  projectName: string,
+  sectionId: string,
+  sectionName: string,
+  miniSectionId?: string,
+  miniSectionName?: string,
+  equipmentType: string,
+  equipmentCategory: string,
+  oldQuantity: number,
+  newQuantity: number,
+  oldCost: number,
+  newCost: number,
+  message?: string
+) => {
+  // Create a hierarchical location description
+  let locationDescription = `${projectName} → ${sectionName}`;
+  if (miniSectionName) {
+    locationDescription += ` → ${miniSectionName}`;
+  }
+
+  await logActivity({
+    activityType: "equipment_updated",
+    category: "equipment",
+    action: "update",
+    description: `Updated ${equipmentType} (${equipmentCategory}) in ${locationDescription}`,
+    projectId,
+    projectName,
+    sectionId,
+    sectionName,
+    miniSectionId,
+    miniSectionName,
+    message,
+    changedData: [
+      {
+        field: "quantity",
+        oldValue: oldQuantity,
+        newValue: newQuantity,
+      },
+      {
+        field: "totalCost",
+        oldValue: oldCost,
+        newValue: newCost,
+      },
+    ],
+    metadata: {
+      equipmentType,
+      equipmentCategory,
+      quantityChange: newQuantity - oldQuantity,
+      costChange: newCost - oldCost,
+      locationHierarchy: {
+        projectName,
+        sectionName,
+        miniSectionName,
+        fullPath: locationDescription
+      }
+    },
+  });
+};
+
+export const logEquipmentRemoved = async (
+  projectId: string,
+  projectName: string,
+  sectionId: string,
+  sectionName: string,
+  miniSectionId?: string,
+  miniSectionName?: string,
+  equipmentType: string,
+  equipmentCategory: string,
+  quantity: number,
+  totalCost: number,
+  message?: string
+) => {
+  // Create a hierarchical location description
+  let locationDescription = `${projectName} → ${sectionName}`;
+  if (miniSectionName) {
+    locationDescription += ` → ${miniSectionName}`;
+  }
+
+  await logActivity({
+    activityType: "equipment_removed",
+    category: "equipment",
+    action: "remove",
+    description: `Removed ${quantity} ${equipmentType} (${equipmentCategory}) from ${locationDescription}`,
+    projectId,
+    projectName,
+    sectionId,
+    sectionName,
+    miniSectionId,
+    miniSectionName,
+    message,
+    metadata: {
+      equipmentType,
+      equipmentCategory,
+      quantity,
+      totalCost,
+      locationHierarchy: {
+        projectName,
+        sectionName,
+        miniSectionName,
+        fullPath: locationDescription
+      }
+    },
+  });
+};
