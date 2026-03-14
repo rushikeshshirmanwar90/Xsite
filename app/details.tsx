@@ -7,7 +7,7 @@ import TabSelector from '@/components/details/TabSelector';
 import { predefinedSections } from '@/data/details';
 import { getSection } from '@/functions/details';
 import { getClientId } from '@/functions/clientId';
-import { domain } from '@/lib/domain';
+import { API_BASE_URL as domain } from '@/lib/domain';
 import { styles } from '@/style/details';
 import { Material, MaterialEntry, Section } from '@/types/details';
 import { logMaterialImported } from '@/utils/activityLogger';
@@ -1237,11 +1237,14 @@ const Details = () => {
             // Fetch ALL available materials (no pagination)
             let allAvailable: any[] = [];
             try {
-                const availableUrl = `${domain}/api/material?projectId=${projectId}&clientId=${clientId}&limit=1000`;
-                console.log('📡 Available materials URL:', availableUrl);
-                
-                const availableResponse = await axios.get(availableUrl, {
-                    timeout: 15000, // 15 second timeout
+                // Use params object instead of query string to avoid URL encoding issues
+                const availableResponse = await axios.get(`${domain}/api/material`, {
+                    params: {
+                        projectId: projectId,
+                        clientId: clientId,
+                        limit: 1000
+                    },
+                    timeout: 15000,
                     headers: {
                         'Content-Type': 'application/json'
                     }
@@ -1266,11 +1269,13 @@ const Details = () => {
             // Fetch ALL used materials (no pagination) - with better error handling
             let allUsed: any[] = [];
             try {
-                const usedUrl = `${domain}/api/material-usage?projectId=${projectId}&clientId=${clientId}&limit=1000`;
-                console.log('📡 Used materials URL:', usedUrl);
-                
-                const usedResponse = await axios.get(usedUrl, {
-                    timeout: 15000, // 15 second timeout
+                // Use params object and try without limit first
+                const usedResponse = await axios.get(`${domain}/api/material-usage`, {
+                    params: {
+                        projectId: projectId,
+                        clientId: clientId
+                    },
+                    timeout: 15000,
                     headers: {
                         'Content-Type': 'application/json'
                     }
@@ -1310,18 +1315,17 @@ const Details = () => {
                 
                 // Handle specific error cases
                 if (usedError.response?.status === 400) {
-                    console.error('❌ BAD REQUEST (400) - Possible causes:');
-                    console.error('   - Invalid projectId or clientId format');
-                    console.error('   - Missing required parameters');
-                    console.error('   - API endpoint expects different parameters');
+                    console.error('❌ BAD REQUEST (400) - Trying alternative parameter format...');
                     
-                    // Try alternative API call without limit parameter
+                    // Try alternative API call with different parameter structure
                     try {
-                        console.log('🔄 Trying alternative API call without limit parameter...');
-                        const alternativeUrl = `${domain}/api/material-usage?projectId=${projectId}&clientId=${clientId}`;
-                        console.log('📡 Alternative URL:', alternativeUrl);
+                        console.log('🔄 Trying alternative parameter format...');
                         
-                        const alternativeResponse = await axios.get(alternativeUrl, {
+                        const alternativeResponse = await axios.get(`${domain}/api/material-usage`, {
+                            params: {
+                                project: projectId,
+                                client: clientId
+                            },
                             timeout: 15000,
                             headers: {
                                 'Content-Type': 'application/json'
@@ -1333,8 +1337,30 @@ const Details = () => {
                             allUsed = alternativeData.MaterialUsed || [];
                             console.log(`✅ Alternative API call successful: ${allUsed.length} used materials`);
                         }
-                    } catch (alternativeError) {
+                    } catch (alternativeError: any) {
                         console.error('❌ Alternative API call also failed:', alternativeError);
+                        
+                        // Try with POST method if GET doesn't work
+                        try {
+                            console.log('🔄 Trying POST method...');
+                            const postResponse = await axios.post(`${domain}/api/material-usage`, {
+                                projectId: projectId,
+                                clientId: clientId
+                            }, {
+                                timeout: 15000,
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                }
+                            });
+                            
+                            const postData = postResponse.data as any;
+                            if (postData.success) {
+                                allUsed = postData.MaterialUsed || [];
+                                console.log(`✅ POST method successful: ${allUsed.length} used materials`);
+                            }
+                        } catch (postError) {
+                            console.error('❌ POST method also failed:', postError);
+                        }
                     }
                 } else if (usedError.response?.status === 404) {
                     console.log('ℹ️ Used materials endpoint not found - this might be normal if no materials have been used');
@@ -1417,8 +1443,8 @@ const Details = () => {
                                 params: { projectId, clientId },
                                 timeout: 10000
                             });
-                            if (availableResponse.data.success) {
-                                completeData.available = availableResponse.data.MaterialAvailable || [];
+                            if ((availableResponse.data as any).success) {
+                                completeData.available = (availableResponse.data as any).MaterialAvailable || [];
                                 console.log(`✅ Simple API: Got ${completeData.available.length} available materials`);
                             }
                         } catch (availError) {
@@ -1430,8 +1456,8 @@ const Details = () => {
                                 params: { projectId, clientId },
                                 timeout: 10000
                             });
-                            if (usedResponse.data.success) {
-                                completeData.used = usedResponse.data.MaterialUsed || [];
+                            if ((usedResponse.data as any).success) {
+                                completeData.used = (usedResponse.data as any).MaterialUsed || [];
                                 console.log(`✅ Simple API: Got ${completeData.used.length} used materials`);
                             }
                         } catch (usedError) {
@@ -1898,6 +1924,37 @@ const Details = () => {
             return [];
         }
     };
+    // Helper function to validate API parameters
+    const validateApiParameters = (params: any) => {
+        const errors = [];
+        
+        if (!params.projectId || !isValidMongoId(params.projectId)) {
+            errors.push('Invalid or missing projectId');
+        }
+        
+        if (!params.sectionId || !isValidMongoId(params.sectionId)) {
+            errors.push('Invalid or missing sectionId');
+        }
+        
+        if (!params.miniSectionId || !isValidMongoId(params.miniSectionId)) {
+            errors.push('Invalid or missing miniSectionId');
+        }
+        
+        if (!params.clientId) {
+            errors.push('Missing clientId');
+        }
+        
+        if (!params.materialUsages || !Array.isArray(params.materialUsages) || params.materialUsages.length === 0) {
+            errors.push('Invalid or empty materialUsages array');
+        }
+        
+        if (!params.user || !params.user.userId) {
+            errors.push('Invalid or missing user data');
+        }
+        
+        return errors;
+    };
+
     // Handle adding material usage from the form (batch version)
     const handleAddMaterialUsage = async (
         miniSectionId: string,
@@ -1974,6 +2031,15 @@ const Details = () => {
             user: user
         };
 
+        // Validate parameters before making API call
+        const validationErrors = validateApiParameters(apiPayload);
+        if (validationErrors.length > 0) {
+            stopUsageLoadingAnimation();
+            console.error('❌ API Parameter validation failed:', validationErrors);
+            toast.error(`Parameter validation failed: ${validationErrors.join(', ')}`);
+            return;
+        }
+
         console.log('\n📤 API PAYLOAD:');
         console.log(JSON.stringify(apiPayload, null, 2));
         console.log('\n🌐 API ENDPOINT:', `${domain}/api/material-usage-batch`);
@@ -1992,14 +2058,20 @@ const Details = () => {
             console.log('  - Domain:', domain);
             console.log('  - Full URL:', `${domain}/api/material-usage-batch`);
             console.log('  - Timeout: 30 seconds');
+            console.log('  - Payload size:', JSON.stringify(apiPayload).length, 'characters');
             console.log('========================================');
 
             // Add request headers for debugging
             const requestConfig = {
                 headers: {
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json',
                 },
                 timeout: 30000, // 30 second timeout
+                validateStatus: function (status: number) {
+                    // Don't throw for any status code, we'll handle it manually
+                    return status < 500;
+                }
             };
 
             console.log('📋 Request config:', JSON.stringify(requestConfig, null, 2));
@@ -2108,7 +2180,6 @@ const Details = () => {
                             staffName: staffName,
                             projectName: projectName,
                             details: notificationDetails,
-                            recipientType: 'admins',
                         });
                         
                         if (notificationSent) {
@@ -2165,9 +2236,9 @@ const Details = () => {
             console.log(JSON.stringify(error, null, 2));
             console.log('========================================\n');
 
-            // If batch API fails with 405, try fallback to single material API
-            if (error?.response?.status === 405) {
-                console.log('🔄 Batch API returned 405, trying fallback to single material API...');
+            // If batch API fails with 400 (bad request) or 405 (method not allowed), try fallback to single material API
+            if (error?.response?.status === 400 || error?.response?.status === 405 || error?.response?.status === 404) {
+                console.log(`🔄 Batch API returned ${error?.response?.status}, trying fallback to single material API...`);
                 
                 try {
                     loadingToast = toast.loading('Retrying with alternative method...');
@@ -2183,12 +2254,18 @@ const Details = () => {
                                 sectionId: sectionId,
                                 miniSectionId: miniSectionId,
                                 materialId: usage.materialId,
-                                qnt: usage.quantity
+                                qnt: usage.quantity,
+                                clientId: clientId // Add clientId to single API payload
                             };
                             
                             console.log(`Processing material ${usage.materialId} with single API...`);
-                            const singleResponse = await axios.post(`${domain}/api/material-usage`, singleApiPayload);
-                            const singleResponseData = singleResponse.data as any; // ✅ FIXED: Type assertion
+                            const singleResponse = await axios.post(`${domain}/api/material-usage`, singleApiPayload, {
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                timeout: 15000,
+                            });
+                            const singleResponseData = singleResponse.data as any;
                             
                             if (singleResponseData.success) {
                                 successCount++;
@@ -2227,16 +2304,11 @@ const Details = () => {
                         
                         return; // Exit successfully
                     } else {
-                        throw new Error('All materials failed to process');
+                        throw new Error(`All ${failCount} materials failed to process`);
                     }
                 } catch (fallbackError: any) {
-                    if (loadingToast) {
-                        toast.dismiss(loadingToast);
-                    }
-                    console.log('❌ Fallback also failed:', fallbackError);
-                    toast.error('Failed to process materials with both methods');
-                    stopUsageLoadingAnimation();
-                    return;
+                    console.error('❌ Fallback single API also failed:', fallbackError);
+                    toast.error('Both batch and single material APIs failed. Please try again.');
                 }
             }
 
@@ -2592,7 +2664,7 @@ const Details = () => {
                 console.log('   - Available mini-sections:', miniSections.map(ms => ({ id: ms._id, name: ms.name })));
                 console.log('   - All used materials:');
                 
-                const allUsed = activeTab === 'imported' ? availableMaterials : usedMaterials;
+                const allUsed = usedMaterials;
                 allUsed.forEach((m, idx) => {
                     console.log(`     ${idx + 1}. ${m.name}`);
                     console.log(`        sectionId: ${m.sectionId}`);
@@ -2797,9 +2869,8 @@ const Details = () => {
             return;
         }
 
-        // Start loading animation
+        // Start loading animation (no toast - handled by MaterialFormModal)
         startMaterialLoadingAnimation();
-        toast.loading(`Adding ${materials.length} material${materials.length === 1 ? '' : 's'}...`);
 
         // Transform materials to match API format
         const formattedMaterials = materials.map((material: any) => ({
@@ -2833,10 +2904,7 @@ const Details = () => {
                 const failCount = responseData.results?.filter((r: any) => !r.success).length || 0;
 
                 if (successCount > 0) {
-                    // Update loading message
-                    toast.loading('Logging activity...');
-
-                    // ✅ FIXED: Log material activity ONLY for successful materials
+                    // Log material activity ONLY for successful materials (no toast)
                     const successfulResults = responseData.results?.filter((r: any) => r.success) || [];
                     
                     console.log('🔍 DEBUG: Successful Results Structure:');
@@ -2980,7 +3048,6 @@ const Details = () => {
                                 staffName: staffName,
                                 projectName: projectName,
                                 details: notificationDetails,
-                                recipientType: 'admins',
                             });
                             
                             if (notificationSent) {
@@ -2995,20 +3062,19 @@ const Details = () => {
                     }
                 }
 
-                // Update loading message for refresh
-                toast.loading('Refreshing materials...');
-
-                // Refresh project materials after adding
+                // Refresh project materials after adding (no toast)
                 await reloadProjectMaterials();
 
-                // Stop loading animation and show success
+                // Stop loading animation (show success toast after completion)
                 stopMaterialLoadingAnimation();
-                toast.dismiss(); // Dismiss loading toast
+
+                // Show success toast for successful additions
+                if (successCount > 0) {
+                    toast.success(`🎉 Successfully added ${successCount} material${successCount === 1 ? '' : 's'} to your project!`);
+                }
 
                 if (failCount > 0) {
                     toast.error(`Failed to add ${failCount} material${failCount > 1 ? 's' : ''}`);
-                } else {
-                    toast.success(`✅ Successfully added ${successCount} material${successCount === 1 ? '' : 's'}`);
                 }
             } else {
                 throw new Error(responseData.error || 'Failed to add materials');

@@ -223,7 +223,13 @@ export class PDFReportGenerator {
     }
 
     // Generate complete HTML for the PDF
-    private generateHTML(activities: MaterialActivity[], projectName?: string, laborData?: any[]): string {
+    private generateHTML(activities: MaterialActivity[], projectName?: string, laborData?: any[], equipmentData?: any[]): string {
+        console.log('🔍 PDF Generator - generateHTML called with:');
+        console.log('  - Activities:', activities.length);
+        console.log('  - Labor data:', laborData?.length || 0);
+        console.log('  - Equipment data:', equipmentData?.length || 0);
+        console.log('  - Equipment data sample:', equipmentData?.slice(0, 2));
+        
         const groupedActivities = this.groupActivitiesByDate(activities);
         const sortedDates = Object.keys(groupedActivities).sort((a, b) => b.localeCompare(a)); // Latest first
 
@@ -262,7 +268,12 @@ export class PDFReportGenerator {
             return sum + (Number(labor.totalCost) || 0);
         }, 0);
 
-        const totalCost = totalMaterialCost + totalLaborCost;
+        // Calculate equipment costs
+        const totalEquipmentCost = (equipmentData || []).reduce((sum, equipment) => {
+            return sum + (Number(equipment.totalCost) || 0);
+        }, 0);
+
+        const totalCost = totalMaterialCost + totalLaborCost + totalEquipmentCost;
 
         const dateRangeHTML = sortedDates.length > 0 ? `
             <div style="background-color: #f0f9ff; padding: 12px; border-radius: 6px; margin-bottom: 20px;">
@@ -306,17 +317,37 @@ export class PDFReportGenerator {
                             <div style="font-size: 12px; color: #6b7280;">Materials Transferred</div>
                         </div>
                     </div>
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 12px;">
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 12px;">
                         <div>
                             <div style="font-size: 18px; font-weight: bold; color: #8b5cf6;">${(laborData || []).length}</div>
                             <div style="font-size: 12px; color: #6b7280;">Labor Entries</div>
                         </div>
                         <div>
-                            <div style="font-size: 18px; font-weight: bold; color: #6b7280;">-</div>
-                            <div style="font-size: 12px; color: #6b7280;">-</div>
+                            <div style="font-size: 18px; font-weight: bold; color: #f59e0b;">${(equipmentData || []).length}</div>
+                            <div style="font-size: 12px; color: #6b7280;">Equipment Entries</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 18px; font-weight: bold; color: #059669;">${this.formatCurrency(totalEquipmentCost)}</div>
+                            <div style="font-size: 12px; color: #6b7280;">Equipment Cost</div>
                         </div>
                     </div>
                 </div>
+                ${equipmentData && equipmentData.length > 0 ? `
+                    <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0; background-color: #fef3c7; padding: 12px; border-radius: 6px;">
+                        <div style="font-weight: bold; color: #374151; margin-bottom: 8px;">Equipment Debug Info:</div>
+                        <div style="font-size: 12px; color: #6b7280;">
+                            Equipment entries found: ${equipmentData.length}<br>
+                            First equipment: ${equipmentData[0]?.type || 'Unknown'} - ${this.formatCurrency(Number(equipmentData[0]?.totalCost) || 0)}
+                        </div>
+                    </div>
+                ` : `
+                    <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0; background-color: #fee2e2; padding: 12px; border-radius: 6px;">
+                        <div style="font-weight: bold; color: #dc2626; margin-bottom: 8px;">Equipment Debug Info:</div>
+                        <div style="font-size: 12px; color: #6b7280;">
+                            No equipment data found or equipment array is empty.
+                        </div>
+                    </div>
+                `}
             </div>
         `;
 
@@ -367,7 +398,7 @@ export class PDFReportGenerator {
             <html>
             <head>
                 <meta charset="utf-8">
-                <title>${projectName ? `${projectName} - Material Report` : 'Material Activity Report'}</title>
+                <title>${projectName ? `${projectName} - Complete Cost Report` : 'Complete Project Cost Report'}</title>
                 <style>
                     body {
                         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -407,9 +438,9 @@ export class PDFReportGenerator {
                             </div>
                         </div>
                         <div style="flex: 1; text-align: center; margin: 0 20px;">
-                            <h1 style="margin: 0 0 8px 0; color: #1e293b; font-size: 32px; font-weight: 800;">${projectName || 'Material Activity Report'}</h1>
+                            <h1 style="margin: 0 0 8px 0; color: #1e293b; font-size: 32px; font-weight: 800;">${projectName || 'Project Cost Report'}</h1>
                             <div style="background: linear-gradient(90deg, #3B82F6, #1E40AF); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 16px; font-weight: 600; margin-bottom: 8px;">
-                                Material Activity Report
+                                Material, Labor & Equipment Report
                             </div>
                             <p style="margin: 0; color: #6b7280; font-size: 13px;">Generated on ${new Date().toLocaleDateString('en-US', { 
                                 weekday: 'long', 
@@ -518,8 +549,86 @@ export class PDFReportGenerator {
                     </div>
                 ` : ''}
 
+                ${(() => {
+                    console.log('🔍 PDF Generator - Equipment section check:');
+                    console.log('  - equipmentData exists:', !!equipmentData);
+                    console.log('  - equipmentData length:', equipmentData?.length || 0);
+                    console.log('  - Condition result:', equipmentData && equipmentData.length > 0);
+                    
+                    if (equipmentData && equipmentData.length > 0) {
+                        console.log('✅ Equipment section SHOULD be rendered');
+                        console.log('✅ First equipment item:', equipmentData[0]);
+                    } else {
+                        console.log('❌ Equipment section will NOT be rendered');
+                    }
+                    return '';
+                })()}
+
+                ${(equipmentData && equipmentData.length > 0) ? `
+                    <div style="page-break-inside: avoid; margin-top: 32px;">
+                        <h2 style="color: #1e293b; margin-bottom: 20px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
+                            Equipment Costs Summary (${equipmentData.length} entries)
+                        </h2>
+                        <div style="background-color: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="background-color: #fef3c7;">
+                                        <th style="padding: 12px; text-align: left; font-size: 14px; color: #374151; border-bottom: 2px solid #e2e8f0;">Equipment Type</th>
+                                        <th style="padding: 12px; text-align: left; font-size: 14px; color: #374151; border-bottom: 2px solid #e2e8f0;">Category</th>
+                                        <th style="padding: 12px; text-align: center; font-size: 14px; color: #374151; border-bottom: 2px solid #e2e8f0;">Quantity</th>
+                                        <th style="padding: 12px; text-align: center; font-size: 14px; color: #374151; border-bottom: 2px solid #e2e8f0;">Cost Type</th>
+                                        <th style="padding: 12px; text-align: right; font-size: 14px; color: #374151; border-bottom: 2px solid #e2e8f0;">Per Unit Cost</th>
+                                        <th style="padding: 12px; text-align: right; font-size: 14px; color: #374151; border-bottom: 2px solid #e2e8f0;">Total Cost</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${equipmentData.map(equipment => `
+                                        <tr>
+                                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9;">
+                                                <div style="display: flex; align-items: center;">
+                                                    <div style="width: 8px; height: 8px; background-color: #F59E0B; border-radius: 50%; margin-right: 8px;"></div>
+                                                    <strong>${equipment.type || 'Unknown Equipment'}</strong>
+                                                </div>
+                                            </td>
+                                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9;">
+                                                ${equipment.category || 'Unknown Category'}
+                                            </td>
+                                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; text-align: center;">
+                                                ${equipment.quantity || 0}
+                                            </td>
+                                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; text-align: center;">
+                                                <span style="background-color: ${equipment.costType === 'rental' ? '#EFF6FF' : equipment.costType === 'purchase' ? '#F0FDF4' : '#FEF3C7'}; 
+                                                             color: ${equipment.costType === 'rental' ? '#3B82F6' : equipment.costType === 'purchase' ? '#10B981' : '#F59E0B'}; 
+                                                             padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">
+                                                    ${(equipment.costType || 'rental').toUpperCase()}
+                                                </span>
+                                            </td>
+                                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; text-align: right;">
+                                                ${this.formatCurrency(Number(equipment.perUnitCost) || 0)}
+                                            </td>
+                                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: bold;">
+                                                ${this.formatCurrency(Number(equipment.totalCost) || 0)}
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                                <tfoot>
+                                    <tr style="background-color: #fef3c7; font-weight: bold;">
+                                        <td style="padding: 12px; border-top: 2px solid #e2e8f0;" colspan="5">
+                                            Total Equipment Cost
+                                        </td>
+                                        <td style="padding: 12px; text-align: right; border-top: 2px solid #e2e8f0; color: #F59E0B; font-size: 16px;">
+                                            ${this.formatCurrency(totalEquipmentCost)}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                ` : ''}
+
                 <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #9ca3af; font-size: 12px;">
-                    <p>This report was automatically generated by Xsite Application</p>
+                    <p>This complete cost report was automatically generated by Xsite Application</p>
                     <p>Project: ${projectName || 'N/A'} | Report ID: ${Date.now()}</p>
                 </div>
             </body>
@@ -528,15 +637,16 @@ export class PDFReportGenerator {
     }
 
     // Generate and download PDF
-    async generatePDF(activities: MaterialActivity[], projectName?: string, laborData?: any[]): Promise<void> {
+    async generatePDF(activities: MaterialActivity[], projectName?: string, laborData?: any[], equipmentData?: any[]): Promise<void> {
         try {
             console.log('📄 Starting PDF generation...');
             console.log('📊 Activities to include:', activities.length);
             console.log('📊 Labor entries to include:', laborData?.length || 0);
+            console.log('📊 Equipment entries to include:', equipmentData?.length || 0);
             console.log('📊 Project name:', projectName);
 
             // Generate HTML content
-            const htmlContent = this.generateHTML(activities, projectName, laborData);
+            const htmlContent = this.generateHTML(activities, projectName, laborData, equipmentData);
             console.log('📄 HTML content generated, length:', htmlContent.length);
             
             // Create custom filename: Company Name - Project Name - Date
@@ -545,7 +655,7 @@ export class PDFReportGenerator {
             const sanitizedCompanyName = companyName.replace(/[^a-zA-Z0-9\s]/g, '').trim();
             const sanitizedProjectName = (projectName || 'Project').replace(/[^a-zA-Z0-9\s]/g, '').trim();
             
-            const customFilename = `${sanitizedCompanyName} - ${sanitizedProjectName} - ${currentDate}.pdf`;
+            const customFilename = `${sanitizedCompanyName} - ${sanitizedProjectName} - Complete Report - ${currentDate}.pdf`;
             console.log('📄 Custom filename components:');
             console.log('  - Company Name (raw):', companyName);
             console.log('  - Company Name (sanitized):', sanitizedCompanyName);
@@ -608,16 +718,16 @@ export class PDFReportGenerator {
                         }
                     } else {
                         console.warn('⚠️ Custom file not found after copy, using original');
-                        actualFilename = 'Material_Activity_Report.pdf'; // Fallback name
+                        actualFilename = 'Complete_Project_Report.pdf'; // Fallback name
                     }
                 } else {
                     console.warn('⚠️ Document directory not available, using original URI');
-                    actualFilename = 'Material_Activity_Report.pdf'; // Fallback name
+                    actualFilename = 'Complete_Project_Report.pdf'; // Fallback name
                 }
             } catch (copyError) {
                 console.error('❌ Could not copy PDF with custom name:', copyError);
                 console.error('❌ Copy error details:', JSON.stringify(copyError, null, 2));
-                actualFilename = 'Material_Activity_Report.pdf'; // Fallback name
+                actualFilename = 'Complete_Project_Report.pdf'; // Fallback name
                 // Continue with original URI if copy fails
             }
             
@@ -631,7 +741,7 @@ export class PDFReportGenerator {
             setTimeout(() => {
                 Alert.alert(
                     'PDF Generated Successfully',
-                    `Your material & labor report has been generated.\n\nFilename: ${actualFilename}\n\nWhat would you like to do?`,
+                    `Your material, labor & equipment report has been generated.\n\nFilename: ${actualFilename}\n\nWhat would you like to do?`,
                     [
                         {
                             text: 'View PDF',

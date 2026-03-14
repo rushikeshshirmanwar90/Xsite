@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 
 interface LaborFormModalProps {
   visible: boolean;
@@ -178,6 +179,24 @@ const laborCategories: LaborCategory[] = [
       'Watchman',
       'Housekeeping Labour'
     ]
+  },
+  {
+    id: 'multitask',
+    name: 'Multitask Labor',
+    icon: 'layers-outline',
+    color: '#8B5CF6',
+    types: [
+      'General Multitask Worker',
+      'Skilled Multitask Labor',
+      'Semi-Skilled Multitask Labor',
+      'Multitask Helper',
+      'Versatile Construction Worker',
+      'All-Round Technician',
+      'Multi-Trade Specialist',
+      'Flexible Labor (Civil + Electrical)',
+      'Flexible Labor (Plumbing + Finishing)',
+      'Cross-Trained Worker'
+    ]
   }
 ];
 
@@ -205,6 +224,8 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
   // Animation values for swipe to submit
   const swipeAnimation = useRef(new Animated.Value(0)).current;
   const [isSwipeComplete, setIsSwipeComplete] = useState(false);
+  const [swipeProgress, setSwipeProgress] = useState(0);
+  const [progressText, setProgressText] = useState('Swipe to Submit All');
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const shimmerAnim = useRef(new Animated.Value(0)).current;
 
@@ -264,19 +285,37 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
   const handleSwipeStart = () => {
     // Reset swipe state
     setIsSwipeComplete(false);
+    setSwipeProgress(0);
+    setProgressText('Swipe to Submit All');
+    // Light haptic feedback on start
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
   const handleSwipeMove = (gestureState: any) => {
     const { dx } = gestureState;
     const progress = Math.max(0, Math.min(dx / maxSwipeDistance, 1));
     
+    setSwipeProgress(progress);
     swipeAnimation.setValue(progress);
     
-    // Check if swipe is complete (70% of the way)
-    if (progress >= 0.7 && !isSwipeComplete) {
-      setIsSwipeComplete(true);
-    } else if (progress < 0.7 && isSwipeComplete) {
-      setIsSwipeComplete(false);
+    // Update progress text based on swipe progress
+    if (progress < 0.3) {
+      setProgressText('Swipe to Submit All');
+    } else if (progress < 0.6) {
+      setProgressText('Keep Swiping...');
+      // Medium haptic feedback at 30% progress
+      if (progress >= 0.3 && swipeProgress < 0.3) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+    } else if (progress < 0.7) {
+      setProgressText('Almost There!');
+    } else {
+      setProgressText('Release to Submit!');
+      // Success haptic feedback at 70% progress
+      if (progress >= 0.7 && !isSwipeComplete) {
+        setIsSwipeComplete(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
     }
   };
 
@@ -287,6 +326,9 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
     console.log('Swipe ended, progress:', progress, 'laborEntries.length:', laborEntries.length);
     
     if (progress >= 0.7) {
+      // Success haptic feedback on completion
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
       // Complete the swipe — snap to end
       Animated.spring(swipeAnimation, {
         toValue: 1,
@@ -298,6 +340,9 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
         handleFinalSubmit();
       });
     } else {
+      // Light haptic feedback on reset
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      
       // Animate back to start with spring physics
       Animated.spring(swipeAnimation, {
         toValue: 0,
@@ -306,6 +351,8 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
         useNativeDriver: false,
       }).start();
       setIsSwipeComplete(false);
+      setSwipeProgress(0);
+      setProgressText('Swipe to Submit All');
     }
   };
 
@@ -334,6 +381,8 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
     setShowAddForm(false);
     setEditingEntry(null);
     setIsSwipeComplete(false);
+    setSwipeProgress(0);
+    setProgressText('Swipe to Submit All');
     swipeAnimation.setValue(0);
     
     // Reset types section animations
@@ -406,7 +455,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
     }
 
     if (!selectedMiniSection) {
-      Alert.alert('Error', 'Please select a mini-section');
+      Alert.alert('Error', 'Please select a work area');
       return;
     }
 
@@ -424,7 +473,15 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
     }
 
     const selectedCategoryData = laborCategories.find(cat => cat.id === selectedCategory);
-    const selectedMiniSectionData = miniSections.find(s => s._id === selectedMiniSection);
+    let selectedMiniSectionData;
+    let miniSectionName;
+    
+    if (selectedMiniSection === 'no-mini-section') {
+      miniSectionName = 'General Building Labor';
+    } else {
+      selectedMiniSectionData = miniSections.find(s => s._id === selectedMiniSection);
+      miniSectionName = selectedMiniSectionData?.name || '';
+    }
     
     // Create LaborEntry format
     const laborEntry: any = {
@@ -434,7 +491,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
       perLaborCost: costNum,
       totalCost: countNum * costNum,
       miniSectionId: selectedMiniSection,
-      miniSectionName: selectedMiniSectionData?.name || '',
+      miniSectionName: miniSectionName,
       icon: selectedCategoryData?.icon || 'people',
       color: selectedCategoryData?.color || '#3B82F6',
     };
@@ -513,21 +570,9 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
       return;
     }
 
-    // Group entries by mini-section for submission
-    const entriesBySection = currentEntries.reduce((acc, entry) => {
-      if (!acc[entry.miniSectionId]) {
-        acc[entry.miniSectionId] = [];
-      }
-      acc[entry.miniSectionId].push(entry);
-      return acc;
-    }, {} as Record<string, any[]>);
-
-    // Submit each group
-    Object.entries(entriesBySection).forEach(([miniSectionId, entries]) => {
-      const entriesArray = entries as any[];
-      const message = `Added ${entriesArray.length} labor ${entriesArray.length === 1 ? 'entry' : 'entries'}`;
-      onSubmit(entriesArray, message, miniSectionId);
-    });
+    // Submit all entries as one group
+    const message = `Labor added successfully`;
+    onSubmit(currentEntries, message);
 
     resetForm();
     onClose();
@@ -882,40 +927,107 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                     return (
                       <>
                         {!selectedType && displayTypes.length > 0 && (
-                          <View style={styles.typesList}>
-                            {displayTypes.map((type, index) => (
-                              <TouchableOpacity
-                                key={index}
-                                style={styles.typeCard}
-                                onPress={() => handleTypeSelect(type)}
-                                activeOpacity={0.7}
-                              >
-                                <View style={styles.typeCardLeft}>
-                                  <View style={styles.typeIconBadge}>
-                                    <Ionicons name="person-outline" size={18} color="#3B82F6" />
+                          <View style={styles.laborTypesContainer}>
+                            {/* Multitask Labor Option */}
+                            <TouchableOpacity
+                              style={styles.multitaskLaborCard}
+                              onPress={() => handleTypeSelect('Multitask Labor')}
+                              activeOpacity={0.7}
+                            >
+                              <View style={styles.multitaskLaborContent}>
+                                <View style={styles.multitaskLaborIconContainer}>
+                                  <View style={styles.multitaskLaborIconBadge}>
+                                    <Ionicons name="people" size={20} color="#7C3AED" />
                                   </View>
-                                  <Text style={styles.typeCardName}>{type}</Text>
+                                  <View style={styles.multitaskLaborIconOverlay}>
+                                    <Ionicons name="star" size={14} color="#7C3AED" />
+                                  </View>
                                 </View>
-                                <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-                              </TouchableOpacity>
-                            ))}
+                                <View style={styles.multitaskLaborInfo}>
+                                  <Text style={styles.multitaskLaborTitle}>Multitask Labor</Text>
+                                  <Text style={styles.multitaskLaborSubtitle}>
+                                    Workers who can handle multiple tasks in this category
+                                  </Text>
+                                  <View style={styles.multitaskLaborBadge}>
+                                    <Ionicons name="flash" size={12} color="#7C3AED" />
+                                    <Text style={styles.multitaskLaborBadgeText}>Versatile</Text>
+                                  </View>
+                                </View>
+                                <View style={styles.multitaskLaborArrow}>
+                                  <Ionicons name="chevron-forward" size={20} color="#7C3AED" />
+                                </View>
+                              </View>
+                            </TouchableOpacity>
+
+                            {/* Specific Labor Types */}
+                            <View style={styles.specificTypesGroup}>
+                              <View style={styles.specificTypesHeader}>
+                                <View style={styles.specificTypesHeaderLine} />
+                                <Text style={styles.specificTypesHeaderText}>Specific Labor Types</Text>
+                                <View style={styles.specificTypesHeaderLine} />
+                              </View>
+                              
+                              <View style={styles.typesList}>
+                                {displayTypes.map((type, index) => (
+                                  <TouchableOpacity
+                                    key={index}
+                                    style={[
+                                      styles.typeCard,
+                                      index === displayTypes.length - 1 && styles.typeCardLast
+                                    ]}
+                                    onPress={() => handleTypeSelect(type)}
+                                    activeOpacity={0.7}
+                                  >
+                                    <View style={styles.typeCardLeft}>
+                                      <View style={styles.typeIconBadge}>
+                                        <Ionicons name="person-outline" size={18} color="#3B82F6" />
+                                      </View>
+                                      <Text style={styles.typeCardName}>{type}</Text>
+                                    </View>
+                                    <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                                  </TouchableOpacity>
+                                ))}
+                              </View>
+                            </View>
                           </View>
                         )}
 
                         {selectedType && (
                           <View style={styles.selectedTypeWrapper}>
                             <View style={styles.selectedTypeContainer}>
-                              <View style={[styles.typeCard, styles.typeCardSelected]}>
-                                <View style={styles.typeCardLeft}>
-                                  <View style={styles.typeIconBadge}>
-                                    <Ionicons name="person-outline" size={18} color="#3B82F6" />
+                              {selectedType === 'Multitask Labor' ? (
+                                <View style={styles.selectedMultitaskLaborCard}>
+                                  <View style={styles.selectedMultitaskLaborContent}>
+                                    <View style={styles.selectedMultitaskLaborIconContainer}>
+                                      <View style={styles.selectedMultitaskLaborIconBadge}>
+                                        <Ionicons name="people" size={20} color="#7C3AED" />
+                                      </View>
+                                      <View style={styles.selectedMultitaskLaborIconOverlay}>
+                                        <Ionicons name="star" size={14} color="#7C3AED" />
+                                      </View>
+                                    </View>
+                                    <View style={styles.selectedMultitaskLaborInfo}>
+                                      <Text style={styles.selectedMultitaskLaborTitle}>Multitask Labor</Text>
+                                      <Text style={styles.selectedMultitaskLaborSubtitle}>
+                                        Versatile workers for multiple tasks
+                                      </Text>
+                                    </View>
+                                    <Ionicons name="checkmark-circle" size={22} color="#7C3AED" />
                                   </View>
-                                  <Text style={[styles.typeCardName, styles.typeCardNameSelected]}>
-                                    {selectedType}
-                                  </Text>
                                 </View>
-                                <Ionicons name="checkmark-circle" size={22} color="#3B82F6" />
-                              </View>
+                              ) : (
+                                <View style={[styles.typeCard, styles.typeCardSelected]}>
+                                  <View style={styles.typeCardLeft}>
+                                    <View style={styles.typeIconBadge}>
+                                      <Ionicons name="person-outline" size={18} color="#3B82F6" />
+                                    </View>
+                                    <Text style={[styles.typeCardName, styles.typeCardNameSelected]}>
+                                      {selectedType}
+                                    </Text>
+                                  </View>
+                                  <Ionicons name="checkmark-circle" size={22} color="#3B82F6" />
+                                </View>
+                              )}
                             </View>
                           </View>
                         )}
@@ -949,57 +1061,142 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                     <Text style={styles.miniSectionLabel}>
                       Where is this labor being used? <Text style={styles.required}>*</Text>
                     </Text>
-                    <Text style={styles.labelHelper}>Select the work area or mini-section</Text>
+                    <Text style={styles.labelHelper}>Select the specific work area or choose general labor</Text>
                   </View>
-                  {miniSections.length > 0 ? (
-                    <>
-                      {!selectedMiniSection && (
-                        <View style={styles.sectionList}>
-                          {miniSections.map((section: any) => (
-                            <TouchableOpacity
-                              key={section._id}
-                              style={styles.sectionItem}
-                              onPress={() => handleMiniSectionSelect(section._id)}
-                              activeOpacity={0.7}
-                            >
-                              <View style={styles.sectionItemLeft}>
-                                <View style={styles.sectionIconBadge}>
-                                  <Ionicons name="layers" size={18} color="#3B82F6" />
+                  
+                  {!selectedMiniSection && (
+                    <View style={styles.workAreaContainer}>
+                      {/* No Mini-Section Option */}
+                      <TouchableOpacity
+                        style={styles.noMiniSectionCard}
+                        onPress={() => handleMiniSectionSelect('no-mini-section')}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.noMiniSectionContent}>
+                          <View style={styles.noMiniSectionIconContainer}>
+                            <View style={styles.noMiniSectionIconBadge}>
+                              <Ionicons name="business-outline" size={24} color="#7C3AED" />
+                            </View>
+                            <View style={styles.noMiniSectionIconOverlay}>
+                              <Ionicons name="globe-outline" size={16} color="#7C3AED" />
+                            </View>
+                          </View>
+                          <View style={styles.noMiniSectionInfo}>
+                            <Text style={styles.noMiniSectionTitle}>General Building Labor</Text>
+                            <Text style={styles.noMiniSectionSubtitle}>
+                              For labor that works across the entire building
+                            </Text>
+                            <View style={styles.noMiniSectionBadge}>
+                              <Ionicons name="checkmark-circle" size={14} color="#7C3AED" />
+                              <Text style={styles.noMiniSectionBadgeText}>No specific area</Text>
+                            </View>
+                          </View>
+                          <View style={styles.noMiniSectionArrow}>
+                            <Ionicons name="chevron-forward" size={20} color="#7C3AED" />
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+
+                      {/* Mini-Sections List */}
+                      {miniSections.length > 0 && (
+                        <View style={styles.miniSectionsGroup}>
+                          <View style={styles.miniSectionsHeader}>
+                            <View style={styles.miniSectionsHeaderLine} />
+                            <Text style={styles.miniSectionsHeaderText}>Specific Work Areas</Text>
+                            <View style={styles.miniSectionsHeaderLine} />
+                          </View>
+                          
+                          <View style={styles.miniSectionsList}>
+                            {miniSections.map((section: any, index: number) => (
+                              <TouchableOpacity
+                                key={section._id}
+                                style={[
+                                  styles.miniSectionCard,
+                                  index === miniSections.length - 1 && styles.miniSectionCardLast
+                                ]}
+                                onPress={() => handleMiniSectionSelect(section._id)}
+                                activeOpacity={0.7}
+                              >
+                                <View style={styles.miniSectionCardContent}>
+                                  <View style={styles.miniSectionIconBadge}>
+                                    <Ionicons name="layers-outline" size={20} color="#3B82F6" />
+                                  </View>
+                                  <View style={styles.miniSectionInfo}>
+                                    <Text style={styles.miniSectionName}>{section.name}</Text>
+                                    <Text style={styles.miniSectionDescription}>Specific area work</Text>
+                                  </View>
+                                  <View style={styles.miniSectionArrow}>
+                                    <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+                                  </View>
                                 </View>
-                                <Text style={styles.sectionItemName}>{section.name}</Text>
-                              </View>
-                            </TouchableOpacity>
-                          ))}
+                              </TouchableOpacity>
+                            ))}
+                          </View>
                         </View>
                       )}
 
-                      {selectedMiniSection && (() => {
-                        const section = miniSections.find(s => s._id === selectedMiniSection);
-                        return section ? (
-                          <View style={styles.selectedMiniSectionWrapper}>
-                            <View style={styles.selectedMiniSectionContainer}>
-                              <View style={[styles.sectionItem, styles.sectionItemSelected]}>
-                                <View style={styles.sectionItemLeft}>
-                                  <View style={styles.sectionIconBadge}>
-                                    <Ionicons name="layers" size={18} color="#3B82F6" />
+                      {miniSections.length === 0 && (
+                        <View style={styles.noSectionsInfo}>
+                          <View style={styles.noSectionsIconContainer}>
+                            <Ionicons name="information-circle-outline" size={24} color="#6B7280" />
+                          </View>
+                          <Text style={styles.noSectionsInfoText}>
+                            No specific work areas available. You can still add general building labor above.
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  {selectedMiniSection && (() => {
+                    if (selectedMiniSection === 'no-mini-section') {
+                      return (
+                        <View style={styles.selectedWorkAreaWrapper}>
+                          <View style={styles.selectedNoMiniSectionContainer}>
+                            <View style={styles.selectedNoMiniSectionCard}>
+                              <View style={styles.selectedNoMiniSectionContent}>
+                                <View style={styles.selectedNoMiniSectionIconContainer}>
+                                  <View style={styles.selectedNoMiniSectionIconBadge}>
+                                    <Ionicons name="business" size={24} color="#7C3AED" />
                                   </View>
-                                  <Text style={styles.sectionItemName}>{section.name}</Text>
+                                  <View style={styles.selectedNoMiniSectionIconOverlay}>
+                                    <Ionicons name="globe" size={16} color="#7C3AED" />
+                                  </View>
+                                </View>
+                                <View style={styles.selectedNoMiniSectionInfo}>
+                                  <Text style={styles.selectedNoMiniSectionTitle}>General Building Labor</Text>
+                                  <Text style={styles.selectedNoMiniSectionSubtitle}>
+                                    Works across the entire building
+                                  </Text>
+                                </View>
+                                <Ionicons name="checkmark-circle" size={24} color="#7C3AED" />
+                              </View>
+                            </View>
+                          </View>
+                        </View>
+                      );
+                    } else {
+                      const section = miniSections.find(s => s._id === selectedMiniSection);
+                      return section ? (
+                        <View style={styles.selectedWorkAreaWrapper}>
+                          <View style={styles.selectedMiniSectionContainer}>
+                            <View style={styles.selectedMiniSectionCard}>
+                              <View style={styles.selectedMiniSectionContent}>
+                                <View style={styles.selectedMiniSectionIconBadge}>
+                                  <Ionicons name="layers" size={20} color="#3B82F6" />
+                                </View>
+                                <View style={styles.selectedMiniSectionInfo}>
+                                  <Text style={styles.selectedMiniSectionTitle}>{section.name}</Text>
+                                  <Text style={styles.selectedMiniSectionSubtitle}>Specific work area</Text>
                                 </View>
                                 <Ionicons name="checkmark-circle" size={22} color="#3B82F6" />
                               </View>
                             </View>
                           </View>
-                        ) : null;
-                      })()}
-                    </>
-                  ) : (
-                    <View style={styles.noSectionsWarning}>
-                      <Ionicons name="alert-circle" size={20} color="#F59E0B" />
-                      <Text style={styles.helperText}>
-                        No mini-sections available. Please create one first.
-                      </Text>
-                    </View>
-                  )}
+                        </View>
+                      ) : null;
+                    }
+                  })()}
                 </View>
               </View>
             )}
@@ -1668,6 +1865,166 @@ const styles = StyleSheet.create({
   typesContainer: {
     paddingVertical: 16,
   },
+  laborTypesContainer: {
+    gap: 20,
+  },
+  // Multitask Labor Card Styles
+  multitaskLaborCard: {
+    backgroundColor: '#FAFAF9',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 2,
+    borderColor: '#E7E5E4',
+    borderStyle: 'dashed',
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  multitaskLaborContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  multitaskLaborIconContainer: {
+    position: 'relative',
+    marginRight: 16,
+  },
+  multitaskLaborIconBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 2,
+    borderColor: '#7C3AED',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  multitaskLaborIconOverlay: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#7C3AED',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  multitaskLaborInfo: {
+    flex: 1,
+  },
+  multitaskLaborTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 4,
+    lineHeight: 20,
+  },
+  multitaskLaborSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    marginBottom: 8,
+    lineHeight: 16,
+  },
+  multitaskLaborBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#7C3AED',
+  },
+  multitaskLaborBadgeText: {
+    fontSize: 11,
+    color: '#7C3AED',
+    fontWeight: '600',
+  },
+  multitaskLaborArrow: {
+    marginLeft: 12,
+  },
+  // Specific Types Group Styles
+  specificTypesGroup: {
+    gap: 12,
+  },
+  specificTypesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginVertical: 8,
+  },
+  specificTypesHeaderLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E2E8F0',
+  },
+  specificTypesHeaderText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  // Selected Multitask Labor Styles
+  selectedMultitaskLaborCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#7C3AED',
+  },
+  selectedMultitaskLaborContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  selectedMultitaskLaborIconContainer: {
+    position: 'relative',
+    marginRight: 16,
+  },
+  selectedMultitaskLaborIconBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 2,
+    borderColor: '#7C3AED',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  selectedMultitaskLaborIconOverlay: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#7C3AED',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  selectedMultitaskLaborInfo: {
+    flex: 1,
+  },
+  selectedMultitaskLaborTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#7C3AED',
+    marginBottom: 2,
+    lineHeight: 18,
+  },
+  selectedMultitaskLaborSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 15,
+  },
   typesList: {
     borderRadius: 12,
     borderWidth: 1,
@@ -1683,6 +2040,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
     minHeight: 60,
+  },
+  typeCardLast: {
+    borderBottomWidth: 0,
   },
   typeCardSelected: {
     backgroundColor: '#EFF6FF',
@@ -1871,6 +2231,288 @@ const styles = StyleSheet.create({
   required: {
     color: '#EF4444',
   },
+  workAreaContainer: {
+    gap: 20,
+  },
+  // No Mini-Section Card Styles
+  noMiniSectionCard: {
+    backgroundColor: '#FAFAF9',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 2,
+    borderColor: '#E7E5E4',
+    borderStyle: 'dashed',
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  noMiniSectionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  noMiniSectionIconContainer: {
+    position: 'relative',
+    marginRight: 16,
+  },
+  noMiniSectionIconBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 2,
+    borderColor: '#7C3AED',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  noMiniSectionIconOverlay: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#7C3AED',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  noMiniSectionInfo: {
+    flex: 1,
+  },
+  noMiniSectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 4,
+    lineHeight: 20,
+  },
+  noMiniSectionSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    marginBottom: 8,
+    lineHeight: 16,
+  },
+  noMiniSectionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#7C3AED',
+  },
+  noMiniSectionBadgeText: {
+    fontSize: 11,
+    color: '#7C3AED',
+    fontWeight: '600',
+  },
+  noMiniSectionArrow: {
+    marginLeft: 12,
+  },
+  // Mini-Sections Group Styles
+  miniSectionsGroup: {
+    gap: 12,
+  },
+  miniSectionsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginVertical: 8,
+  },
+  miniSectionsHeaderLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E2E8F0',
+  },
+  miniSectionsHeaderText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  miniSectionsList: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+  },
+  miniSectionCard: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  miniSectionCardLast: {
+    borderBottomWidth: 0,
+  },
+  miniSectionCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  miniSectionIconBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#EFF6FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  miniSectionInfo: {
+    flex: 1,
+  },
+  miniSectionName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: 2,
+    lineHeight: 18,
+  },
+  miniSectionDescription: {
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 15,
+  },
+  miniSectionArrow: {
+    marginLeft: 8,
+  },
+  // No Sections Info Styles
+  noSectionsInfo: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F8FAFC',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 12,
+  },
+  noSectionsIconContainer: {
+    marginTop: 2,
+  },
+  noSectionsInfoText: {
+    fontSize: 13,
+    color: '#64748B',
+    flex: 1,
+    lineHeight: 18,
+  },
+  // Selected Work Area Wrapper
+  selectedWorkAreaWrapper: {
+    backgroundColor: '#FFF7ED',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+    shadowColor: '#F97316',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    marginTop: 8,
+  },
+  // Selected No Mini-Section Styles
+  selectedNoMiniSectionContainer: {
+    gap: 12,
+  },
+  selectedNoMiniSectionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#7C3AED',
+  },
+  selectedNoMiniSectionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  selectedNoMiniSectionIconContainer: {
+    position: 'relative',
+    marginRight: 16,
+  },
+  selectedNoMiniSectionIconBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 2,
+    borderColor: '#7C3AED',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  selectedNoMiniSectionIconOverlay: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#7C3AED',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  selectedNoMiniSectionInfo: {
+    flex: 1,
+  },
+  selectedNoMiniSectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#7C3AED',
+    marginBottom: 2,
+    lineHeight: 18,
+  },
+  selectedNoMiniSectionSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 15,
+  },
+  // Selected Mini-Section Styles
+  selectedMiniSectionContainer: {
+    gap: 12,
+  },
+  selectedMiniSectionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#3B82F6',
+  },
+  selectedMiniSectionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  selectedMiniSectionIconBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#EFF6FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  selectedMiniSectionInfo: {
+    flex: 1,
+  },
+  selectedMiniSectionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#3B82F6',
+    marginBottom: 2,
+    lineHeight: 18,
+  },
+  selectedMiniSectionSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 15,
+  },
   sectionList: {
     borderRadius: 12,
     borderWidth: 1,
@@ -1926,23 +2568,7 @@ const styles = StyleSheet.create({
     color: '#92400E',
     flex: 1,
   },
-  // Selected Mini-Section Wrapper Styles
-  selectedMiniSectionWrapper: {
-    backgroundColor: '#FFF7ED',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#FDBA74',
-    shadowColor: '#F97316',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-    marginTop: 8,
-  },
-  selectedMiniSectionContainer: {
-    gap: 12,
-  },
+
   // Total Cost Card
   totalCostCard: {
     backgroundColor: '#EFF6FF',

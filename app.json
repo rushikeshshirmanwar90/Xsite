@@ -11,8 +11,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.codewithrushi.xsite",
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "bundleIdentifier": "com.codewithrushi.xsite"
     },
     "android": {
       "package": "com.codewithrushi.xsite",
@@ -29,8 +28,7 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.SCHEDULE_EXACT_ALARM"
-      ],
-      "googleServicesFile": "./google-services.json"
+      ]
     },
     "web": {
       "output": "static",

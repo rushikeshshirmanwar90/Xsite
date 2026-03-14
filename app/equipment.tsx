@@ -456,10 +456,7 @@ const EquipmentManagement = () => {
             console.log('Equipment API response:', result);
 
             if (result.success) {
-                // Update loading message
-                toast.loading('Logging activity...');
-
-                // Log activity for equipment addition
+                // Log activity for equipment addition (without loading toast)
                 try {
                     console.log('🚀 Starting equipment activity logging...');
                     
@@ -531,17 +528,14 @@ const EquipmentManagement = () => {
                     console.error('❌ Failed to log equipment activity:', activityError);
                 }
 
-                // Update loading message for refresh
-                toast.loading('Refreshing equipment list...');
-
-                // Refresh the equipment list
+                // Refresh the equipment list (without loading toast)
                 await loadEquipment();
 
                 // Stop loading animation and show success
                 stopLoadingAnimation();
                 setIsAddingEquipment(false);
                 toast.dismiss();
-                toast.success(`✅ Successfully added ${equipmentEntries.length} equipment ${equipmentEntries.length === 1 ? 'entry' : 'entries'}`);
+                toast.success(`🎉 Successfully added ${equipmentEntries.length} equipment ${equipmentEntries.length === 1 ? 'entry' : 'entries'} to your project!`);
                 
                 // Close the form modal
                 setShowEquipmentForm(false);

@@ -1229,8 +1229,8 @@ const CompanyProfile: React.FC = () => {
                                 <Ionicons name="document-text-outline" size={22} color="#10B981" />
                             </View>
                             <View style={styles.reportButtonContent}>
-                                <Text style={styles.reportButtonTitle}>Generate Material Report</Text>
-                                <Text style={styles.reportButtonSubtitle}>Download PDF report of material activities</Text>
+                                <Text style={styles.reportButtonTitle}>Generate Complete Report</Text>
+                                <Text style={styles.reportButtonSubtitle}>Download PDF report of material, labor & equipment costs</Text>
                             </View>
                         </View>
                         <View style={styles.reportButtonBadge}>

@@ -167,12 +167,12 @@ const ReviewPurposeStep: React.FC<ReviewPurposeStepProps> = ({
         {/* Back Button at bottom of scroll */}
         <View style={styles.backButtonContainer}>
           <TouchableOpacity
-            style={styles.backButton}
+            style={styles.backButtonInline}
             onPress={onBack}
             activeOpacity={0.7}
           >
-            <ArrowLeft size={16} color="#FFFFFF" />
-            <Text style={styles.backButtonText}>Back to Edit Materials</Text>
+            <ArrowLeft size={16} color="#3B82F6" />
+            <Text style={styles.backButtonInlineText}>Back to Edit Materials</Text>
           </TouchableOpacity>
         </View>
 
@@ -426,6 +426,23 @@ const styles = StyleSheet.create<Styles>({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  backButtonInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.2)',
+    gap: 6,
+    alignSelf: 'flex-start',
+  },
+  backButtonInlineText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#3B82F6',
   },
   // Error state styles
   errorContainer: {

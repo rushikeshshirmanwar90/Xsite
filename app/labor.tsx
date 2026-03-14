@@ -248,18 +248,23 @@ const LaborPage = () => {
         loadingAnimation.setValue(0);
     };
     // Function to handle adding labor entries (real API implementation)
-    const handleAddLaborEntries = async (laborEntries: LaborEntry[], message: string, miniSectionId?: string) => {
+    const handleAddLaborEntries = async (laborEntries: LaborEntry[], message: string) => {
         try {
             console.log('Adding labor entries:', laborEntries);
             
-            if (!miniSectionId) {
-                toast.error('Mini-section is required for labor entries');
-                return;
-            }
+            // Group entries by mini-section
+            const entriesBySection = laborEntries.reduce((acc, entry) => {
+                const sectionId = entry.miniSectionId;
+                if (!acc[sectionId]) {
+                    acc[sectionId] = [];
+                }
+                acc[sectionId].push(entry);
+                return acc;
+            }, {} as Record<string, LaborEntry[]>);
 
             // Start loading animation
             startLoadingAnimation();
-            toast.loading(`Adding ${laborEntries.length} labor ${laborEntries.length === 1 ? 'entry' : 'entries'}...`);
+            toast.loading(`Adding labor...`);
 
             const clientId = await getClientId();
             if (!clientId) {
@@ -269,15 +274,18 @@ const LaborPage = () => {
             // Import domain
             const { domain } = await import('@/lib/domain');
 
-            // Prepare data for the labor API
-            const requestData = {
-                laborEntries: laborEntries.map(entry => ({
-                    type: entry.type,
-                    category: entry.category,
-                    count: entry.count,
-                    perLaborCost: entry.perLaborCost,
-                    totalCost: entry.count * entry.perLaborCost,
-                    notes: message || '',
+            // Process each mini-section group
+            const results = [];
+            for (const [miniSectionId, sectionEntries] of Object.entries(entriesBySection)) {
+                // Prepare data for the labor API
+                const requestData = {
+                    laborEntries: sectionEntries.map(entry => ({
+                        type: entry.type,
+                        category: entry.category,
+                        count: entry.count,
+                        perLaborCost: entry.perLaborCost,
+                        totalCost: entry.count * entry.perLaborCost,
+                        notes: message || '',
                     workDate: new Date().toISOString(),
                     status: 'active'
                 })),
@@ -303,45 +311,30 @@ const LaborPage = () => {
             console.log('Labor API response:', result);
 
             if (result.success) {
-                // Update loading message
-                toast.loading('Logging activity...');
+                results.push(result);
+            } else {
+                throw new Error(result.message || 'Failed to add labor entries');
+            }
+        }
 
-                // Log activity for labor addition
-                try {
-                    console.log('🚀 Starting labor activity logging...');
-                    console.log('📋 Labor entries to log:', laborEntries);
-                    console.log('📍 Project details:', { projectId, projectName, sectionId, sectionName });
-                    
-                    // Import the activity logger
-                    const { logLaborAdded } = await import('@/utils/activityLogger');
-                    
-                    // Find the mini-section name
-                    console.log('🔍 Debug mini-sections lookup:');
-                    console.log('   - miniSectionId to find:', miniSectionId);
-                    console.log('   - miniSections array length:', miniSections.length);
-                    console.log('   - miniSections array:', miniSections.map(s => ({ id: s._id, name: s.name })));
-                    
+        // All sections processed successfully
+        if (results.length > 0) {
+            // Log activity for labor addition (without loading toast)
+            try {
+                console.log('🚀 Starting labor activity logging...');
+                console.log('📋 Labor entries to log:', laborEntries);
+                console.log('📍 Project details:', { projectId, projectName, sectionId, sectionName });
+                
+                // Import the activity logger
+                const { logLaborAdded } = await import('@/utils/activityLogger');
+                
+                // For multiple mini-sections, log activity for each section
+                for (const [miniSectionId, sectionEntries] of Object.entries(entriesBySection)) {
                     const miniSection = miniSections.find(s => s._id === miniSectionId);
-                    console.log('   - Found miniSection:', miniSection);
+                    const miniSectionName = miniSection?.name || 'Unknown Section';
                     
-                    const miniSectionName = miniSection?.name || 'Foundation';
+                    console.log('🚀 Logging activity for mini-section:', miniSectionName);
                     
-                    console.log('🔍 Found mini-section:', miniSection);
-                    console.log('📍 Using mini-section name:', miniSectionName);
-                    console.log('📍 Mini-section details:', { miniSectionId, miniSectionName });
-                    
-                    // Verify all required parameters
-                    console.log('🔍 Verifying parameters for activity logging:');
-                    console.log('   - projectId:', projectId, '(type:', typeof projectId, ')');
-                    console.log('   - projectName:', projectName, '(type:', typeof projectName, ')');
-                    console.log('   - sectionId:', sectionId, '(type:', typeof sectionId, ')');
-                    console.log('   - sectionName:', sectionName, '(type:', typeof sectionName, ')');
-                    console.log('   - miniSectionId:', miniSectionId, '(type:', typeof miniSectionId, ')');
-                    console.log('   - miniSectionName:', miniSectionName, '(type:', typeof miniSectionName, ')');
-                    console.log('   - message:', message, '(type:', typeof message, ')');
-                    
-                    // Log the labor addition activity
-                    console.log('🚀 Calling logLaborAdded function...');
                     await logLaborAdded(
                         projectId,
                         projectName,
@@ -349,7 +342,7 @@ const LaborPage = () => {
                         sectionName,
                         miniSectionId,
                         miniSectionName,
-                        laborEntries.map(entry => ({
+                        sectionEntries.map(entry => ({
                             type: entry.type,
                             category: entry.category,
                             count: entry.count,
@@ -358,6 +351,7 @@ const LaborPage = () => {
                         })),
                         message
                     );
+                }
                     
                     console.log('✅ Labor activity logged successfully');
                 } catch (activityError: any) {
@@ -368,22 +362,16 @@ const LaborPage = () => {
                         stack: activityError?.stack
                     });
                     
-                    // Show error to user for debugging
-                    toast.error(`Activity logging failed: ${activityError?.message || 'Unknown error'}`);
-                    
                     // Don't fail the main operation if activity logging fails
                 }
 
-                // Update loading message for refresh
-                toast.loading('Refreshing labor entries...');
-
-                // Refresh the labor entries list
+                // Refresh the labor entries list (without loading toast)
                 await fetchLaborEntries();
 
                 // Stop loading animation and show success
                 stopLoadingAnimation();
                 toast.dismiss(); // Dismiss loading toast
-                toast.success(`✅ Successfully added ${laborEntries.length} labor ${laborEntries.length === 1 ? 'entry' : 'entries'}`);
+                toast.success(`Labor added successfully`);
                 
                 // 🔔 NEW: Send simple notification for labor addition
                 try {
@@ -421,7 +409,7 @@ const LaborPage = () => {
                     // Don't fail the whole operation if notification fails
                 }
             } else {
-                throw new Error(result.message || 'Failed to add labor entries');
+                throw new Error('Failed to add some labor entries');
             }
             
         } catch (error: any) {

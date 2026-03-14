@@ -16,6 +16,7 @@ import {
   ViewStyle
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 import AddMaterialsStep from './AddMaterialsStep';
@@ -59,14 +60,6 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   
   // Ref to store loading toast ID
   const loadingToastRef = useRef<any>(null);
-  
-  // Function to update loading toast message
-  const updateLoadingToast = (message: string) => {
-    if (loadingToastRef.current) {
-      toast.dismiss(loadingToastRef.current);
-    }
-    loadingToastRef.current = toast.loading(message);
-  };
   
   const [formData, setFormData] = useState<MaterialFormData>({
     name: '',
@@ -152,6 +145,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   // Animation values for swipe to submit
   const swipeAnimation = useRef(new Animated.Value(0)).current;
   const [isSwipeComplete, setIsSwipeComplete] = useState(false);
+  const [swipeProgress, setSwipeProgress] = useState(0);
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const shimmerAnim = useRef(new Animated.Value(0)).current;
 
@@ -199,6 +193,17 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       };
     }
   }, [currentStep, addedMaterials.length]);
+
+  // Add listener to swipe animation for dynamic text updates
+  useEffect(() => {
+    const listenerId = swipeAnimation.addListener(({ value }) => {
+      setSwipeProgress(value);
+    });
+
+    return () => {
+      swipeAnimation.removeListener(listenerId);
+    };
+  }, [swipeAnimation]);
 
   const handleTemplateSelect = (templateKey: string) => {
     const template = MATERIAL_TEMPLATES[templateKey];
@@ -312,10 +317,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       updateAddedMaterials(updatedMaterials);
       setEditingMaterialIndex(null); // Clear editing state
 
-      // Show toast for update
-      toast.success('Material updated successfully');
-      
-      // Hide form after updating
+      // Hide form after updating (no toast for individual updates)
       setShowAddForm(false);
     } else {
       const newEntry: InternalMaterial = {
@@ -330,10 +332,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       const newMaterials = [...addedMaterials, newEntry];
       updateAddedMaterials(newMaterials);
 
-      // Show toast for new material
-      toast.success(`✓ ${formData.name} added to list`);
-
-      // Hide form after adding first material (or any material)
+      // Hide form after adding material (no toast for individual additions)
       setShowAddForm(false);
 
       // Scroll to top to show the added material
@@ -510,7 +509,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       // Reset retry counter on successful attempt
       retryAttemptRef.current = 0;
       
-      // Show initial loading toast with material count
+      // Show only one loading toast - no success toast after
       const materialCount = formattedMaterials.length;
       loadingToastRef.current = toast.loading(
         `Adding ${materialCount} material${materialCount > 1 ? 's' : ''}...`
@@ -519,43 +518,25 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       // Close the modal immediately to show the loading state
       handleClose(true);
       
-      // Update loading message for API call
-      updateLoadingToast(`Saving ${materialCount} material${materialCount > 1 ? 's' : ''} to database...`);
-      
       // Call onSubmit and wait for it to complete (including material refresh)
       await onSubmit(formattedMaterials, currentPurposeMessage);
       
-      // Update loading message for UI refresh
-      updateLoadingToast('Refreshing materials list...');
-      
-      // Add a small delay to ensure UI has updated with new materials
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Final completion message
-      updateLoadingToast('Materials added successfully!');
-      
-      // Brief delay to show completion message
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Dismiss loading toast and show success only after everything is complete
+      // Simply dismiss loading toast - let parent handle success message
       if (loadingToastRef.current) {
         toast.dismiss(loadingToastRef.current);
         loadingToastRef.current = null;
       }
-      
-      toast.success(
-        `✅ ${materialCount} material${materialCount > 1 ? 's' : ''} added successfully!`
-      );
       
     } catch (error) {
       console.error('Error submitting materials:', error);
       
-      // Dismiss loading toast and show error
+      // Dismiss loading toast and show single error message only on error
       if (loadingToastRef.current) {
         toast.dismiss(loadingToastRef.current);
         loadingToastRef.current = null;
       }
       
+      // Show error toast only if submission fails
       toast.error('Failed to add materials. Please try again.');
       
     } finally {
@@ -568,6 +549,13 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   const handleSwipeStart = () => {
     // Reset swipe state
     setIsSwipeComplete(false);
+    
+    // Light haptic feedback when starting to swipe
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (error) {
+      console.log('Haptic feedback not available:', error);
+    }
   };
 
   const handleSwipeMove = (gestureState: any) => {
@@ -579,8 +567,20 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     // Check if swipe is complete (70% of the way)
     if (progress >= 0.7 && !isSwipeComplete) {
       setIsSwipeComplete(true);
+      // Haptic feedback when reaching the completion threshold
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } catch (error) {
+        console.log('Haptic feedback not available:', error);
+      }
     } else if (progress < 0.7 && isSwipeComplete) {
       setIsSwipeComplete(false);
+      // Light haptic feedback when leaving the completion zone
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch (error) {
+        console.log('Haptic feedback not available:', error);
+      }
     }
   };
 
@@ -589,6 +589,13 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     const progress = dx / maxSwipeDistance;
     
     if (progress >= 0.7) {
+      // Success haptic feedback
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch (error) {
+        console.log('Haptic feedback not available:', error);
+      }
+      
       // Complete the swipe — snap to end
       Animated.spring(swipeAnimation, {
         toValue: 1,
@@ -602,6 +609,13 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
         }, 100);
       });
     } else {
+      // Light haptic feedback for incomplete swipe
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch (error) {
+        console.log('Haptic feedback not available:', error);
+      }
+      
       // Animate back to start with spring physics
       Animated.spring(swipeAnimation, {
         toValue: 0,
@@ -851,6 +865,45 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
             <View style={styles.floatingButtonContainer}>
               {/* PhonePe-style Swipe to Submit */}
               <View style={styles.swipeToSubmitContainer}>
+                {/* Progress indicator above swipe */}
+                <View style={styles.swipeProgressContainer}>
+                  <View style={styles.swipeProgressTrack}>
+                    <Animated.View
+                      style={[
+                        styles.swipeProgressFill,
+                        {
+                          width: swipeAnimation.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: ['0%', '100%'],
+                            extrapolate: 'clamp',
+                          }),
+                          backgroundColor: swipeAnimation.interpolate({
+                            inputRange: [0, 0.7, 1],
+                            outputRange: ['#3B82F6', '#10B981', '#10B981'],
+                            extrapolate: 'clamp',
+                          }),
+                        }
+                      ]}
+                    />
+                  </View>
+                  <Animated.Text 
+                    style={[
+                      styles.swipeProgressText,
+                      {
+                        color: swipeAnimation.interpolate({
+                          inputRange: [0, 0.7, 1],
+                          outputRange: ['#64748B', '#10B981', '#10B981'],
+                          extrapolate: 'clamp',
+                        }),
+                      }
+                    ]}
+                  >
+                    {swipeProgress > 0.7 ? 'Release to Submit!' : 
+                     swipeProgress > 0.3 ? 'Keep Swiping...' : 
+                     'Swipe to Add Materials'}
+                  </Animated.Text>
+                </View>
+
                 <View style={styles.swipeTrack} {...panResponder.panHandlers}>
                   {/* Animated fill behind the button */}
                   <Animated.View
@@ -1134,6 +1187,28 @@ const styles = StyleSheet.create<Styles>({
   // Swipe to Submit Styles
   swipeToSubmitContainer: {
     width: '100%',
+  },
+  swipeProgressContainer: {
+    marginBottom: 8,
+    alignItems: 'center' as const,
+  },
+  swipeProgressTrack: {
+    width: '100%',
+    height: 4,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 2,
+    overflow: 'hidden' as const,
+    marginBottom: 6,
+  },
+  swipeProgressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  swipeProgressText: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    textAlign: 'center' as const,
+    letterSpacing: 0.5,
   },
   swipeTrack: {
     backgroundColor: '#1E293B',

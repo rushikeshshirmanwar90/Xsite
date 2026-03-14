@@ -223,12 +223,33 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                 // Continue without labor data
             }
 
+            // Fetch equipment data from project
+            console.log('🔍 Fetching equipment data for project:', selectedProjectId);
+            let equipmentData: any[] = [];
+            
+            try {
+                const equipmentResponse = await axios.get<ApiResponse<any>>(`${domain}/api/equipment?projectId=${selectedProjectId}`);
+                console.log('🔍 Equipment API Response:', equipmentResponse.data);
+                
+                if (equipmentResponse.data.success && equipmentResponse.data.data && equipmentResponse.data.data.equipment) {
+                    equipmentData = equipmentResponse.data.data.equipment;
+                    console.log('✅ Equipment data fetched:', equipmentData.length, 'entries');
+                    console.log('✅ Equipment data sample:', equipmentData.slice(0, 2));
+                } else {
+                    console.warn('⚠️ Could not fetch project equipment data');
+                    console.warn('⚠️ Response structure:', equipmentResponse.data);
+                }
+            } catch (equipmentError) {
+                console.error('❌ Error fetching equipment data:', equipmentError);
+                // Continue without equipment data
+            }
+
             if (!activities || activities.length === 0) {
-                // Check if we have labor data even if no material activities
-                if (laborData.length === 0) {
+                // Check if we have labor data or equipment data even if no material activities
+                if (laborData.length === 0 && equipmentData.length === 0) {
                     Alert.alert(
                         'No Data Found',
-                        `No material activities or labor entries found for the selected period (${formatDate(startDate)} to ${formatDate(endDate)}).`,
+                        `No material activities, labor entries, or equipment entries found for the selected period (${formatDate(startDate)} to ${formatDate(endDate)}).`,
                         [
                             { text: 'OK' },
                             {
@@ -246,7 +267,8 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                 }
             }
 
-            console.log('📄 Generating PDF with activities:', activities.length, 'and labor entries:', laborData.length);
+            console.log('📄 Generating PDF with activities:', activities.length, ', labor entries:', laborData.length, ', and equipment entries:', equipmentData.length);
+            console.log('📄 Equipment data being passed to PDF:', equipmentData.slice(0, 2));
 
             // Get selected project name for PDF title
             const selectedProject = projects.find(p => p._id === selectedProjectId);
@@ -262,7 +284,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
             const pdfGenerator = new PDFReportGenerator(clientData, userData);
             
             console.log('📄 Calling generatePDF...');
-            await pdfGenerator.generatePDF(activities || [], projectName, laborData);
+            await pdfGenerator.generatePDF(activities || [], projectName, laborData, equipmentData);
             console.log('📄 generatePDF completed successfully');
 
             console.log('✅ PDF generation completed successfully');
@@ -325,7 +347,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                             </View>
                             <View>
                                 <Text style={styles.title}>Generate Report</Text>
-                                <Text style={styles.subtitle}>Material & labor report</Text>
+                                <Text style={styles.subtitle}>Material, labor & equipment report</Text>
                             </View>
                         </View>
                         <TouchableOpacity onPress={onClose} style={styles.closeButton}>
@@ -530,7 +552,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                             <View style={styles.previewCard}>
                                 <View style={styles.previewHeader}>
                                     <Ionicons name="document-text-outline" size={24} color="#3B82F6" />
-                                    <Text style={styles.previewTitle}>Material & Labor Report</Text>
+                                    <Text style={styles.previewTitle}>Material, Labor & Equipment Report</Text>
                                 </View>
                                 <View style={styles.previewDetails}>
                                     <View style={styles.previewRow}>
@@ -550,7 +572,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                                     <View style={styles.previewRow}>
                                         <Text style={styles.previewLabel}>Includes:</Text>
                                         <Text style={styles.previewValue}>
-                                            Materials & Labor Costs
+                                            Materials, Labor & Equipment Costs
                                         </Text>
                                     </View>
                                     <View style={styles.previewRow}>

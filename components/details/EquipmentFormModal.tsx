@@ -14,6 +14,7 @@ import {
   Platform,
   Dimensions,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { domain } from '@/lib/domain';
 
 interface EquipmentFormModalProps {
@@ -61,6 +62,8 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
   // Animation values for swipe to submit
   const swipeAnimation = useRef(new Animated.Value(0)).current;
   const [isSwipeComplete, setIsSwipeComplete] = useState(false);
+  const [swipeProgress, setSwipeProgress] = useState(0);
+  const [progressText, setProgressText] = useState('Swipe to Submit All');
 
   // Animation values
   const scrollViewRef = useRef<ScrollView>(null);
@@ -93,6 +96,10 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
   // Swipe gesture handlers
   const handleSwipeStart = () => {
     setIsSwipeComplete(false);
+    setSwipeProgress(0);
+    setProgressText('Swipe to Submit All');
+    // Light haptic feedback on start
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
   const handleSwipeMove = (gestureState: any) => {
@@ -100,10 +107,27 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
     const maxSwipe = 200;
     const progress = Math.max(0, Math.min(dx / maxSwipe, 1));
     
+    setSwipeProgress(progress);
     swipeAnimation.setValue(progress);
     
-    if (progress >= 0.7 && !isSwipeComplete) {
-      setIsSwipeComplete(true);
+    // Update progress text based on swipe progress
+    if (progress < 0.3) {
+      setProgressText('Swipe to Submit All');
+    } else if (progress < 0.6) {
+      setProgressText('Keep Swiping...');
+      // Medium haptic feedback at 30% progress
+      if (progress >= 0.3 && swipeProgress < 0.3) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+    } else if (progress < 0.7) {
+      setProgressText('Almost There!');
+    } else {
+      setProgressText('Release to Submit!');
+      // Success haptic feedback at 70% progress
+      if (progress >= 0.7 && !isSwipeComplete) {
+        setIsSwipeComplete(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
     }
   };
 
@@ -113,6 +137,9 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
     const progress = dx / maxSwipe;
     
     if (progress >= 0.7) {
+      // Success haptic feedback on completion
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
       Animated.timing(swipeAnimation, {
         toValue: 1,
         duration: 200,
@@ -121,12 +148,17 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
         handleFinalSubmit();
       });
     } else {
+      // Light haptic feedback on reset
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      
       Animated.timing(swipeAnimation, {
         toValue: 0,
         duration: 300,
         useNativeDriver: false,
       }).start();
       setIsSwipeComplete(false);
+      setSwipeProgress(0);
+      setProgressText('Swipe to Submit All');
     }
   };
 
@@ -153,6 +185,8 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
     setShowAddForm(false);
     setEditingEntry(null);
     setIsSwipeComplete(false);
+    setSwipeProgress(0);
+    setProgressText('Swipe to Submit All');
     swipeAnimation.setValue(0);
   };
 
@@ -923,6 +957,52 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
           {/* Swipe to Submit */}
           {equipmentEntries.length > 0 && !showAddForm && (
             <View style={[styles.modalActions, { paddingBottom: safeBottomPadding + 8 }]}>
+              {/* Progress Indicator */}
+              <View style={styles.progressIndicatorContainer}>
+                <Animated.Text 
+                  style={[
+                    styles.progressIndicatorText,
+                    {
+                      opacity: swipeAnimation.interpolate({
+                        inputRange: [0, 0.3, 0.7, 1],
+                        outputRange: [1, 1, 1, 0],
+                        extrapolate: 'clamp',
+                      }),
+                      transform: [{
+                        scale: swipeAnimation.interpolate({
+                          inputRange: [0, 0.3, 0.7, 1],
+                          outputRange: [1, 1.05, 1.1, 0.95],
+                          extrapolate: 'clamp',
+                        })
+                      }]
+                    }
+                  ]}
+                >
+                  {progressText}
+                </Animated.Text>
+                
+                {/* Progress Bar */}
+                <View style={styles.progressBarContainer}>
+                  <Animated.View 
+                    style={[
+                      styles.progressBar,
+                      {
+                        width: swipeAnimation.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ['0%', '100%'],
+                          extrapolate: 'clamp',
+                        }),
+                        backgroundColor: swipeAnimation.interpolate({
+                          inputRange: [0, 0.3, 0.7, 1],
+                          outputRange: ['#64748B', '#3B82F6', '#10B981', '#059669'],
+                          extrapolate: 'clamp',
+                        })
+                      }
+                    ]}
+                  />
+                </View>
+              </View>
+
               <View style={styles.swipeToSubmitContainer}>
                 <View style={styles.swipeTrack} {...panResponder.panHandlers}>
                   <Animated.View 
@@ -935,14 +1015,32 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                             outputRange: [0, 200],
                             extrapolate: 'clamp',
                           })
-                        }]
+                        }],
+                        backgroundColor: swipeAnimation.interpolate({
+                          inputRange: [0, 0.3, 0.7, 1],
+                          outputRange: ['#3B82F6', '#3B82F6', '#10B981', '#059669'],
+                          extrapolate: 'clamp',
+                        })
                       }
                     ]}
                   >
-                    <View style={styles.doubleChevron}>
+                    <Animated.View 
+                      style={[
+                        styles.doubleChevron,
+                        {
+                          transform: [{
+                            rotate: swipeAnimation.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: ['0deg', '360deg'],
+                              extrapolate: 'clamp',
+                            })
+                          }]
+                        }
+                      ]}
+                    >
                       <Ionicons name="chevron-forward" size={20} color="#FFFFFF" style={styles.chevronFirst} />
                       <Ionicons name="chevron-forward" size={20} color="#FFFFFF" style={styles.chevronSecond} />
-                    </View>
+                    </Animated.View>
                   </Animated.View>
                   
                   <View style={styles.swipeTextContainer}>
@@ -1775,10 +1873,34 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingHorizontal: 4,
   },
+  progressIndicatorContainer: {
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingHorizontal: 8,
+  },
+  progressIndicatorText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+    textAlign: 'center',
+    letterSpacing: 0.2,
+  },
+  progressBarContainer: {
+    width: '100%',
+    height: 4,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    borderRadius: 2,
+  },
   swipeTrack: {
     backgroundColor: '#1E293B',
     borderRadius: 32,
-    height: 64,
+    height: 56,
     position: 'relative',
     justifyContent: 'center',
     alignItems: 'flex-start',
@@ -1793,10 +1915,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 4,
     top: 4,
-    width: 56,
-    height: 56,
+    width: 48,
+    height: 48,
     backgroundColor: '#3B82F6',
-    borderRadius: 28,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -1820,7 +1942,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingLeft: 64,
+    paddingLeft: 56,
     paddingRight: 16,
   },
   swipeText: {

@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     Animated,
@@ -77,14 +78,15 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
     // Animation values for swipe to submit
     const swipeAnimation = useRef(new Animated.Value(0)).current;
     const [isSwipeComplete, setIsSwipeComplete] = useState(false);
+    const [swipeProgress, setSwipeProgress] = useState(0);
     const pulseAnim = useRef(new Animated.Value(0)).current;
     const shimmerAnim = useRef(new Animated.Value(0)).current;
 
     // Calculate max swipe distance based on screen width
-    // Track has 20px padding on each side (footer paddingHorizontal) + 5px button inset on each side
-    const BUTTON_SIZE = 54;
+    // Track has 20px padding on each side (footer paddingHorizontal) + 4px button inset on each side
+    const BUTTON_SIZE = 48;
     const TRACK_HORIZONTAL_PADDING = 40; // 20px footer padding on each side
-    const BUTTON_INSET = 5;
+    const BUTTON_INSET = 4;
     const maxSwipeDistance = Dimensions.get('window').width - TRACK_HORIZONTAL_PADDING - BUTTON_SIZE - (BUTTON_INSET * 2);
 
     // Loading animation states
@@ -418,6 +420,17 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
         onClose();
     };
 
+    // Add listener to swipe animation for dynamic text updates
+    useEffect(() => {
+        const listenerId = swipeAnimation.addListener(({ value }) => {
+            setSwipeProgress(value);
+        });
+
+        return () => {
+            swipeAnimation.removeListener(listenerId);
+        };
+    }, [swipeAnimation]);
+
     // Start pulse animation when on step 3 (quantity)
     useEffect(() => {
         if (currentStep === 'quantity') {
@@ -463,6 +476,13 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
     const handleSwipeStart = () => {
         // Reset swipe state
         setIsSwipeComplete(false);
+        
+        // Light haptic feedback when starting to swipe
+        try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch (error) {
+            console.log('Haptic feedback not available:', error);
+        }
     };
 
     const handleSwipeMove = (gestureState: any) => {
@@ -474,8 +494,20 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
         // Check if swipe is complete (70% of the way)
         if (progress >= 0.7 && !isSwipeComplete) {
             setIsSwipeComplete(true);
+            // Haptic feedback when reaching the completion threshold
+            try {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            } catch (error) {
+                console.log('Haptic feedback not available:', error);
+            }
         } else if (progress < 0.7 && isSwipeComplete) {
             setIsSwipeComplete(false);
+            // Light haptic feedback when leaving the completion zone
+            try {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            } catch (error) {
+                console.log('Haptic feedback not available:', error);
+            }
         }
     };
 
@@ -492,6 +524,13 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
         console.log('currentSelectedMiniSectionId:', currentSelectedMiniSectionId);
         
         if (progress >= 0.7) {
+            // Success haptic feedback
+            try {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch (error) {
+                console.log('Haptic feedback not available:', error);
+            }
+            
             // Complete the swipe — snap to end
             Animated.spring(swipeAnimation, {
                 toValue: 1,
@@ -503,6 +542,13 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                 await handleSubmit();
             });
         } else {
+            // Light haptic feedback for incomplete swipe
+            try {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            } catch (error) {
+                console.log('Haptic feedback not available:', error);
+            }
+            
             // Animate back to start with spring physics
             Animated.spring(swipeAnimation, {
                 toValue: 0,
@@ -796,10 +842,10 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                 <View style={styles.fieldContainer}>
                                     <View style={styles.labelWithHelper}>
                                         <Text style={styles.label}>
-                                            Where is this material being used? <Text style={styles.required}>*</Text>
+                                            Select Work Area <Text style={styles.required}>*</Text>
                                         </Text>
                                         <Text style={styles.labelHelper}>
-                                            Select the work area or mini-section
+                                            Choose ONE work area where materials will be used
                                             {miniSections.length > availableMiniSections.length && 
                                                 ` (${miniSections.length - availableMiniSections.length} completed section${miniSections.length - availableMiniSections.length > 1 ? 's' : ''} hidden)`
                                             }
@@ -817,22 +863,38 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                                             isSelected && styles.sectionItemSelected
                                                         ]}
                                                         onPress={() => {
+                                                            console.log(`🎯 Mini-section selected: ${section.name} (${section._id})`);
                                                             setSelectedMiniSectionId(section._id);
                                                             selectedMiniSectionIdRef.current = section._id;
-                                                            // Auto-advance to next step
-                                                            setTimeout(() => {
-                                                                setCurrentStep('materialSelection');
-                                                            }, 300);
+                                                            // Remove auto-advance to prevent laggy interface
                                                         }}
+                                                        activeOpacity={0.7}
                                                     >
                                                         <View style={styles.sectionItemLeft}>
-                                                            <View style={styles.sectionIconBadge}>
-                                                                <Ionicons name="layers" size={18} color="#3B82F6" />
+                                                            <View style={[
+                                                                styles.sectionIconBadge,
+                                                                isSelected && styles.sectionIconBadgeSelected
+                                                            ]}>
+                                                                <Ionicons 
+                                                                    name={isSelected ? "radio-button-on" : "radio-button-off"} 
+                                                                    size={20} 
+                                                                    color={isSelected ? "#3B82F6" : "#94A3B8"} 
+                                                                />
                                                             </View>
-                                                            <Text style={styles.sectionItemName}>{section.name}</Text>
+                                                            <View style={styles.sectionItemInfo}>
+                                                                <Text style={[
+                                                                    styles.sectionItemName,
+                                                                    isSelected && styles.sectionItemNameSelected
+                                                                ]}>{section.name}</Text>
+                                                                <Text style={styles.sectionItemHelper}>
+                                                                    {isSelected ? 'Selected work area' : 'Tap to select this area'}
+                                                                </Text>
+                                                            </View>
                                                         </View>
                                                         {isSelected && (
-                                                            <Ionicons name="checkmark-circle" size={22} color="#3B82F6" />
+                                                            <View style={styles.selectedIndicator}>
+                                                                <Ionicons name="checkmark-circle" size={24} color="#10B981" />
+                                                            </View>
                                                         )}
                                                     </TouchableOpacity>
                                                 );
@@ -863,6 +925,9 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                         <Text style={styles.currentAreaText} numberOfLines={1}>
                                             Area: {availableMiniSections.find(s => s._id === selectedMiniSectionId)?.name || 
                                                   miniSections.find(s => s._id === selectedMiniSectionId)?.name || 'None'}
+                                        </Text>
+                                        <Text style={styles.multiSelectHelper}>
+                                            Tap multiple materials to select them
                                         </Text>
                                     </View>
                                 </View>
@@ -956,11 +1021,16 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                                         
                                                         {/* Selection Checkbox */}
                                                         <View style={styles.checkboxContainer}>
-                                                            <Ionicons 
-                                                                name={isSelected ? "checkmark-circle" : "ellipse-outline"} 
-                                                                size={28} 
-                                                                color={isSelected ? "#10B981" : "#CBD5E1"} 
-                                                            />
+                                                            <View style={[
+                                                                styles.materialCheckbox,
+                                                                isSelected && styles.materialCheckboxSelected
+                                                            ]}>
+                                                                <Ionicons 
+                                                                    name={isSelected ? "checkmark" : "add"} 
+                                                                    size={20} 
+                                                                    color={isSelected ? "#FFFFFF" : "#94A3B8"} 
+                                                                />
+                                                            </View>
                                                         </View>
                                                     </TouchableOpacity>
                                                 );
@@ -1014,9 +1084,15 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                             // STEP 3: QUANTITY INPUT
                             <>
 
-                                {/* Selected Section Info */}
+                                {/* Selected Section Info with Back Button */}
                                 <View style={styles.sectionInfo}>
                                     <View style={styles.sectionInfoHeader}>
+                                        <TouchableOpacity
+                                            style={styles.backButtonInline}
+                                            onPress={handlePreviousStep}
+                                        >
+                                            <Ionicons name="arrow-back" size={16} color="#3B82F6" />
+                                        </TouchableOpacity>
                                         <Ionicons name="layers" size={20} color="#3B82F6" />
                                         <Text style={styles.sectionInfoTitle}>Using materials in:</Text>
                                     </View>
@@ -1199,14 +1275,20 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                     disabled={!selectedMiniSectionId}
                                 >
                                     <Text style={styles.nextButtonText}>
-                                        Next: Select Materials
+                                        {selectedMiniSectionId ? 'Continue to Materials' : 'Select Work Area First'}
                                     </Text>
                                     <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
                                 </TouchableOpacity>
                             </>
                         ) : currentStep === 'materialSelection' ? (
-                            // Step 2 Footer (Material Selection - Back button removed, use breadcrumbs)
+                            // Step 2 Footer (Material Selection)
                             <>
+                                <TouchableOpacity
+                                    style={styles.backButtonIcon}
+                                    onPress={handlePreviousStep}
+                                >
+                                    <Ionicons name="arrow-back" size={24} color="#64748B" />
+                                </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[
                                         styles.nextButtonLarge,
@@ -1216,17 +1298,59 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                     disabled={getSelectedMaterialsCount() === 0}
                                 >
                                     <Text style={styles.nextButtonText}>
-                                        Next: Enter Quantities
+                                        {getSelectedMaterialsCount() > 0 
+                                            ? `Continue with ${getSelectedMaterialsCount()} Material${getSelectedMaterialsCount() > 1 ? 's' : ''}` 
+                                            : 'Select Materials First'
+                                        }
                                     </Text>
                                     <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
                                 </TouchableOpacity>
                             </>
                         ) : (
-                            // Step 3 Footer (Quantity Swipe)
-                            <View style={styles.step2FooterSimple}>
+                            // Step 3 Footer (Full Width Swipe)
+                            <View style={styles.step3FooterFullWidth}>
                                 <View style={styles.swipeToSubmitContainer}>
+                                    {/* Progress indicator above swipe */}
+                                    <View style={styles.swipeProgressContainer}>
+                                        <View style={styles.swipeProgressTrack}>
+                                            <Animated.View
+                                                style={[
+                                                    styles.swipeProgressFill,
+                                                    {
+                                                        width: swipeAnimation.interpolate({
+                                                            inputRange: [0, 1],
+                                                            outputRange: ['0%', '100%'],
+                                                            extrapolate: 'clamp',
+                                                        }),
+                                                        backgroundColor: swipeAnimation.interpolate({
+                                                            inputRange: [0, 0.7, 1],
+                                                            outputRange: ['#3B82F6', '#10B981', '#10B981'],
+                                                            extrapolate: 'clamp',
+                                                        }),
+                                                    }
+                                                ]}
+                                            />
+                                        </View>
+                                        <Animated.Text 
+                                            style={[
+                                                styles.swipeProgressText,
+                                                {
+                                                    color: swipeAnimation.interpolate({
+                                                        inputRange: [0, 0.7, 1],
+                                                        outputRange: ['#64748B', '#10B981', '#10B981'],
+                                                        extrapolate: 'clamp',
+                                                    }),
+                                                }
+                                            ]}
+                                        >
+                                            {swipeProgress > 0.7 ? 'Release to Submit!' : 
+                                             swipeProgress > 0.3 ? 'Keep Swiping...' : 
+                                             'Swipe to Record Usage'}
+                                        </Animated.Text>
+                                    </View>
+
                                     <View style={styles.swipeTrack} {...panResponder.panHandlers}>
-                                        {/* Animated green fill behind the button */}
+                                        {/* Enhanced gradient fill behind the button */}
                                         <Animated.View
                                             style={[
                                                 styles.swipeFill,
@@ -1236,122 +1360,227 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                                         outputRange: [BUTTON_SIZE + BUTTON_INSET * 2, maxSwipeDistance + BUTTON_SIZE + BUTTON_INSET * 2],
                                                         extrapolate: 'clamp',
                                                     }),
-                                                    backgroundColor: swipeAnimation.interpolate({
-                                                        inputRange: [0, 0.5, 0.7, 1],
-                                                        outputRange: ['rgba(59, 130, 246, 0.15)', 'rgba(59, 130, 246, 0.25)', 'rgba(16, 185, 129, 0.3)', 'rgba(16, 185, 129, 0.4)'],
+                                                    opacity: swipeAnimation.interpolate({
+                                                        inputRange: [0, 0.3, 0.7, 1],
+                                                        outputRange: [0.1, 0.3, 0.6, 0.8],
                                                         extrapolate: 'clamp',
                                                     }),
                                                 }
                                             ]}
                                         />
 
-                                        {/* Shimmer arrow hints */}
+                                        {/* Enhanced shimmer arrow hints with better animation */}
                                         <Animated.View
                                             style={[
                                                 styles.shimmerContainer,
                                                 {
                                                     opacity: swipeAnimation.interpolate({
-                                                        inputRange: [0, 0.15],
+                                                        inputRange: [0, 0.2],
                                                         outputRange: [1, 0],
                                                         extrapolate: 'clamp',
                                                     }),
                                                 }
                                             ]}
                                         >
-                                            {[0, 1, 2].map((i) => (
+                                            {[0, 1, 2, 3].map((i) => (
                                                 <Animated.View
                                                     key={i}
-                                                    style={{
-                                                        opacity: shimmerAnim.interpolate({
-                                                            inputRange: [0, 0.33 * i, 0.33 * i + 0.15, 0.33 * i + 0.33, 1],
-                                                            outputRange: [0.15, 0.15, 0.5, 0.15, 0.15],
-                                                            extrapolate: 'clamp',
-                                                        }),
-                                                    }}
+                                                    style={[
+                                                        styles.shimmerArrow,
+                                                        {
+                                                            opacity: shimmerAnim.interpolate({
+                                                                inputRange: [0, 0.25 * i, 0.25 * i + 0.1, 0.25 * i + 0.25, 1],
+                                                                outputRange: [0.2, 0.2, 1, 0.2, 0.2],
+                                                                extrapolate: 'clamp',
+                                                            }),
+                                                            transform: [{
+                                                                scale: shimmerAnim.interpolate({
+                                                                    inputRange: [0, 0.25 * i, 0.25 * i + 0.1, 0.25 * i + 0.25, 1],
+                                                                    outputRange: [0.8, 0.8, 1.2, 0.8, 0.8],
+                                                                    extrapolate: 'clamp',
+                                                                }),
+                                                            }],
+                                                        }
+                                                    ]}
                                                 >
-                                                    <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.5)" />
+                                                    <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.8)" />
                                                 </Animated.View>
                                             ))}
                                         </Animated.View>
 
-                                        {/* Swipe button with pulsing chevrons */}
+                                        {/* Enhanced swipe button with better feedback */}
                                         <Animated.View 
                                             style={[
                                                 styles.swipeButton,
                                                 {
-                                                    transform: [{
-                                                        translateX: swipeAnimation.interpolate({
-                                                            inputRange: [0, 1],
-                                                            outputRange: [0, maxSwipeDistance],
-                                                            extrapolate: 'clamp',
-                                                        })
-                                                    }],
+                                                    transform: [
+                                                        {
+                                                            translateX: swipeAnimation.interpolate({
+                                                                inputRange: [0, 1],
+                                                                outputRange: [0, maxSwipeDistance],
+                                                                extrapolate: 'clamp',
+                                                            })
+                                                        },
+                                                        {
+                                                            scale: swipeAnimation.interpolate({
+                                                                inputRange: [0, 0.7, 1],
+                                                                outputRange: [1, 1.05, 1.1],
+                                                                extrapolate: 'clamp',
+                                                            })
+                                                        }
+                                                    ],
                                                     backgroundColor: swipeAnimation.interpolate({
-                                                        inputRange: [0, 0.65, 0.7, 1],
-                                                        outputRange: ['#3B82F6', '#3B82F6', '#10B981', '#10B981'],
+                                                        inputRange: [0, 0.5, 0.7, 1],
+                                                        outputRange: ['#3B82F6', '#2563EB', '#10B981', '#059669'],
+                                                        extrapolate: 'clamp',
+                                                    }),
+                                                    shadowOpacity: swipeAnimation.interpolate({
+                                                        inputRange: [0, 0.7, 1],
+                                                        outputRange: [0.3, 0.5, 0.7],
                                                         extrapolate: 'clamp',
                                                     }),
                                                 }
                                             ]}
                                         >
+                                            {/* Pulsing ring effect */}
+                                            <Animated.View
+                                                style={[
+                                                    styles.pulseRing,
+                                                    {
+                                                        opacity: pulseAnim.interpolate({
+                                                            inputRange: [0, 0.5, 1],
+                                                            outputRange: [0.3, 0.1, 0.3],
+                                                        }),
+                                                        transform: [{
+                                                            scale: pulseAnim.interpolate({
+                                                                inputRange: [0, 1],
+                                                                outputRange: [1, 1.4],
+                                                            }),
+                                                        }],
+                                                    }
+                                                ]}
+                                            />
+
                                             <Animated.View
                                                 style={{
                                                     transform: [{
                                                         translateX: pulseAnim.interpolate({
                                                             inputRange: [0, 1],
-                                                            outputRange: [-2, 4],
+                                                            outputRange: [-1, 2],
                                                         }),
                                                     }],
                                                 }}
                                             >
+                                                {/* Chevron icons with enhanced animation */}
                                                 <Animated.View
                                                     style={{
                                                         opacity: swipeAnimation.interpolate({
-                                                            inputRange: [0, 0.7, 1],
-                                                            outputRange: [1, 1, 0],
+                                                            inputRange: [0, 0.6, 0.7, 1],
+                                                            outputRange: [1, 1, 0, 0],
                                                             extrapolate: 'clamp',
                                                         }),
                                                     }}
                                                 >
-                                                    <View style={styles.doubleChevron}>
-                                                        <Ionicons name="chevron-forward" size={22} color="#FFFFFF" style={styles.chevronFirst} />
-                                                        <Ionicons name="chevron-forward" size={22} color="rgba(255,255,255,0.6)" style={styles.chevronSecond} />
+                                                    <View style={styles.tripleChevron}>
+                                                        <Ionicons name="chevron-forward" size={18} color="#FFFFFF" style={styles.chevronFirst} />
+                                                        <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.8)" style={styles.chevronSecond} />
+                                                        <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.5)" style={styles.chevronThird} />
                                                     </View>
                                                 </Animated.View>
+
+                                                {/* Success checkmark with bounce animation */}
                                                 <Animated.View
                                                     style={[
                                                         styles.checkmarkOverlay,
                                                         {
                                                             opacity: swipeAnimation.interpolate({
-                                                                inputRange: [0, 0.65, 0.7, 1],
+                                                                inputRange: [0, 0.6, 0.7, 1],
                                                                 outputRange: [0, 0, 1, 1],
                                                                 extrapolate: 'clamp',
                                                             }),
+                                                            transform: [{
+                                                                scale: swipeAnimation.interpolate({
+                                                                    inputRange: [0.7, 0.8, 1],
+                                                                    outputRange: [0.5, 1.2, 1],
+                                                                    extrapolate: 'clamp',
+                                                                }),
+                                                            }],
                                                         }
                                                     ]}
                                                 >
-                                                    <Ionicons name="checkmark" size={28} color="#FFFFFF" />
+                                                    <Ionicons name="checkmark" size={24} color="#FFFFFF" />
                                                 </Animated.View>
                                             </Animated.View>
                                         </Animated.View>
                                         
-                                        {/* Text */}
+                                        {/* Enhanced text with better positioning */}
                                         <View style={styles.swipeTextContainer}>
                                             <Animated.Text 
                                                 style={[
                                                     styles.swipeText,
                                                     {
                                                         opacity: swipeAnimation.interpolate({
-                                                            inputRange: [0, 0.3],
-                                                            outputRange: [1, 0],
+                                                            inputRange: [0, 0.2, 0.4],
+                                                            outputRange: [1, 0.5, 0],
                                                             extrapolate: 'clamp',
                                                         }),
+                                                        transform: [{
+                                                            translateX: swipeAnimation.interpolate({
+                                                                inputRange: [0, 0.4],
+                                                                outputRange: [0, -20],
+                                                                extrapolate: 'clamp',
+                                                            }),
+                                                        }],
                                                     }
                                                 ]}
                                             >
-                                                Swipe to Record Usage
+                                                Record Material Usage
+                                            </Animated.Text>
+                                            
+                                            {/* Success text */}
+                                            <Animated.Text 
+                                                style={[
+                                                    styles.swipeSuccessText,
+                                                    {
+                                                        opacity: swipeAnimation.interpolate({
+                                                            inputRange: [0, 0.6, 0.7, 1],
+                                                            outputRange: [0, 0, 1, 1],
+                                                            extrapolate: 'clamp',
+                                                        }),
+                                                        transform: [{
+                                                            translateY: swipeAnimation.interpolate({
+                                                                inputRange: [0.7, 1],
+                                                                outputRange: [10, 0],
+                                                                extrapolate: 'clamp',
+                                                            }),
+                                                        }],
+                                                    }
+                                                ]}
+                                            >
+                                                ✓ Ready to Submit!
                                             </Animated.Text>
                                         </View>
+
+                                        {/* Haptic feedback indicator */}
+                                        <Animated.View
+                                            style={[
+                                                styles.hapticIndicator,
+                                                {
+                                                    opacity: swipeAnimation.interpolate({
+                                                        inputRange: [0.65, 0.7, 0.75],
+                                                        outputRange: [0, 1, 0],
+                                                        extrapolate: 'clamp',
+                                                    }),
+                                                    transform: [{
+                                                        scale: swipeAnimation.interpolate({
+                                                            inputRange: [0.65, 0.7, 0.75],
+                                                            outputRange: [0.5, 1.5, 0.5],
+                                                            extrapolate: 'clamp',
+                                                        }),
+                                                    }],
+                                                }
+                                            ]}
+                                        />
                                     </View>
                                 </View>
                             </View>
@@ -1425,7 +1654,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
-        maxHeight: '95%', // Increased from 90% to 95% for more space
+        height: '95%', // Increased height to 95% as requested
         paddingBottom: 20,
     },
     header: {
@@ -1464,6 +1693,7 @@ const styles = StyleSheet.create({
         padding: 4,
     },
     formContainer: {
+        flex: 1, // Use flex to take up available space
         padding: 20,
     },
     fieldContainer: {
@@ -1533,12 +1763,13 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
     materialList: {
-        maxHeight: 280,
+        flex: 1, // Use flex to take available space
         marginTop: 12,
         borderRadius: 12,
         borderWidth: 1,
         borderColor: '#E2E8F0',
         backgroundColor: '#FFFFFF',
+        minHeight: 200, // Minimum height to ensure usability
     },
     materialItem: {
         flexDirection: 'row',
@@ -1648,10 +1879,30 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginRight: 12,
     },
+    sectionIconBadgeSelected: {
+        backgroundColor: '#DBEAFE',
+        borderWidth: 2,
+        borderColor: '#3B82F6',
+    },
+    sectionItemInfo: {
+        flex: 1,
+    },
     sectionItemName: {
         fontSize: 15,
         fontWeight: '600',
         color: '#1E293B',
+        marginBottom: 2,
+    },
+    sectionItemNameSelected: {
+        color: '#1E40AF',
+    },
+    sectionItemHelper: {
+        fontSize: 12,
+        color: '#64748B',
+        fontStyle: 'italic',
+    },
+    selectedIndicator: {
+        marginLeft: 8,
     },
     noSectionsWarning: {
         flexDirection: 'row',
@@ -1703,6 +1954,12 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#64748B',
         marginTop: 1,
+    },
+    multiSelectHelper: {
+        fontSize: 11,
+        color: '#3B82F6',
+        marginTop: 2,
+        fontWeight: '500',
     },
     fieldContainerCompact: {
         marginBottom: 16,
@@ -1823,6 +2080,20 @@ const styles = StyleSheet.create({
     },
     checkboxContainer: {
         padding: 0,
+    },
+    materialCheckbox: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        backgroundColor: '#F1F5F9',
+        borderWidth: 2,
+        borderColor: '#E2E8F0',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    materialCheckboxSelected: {
+        backgroundColor: '#10B981',
+        borderColor: '#10B981',
     },
     quantityInputContainer: {
         flexDirection: 'row',
@@ -2050,6 +2321,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         marginBottom: 8,
+        gap: 8,
+    },
+    backButtonInline: {
+        padding: 4,
+        borderRadius: 6,
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        borderWidth: 1,
+        borderColor: 'rgba(59, 130, 246, 0.2)',
     },
     sectionInfoTitle: {
         fontSize: 14,
@@ -2194,6 +2473,24 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
+    backButtonCompact: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        gap: 4,
+        marginBottom: 8,
+        alignSelf: 'flex-start',
+    },
+    backButtonCompactText: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#64748B',
+    },
     backButtonText: {
         fontSize: 16,
         fontWeight: '600',
@@ -2300,8 +2597,16 @@ const styles = StyleSheet.create({
     },
     step2FooterSimple: {
         paddingHorizontal: 20,
-        paddingTop: 12,
-        paddingBottom: 20,
+        paddingTop: 8,
+        paddingBottom: 12,
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+        width: '100%',
+    },
+    step3FooterFullWidth: {
+        paddingHorizontal: 20,
+        paddingTop: 8,
+        paddingBottom: 12,
         borderTopWidth: 1,
         borderTopColor: '#F1F5F9',
         width: '100%',
@@ -2358,14 +2663,36 @@ const styles = StyleSheet.create({
         textShadowOffset: { width: 0, height: 1 },
         textShadowRadius: 2,
     },
-    // Swipe to Submit Styles
+    // Enhanced Swipe to Submit Styles
     swipeToSubmitContainer: {
         width: '100%',
     },
+    swipeProgressContainer: {
+        marginBottom: 8,
+        alignItems: 'center',
+    },
+    swipeProgressTrack: {
+        width: '100%',
+        height: 4,
+        backgroundColor: '#E2E8F0',
+        borderRadius: 2,
+        overflow: 'hidden',
+        marginBottom: 6,
+    },
+    swipeProgressFill: {
+        height: '100%',
+        borderRadius: 2,
+    },
+    swipeProgressText: {
+        fontSize: 12,
+        fontWeight: '600',
+        textAlign: 'center',
+        letterSpacing: 0.5,
+    },
     swipeTrack: {
         backgroundColor: '#1E293B',
-        borderRadius: 32,
-        height: 64,
+        borderRadius: 28,
+        height: 56,
         position: 'relative',
         justifyContent: 'center',
         alignItems: 'flex-start',
@@ -2381,34 +2708,52 @@ const styles = StyleSheet.create({
         left: 0,
         top: 0,
         bottom: 0,
-        borderRadius: 32,
+        borderRadius: 28,
+        backgroundColor: 'rgba(59, 130, 246, 0.2)',
     },
     shimmerContainer: {
         position: 'absolute',
-        left: 68,
+        left: 70,
         top: 0,
         bottom: 0,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 2,
+        gap: 4,
         zIndex: 1,
+    },
+    shimmerArrow: {
+        marginHorizontal: 2,
     },
     swipeButton: {
         position: 'absolute',
-        left: 5,
-        top: 5,
-        width: 54,
-        height: 54,
-        borderRadius: 27,
+        left: 4,
+        top: 4,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
         justifyContent: 'center',
         alignItems: 'center',
         zIndex: 3,
         shadowColor: '#3B82F6',
         shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.5,
         shadowRadius: 8,
         elevation: 6,
-        overflow: 'hidden', // Ensure checkmark doesn't bleed out
+        overflow: 'hidden',
+    },
+    pulseRing: {
+        position: 'absolute',
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        borderWidth: 2,
+        borderColor: '#FFFFFF',
+        top: 0,
+        left: 0,
+    },
+    tripleChevron: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     doubleChevron: {
         flexDirection: 'row',
@@ -2416,10 +2761,14 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     chevronFirst: {
-        marginRight: -8,
+        marginRight: -6,
     },
     chevronSecond: {
-        marginLeft: -8,
+        marginLeft: -6,
+        marginRight: -6,
+    },
+    chevronThird: {
+        marginLeft: -6,
     },
     checkmarkOverlay: {
         position: 'absolute',
@@ -2441,11 +2790,31 @@ const styles = StyleSheet.create({
         zIndex: 1,
     },
     swipeText: {
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: '700',
-        color: 'rgba(255, 255, 255, 0.7)',
-        letterSpacing: 1.5,
+        color: 'rgba(255, 255, 255, 0.8)',
+        letterSpacing: 1,
         textTransform: 'uppercase',
+        position: 'absolute',
+    },
+    swipeSuccessText: {
+        fontSize: 14,
+        fontWeight: '800',
+        color: 'rgba(255, 255, 255, 0.95)',
+        letterSpacing: 1.2,
+        textTransform: 'uppercase',
+        position: 'absolute',
+    },
+    hapticIndicator: {
+        position: 'absolute',
+        right: 20,
+        top: '50%',
+        marginTop: -10,
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255, 255, 255, 0.3)',
+        zIndex: 2,
     },
     // Loading and Error States
     loadingState: {
