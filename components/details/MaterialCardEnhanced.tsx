@@ -352,10 +352,6 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                     <Ionicons name="ellipsis-vertical" size={20} color="#6B7280" />
                                 </TouchableOpacity>
                             )}
-                            {/* Debug: Log when transfer button is hidden for staff */}
-                            {activeTab === 'imported' && onTransferMaterial && ['staff', 'users'].includes(userType) && 
-                                console.log('🚫 Transfer button hidden for user type:', userType, 'on material:', material.name)
-                            }
                         </View>
                     </View>
                     
