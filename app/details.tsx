@@ -60,6 +60,12 @@ const Details = () => {
     const [miniSectionCompletions, setMiniSectionCompletions] = useState<{[key: string]: boolean}>({});
     const [isUpdatingCompletion, setIsUpdatingCompletion] = useState(false);
     const [currentUserType, setCurrentUserType] = useState<string>('staff'); // Track current user type
+    
+    // Low stock alert system
+    const [lowStockThreshold, setLowStockThreshold] = useState(10); // Default 10% threshold
+    const [ignoredMaterials, setIgnoredMaterials] = useState<string[]>([]);
+    const [lowStockMaterials, setLowStockMaterials] = useState<any[]>([]);
+    const [showLowStockAlert, setShowLowStockAlert] = useState(false);
 
     // Log section completion status changes and button states
     useEffect(() => {
@@ -187,6 +193,133 @@ const Details = () => {
             fullName: 'Unknown User',
             userType: 'staff', // Default to 'staff'
         };
+    };
+
+    // Function to check for low stock materials
+    const checkLowStockMaterials = () => {
+        console.log('\n🔍 CHECKING LOW STOCK MATERIALS...');
+        console.log('Available materials:', availableMaterials.length);
+        console.log('Used materials:', usedMaterials.length);
+        console.log('Ignored materials:', ignoredMaterials);
+        console.log('Low stock threshold:', lowStockThreshold, '%');
+
+        const lowStockItems: any[] = [];
+
+        // Group materials to get complete picture
+        const groupedMaterials = groupMaterialsByName(availableMaterials, false);
+
+        groupedMaterials.forEach((group: any) => {
+            const materialKey = `${group.name}-${group.unit}`;
+            
+            // Skip if this material is ignored
+            if (ignoredMaterials.includes(materialKey)) {
+                console.log(`⏭️ Skipping ignored material: ${group.name}`);
+                return;
+            }
+
+            // Calculate total imported and current available
+            const totalImported = group.totalImported || group.totalQuantity;
+            const currentAvailable = group.currentlyAvailable || group.totalQuantity;
+            
+            if (totalImported > 0) {
+                const stockPercentage = (currentAvailable / totalImported) * 100;
+                
+                console.log(`📊 ${group.name}:`, {
+                    totalImported,
+                    currentAvailable,
+                    stockPercentage: stockPercentage.toFixed(1) + '%',
+                    threshold: lowStockThreshold + '%',
+                    isLowStock: stockPercentage <= lowStockThreshold
+                });
+
+                if (stockPercentage <= lowStockThreshold) {
+                    lowStockItems.push({
+                        ...group,
+                        materialKey,
+                        totalImported,
+                        currentAvailable,
+                        stockPercentage,
+                        alertLevel: stockPercentage <= 3 ? 'critical' : stockPercentage <= 7 ? 'warning' : 'low'
+                    });
+                }
+            }
+        });
+
+        console.log(`🚨 Found ${lowStockItems.length} low stock materials`);
+        setLowStockMaterials(lowStockItems);
+        
+        // Show alert if there are new low stock items
+        if (lowStockItems.length > 0 && !showLowStockAlert) {
+            setShowLowStockAlert(true);
+        }
+
+        return lowStockItems;
+    };
+
+    // Function to ignore a material from alerts
+    const ignoreMaterial = async (materialKey: string, materialName: string) => {
+        try {
+            const updatedIgnored = [...ignoredMaterials, materialKey];
+            setIgnoredMaterials(updatedIgnored);
+            
+            // Save to AsyncStorage for persistence
+            await AsyncStorage.setItem(
+                `ignored_materials_${projectId}`, 
+                JSON.stringify(updatedIgnored)
+            );
+            
+            // Remove from low stock materials
+            setLowStockMaterials(prev => prev.filter(item => item.materialKey !== materialKey));
+            
+            toast.success(`${materialName} will no longer show low stock alerts`);
+            console.log(`✅ Material ignored: ${materialName} (${materialKey})`);
+        } catch (error) {
+            console.error('❌ Error ignoring material:', error);
+            toast.error('Failed to ignore material');
+        }
+    };
+
+    // Function to load ignored materials from storage
+    const loadIgnoredMaterials = async () => {
+        try {
+            const stored = await AsyncStorage.getItem(`ignored_materials_${projectId}`);
+            if (stored) {
+                const ignored = JSON.parse(stored);
+                setIgnoredMaterials(ignored);
+                console.log('✅ Loaded ignored materials:', ignored);
+            }
+        } catch (error) {
+            console.error('❌ Error loading ignored materials:', error);
+        }
+    };
+
+    // Function to reset ignored materials (for testing/admin)
+    const resetIgnoredMaterials = async () => {
+        try {
+            setIgnoredMaterials([]);
+            await AsyncStorage.removeItem(`ignored_materials_${projectId}`);
+            toast.success('Ignored materials list cleared');
+            console.log('✅ Ignored materials reset');
+            
+            // Recheck low stock after reset
+            setTimeout(() => {
+                checkLowStockMaterials();
+            }, 500);
+        } catch (error) {
+            console.error('❌ Error resetting ignored materials:', error);
+            toast.error('Failed to reset ignored materials');
+        }
+    };
+
+    // Function to get alert message based on stock level
+    const getStockAlertMessage = (stockPercentage: number, materialName: string) => {
+        if (stockPercentage <= 3) {
+            return `🚨 Critical: ${materialName} is almost out of stock (${stockPercentage.toFixed(1)}% remaining)`;
+        } else if (stockPercentage <= 7) {
+            return `⚠️ Warning: ${materialName} is running low (${stockPercentage.toFixed(1)}% remaining)`;
+        } else {
+            return `📉 Low Stock: ${materialName} needs restocking soon (${stockPercentage.toFixed(1)}% remaining)`;
+        }
     };
 
     // Helper function to validate MongoDB ObjectId
@@ -1629,6 +1762,7 @@ const Details = () => {
         isMountedRef.current = true;
         reloadProjectMaterials(true); // Use the new enhanced function with force reload
         loadInitialCompletionStatus(); // Load completion status on mount
+        loadIgnoredMaterials(); // Load ignored materials from storage
 
         // Load current user type
         const loadUserType = async () => {
@@ -1656,6 +1790,18 @@ const Details = () => {
             });
         };
     }, [projectId, materialAvailableParam, materialUsedParam]);
+
+    // Check for low stock materials when materials data changes
+    useEffect(() => {
+        if (availableMaterials.length > 0 || usedMaterials.length > 0) {
+            // Delay the check to ensure all data is loaded
+            const timer = setTimeout(() => {
+                checkLowStockMaterials();
+            }, 1000);
+            
+            return () => clearTimeout(timer);
+        }
+    }, [availableMaterials, usedMaterials, ignoredMaterials, lowStockThreshold]);
 
     // Debug: Log when usedMaterials state changes (limited logging)
     useEffect(() => {
@@ -3272,7 +3418,10 @@ const Details = () => {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
             >
-                <TabSelector activeTab={activeTab} onSelectTab={setActiveTab} />
+                <TabSelector 
+                    activeTab={activeTab} 
+                    onSelectTab={setActiveTab}
+                />
 
                 {/* Navigation Section - Compact Horizontal Layout */}
                 <View style={navigationStyles.navigationContainer}>
@@ -3740,6 +3889,54 @@ const Details = () => {
                 </View>
             </ScrollView>
 
+            {/* Floating Low Stock Alert Indicator */}
+            {lowStockMaterials.length > 0 && !showLowStockAlert && (
+                <TouchableOpacity
+                    style={{
+                        position: 'absolute',
+                        top: 100,
+                        right: 20,
+                        backgroundColor: '#EF4444',
+                        borderRadius: 25,
+                        width: 50,
+                        height: 50,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        shadowColor: '#EF4444',
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.3,
+                        shadowRadius: 8,
+                        elevation: 8,
+                        zIndex: 1000,
+                    }}
+                    onPress={() => setShowLowStockAlert(true)}
+                    activeOpacity={0.8}
+                >
+                    <Ionicons name="warning" size={24} color="#fff" />
+                    <View style={{
+                        position: 'absolute',
+                        top: -5,
+                        right: -5,
+                        backgroundColor: '#fff',
+                        borderRadius: 10,
+                        minWidth: 20,
+                        height: 20,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 2,
+                        borderColor: '#EF4444',
+                    }}>
+                        <Text style={{
+                            color: '#EF4444',
+                            fontSize: 11,
+                            fontWeight: '700',
+                        }}>
+                            {lowStockMaterials.length}
+                        </Text>
+                    </View>
+                </TouchableOpacity>
+            )}
+
             {/* Custom Date Picker Modal */}
             <Modal
                 visible={showCustomDatePicker}
@@ -3881,6 +4078,306 @@ const Details = () => {
                                 disabled={!newSectionName.trim()}
                             >
                                 <Text style={sectionStyles.modalApplyText}>Add Section</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Low Stock Alert Modal */}
+            <Modal
+                visible={showLowStockAlert}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setShowLowStockAlert(false)}
+            >
+                <View style={sectionStyles.modalOverlay}>
+                    <View style={[sectionStyles.modalContent, { maxHeight: '85%', maxWidth: '90%' }]}>
+                        {/* Header */}
+                        <View style={{ 
+                            flexDirection: 'row', 
+                            alignItems: 'center', 
+                            marginBottom: 20,
+                            paddingBottom: 16,
+                            borderBottomWidth: 1,
+                            borderBottomColor: '#F1F5F9'
+                        }}>
+                            <View style={{
+                                backgroundColor: '#FEF2F2',
+                                borderRadius: 12,
+                                padding: 8,
+                                marginRight: 12
+                            }}>
+                                <Ionicons name="warning" size={24} color="#EF4444" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={[sectionStyles.modalTitle, { marginBottom: 4 }]}>Low Stock Alert</Text>
+                                <Text style={{ fontSize: 14, color: '#64748B', fontWeight: '500' }}>
+                                    {lowStockMaterials.length} material{lowStockMaterials.length > 1 ? 's need' : ' needs'} attention
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* Materials List */}
+                        <ScrollView 
+                            style={{ maxHeight: 400 }} 
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={{ paddingBottom: 8 }}
+                        >
+                            {lowStockMaterials.map((material, index) => (
+                                <View key={material.materialKey} style={{
+                                    backgroundColor: '#FFFFFF',
+                                    borderRadius: 16,
+                                    marginBottom: 16,
+                                    padding: 20,
+                                    borderWidth: 1,
+                                    borderColor: material.alertLevel === 'critical' ? '#FECACA' : '#FED7AA',
+                                    shadowColor: material.alertLevel === 'critical' ? '#EF4444' : '#F59E0B',
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.1,
+                                    shadowRadius: 8,
+                                    elevation: 3,
+                                }}>
+                                    {/* Material Header */}
+                                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16 }}>
+                                        <View style={[
+                                            styles.iconContainer, 
+                                            { 
+                                                backgroundColor: material.color, 
+                                                width: 48, 
+                                                height: 48, 
+                                                marginRight: 16,
+                                                shadowColor: material.color,
+                                                shadowOffset: { width: 0, height: 2 },
+                                                shadowOpacity: 0.3,
+                                                shadowRadius: 4,
+                                                elevation: 2,
+                                            }
+                                        ]}>
+                                            <Ionicons name={material.icon} size={24} color="#fff" />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={{ 
+                                                fontSize: 18, 
+                                                fontWeight: '700', 
+                                                color: '#1E293B', 
+                                                marginBottom: 6 
+                                            }}>
+                                                {material.name}
+                                            </Text>
+                                            <View style={{
+                                                backgroundColor: material.alertLevel === 'critical' ? '#FEF2F2' : '#FFFBEB',
+                                                paddingHorizontal: 12,
+                                                paddingVertical: 6,
+                                                borderRadius: 20,
+                                                alignSelf: 'flex-start',
+                                                borderWidth: 1,
+                                                borderColor: material.alertLevel === 'critical' ? '#FECACA' : '#FED7AA',
+                                            }}>
+                                                <Text style={{ 
+                                                    fontSize: 12, 
+                                                    fontWeight: '600',
+                                                    color: material.alertLevel === 'critical' ? '#DC2626' : '#D97706',
+                                                    textTransform: 'uppercase',
+                                                    letterSpacing: 0.5
+                                                }}>
+                                                    {material.alertLevel === 'critical' ? '🚨 Critical' : '⚠️ Low Stock'}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    </View>
+
+                                    {/* Stock Information */}
+                                    <View style={{ 
+                                        backgroundColor: '#F8FAFC', 
+                                        borderRadius: 12, 
+                                        padding: 16, 
+                                        marginBottom: 16 
+                                    }}>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
+                                            <View style={{ alignItems: 'center', flex: 1 }}>
+                                                <Text style={{ 
+                                                    fontSize: 11, 
+                                                    color: '#64748B', 
+                                                    fontWeight: '600',
+                                                    textTransform: 'uppercase',
+                                                    letterSpacing: 0.5,
+                                                    marginBottom: 4
+                                                }}>
+                                                    Total Imported
+                                                </Text>
+                                                <Text style={{ 
+                                                    fontSize: 16, 
+                                                    fontWeight: '700', 
+                                                    color: '#1E293B' 
+                                                }}>
+                                                    {material.totalImported}
+                                                </Text>
+                                                <Text style={{ 
+                                                    fontSize: 12, 
+                                                    color: '#64748B', 
+                                                    fontWeight: '500' 
+                                                }}>
+                                                    {material.unit}
+                                                </Text>
+                                            </View>
+                                            
+                                            <View style={{ width: 1, backgroundColor: '#E2E8F0', marginHorizontal: 16 }} />
+                                            
+                                            <View style={{ alignItems: 'center', flex: 1 }}>
+                                                <Text style={{ 
+                                                    fontSize: 11, 
+                                                    color: '#64748B', 
+                                                    fontWeight: '600',
+                                                    textTransform: 'uppercase',
+                                                    letterSpacing: 0.5,
+                                                    marginBottom: 4
+                                                }}>
+                                                    Available Now
+                                                </Text>
+                                                <Text style={{ 
+                                                    fontSize: 16, 
+                                                    fontWeight: '700', 
+                                                    color: material.alertLevel === 'critical' ? '#DC2626' : '#D97706'
+                                                }}>
+                                                    {material.currentAvailable}
+                                                </Text>
+                                                <Text style={{ 
+                                                    fontSize: 12, 
+                                                    color: '#64748B', 
+                                                    fontWeight: '500' 
+                                                }}>
+                                                    {material.unit}
+                                                </Text>
+                                            </View>
+                                            
+                                            <View style={{ width: 1, backgroundColor: '#E2E8F0', marginHorizontal: 16 }} />
+                                            
+                                            <View style={{ alignItems: 'center', flex: 1 }}>
+                                                <Text style={{ 
+                                                    fontSize: 11, 
+                                                    color: '#64748B', 
+                                                    fontWeight: '600',
+                                                    textTransform: 'uppercase',
+                                                    letterSpacing: 0.5,
+                                                    marginBottom: 4
+                                                }}>
+                                                    Stock Level
+                                                </Text>
+                                                <Text style={{ 
+                                                    fontSize: 16, 
+                                                    fontWeight: '700', 
+                                                    color: material.alertLevel === 'critical' ? '#DC2626' : '#D97706'
+                                                }}>
+                                                    {material.stockPercentage.toFixed(1)}%
+                                                </Text>
+                                                <Text style={{ 
+                                                    fontSize: 12, 
+                                                    color: '#64748B', 
+                                                    fontWeight: '500' 
+                                                }}>
+                                                    remaining
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        {/* Enhanced Progress Bar */}
+                                        <View style={{ 
+                                            height: 8, 
+                                            backgroundColor: '#E2E8F0', 
+                                            borderRadius: 4, 
+                                            overflow: 'hidden',
+                                            marginBottom: 8
+                                        }}>
+                                            <View style={{
+                                                height: '100%',
+                                                width: `${Math.max(material.stockPercentage, 3)}%`,
+                                                backgroundColor: material.alertLevel === 'critical' ? '#DC2626' : '#D97706',
+                                                borderRadius: 4,
+                                                shadowColor: material.alertLevel === 'critical' ? '#DC2626' : '#D97706',
+                                                shadowOffset: { width: 0, height: 1 },
+                                                shadowOpacity: 0.3,
+                                                shadowRadius: 2,
+                                            }} />
+                                        </View>
+                                        
+                                        <Text style={{ 
+                                            fontSize: 13, 
+                                            color: '#64748B', 
+                                            textAlign: 'center',
+                                            fontWeight: '500',
+                                            lineHeight: 18
+                                        }}>
+                                            {material.stockPercentage <= 3 
+                                                ? `⚠️ Only ${material.currentAvailable} ${material.unit} left - Restock urgently needed`
+                                                : `📉 Running low - Consider restocking soon`
+                                            }
+                                        </Text>
+                                    </View>
+
+                                    {/* Improved Don't Show Again Button */}
+                                    <TouchableOpacity
+                                        style={{
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            backgroundColor: '#F1F5F9',
+                                            paddingVertical: 12,
+                                            paddingHorizontal: 16,
+                                            borderRadius: 12,
+                                            borderWidth: 1,
+                                            borderColor: '#E2E8F0',
+                                            shadowColor: '#000',
+                                            shadowOffset: { width: 0, height: 1 },
+                                            shadowOpacity: 0.05,
+                                            shadowRadius: 2,
+                                            elevation: 1,
+                                        }}
+                                        onPress={() => {
+                                            ignoreMaterial(material.materialKey, material.name);
+                                            // Remove from current modal display
+                                            setLowStockMaterials(prev => prev.filter(m => m.materialKey !== material.materialKey));
+                                        }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="eye-off-outline" size={16} color="#64748B" style={{ marginRight: 8 }} />
+                                        <Text style={{ 
+                                            color: '#64748B', 
+                                            fontSize: 14, 
+                                            fontWeight: '600' 
+                                        }}>
+                                            Don't alert me about this material
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ))}
+                        </ScrollView>
+
+                        {/* Close Button */}
+                        <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
+                            <TouchableOpacity
+                                style={{
+                                    backgroundColor: '#3B82F6',
+                                    paddingVertical: 14,
+                                    paddingHorizontal: 24,
+                                    borderRadius: 12,
+                                    alignItems: 'center',
+                                    shadowColor: '#3B82F6',
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.2,
+                                    shadowRadius: 4,
+                                    elevation: 3,
+                                }}
+                                onPress={() => setShowLowStockAlert(false)}
+                                activeOpacity={0.9}
+                            >
+                                <Text style={{ 
+                                    color: '#FFFFFF', 
+                                    fontSize: 16, 
+                                    fontWeight: '600' 
+                                }}>
+                                    Got it
+                                </Text>
                             </TouchableOpacity>
                         </View>
                     </View>

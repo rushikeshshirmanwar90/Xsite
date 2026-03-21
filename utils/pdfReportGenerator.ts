@@ -108,6 +108,60 @@ export class PDFReportGenerator {
         const isUsed = activity.activity === 'used';
         const isTransferred = activity.activity === 'transferred';
         
+        // ✅ ENHANCED: Create location path for better visibility
+        const createLocationPath = () => {
+            const parts = [];
+            if (activity.projectName) parts.push(activity.projectName);
+            if (activity.sectionName) parts.push(activity.sectionName);
+            if (activity.miniSectionName) parts.push(activity.miniSectionName);
+            return parts.length > 1 ? parts.join(' → ') : (parts[0] || 'Unknown Location');
+        };
+        
+        const locationPath = createLocationPath();
+        const hasLocationDetails = activity.sectionName || activity.miniSectionName;
+        
+        // ✅ NEW: Get the best available location name for display
+        const getLocationDisplayName = () => {
+            // If we have a specific mini-section name that's not generic, use it
+            if (activity.miniSectionName && 
+                activity.miniSectionName !== 'Mini-section' && 
+                activity.miniSectionName !== 'mini-section' &&
+                !activity.miniSectionName.toLowerCase().includes('unknown')) {
+                return activity.miniSectionName;
+            }
+            
+            // Otherwise use section name if available
+            if (activity.sectionName && 
+                activity.sectionName !== 'Unknown Section' &&
+                !activity.sectionName.toLowerCase().includes('unknown')) {
+                return activity.sectionName;
+            }
+            
+            // Try to extract from message as last resort
+            if (activity.message) {
+                const messageStr = activity.message;
+                
+                // Look for patterns like "Used 2 materials in first-slab (₹780)"
+                const locationMatch = messageStr.match(/in ([^(]+) \(/);
+                if (locationMatch) {
+                    const extractedName = locationMatch[1].trim();
+                    if (extractedName && !extractedName.toLowerCase().includes('mini-section')) {
+                        return extractedName;
+                    }
+                }
+                
+                // Look for slab/floor patterns
+                const slabMatch = messageStr.match(/in ([a-zA-Z0-9]+[- ]?(?:slab|floor|section))/i);
+                if (slabMatch) {
+                    return slabMatch[1].trim();
+                }
+            }
+            
+            return 'Unknown Location';
+        };
+        
+        const displayLocationName = getLocationDisplayName();
+        
         const materialsHTML = activity.materials.map(material => {
             let perUnitCost = 0;
             let materialTotalCost = 0;
@@ -165,24 +219,44 @@ export class PDFReportGenerator {
         return `
             <div style="margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
                 <div style="background-color: ${isImported ? '#f0fdf4' : isUsed ? '#fef2f2' : '#eff6ff'}; padding: 12px; border-bottom: 1px solid #e2e8f0;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <span style="background-color: ${isImported ? '#10B981' : isUsed ? '#EF4444' : '#3B82F6'}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
-                                ${isImported ? 'IMPORTED' : isUsed ? 'USED' : 'TRANSFERRED'}
-                            </span>
-                            <span style="margin-left: 10px; font-weight: 600; color: #374151;">
-                                ${activity.user.fullName}
-                            </span>
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div style="flex: 1;">
+                            <div style="margin-bottom: 8px;">
+                                <span style="background-color: ${isImported ? '#10B981' : isUsed ? '#EF4444' : '#3B82F6'}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
+                                    ${isImported ? 'IMPORTED' : isUsed ? 'USED' : 'TRANSFERRED'}
+                                </span>
+                                <span style="margin-left: 10px; font-weight: 600; color: #374151;">
+                                    ${activity.user.fullName}
+                                </span>
+                            </div>
+                            
+                            ${isUsed && hasLocationDetails ? `
+                                <div style="background-color: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 6px; padding: 8px; margin-top: 8px;">
+                                    <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                        <div style="width: 16px; height: 16px; background-color: #EF4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 6px;">
+                                            <div style="width: 6px; height: 6px; background-color: white; border-radius: 50%;"></div>
+                                        </div>
+                                        <span style="font-size: 12px; font-weight: 600; color: #DC2626;">MATERIAL USAGE LOCATION</span>
+                                    </div>
+                                    <div style="font-size: 13px; color: #374151; font-weight: 600; margin-left: 22px;">
+                                        📍 Used in: ${displayLocationName}
+                                    </div>
+                                </div>
+                            ` : ''}
+                            
                         </div>
-                        <div style="text-align: right;">
-                            <div style="font-size: 12px; color: #6b7280;">
+                        
+                        <div style="text-align: right; flex-shrink: 0; margin-left: 12px;">
+                            <div style="font-size: 12px; color: #6b7280; font-weight: 500;">
                                 ${activity.projectName || 'Unknown Project'}
                             </div>
                             ${activity.sectionName ? `<div style="font-size: 11px; color: #9ca3af;">${activity.sectionName}</div>` : ''}
                             ${activity.miniSectionName ? `<div style="font-size: 11px; color: #9ca3af;">${activity.miniSectionName}</div>` : ''}
                         </div>
                     </div>
+                    
                     ${activity.message ? `<div style="margin-top: 8px; font-size: 13px; color: #6b7280; font-style: italic;">"${activity.message}"</div>` : ''}
+                    
                     ${isTransferred && activity.transferDetails ? `
                         <div style="margin-top: 8px; padding: 8px; background-color: rgba(59, 130, 246, 0.1); border-radius: 6px; border-left: 3px solid #3B82F6;">
                             <div style="font-size: 12px; color: #374151; font-weight: 600;">Transfer Details:</div>
@@ -332,22 +406,6 @@ export class PDFReportGenerator {
                         </div>
                     </div>
                 </div>
-                ${equipmentData && equipmentData.length > 0 ? `
-                    <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0; background-color: #fef3c7; padding: 12px; border-radius: 6px;">
-                        <div style="font-weight: bold; color: #374151; margin-bottom: 8px;">Equipment Debug Info:</div>
-                        <div style="font-size: 12px; color: #6b7280;">
-                            Equipment entries found: ${equipmentData.length}<br>
-                            First equipment: ${equipmentData[0]?.type || 'Unknown'} - ${this.formatCurrency(Number(equipmentData[0]?.totalCost) || 0)}
-                        </div>
-                    </div>
-                ` : `
-                    <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0; background-color: #fee2e2; padding: 12px; border-radius: 6px;">
-                        <div style="font-weight: bold; color: #dc2626; margin-bottom: 8px;">Equipment Debug Info:</div>
-                        <div style="font-size: 12px; color: #6b7280;">
-                            No equipment data found or equipment array is empty.
-                        </div>
-                    </div>
-                `}
             </div>
         `;
 

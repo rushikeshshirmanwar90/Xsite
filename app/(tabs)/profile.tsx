@@ -1230,7 +1230,7 @@ const CompanyProfile: React.FC = () => {
                             </View>
                             <View style={styles.reportButtonContent}>
                                 <Text style={styles.reportButtonTitle}>Generate Complete Report</Text>
-                                <Text style={styles.reportButtonSubtitle}>Download PDF report of material, labor & equipment costs</Text>
+                                <Text style={styles.reportButtonSubtitle}>Download PDF report with material usage details, labor & equipment costs</Text>
                             </View>
                         </View>
                         <View style={styles.reportButtonBadge}>
