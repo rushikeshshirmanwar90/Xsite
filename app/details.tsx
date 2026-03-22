@@ -4092,27 +4092,27 @@ const Details = () => {
                 onRequestClose={() => setShowLowStockAlert(false)}
             >
                 <View style={sectionStyles.modalOverlay}>
-                    <View style={[sectionStyles.modalContent, { maxHeight: '85%', maxWidth: '90%' }]}>
+                    <View style={[sectionStyles.modalContent, { maxHeight: '90%', maxWidth: '95%', width: '95%' }]}>
                         {/* Header */}
                         <View style={{ 
                             flexDirection: 'row', 
                             alignItems: 'center', 
-                            marginBottom: 20,
-                            paddingBottom: 16,
+                            marginBottom: 16,
+                            paddingBottom: 12,
                             borderBottomWidth: 1,
                             borderBottomColor: '#F1F5F9'
                         }}>
                             <View style={{
                                 backgroundColor: '#FEF2F2',
-                                borderRadius: 12,
-                                padding: 8,
-                                marginRight: 12
+                                borderRadius: 10,
+                                padding: 6,
+                                marginRight: 10
                             }}>
-                                <Ionicons name="warning" size={24} color="#EF4444" />
+                                <Ionicons name="warning" size={20} color="#EF4444" />
                             </View>
                             <View style={{ flex: 1 }}>
-                                <Text style={[sectionStyles.modalTitle, { marginBottom: 4 }]}>Low Stock Alert</Text>
-                                <Text style={{ fontSize: 14, color: '#64748B', fontWeight: '500' }}>
+                                <Text style={[sectionStyles.modalTitle, { marginBottom: 2, fontSize: 16 }]}>Low Stock Alert</Text>
+                                <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '500' }}>
                                     {lowStockMaterials.length} material{lowStockMaterials.length > 1 ? 's need' : ' needs'} attention
                                 </Text>
                             </View>
@@ -4120,66 +4120,66 @@ const Details = () => {
 
                         {/* Materials List */}
                         <ScrollView 
-                            style={{ maxHeight: 400 }} 
+                            style={{ maxHeight: 500 }} 
                             showsVerticalScrollIndicator={false}
                             contentContainerStyle={{ paddingBottom: 8 }}
                         >
                             {lowStockMaterials.map((material, index) => (
                                 <View key={material.materialKey} style={{
                                     backgroundColor: '#FFFFFF',
-                                    borderRadius: 16,
-                                    marginBottom: 16,
-                                    padding: 20,
+                                    borderRadius: 12,
+                                    marginBottom: 12,
+                                    padding: 16,
                                     borderWidth: 1,
                                     borderColor: material.alertLevel === 'critical' ? '#FECACA' : '#FED7AA',
                                     shadowColor: material.alertLevel === 'critical' ? '#EF4444' : '#F59E0B',
-                                    shadowOffset: { width: 0, height: 2 },
-                                    shadowOpacity: 0.1,
-                                    shadowRadius: 8,
-                                    elevation: 3,
+                                    shadowOffset: { width: 0, height: 1 },
+                                    shadowOpacity: 0.08,
+                                    shadowRadius: 4,
+                                    elevation: 2,
                                 }}>
                                     {/* Material Header */}
-                                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 }}>
                                         <View style={[
                                             styles.iconContainer, 
                                             { 
                                                 backgroundColor: material.color, 
-                                                width: 48, 
-                                                height: 48, 
-                                                marginRight: 16,
+                                                width: 36, 
+                                                height: 36, 
+                                                marginRight: 12,
                                                 shadowColor: material.color,
-                                                shadowOffset: { width: 0, height: 2 },
-                                                shadowOpacity: 0.3,
-                                                shadowRadius: 4,
-                                                elevation: 2,
+                                                shadowOffset: { width: 0, height: 1 },
+                                                shadowOpacity: 0.2,
+                                                shadowRadius: 2,
+                                                elevation: 1,
                                             }
                                         ]}>
-                                            <Ionicons name={material.icon} size={24} color="#fff" />
+                                            <Ionicons name={material.icon} size={18} color="#fff" />
                                         </View>
                                         <View style={{ flex: 1 }}>
                                             <Text style={{ 
-                                                fontSize: 18, 
+                                                fontSize: 14, 
                                                 fontWeight: '700', 
                                                 color: '#1E293B', 
-                                                marginBottom: 6 
+                                                marginBottom: 4 
                                             }}>
                                                 {material.name}
                                             </Text>
                                             <View style={{
                                                 backgroundColor: material.alertLevel === 'critical' ? '#FEF2F2' : '#FFFBEB',
-                                                paddingHorizontal: 12,
-                                                paddingVertical: 6,
-                                                borderRadius: 20,
+                                                paddingHorizontal: 8,
+                                                paddingVertical: 4,
+                                                borderRadius: 12,
                                                 alignSelf: 'flex-start',
                                                 borderWidth: 1,
                                                 borderColor: material.alertLevel === 'critical' ? '#FECACA' : '#FED7AA',
                                             }}>
                                                 <Text style={{ 
-                                                    fontSize: 12, 
+                                                    fontSize: 10, 
                                                     fontWeight: '600',
                                                     color: material.alertLevel === 'critical' ? '#DC2626' : '#D97706',
                                                     textTransform: 'uppercase',
-                                                    letterSpacing: 0.5
+                                                    letterSpacing: 0.3
                                                 }}>
                                                     {material.alertLevel === 'critical' ? '🚨 Critical' : '⚠️ Low Stock'}
                                                 </Text>
@@ -4190,31 +4190,31 @@ const Details = () => {
                                     {/* Stock Information */}
                                     <View style={{ 
                                         backgroundColor: '#F8FAFC', 
-                                        borderRadius: 12, 
-                                        padding: 16, 
-                                        marginBottom: 16 
+                                        borderRadius: 10, 
+                                        padding: 12, 
+                                        marginBottom: 12 
                                     }}>
-                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
                                             <View style={{ alignItems: 'center', flex: 1 }}>
                                                 <Text style={{ 
-                                                    fontSize: 11, 
+                                                    fontSize: 9, 
                                                     color: '#64748B', 
                                                     fontWeight: '600',
                                                     textTransform: 'uppercase',
-                                                    letterSpacing: 0.5,
-                                                    marginBottom: 4
+                                                    letterSpacing: 0.3,
+                                                    marginBottom: 3
                                                 }}>
                                                     Total Imported
                                                 </Text>
                                                 <Text style={{ 
-                                                    fontSize: 16, 
+                                                    fontSize: 13, 
                                                     fontWeight: '700', 
                                                     color: '#1E293B' 
                                                 }}>
                                                     {material.totalImported}
                                                 </Text>
                                                 <Text style={{ 
-                                                    fontSize: 12, 
+                                                    fontSize: 10, 
                                                     color: '#64748B', 
                                                     fontWeight: '500' 
                                                 }}>
@@ -4222,95 +4222,62 @@ const Details = () => {
                                                 </Text>
                                             </View>
                                             
-                                            <View style={{ width: 1, backgroundColor: '#E2E8F0', marginHorizontal: 16 }} />
+                                            <View style={{ width: 1, backgroundColor: '#E2E8F0', marginHorizontal: 12 }} />
                                             
                                             <View style={{ alignItems: 'center', flex: 1 }}>
                                                 <Text style={{ 
-                                                    fontSize: 11, 
+                                                    fontSize: 9, 
                                                     color: '#64748B', 
                                                     fontWeight: '600',
                                                     textTransform: 'uppercase',
-                                                    letterSpacing: 0.5,
-                                                    marginBottom: 4
+                                                    letterSpacing: 0.3,
+                                                    marginBottom: 3
                                                 }}>
                                                     Available Now
                                                 </Text>
                                                 <Text style={{ 
-                                                    fontSize: 16, 
+                                                    fontSize: 13, 
                                                     fontWeight: '700', 
                                                     color: material.alertLevel === 'critical' ? '#DC2626' : '#D97706'
                                                 }}>
                                                     {material.currentAvailable}
                                                 </Text>
                                                 <Text style={{ 
-                                                    fontSize: 12, 
+                                                    fontSize: 10, 
                                                     color: '#64748B', 
                                                     fontWeight: '500' 
                                                 }}>
                                                     {material.unit}
                                                 </Text>
                                             </View>
-                                            
-                                            <View style={{ width: 1, backgroundColor: '#E2E8F0', marginHorizontal: 16 }} />
-                                            
-                                            <View style={{ alignItems: 'center', flex: 1 }}>
-                                                <Text style={{ 
-                                                    fontSize: 11, 
-                                                    color: '#64748B', 
-                                                    fontWeight: '600',
-                                                    textTransform: 'uppercase',
-                                                    letterSpacing: 0.5,
-                                                    marginBottom: 4
-                                                }}>
-                                                    Stock Level
-                                                </Text>
-                                                <Text style={{ 
-                                                    fontSize: 16, 
-                                                    fontWeight: '700', 
-                                                    color: material.alertLevel === 'critical' ? '#DC2626' : '#D97706'
-                                                }}>
-                                                    {material.stockPercentage.toFixed(1)}%
-                                                </Text>
-                                                <Text style={{ 
-                                                    fontSize: 12, 
-                                                    color: '#64748B', 
-                                                    fontWeight: '500' 
-                                                }}>
-                                                    remaining
-                                                </Text>
-                                            </View>
                                         </View>
 
                                         {/* Enhanced Progress Bar */}
                                         <View style={{ 
-                                            height: 8, 
+                                            height: 6, 
                                             backgroundColor: '#E2E8F0', 
-                                            borderRadius: 4, 
+                                            borderRadius: 3, 
                                             overflow: 'hidden',
-                                            marginBottom: 8
+                                            marginBottom: 6
                                         }}>
                                             <View style={{
                                                 height: '100%',
                                                 width: `${Math.max(material.stockPercentage, 3)}%`,
                                                 backgroundColor: material.alertLevel === 'critical' ? '#DC2626' : '#D97706',
-                                                borderRadius: 4,
-                                                shadowColor: material.alertLevel === 'critical' ? '#DC2626' : '#D97706',
-                                                shadowOffset: { width: 0, height: 1 },
-                                                shadowOpacity: 0.3,
-                                                shadowRadius: 2,
+                                                borderRadius: 3,
                                             }} />
                                         </View>
                                         
                                         <Text style={{ 
-                                            fontSize: 13, 
+                                            fontSize: 11, 
                                             color: '#64748B', 
                                             textAlign: 'center',
                                             fontWeight: '500',
-                                            lineHeight: 18
+                                            lineHeight: 14
                                         }}>
                                             {material.stockPercentage <= 3 
                                                 ? `⚠️ Only ${material.currentAvailable} ${material.unit} left - Restock urgently needed`
-                                                : `📉 Running low - Consider restocking soon`
+                                                : `${material.stockPercentage.toFixed(1)}% remaining`
                                             }
                                         </Text>
                                     </View>
@@ -4322,16 +4289,11 @@ const Details = () => {
                                             alignItems: 'center',
                                             justifyContent: 'center',
                                             backgroundColor: '#F1F5F9',
-                                            paddingVertical: 12,
-                                            paddingHorizontal: 16,
-                                            borderRadius: 12,
+                                            paddingVertical: 8,
+                                            paddingHorizontal: 12,
+                                            borderRadius: 8,
                                             borderWidth: 1,
                                             borderColor: '#E2E8F0',
-                                            shadowColor: '#000',
-                                            shadowOffset: { width: 0, height: 1 },
-                                            shadowOpacity: 0.05,
-                                            shadowRadius: 2,
-                                            elevation: 1,
                                         }}
                                         onPress={() => {
                                             ignoreMaterial(material.materialKey, material.name);
@@ -4340,10 +4302,10 @@ const Details = () => {
                                         }}
                                         activeOpacity={0.7}
                                     >
-                                        <Ionicons name="eye-off-outline" size={16} color="#64748B" style={{ marginRight: 8 }} />
+                                        <Ionicons name="eye-off-outline" size={14} color="#64748B" style={{ marginRight: 6 }} />
                                         <Text style={{ 
                                             color: '#64748B', 
-                                            fontSize: 14, 
+                                            fontSize: 12, 
                                             fontWeight: '600' 
                                         }}>
                                             Don't alert me about this material
@@ -4354,26 +4316,26 @@ const Details = () => {
                         </ScrollView>
 
                         {/* Close Button */}
-                        <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
+                        <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
                             <TouchableOpacity
                                 style={{
                                     backgroundColor: '#3B82F6',
-                                    paddingVertical: 14,
-                                    paddingHorizontal: 24,
-                                    borderRadius: 12,
+                                    paddingVertical: 12,
+                                    paddingHorizontal: 20,
+                                    borderRadius: 10,
                                     alignItems: 'center',
                                     shadowColor: '#3B82F6',
-                                    shadowOffset: { width: 0, height: 2 },
-                                    shadowOpacity: 0.2,
-                                    shadowRadius: 4,
-                                    elevation: 3,
+                                    shadowOffset: { width: 0, height: 1 },
+                                    shadowOpacity: 0.15,
+                                    shadowRadius: 2,
+                                    elevation: 2,
                                 }}
                                 onPress={() => setShowLowStockAlert(false)}
                                 activeOpacity={0.9}
                             >
                                 <Text style={{ 
                                     color: '#FFFFFF', 
-                                    fontSize: 16, 
+                                    fontSize: 14, 
                                     fontWeight: '600' 
                                 }}>
                                     Got it
