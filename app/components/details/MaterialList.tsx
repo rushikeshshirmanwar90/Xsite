@@ -2,7 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { View, Text, Animated, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import MaterialCard from './MaterialCard';
-import { Material } from '../../types/material';
+import { Material } from '@/types/material';
 import { MaterialTab } from '../types/common';
 
 interface MaterialListProps {

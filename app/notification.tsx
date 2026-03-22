@@ -202,34 +202,9 @@ const NotificationPage: React.FC = () => {
 
     const fetchActivities = async (showLoadingState = true, loadMore = false, targetDate?: string) => {
         console.log('🚀 fetchActivities CALLED');
-        console.log('   - showLoadingState:', showLoadingState);
-        console.log('   - loadMore:', loadMore);
         console.log('   - targetDate:', targetDate);
         console.log('   - currentDate:', currentDate);
-        console.log('   - isLoadingRef.current:', isLoadingRef.current);
         
-        // DEBUG: Check what clientId we're getting
-        const debugClientId = await getClientId();
-        console.log('🔍 DEBUG: ClientId from getClientId():', debugClientId);
-        console.log('🔍 DEBUG: ClientId type:', typeof debugClientId);
-        console.log('🔍 DEBUG: ClientId length:', debugClientId?.length);
-        
-        // DEBUG: Check AsyncStorage directly
-        try {
-            const userDetailsString = await AsyncStorage.getItem("user");
-            console.log('🔍 DEBUG: Raw user data from AsyncStorage:', userDetailsString);
-            if (userDetailsString) {
-                const userData = JSON.parse(userDetailsString);
-                console.log('🔍 DEBUG: Parsed user data keys:', Object.keys(userData || {}));
-                console.log('🔍 DEBUG: User _id:', userData?._id);
-                console.log('🔍 DEBUG: User clientId:', userData?.clientId);
-                console.log('🔍 DEBUG: User firstName:', userData?.firstName);
-                console.log('🔍 DEBUG: User lastName:', userData?.lastName);
-            }
-        } catch (debugError) {
-            console.log('🔍 DEBUG: Error reading AsyncStorage:', debugError);
-        }
-
         // Prevent duplicate calls
         if (isLoadingRef.current) {
             console.log('⏸️ Skipping fetch - already loading');
@@ -239,7 +214,6 @@ const NotificationPage: React.FC = () => {
         // Debounce
         const now = Date.now();
         const timeSinceLastLoad = now - lastLoadTimeRef.current;
-        console.log('   - Time since last load:', timeSinceLastLoad, 'ms');
 
         if (timeSinceLastLoad < DEBOUNCE_DELAY && lastLoadTimeRef.current > 0 && !loadMore) {
             console.log('⏸️ Skipping fetch - debounced');
@@ -260,18 +234,10 @@ const NotificationPage: React.FC = () => {
             setError(null);
 
             const clientId = await getClientId();
-            console.log('\n========================================');
-            console.log('FETCHING ACTIVITIES - DATE PAGINATION');
-            console.log('========================================');
             console.log('Client ID:', clientId);
-            console.log('Client ID type:', typeof clientId);
-            console.log('Client ID length:', clientId?.length);
-            console.log('Load More:', loadMore);
-            console.log('Next Date:', nextDate);
 
             if (!clientId) {
                 console.error('❌ CRITICAL: Client ID not found!');
-                console.error('❌ This means user is not logged in or clientId is missing');
                 throw new Error('Client ID not found - user may not be logged in');
             }
 
@@ -280,18 +246,15 @@ const NotificationPage: React.FC = () => {
             // Date-based navigation - fetch activities for specific date
             const dateToFetch = targetDate || currentDate;
             
+            // Simplified API parameters - the API doesn't support date-based pagination
             const activityParams = new URLSearchParams({
                 clientId,
-                paginationMode: 'date',
-                targetDate: dateToFetch, // Fetch activities for specific date
-                dateLimit: '1' // Only get one date at a time
+                ...(targetDate && { targetDate: dateToFetch }) // Only add targetDate if specified
             });
             
             const materialParams = new URLSearchParams({
                 clientId,
-                paginationMode: 'date',
-                targetDate: dateToFetch, // Fetch activities for specific date
-                dateLimit: '1' // Only get one date at a time
+                ...(targetDate && { targetDate: dateToFetch }) // Only add targetDate if specified
             });
 
             console.log('📅 Date-based navigation - fetching for date:', dateToFetch);
@@ -369,36 +332,47 @@ const NotificationPage: React.FC = () => {
             const activityData = activityRes.data as any;
             const materialData = materialActivityRes.data as any;
 
-            // Handle date-based navigation - single date at a time
-            const activityDateGroups = (activityData.success !== false) 
-                ? (activityData.data?.dateGroups || activityData.dateGroups || [])
+            // Handle actual API response format - activities are returned directly
+            const activityList = (activityData.success !== false) 
+                ? (activityData.data?.activities || activityData.activities || [])
                 : [];
-            const materialDateGroups = (materialData.success !== false)
-                ? (materialData.data?.dateGroups || materialData.dateGroups || [])
+            const materialList = (materialData.success !== false)
+                ? (materialData.data?.activities || materialData.activities || [])
                 : [];
 
-            console.log('\n--- DATE NAVIGATION ---');
+            console.log('\n--- ACTIVITY DATA ---');
             console.log('Target Date:', targetDate || currentDate);
-            console.log('Activity Date Groups:', activityDateGroups.length);
-            console.log('Material Date Groups:', materialDateGroups.length);
+            console.log('Activity List Length:', activityList.length);
+            console.log('Material List Length:', materialList.length);
             
-            // DEBUG: Log the actual date groups content
-            console.log('\n--- DATE GROUPS CONTENT DEBUG ---');
-            console.log('Activity Date Groups Content:');
-            activityDateGroups.forEach((group: any, index: number) => {
-                console.log(`  Group ${index + 1}: Date=${group.date}, Count=${group.count}, Activities=${group.activities?.length || 0}`);
+            // DEBUG: Log the actual activities content
+            console.log('\n--- ACTIVITIES CONTENT DEBUG ---');
+            console.log('Activity List Sample:');
+            activityList.slice(0, 5).forEach((activity: any, index: number) => {
+                console.log(`  Activity ${index + 1}: Category=${activity.category}, Action=${activity.action}, Date=${activity.date}, Description=${activity.description?.substring(0, 50)}...`);
             });
-            console.log('Material Date Groups Content:');
-            materialDateGroups.forEach((group: any, index: number) => {
-                console.log(`  Group ${index + 1}: Date=${group.date}, Count=${group.count}, Activities=${group.activities?.length || 0}`);
+            console.log('Material List Sample:');
+            materialList.slice(0, 3).forEach((material: any, index: number) => {
+                console.log(`  Material ${index + 1}: Activity=${material.activity}, Date=${material.date || material.createdAt}`);
             });
 
-            // Get available dates for navigation
-            const activityAvailableDates = (activityData.data?.availableDates || activityData.availableDates || []);
-            const materialAvailableDates = (materialData.data?.availableDates || materialData.availableDates || []);
+            // DEBUG: Check what categories exist in the activities
+            const categories = [...new Set(activityList.map((a: any) => a.category))];
+            console.log('📊 Available activity categories:', categories);
+
+            // Get available dates for navigation - extract unique dates from activities
+            const activityDates = activityList.map((activity: any) => {
+                const date = activity.date || activity.createdAt;
+                return date ? date.split('T')[0] : null;
+            }).filter(Boolean);
+            
+            const materialDates = materialList.map((material: any) => {
+                const date = material.date || material.createdAt;
+                return date ? date.split('T')[0] : null;
+            }).filter(Boolean);
             
             // Merge and sort all available dates
-            const allAvailableDates = [...new Set([...activityAvailableDates, ...materialAvailableDates])].sort((a, b) => b.localeCompare(a));
+            const allAvailableDates = [...new Set([...activityDates, ...materialDates])].sort((a, b) => b.localeCompare(a));
             setAvailableDates(allAvailableDates);
 
             // Update current date if targetDate was provided
@@ -437,8 +411,22 @@ const NotificationPage: React.FC = () => {
             console.log('   - Has Next Date:', finalDateToUse < today);
             console.log('   - Available Dates Array:', allAvailableDates);
 
+            // Filter activities for the target date
+            const targetDateStart = finalDateToUse + 'T00:00:00.000Z';
+            const targetDateEnd = finalDateToUse + 'T23:59:59.999Z';
+            
+            const filteredActivities = activityList.filter((activity: any) => {
+                const activityDate = activity.date || activity.createdAt;
+                return activityDate >= targetDateStart && activityDate <= targetDateEnd;
+            });
+            
+            const filteredMaterials = materialList.filter((material: any) => {
+                const materialDate = material.date || material.createdAt;
+                return materialDate >= targetDateStart && materialDate <= targetDateEnd;
+            });
+
             // If no activities found for current date, show empty state but keep navigation
-            if (activityDateGroups.length === 0 && materialDateGroups.length === 0) {
+            if (filteredActivities.length === 0 && filteredMaterials.length === 0) {
                 console.log('📭 No activities found for date:', finalDateToUse);
                 setDateGroups([]);
                 setActivitiesRaw([]);
@@ -446,28 +434,26 @@ const NotificationPage: React.FC = () => {
                 return;
             }
 
-            // Merge activities for the current date
+            // Create date groups from filtered activities
             const allDateGroups: { [date: string]: any[] } = {};
 
-            // Add activity date groups
-            activityDateGroups.forEach((group: any) => {
-                if (!allDateGroups[group.date]) {
-                    allDateGroups[group.date] = [];
+            // Add filtered activities
+            filteredActivities.forEach((activity: any) => {
+                const activityDate = (activity.date || activity.createdAt).split('T')[0];
+                if (!allDateGroups[activityDate]) {
+                    allDateGroups[activityDate] = [];
                 }
-                group.activities.forEach((activity: any) => {
-                    allDateGroups[group.date].push({ type: 'activity', data: activity, timestamp: activity.createdAt });
-                });
+                allDateGroups[activityDate].push({ type: 'activity', data: activity, timestamp: activity.createdAt || activity.date });
             });
 
-            // Add material date groups
-            materialDateGroups.forEach((group: any) => {
-                if (!allDateGroups[group.date]) {
-                    allDateGroups[group.date] = [];
+            // Add filtered materials
+            filteredMaterials.forEach((material: any) => {
+                const materialDate = (material.date || material.createdAt).split('T')[0];
+                const timestamp = material.date || material.createdAt || new Date().toISOString();
+                if (!allDateGroups[materialDate]) {
+                    allDateGroups[materialDate] = [];
                 }
-                group.activities.forEach((material: any) => {
-                    const timestamp = material.date || material.createdAt || new Date().toISOString();
-                    allDateGroups[group.date].push({ type: 'material', data: material, timestamp });
-                });
+                allDateGroups[materialDate].push({ type: 'material', data: material, timestamp });
             });
 
             // Convert to sorted array (should only be one date)
@@ -484,24 +470,13 @@ const NotificationPage: React.FC = () => {
             setDateGroups(newDateGroups);
             
             // Also update legacy state for backward compatibility
-            const allActivities: Activity[] = [];
-            const allMaterials: MaterialActivity[] = [];
-            
-            activityDateGroups.forEach((group: any) => {
-                allActivities.push(...group.activities);
-            });
-            
-            materialDateGroups.forEach((group: any) => {
-                allMaterials.push(...group.activities);
-            });
-            
-            setActivitiesRaw(allActivities);
-            setMaterialActivities(allMaterials);
+            setActivitiesRaw(filteredActivities);
+            setMaterialActivities(filteredMaterials);
 
             console.log('✅ Date navigation state updated');
             console.log('   - Date Groups:', newDateGroups.length);
-            console.log('   - Activities:', allActivities.length);
-            console.log('   - Materials:', allMaterials.length);
+            console.log('   - Activities:', filteredActivities.length);
+            console.log('   - Materials:', filteredMaterials.length);
 
             // Update pagination state - handle nested data structure
             const hasMoreFromActivity = activityData.data?.hasMoreDates || activityData.hasMoreDates || false;
@@ -1031,14 +1006,23 @@ const NotificationPage: React.FC = () => {
     };
 
     const getFilteredActivities = () => {
+        console.log('🔍 getFilteredActivities called with activeTab:', activeTab);
+        console.log('🔍 activities array length:', activities.length);
+        
         if (activeTab === 'all') {
             return getCombinedActivities();
         } else if (activeTab === 'project') {
             // Safely map activities (ensure it's an array) - include project, section, mini-section, and equipment activities
             if (Array.isArray(activities)) {
-                return activities
-                    .filter(a => a.category === 'project' || a.category === 'section' || a.category === 'mini_section' || a.category === 'equipment')
-                    .map(a => ({ type: 'activity' as const, data: a, timestamp: a.createdAt }));
+                const projectActivities = activities.filter(a => {
+                    const isProjectCategory = a.category === 'project' || a.category === 'section' || a.category === 'mini_section' || a.category === 'equipment';
+                    if (isProjectCategory) {
+                        console.log('✅ Found project activity:', a.category, a.action, a.description?.substring(0, 30));
+                    }
+                    return isProjectCategory;
+                });
+                console.log('🎯 Project activities found:', projectActivities.length);
+                return projectActivities.map(a => ({ type: 'activity' as const, data: a, timestamp: a.createdAt }));
             }
             return [];
         } else if (activeTab === 'labor') {

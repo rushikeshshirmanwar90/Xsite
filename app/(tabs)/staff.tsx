@@ -113,81 +113,125 @@ const StaffManagement: React.FC = () => {
             console.log('📡 Making API calls with clientId:', clientId);
             console.log('📡 Domain:', domain);
             
-            // ✅ Try new API first (using client's staffs array)
+            // ✅ FIXED: Try new API first (using client's staffs array)
             console.log('🔍 Trying new Staff API (client staffs array)...');
             let staffUrl = `${domain}/api/clients/staff?clientId=${clientId}`;
             console.log('📤 Staff URL:', staffUrl);
             
             let staffRes = await axios.get(staffUrl);
             console.log('📥 Staff Response Status:', staffRes.status);
+            console.log('📥 Staff Response Data:', JSON.stringify(staffRes.data, null, 2));
             
-            let staffResponse = staffRes.data as { success?: boolean; data?: Staff[] };
-            let staffData = staffResponse?.success ? (staffResponse.data || []) : [];
+            // ✅ FIXED: Handle the correct API response format
+            let staffResponse = staffRes.data as { success?: boolean; data?: Staff[]; message?: string };
+            let staffData: Staff[] = [];
             
-            // ✅ Fallback to old API if new API returns empty
-            if (staffData.length === 0) {
-                console.log('⚠️ New API returned empty, falling back to old API...');
-                staffUrl = `${domain}/api/users/staff?clientId=${clientId}`;
-                console.log('📤 Fallback Staff URL:', staffUrl);
+            if (staffResponse?.success && Array.isArray(staffResponse.data)) {
+                staffData = staffResponse.data;
+                console.log('✅ New API returned staff data:', staffData.length, 'items');
+            } else {
+                console.log('⚠️ New API returned no data or failed, trying fallback...');
                 
-                staffRes = await axios.get(staffUrl);
-                console.log('📥 Fallback Response Status:', staffRes.status);
-                
-                staffResponse = staffRes.data as { success?: boolean; data?: Staff[] };
-                staffData = staffResponse?.success ? (staffResponse.data || []) : [];
+                // ✅ Fallback to old API if new API returns empty or fails
+                try {
+                    staffUrl = `${domain}/api/users/staff?clientId=${clientId}`;
+                    console.log('📤 Fallback Staff URL:', staffUrl);
+                    
+                    staffRes = await axios.get(staffUrl);
+                    console.log('📥 Fallback Response Status:', staffRes.status);
+                    console.log('📥 Fallback Response Data:', JSON.stringify(staffRes.data, null, 2));
+                    
+                    staffResponse = staffRes.data as { success?: boolean; data?: Staff[]; message?: string };
+                    
+                    if (staffResponse?.success && Array.isArray(staffResponse.data)) {
+                        staffData = staffResponse.data;
+                        console.log('✅ Fallback API returned staff data:', staffData.length, 'items');
+                    } else {
+                        console.log('⚠️ Fallback API also failed or returned no data');
+                        staffData = [];
+                    }
+                } catch (fallbackError: any) {
+                    console.error('❌ Fallback API error:', fallbackError);
+                    staffData = [];
+                }
             }
             
-            console.log('✅ Staff data processed:', staffData.length, 'items');
-            console.log('📋 Staff data details:', staffData);
+            console.log('✅ Final staff data processed:', staffData.length, 'items');
             setStaffList(Array.isArray(staffData) ? staffData : []);
             
-            console.log('🔍 Testing Admin API...');
-            const adminUrl = `${domain}/api/users/admin?clientId=${clientId}`;
-            console.log('📤 Admin URL:', adminUrl);
-            
-            const adminRes = await axios.get(adminUrl);
-            console.log('📥 Admin Response Status:', adminRes.status);
-            console.log('📥 Admin Response Data:', JSON.stringify(adminRes.data, null, 2));
-            
-            console.log('🔍 Testing Client API...');
-            const clientUrl = `${domain}/api/clients?id=${clientId}`;
-            console.log('📤 Client URL:', clientUrl);
-            
-            const clientRes = await axios.get(clientUrl);
-            console.log('📥 Client Response Status:', clientRes.status);
-            console.log('📥 Client Response Data:', JSON.stringify(clientRes.data, null, 2));
-            
-            // Handle admin data with proper typing
-            const adminResponse = adminRes.data as { success?: boolean; data?: Admin | Admin[] };
-            const adminData = adminResponse?.success ? adminResponse.data : null;
-            console.log('✅ Admin data processed:', adminData ? 'Found' : 'Not found');
-            console.log('📋 Admin data details:', adminData);
-            if (Array.isArray(adminData)) {
+            // ✅ FIXED: Fetch Admin data with proper error handling
+            console.log('🔍 Fetching Admin data...');
+            try {
+                const adminUrl = `${domain}/api/users/admin?clientId=${clientId}`;
+                console.log('📤 Admin URL:', adminUrl);
+                
+                const adminRes = await axios.get(adminUrl);
+                console.log('📥 Admin Response Status:', adminRes.status);
+                console.log('📥 Admin Response Data:', JSON.stringify(adminRes.data, null, 2));
+                
+                // ✅ FIXED: Handle admin response format
+                const adminResponse = adminRes.data as { success?: boolean; data?: Admin | Admin[]; message?: string };
+                let adminData: Admin[] = [];
+                
+                if (adminResponse?.success) {
+                    if (Array.isArray(adminResponse.data)) {
+                        adminData = adminResponse.data;
+                    } else if (adminResponse.data) {
+                        adminData = [adminResponse.data];
+                    }
+                    console.log('✅ Admin data processed:', adminData.length, 'items');
+                } else {
+                    console.log('⚠️ Admin API returned no data or failed');
+                    adminData = [];
+                }
+                
                 setAdminList(adminData);
-            } else if (adminData) {
-                setAdminList([adminData]);
-            } else {
-                setAdminList([]);
+            } catch (adminError: any) {
+                console.error('❌ Admin API error:', adminError);
+                console.error('❌ Admin error response:', adminError.response?.data);
+                console.error('❌ Admin error status:', adminError.response?.status);
+                
+                // Handle specific admin error cases
+                if (adminError.response?.status === 404) {
+                    console.log('⚠️ Admin not found - this is normal for some clients');
+                    setAdminList([]);
+                } else {
+                    console.error('❌ Unexpected admin API error');
+                    setAdminList([]);
+                }
             }
             
-            // Handle client data with proper typing
-            const clientResponse = clientRes.data as { success?: boolean; data?: ClientData };
-            const clientInfo = clientResponse?.success ? clientResponse.data : null;
-            console.log('✅ Client data processed:', clientInfo?.name || 'Unknown Company');
-            console.log('📋 Client data details:', clientInfo);
-            setClientData(clientInfo || null);
-            
-            // Show success message if at least one API worked
-            const staffSuccess = staffResponse?.success || false;
-            const adminSuccess = adminResponse?.success || false;
-            const clientSuccess = clientResponse?.success || false;
-            
-            if (staffSuccess || adminSuccess || clientSuccess) {
-                console.log('✅ Data loading completed successfully');
-            } else {
-                console.log('❌ All APIs failed');
-                toast.error('Failed to load data. Please check your connection.');
+            // ✅ FIXED: Fetch Client data with proper error handling
+            console.log('🔍 Fetching Client data...');
+            try {
+                const clientUrl = `${domain}/api/clients?id=${clientId}`;
+                console.log('📤 Client URL:', clientUrl);
+                
+                const clientRes = await axios.get(clientUrl);
+                console.log('📥 Client Response Status:', clientRes.status);
+                console.log('📥 Client Response Data:', JSON.stringify(clientRes.data, null, 2));
+                
+                // ✅ FIXED: Handle client response format
+                const clientResponse = clientRes.data as { success?: boolean; data?: ClientData; message?: string };
+                let clientInfo: ClientData | null = null;
+                
+                if (clientResponse?.success && clientResponse.data) {
+                    clientInfo = clientResponse.data;
+                    console.log('✅ Client data processed:', clientInfo.name || 'Unknown Company');
+                } else {
+                    console.log('⚠️ Client API returned no data or failed');
+                    clientInfo = null;
+                }
+                
+                setClientData(clientInfo);
+            } catch (clientError: any) {
+                console.error('❌ Client API error:', clientError);
+                console.error('❌ Client error response:', clientError.response?.data);
+                console.error('❌ Client error status:', clientError.response?.status);
+                setClientData(null);
             }
+            
+            console.log('✅ Data loading completed successfully');
             
         } catch (error) {
             console.error('❌ Error fetching data:', error);

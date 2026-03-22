@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { MaterialCharacteristics } from '../types/materialTypes';
+import { MaterialCharacteristics } from '@/types/materialTypes';
 
 interface MaterialCharacteristicsViewProps {
   characteristics: MaterialCharacteristics;

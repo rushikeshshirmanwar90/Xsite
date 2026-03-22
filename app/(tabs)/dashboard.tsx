@@ -214,17 +214,10 @@ const AnalyticsDashboard: React.FC = () => {
         willFilter: !!staffId
       });
 
-      const projectData = await getProjectData(clientId, 1, 1000, staffId); // Get all projects with staff filtering
+      const projectData = await getProjectData(clientId, staffId); // Get all projects with staff filtering
       
-      // Handle the correct response structure from getProjectData
-      let projectsArray: Project[] = [];
-      if (projectData && typeof projectData === 'object' && 'projects' in projectData) {
-        // New structure: { projects: [...], meta: {...} }
-        projectsArray = Array.isArray(projectData.projects) ? projectData.projects : [];
-      } else if (Array.isArray(projectData)) {
-        // Fallback: direct array
-        projectsArray = projectData;
-      }
+      // Handle the response structure from getProjectData
+      const projectsArray: Project[] = Array.isArray(projectData) ? projectData : [];
 
       console.log('Dashboard - Fetched projects:', projectsArray.length);
       console.log('Dashboard - Project data structure:', typeof projectData);

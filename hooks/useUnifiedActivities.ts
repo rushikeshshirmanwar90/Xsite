@@ -43,8 +43,8 @@ export const useUnifiedActivities = () => {
 
       // Fetch both material activities and completion activities in parallel
       const [materialResponse, completionResponse] = await Promise.allSettled([
-        axios.get(`${domain}/api/(Xsite)/materialActivity?clientId=${clientId}&limit=50&paginationMode=traditional`),
-        axios.get(`${domain}/api/activity?clientId=${clientId}&limit=50&paginationMode=traditional`)
+        axios.get(`${domain}/api/(Xsite)/materialActivity?clientId=${clientId}`),
+        axios.get(`${domain}/api/activity?clientId=${clientId}`)
       ]);
 
       const unifiedActivities: UnifiedActivity[] = [];

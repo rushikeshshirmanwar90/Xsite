@@ -17,7 +17,7 @@ import AddMaterialCharacteristicsModal from './AddMaterialCharacteristicsModal';
 import SearchModal from './SearchModal';
 
 // Import types and data
-import { Material, Period, MaterialCharacteristics } from '../types/materialTypes';
+import { Material, Period, MaterialCharacteristics } from '@/types/materialTypes';
 import { importedMaterials, usedMaterials, periods } from '../data/materialData';
 
 // Import styles

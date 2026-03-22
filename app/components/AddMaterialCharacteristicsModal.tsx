@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import React, { useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { Material, MaterialCharacteristics } from '../types/materialTypes';
+import { Material, MaterialCharacteristics } from '@/types/materialTypes';
 
 export interface AddMaterialCharacteristicsModalProps {
   visible: boolean;

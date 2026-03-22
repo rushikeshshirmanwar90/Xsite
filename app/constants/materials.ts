@@ -1,4 +1,4 @@
-import { Material, MaterialTemplate } from '../types/material';
+import { Material, MaterialTemplate } from '@/types/material';
 
 // Material Templates
 export const MATERIAL_TEMPLATES: Record<string, MaterialTemplate> = {

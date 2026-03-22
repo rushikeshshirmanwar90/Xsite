@@ -34,8 +34,7 @@ const Details = () => {
     const projectName = params.projectName as string;
     const sectionId = params.sectionId as string;
     const sectionName = params.sectionName as string;
-    const materialAvailableParam = params.materialAvailable as string;
-    const materialUsedParam = params.materialUsed as string;
+    // ✅ OPTIMIZED: Removed material params - will fetch directly from API
     const [activeTab, setActiveTab] = useState<'imported' | 'used'>('imported');
     const [selectedPeriod, setSelectedPeriod] = useState('All');
     const [showMaterialForm, setShowMaterialForm] = useState(false);
@@ -47,8 +46,30 @@ const Details = () => {
     const [showStartPicker, setShowStartPicker] = useState(false);
     const [showEndPicker, setShowEndPicker] = useState(false);
 
-    const [availableMaterials, setAvailableMaterials] = useState<Material[]>([]);
-    const [usedMaterials, setUsedMaterials] = useState<Material[]>([]);
+    // ✅ OPTIMIZED: Simple state management for materials
+    const [materials, setMaterials] = useState({
+        available: [],
+        used: [],
+        loading: false,
+        error: null,
+        pagination: {
+            available: {
+                currentPage: 1,
+                totalPages: 1,
+                totalItems: 0,
+                hasNextPage: false,
+                hasPrevPage: false
+            },
+            used: {
+                currentPage: 1,
+                totalPages: 1,
+                totalItems: 0,
+                hasNextPage: false,
+                hasPrevPage: false
+            }
+        }
+    });
+
     const [miniSections, setMiniSections] = useState<Section[]>([]);
     const [loading, setLoading] = useState(false);
     const [showAddSectionModal, setShowAddSectionModal] = useState(false);
@@ -103,22 +124,6 @@ const Details = () => {
     // Loading animations for material operations
     const materialLoadingAnimation = useRef(new Animated.Value(0)).current;
     const usageLoadingAnimation = useRef(new Animated.Value(0)).current;
-
-    // Pagination state
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage] = useState(10); // Fixed items per page
-    const [totalAvailableCount, setTotalAvailableCount] = useState(0);
-    const [totalUsedCount, setTotalUsedCount] = useState(0);
-    const [apiLoading, setApiLoading] = useState(false);
-
-    // Performance optimization: Request cancellation and debouncing
-    const abortControllerRef = useRef<AbortController | null>(null);
-    const isLoadingRef = useRef(false);
-    const lastLoadTimeRef = useRef<number>(0);
-    const isMountedRef = useRef(true);
-    const DEBOUNCE_DELAY = 500; // 500ms debounce
-    const MAX_CONSOLE_LOGS = 10; // Limit console logs
-    let consoleLogCount = 0;
 
     // Function to start material loading animation
     const startMaterialLoadingAnimation = () => {
@@ -195,65 +200,135 @@ const Details = () => {
         };
     };
 
-    // Function to check for low stock materials
-    const checkLowStockMaterials = () => {
-        console.log('\n🔍 CHECKING LOW STOCK MATERIALS...');
-        console.log('Available materials:', availableMaterials.length);
-        console.log('Used materials:', usedMaterials.length);
-        console.log('Ignored materials:', ignoredMaterials);
-        console.log('Low stock threshold:', lowStockThreshold, '%');
-
-        const lowStockItems: any[] = [];
-
-        // Group materials to get complete picture
-        const groupedMaterials = groupMaterialsByName(availableMaterials, false);
-
-        groupedMaterials.forEach((group: any) => {
-            const materialKey = `${group.name}-${group.unit}`;
-            
-            // Skip if this material is ignored
-            if (ignoredMaterials.includes(materialKey)) {
-                console.log(`⏭️ Skipping ignored material: ${group.name}`);
-                return;
-            }
-
-            // Calculate total imported and current available
-            const totalImported = group.totalImported || group.totalQuantity;
-            const currentAvailable = group.currentlyAvailable || group.totalQuantity;
-            
-            if (totalImported > 0) {
-                const stockPercentage = (currentAvailable / totalImported) * 100;
-                
-                console.log(`📊 ${group.name}:`, {
-                    totalImported,
-                    currentAvailable,
-                    stockPercentage: stockPercentage.toFixed(1) + '%',
-                    threshold: lowStockThreshold + '%',
-                    isLowStock: stockPercentage <= lowStockThreshold
-                });
-
-                if (stockPercentage <= lowStockThreshold) {
-                    lowStockItems.push({
-                        ...group,
-                        materialKey,
-                        totalImported,
-                        currentAvailable,
-                        stockPercentage,
-                        alertLevel: stockPercentage <= 3 ? 'critical' : stockPercentage <= 7 ? 'warning' : 'low'
-                    });
-                }
-            }
-        });
-
-        console.log(`🚨 Found ${lowStockItems.length} low stock materials`);
-        setLowStockMaterials(lowStockItems);
-        
-        // Show alert if there are new low stock items
-        if (lowStockItems.length > 0 && !showLowStockAlert) {
-            setShowLowStockAlert(true);
+    // ✅ OPTIMIZED: Simple, efficient material fetching with pagination
+    const fetchMaterials = async (page: number = 1, limit: number = 20, forceRefresh: boolean = false) => {
+        if (!projectId) {
+            console.log('❌ No projectId available');
+            return;
         }
 
-        return lowStockItems;
+        try {
+            const clientId = await getClientId();
+            if (!clientId) {
+                throw new Error('Client ID not available');
+            }
+
+            console.log(`🔄 Fetching materials - Page: ${page}, Limit: ${limit}, Section: ${selectedMiniSection || 'all'}`);
+
+            setMaterials(prev => ({ ...prev, loading: true, error: null }));
+
+            // Fetch both available and used materials in parallel
+            const [availableResponse, usedResponse] = await Promise.all([
+                axios.get(`${domain}/api/material`, {
+                    params: {
+                        projectId,
+                        clientId,
+                        page,
+                        limit,
+                        sectionId: selectedMiniSection || undefined,
+                        sortBy: 'createdAt',
+                        sortOrder: 'desc'
+                    },
+                    timeout: 10000
+                }),
+                axios.get(`${domain}/api/material-usage`, {
+                    params: {
+                        projectId,
+                        clientId,
+                        page,
+                        limit,
+                        sectionId: selectedMiniSection || undefined,
+                        miniSectionId: selectedMiniSection || undefined,
+                        sortBy: 'createdAt',
+                        sortOrder: 'desc'
+                    },
+                    timeout: 10000
+                })
+            ]);
+
+            const availableData = availableResponse.data;
+            const usedData = usedResponse.data;
+
+            console.log('✅ Materials fetched successfully:');
+            console.log(`   Available: ${availableData.MaterialAvailable?.length || 0} items`);
+            console.log(`   Used: ${usedData.MaterialUsed?.length || 0} items`);
+
+            // Transform materials to match existing interface
+            const transformedAvailable = (availableData.MaterialAvailable || []).map((material: any, index: number) => {
+                const { icon, color } = getMaterialIconAndColor(material.name);
+                return {
+                    id: index + 1,
+                    _id: material._id,
+                    name: material.name,
+                    quantity: material.qnt || 0,
+                    unit: material.unit,
+                    price: material.totalCost || material.perUnitCost || 0,
+                    date: new Date().toLocaleDateString(),
+                    icon,
+                    color,
+                    specs: material.specs || {},
+                    sectionId: material.sectionId
+                };
+            });
+
+            const transformedUsed = (usedData.MaterialUsed || []).map((material: any, index: number) => {
+                const { icon, color } = getMaterialIconAndColor(material.name);
+                return {
+                    id: index + 1000,
+                    _id: material._id,
+                    name: material.name,
+                    quantity: material.qnt || 0,
+                    unit: material.unit,
+                    price: material.totalCost || material.perUnitCost || 0,
+                    date: new Date().toLocaleDateString(),
+                    icon,
+                    color,
+                    specs: material.specs || {},
+                    sectionId: material.sectionId,
+                    miniSectionId: material.miniSectionId
+                };
+            });
+
+            setMaterials(prev => ({
+                ...prev,
+                available: transformedAvailable,
+                used: transformedUsed,
+                loading: false,
+                pagination: {
+                    available: {
+                        currentPage: availableData.pagination?.currentPage || 1,
+                        totalPages: availableData.pagination?.totalPages || 1,
+                        totalItems: availableData.pagination?.totalItems || 0,
+                        hasNextPage: availableData.pagination?.hasNextPage || false,
+                        hasPrevPage: availableData.pagination?.hasPrevPage || false
+                    },
+                    used: {
+                        currentPage: usedData.pagination?.currentPage || 1,
+                        totalPages: usedData.pagination?.totalPages || 1,
+                        totalItems: usedData.pagination?.totalItems || 0,
+                        hasNextPage: usedData.pagination?.hasNextPage || false,
+                        hasPrevPage: usedData.pagination?.hasPrevPage || false
+                    }
+                }
+            }));
+
+        } catch (error: any) {
+            console.error('❌ Error fetching materials:', error);
+            const errorMessage = error?.response?.data?.message || error?.message || 'Failed to load materials';
+            
+            setMaterials(prev => ({ 
+                ...prev, 
+                loading: false, 
+                error: errorMessage
+            }));
+
+            toast.error(errorMessage);
+        }
+    };
+
+    // ✅ OPTIMIZED: Simple reload function
+    const reloadMaterials = async (page: number = 1) => {
+        await fetchMaterials(page, 20, true);
     };
 
     // Function to ignore a material from alerts
@@ -1352,385 +1427,87 @@ const Details = () => {
         return { icon: 'cube-outline' as keyof typeof import('@expo/vector-icons').Ionicons.glyphMap, color: '#6B7280' };
     };
 
-    // ✅ NEW: Function to fetch complete material data for accurate calculations
-    const fetchCompleteProjectMaterials = async () => {
-        try {
-            const { getClientId } = require('@/functions/clientId');
-            const clientId = await getClientId();
+    // Function to check for low stock materials
+    const checkLowStockMaterials = () => {
+        console.log('\n🔍 CHECKING LOW STOCK MATERIALS...');
+        console.log('Available materials:', materials.available.length);
+        console.log('Used materials:', materials.used.length);
+        console.log('Ignored materials:', ignoredMaterials);
+        console.log('Low stock threshold:', lowStockThreshold, '%');
 
-            if (!clientId || !projectId) {
-                console.log('❌ Missing clientId or projectId:', { clientId, projectId });
-                return { available: [], used: [] };
-            }
+        const lowStockItems: any[] = [];
 
-            console.log('🔄 Fetching complete project materials for accurate calculations...');
-            console.log('   - Project ID:', projectId);
-            console.log('   - Client ID:', clientId);
+        // Group materials to get complete picture
+        const groupedMaterials = groupMaterialsByName(materials.available, false);
 
-            // Fetch ALL available materials (no pagination)
-            let allAvailable: any[] = [];
-            try {
-                // Use params object instead of query string to avoid URL encoding issues
-                const availableResponse = await axios.get(`${domain}/api/material`, {
-                    params: {
-                        projectId: projectId,
-                        clientId: clientId,
-                        limit: 1000
-                    },
-                    timeout: 15000,
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                const availableData = availableResponse.data as any;
-                if (availableData.success) {
-                    allAvailable = availableData.MaterialAvailable || [];
-                    console.log(`✅ Fetched ${allAvailable.length} available materials`);
-                } else {
-                    console.warn('⚠️ Available materials API returned success: false:', availableData.message);
-                }
-            } catch (availableError: any) {
-                console.error('❌ Error fetching all available materials:', {
-                    message: availableError.message,
-                    status: availableError.response?.status,
-                    statusText: availableError.response?.statusText,
-                    data: availableError.response?.data
-                });
-            }
-
-            // Fetch ALL used materials (no pagination) - with better error handling
-            let allUsed: any[] = [];
-            try {
-                // Use params object and try without limit first
-                const usedResponse = await axios.get(`${domain}/api/material-usage`, {
-                    params: {
-                        projectId: projectId,
-                        clientId: clientId
-                    },
-                    timeout: 15000,
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                const usedData = usedResponse.data as any;
-                console.log('🔍 USED MATERIALS API RESPONSE STATUS:', usedResponse.status);
-                console.log('🔍 USED MATERIALS API RESPONSE:', JSON.stringify(usedData, null, 2));
-                
-                if (usedData.success) {
-                    allUsed = usedData.MaterialUsed || [];
-                    console.log(`✅ Fetched ${allUsed.length} used materials`);
-                    
-                    // Debug: Log first few used materials
-                    if (allUsed.length > 0) {
-                        console.log('📋 Sample used materials:');
-                        allUsed.slice(0, 3).forEach((material, idx) => {
-                            console.log(`   ${idx + 1}. ${material.name} - Qty: ${material.qnt} ${material.unit}`);
-                            console.log(`      sectionId: ${material.sectionId}`);
-                            console.log(`      miniSectionId: ${material.miniSectionId}`);
-                            console.log(`      _id: ${material._id}`);
-                        });
-                    } else {
-                        console.log('ℹ️ No used materials found for this project');
-                    }
-                } else {
-                    console.warn('⚠️ Used materials API returned success: false:', usedData.message);
-                }
-            } catch (usedError: any) {
-                console.error('❌ Error fetching all used materials:', {
-                    message: usedError.message,
-                    status: usedError.response?.status,
-                    statusText: usedError.response?.statusText,
-                    data: usedError.response?.data,
-                    url: usedError.config?.url
-                });
-                
-                // Handle specific error cases
-                if (usedError.response?.status === 400) {
-                    console.error('❌ BAD REQUEST (400) - Trying alternative parameter format...');
-                    
-                    // Try alternative API call with different parameter structure
-                    try {
-                        console.log('🔄 Trying alternative parameter format...');
-                        
-                        const alternativeResponse = await axios.get(`${domain}/api/material-usage`, {
-                            params: {
-                                project: projectId,
-                                client: clientId
-                            },
-                            timeout: 15000,
-                            headers: {
-                                'Content-Type': 'application/json'
-                            }
-                        });
-                        
-                        const alternativeData = alternativeResponse.data as any;
-                        if (alternativeData.success) {
-                            allUsed = alternativeData.MaterialUsed || [];
-                            console.log(`✅ Alternative API call successful: ${allUsed.length} used materials`);
-                        }
-                    } catch (alternativeError: any) {
-                        console.error('❌ Alternative API call also failed:', alternativeError);
-                        
-                        // Try with POST method if GET doesn't work
-                        try {
-                            console.log('🔄 Trying POST method...');
-                            const postResponse = await axios.post(`${domain}/api/material-usage`, {
-                                projectId: projectId,
-                                clientId: clientId
-                            }, {
-                                timeout: 15000,
-                                headers: {
-                                    'Content-Type': 'application/json'
-                                }
-                            });
-                            
-                            const postData = postResponse.data as any;
-                            if (postData.success) {
-                                allUsed = postData.MaterialUsed || [];
-                                console.log(`✅ POST method successful: ${allUsed.length} used materials`);
-                            }
-                        } catch (postError) {
-                            console.error('❌ POST method also failed:', postError);
-                        }
-                    }
-                } else if (usedError.response?.status === 404) {
-                    console.log('ℹ️ Used materials endpoint not found - this might be normal if no materials have been used');
-                } else if (usedError.code === 'ECONNABORTED') {
-                    console.error('❌ Request timeout - API is taking too long to respond');
-                }
-            }
-
-            return { available: allAvailable, used: allUsed };
-        } catch (error) {
-            console.error('❌ Error in fetchCompleteProjectMaterials:', error);
-            return { available: [], used: [] };
-        }
-    };
-
-    // ✅ UPDATED: Enhanced reload function with complete material data
-    const reloadProjectMaterials = async (forceReload: boolean = false, page: number = currentPage) => {
-        if (!projectId) {
-            return;
-        }
-
-        // Prevent duplicate simultaneous calls (unless force reload)
-        if (!forceReload && isLoadingRef.current) {
-            console.log('⏸️ Skipping reload - already loading');
-            return;
-        }
-
-        // Debounce: Prevent rapid successive calls (unless force reload)
-        if (!forceReload) {
-            const now = Date.now();
-            if (now - lastLoadTimeRef.current < DEBOUNCE_DELAY) {
-                console.log('⏸️ Skipping reload - too soon (debounced)');
-                return;
-            }
-            lastLoadTimeRef.current = now;
-        } else {
-            console.log('🔄 Force reload requested - bypassing debounce');
-            lastLoadTimeRef.current = Date.now();
-        }
-
-        // Cancel any pending requests
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-            console.log('🚫 Cancelled previous request');
-        }
-
-        // Create new abort controller for this request
-        abortControllerRef.current = new AbortController();
-        const signal = abortControllerRef.current.signal;
-
-        isLoadingRef.current = true;
-        setLoading(true);
-        setApiLoading(true);
-
-        try {
-            // ✅ NEW: Fetch complete material data first for accurate calculations
-            console.log('🔄 Starting complete material data fetch...');
-            let completeData;
+        groupedMaterials.forEach((group: any) => {
+            const materialKey = `${group.name}-${group.unit}`;
             
-            try {
-                completeData = await fetchCompleteProjectMaterials();
-            } catch (fetchError) {
-                console.error('❌ fetchCompleteProjectMaterials failed:', fetchError);
-                // Fallback to empty data
-                completeData = { available: [], used: [] };
-            }
-            
-            // Check if we got any data, if not, try a simpler approach
-            if (completeData.available.length === 0 && completeData.used.length === 0) {
-                console.log('⚠️ No complete data received, trying simpler API calls...');
-                
-                try {
-                    const { getClientId } = require('@/functions/clientId');
-                    const clientId = await getClientId();
-                    
-                    if (clientId) {
-                        // Try simpler API calls without the limit parameter
-                        try {
-                            const availableResponse = await axios.get(`${domain}/api/material`, {
-                                params: { projectId, clientId },
-                                timeout: 10000
-                            });
-                            if ((availableResponse.data as any).success) {
-                                completeData.available = (availableResponse.data as any).MaterialAvailable || [];
-                                console.log(`✅ Simple API: Got ${completeData.available.length} available materials`);
-                            }
-                        } catch (availError) {
-                            console.error('❌ Simple available materials API failed:', availError);
-                        }
-                        
-                        try {
-                            const usedResponse = await axios.get(`${domain}/api/material-usage`, {
-                                params: { projectId, clientId },
-                                timeout: 10000
-                            });
-                            if ((usedResponse.data as any).success) {
-                                completeData.used = (usedResponse.data as any).MaterialUsed || [];
-                                console.log(`✅ Simple API: Got ${completeData.used.length} used materials`);
-                            }
-                        } catch (usedError) {
-                            console.error('❌ Simple used materials API failed:', usedError);
-                            // This is expected if no materials have been used yet
-                            console.log('ℹ️ No used materials found - this is normal for new projects');
-                        }
-                    }
-                } catch (fallbackError) {
-                    console.error('❌ Fallback API calls failed:', fallbackError);
-                }
-            }
-            
-            // Store complete data in state for calculations
-            const completeAvailable: Material[] = completeData.available.map((material: any, index: number) => {
-                const { icon, color } = getMaterialIconAndColor(material.name);
-                let materialCost = 0;
-                if (material.perUnitCost !== undefined) {
-                    materialCost = Number(material.perUnitCost) || 0;
-                } else if (material.totalCost !== undefined) {
-                    materialCost = Number(material.totalCost) || 0;
-                } else if (material.cost !== undefined) {
-                    materialCost = Number(material.cost) || 0;
-                }
-
-                return {
-                    id: index + 1,
-                    _id: material._id,
-                    name: material.name,
-                    quantity: material.qnt,
-                    unit: material.unit,
-                    price: materialCost,
-                    date: new Date().toLocaleDateString(),
-                    icon,
-                    color,
-                    specs: material.specs || {},
-                    sectionId: material.sectionId
-                };
-            });
-
-            const completeUsed: Material[] = completeData.used.map((material: any, index: number) => {
-                const { icon, color } = getMaterialIconAndColor(material.name);
-                let materialCost = 0;
-                if (material.totalCost !== undefined) {
-                    materialCost = Number(material.totalCost) || 0;
-                } else if (material.perUnitCost !== undefined) {
-                    materialCost = (Number(material.perUnitCost) || 0) * (Number(material.qnt) || 1);
-                } else if (material.cost !== undefined) {
-                    materialCost = Number(material.cost) || 0;
-                }
-
-                const transformedMaterial = {
-                    id: index + 1000,
-                    _id: material._id,
-                    name: material.name,
-                    quantity: material.qnt,
-                    unit: material.unit,
-                    price: materialCost,
-                    date: new Date().toLocaleDateString(),
-                    icon,
-                    color,
-                    specs: material.specs || {},
-                    sectionId: material.sectionId || material.miniSectionId,
-                    miniSectionId: material.miniSectionId,
-                    addedAt: material.addedAt,
-                    createdAt: material.createdAt,
-                    updatedAt: material.updatedAt
-                };
-
-                // Debug: Log transformation
-                console.log(`🔄 Transforming used material ${index + 1}:`, {
-                    name: material.name,
-                    originalSectionId: material.sectionId,
-                    originalMiniSectionId: material.miniSectionId,
-                    finalSectionId: transformedMaterial.sectionId,
-                    quantity: material.qnt
-                });
-
-                return transformedMaterial;
-            });
-
-            // Store complete data for calculations (this will be used by groupMaterialsByName)
-            setAvailableMaterials(completeAvailable);
-            setUsedMaterials(completeUsed);
-
-            console.log('✅ Complete material data loaded for calculations:');
-            console.log(`   Available: ${completeAvailable.length} items`);
-            console.log(`   Used: ${completeUsed.length} items`);
-
-            // Now fetch paginated data for display if needed
-            // (For now, we'll use the complete data for both calculations and display)
-            setTotalAvailableCount(completeAvailable.length);
-            setTotalUsedCount(completeUsed.length);
-
-            // Reinitialize animations
-            const totalMaterials = Math.max(completeAvailable.length, completeUsed.length);
-            cardAnimations.splice(0);
-            for (let i = 0; i < totalMaterials; i++) {
-                cardAnimations.push(new Animated.Value(0));
-            }
-
-            Animated.stagger(100,
-                cardAnimations.map((anim: Animated.Value) =>
-                    Animated.timing(anim, {
-                        toValue: 1,
-                        duration: 300,
-                        useNativeDriver: false,
-                    })
-                )
-            ).start();
-
-        } catch (error: any) {
-            // Don't show error if request was cancelled
-            if (error.name === 'AbortError' || error.name === 'CanceledError' || error.message?.includes('cancel')) {
-                console.log('🚫 Request cancelled');
+            // Skip if this material is ignored
+            if (ignoredMaterials.includes(materialKey)) {
+                console.log(`⏭️ Skipping ignored material: ${group.name}`);
                 return;
             }
 
-            console.error('Error reloading materials:', error);
+            // Calculate total imported and current available
+            const totalImported = group.totalImported || group.totalQuantity;
+            const currentAvailable = group.currentlyAvailable || group.totalQuantity;
+            
+            if (totalImported > 0) {
+                const stockPercentage = (currentAvailable / totalImported) * 100;
+                
+                console.log(`📊 ${group.name}:`, {
+                    totalImported,
+                    currentAvailable,
+                    stockPercentage: stockPercentage.toFixed(1) + '%',
+                    threshold: lowStockThreshold + '%',
+                    isLowStock: stockPercentage <= lowStockThreshold
+                });
 
-            // Only show error toast if it's not a timeout
-            if (error.code !== 'ECONNABORTED') {
-                toast.error('Failed to refresh materials');
-            } else {
-                toast.error('Request timeout - please try again');
+                if (stockPercentage <= lowStockThreshold) {
+                    lowStockItems.push({
+                        ...group,
+                        materialKey,
+                        totalImported,
+                        currentAvailable,
+                        stockPercentage,
+                        alertLevel: stockPercentage <= 3 ? 'critical' : stockPercentage <= 7 ? 'warning' : 'low'
+                    });
+                }
             }
-        } finally {
-            isLoadingRef.current = false;
-            setLoading(false);
-            setApiLoading(false);
-            abortControllerRef.current = null;
+        });
+
+        console.log(`🚨 Found ${lowStockItems.length} low stock materials`);
+        setLowStockMaterials(lowStockItems);
+        
+        // Show alert if there are new low stock items
+        if (lowStockItems.length > 0 && !showLowStockAlert) {
+            setShowLowStockAlert(true);
         }
+
+        return lowStockItems;
     };
 
-    // ✅ DEPRECATED: Use reloadProjectMaterials instead
-    // This function is kept for backward compatibility but now just calls the enhanced version
-    const loadProjectMaterials = async (forceRefresh = false) => {
-        console.log('⚠️ loadProjectMaterials is deprecated, using reloadProjectMaterials instead');
-        await reloadProjectMaterials(forceRefresh);
-    };
+    // Load project materials on mount
+    useEffect(() => {
+        fetchMaterials(1, 20, true); // ✅ OPTIMIZED: Use new simple fetch function
+        loadInitialCompletionStatus(); // Load completion status on mount
+        loadIgnoredMaterials(); // Load ignored materials from storage
+
+        // Load current user type
+        const loadUserType = async () => {
+            try {
+                const userData = await getUserData();
+                setCurrentUserType(userData.userType);
+                console.log('🔍 Current user type loaded:', userData.userType);
+                console.log('🔍 Transfer button will be:', userData.userType === 'staff' ? 'HIDDEN' : 'VISIBLE');
+            } catch (error) {
+                console.error('Error loading user type:', error);
+                setCurrentUserType('staff'); // Default to staff
+            }
+        };
+        loadUserType();
+    }, [projectId]);
 
     // Load initial completion status for section and mini-sections
     const loadInitialCompletionStatus = async () => {
@@ -1757,67 +1534,23 @@ const Details = () => {
         }
     };
 
-    // Load project materials on mount
-    useEffect(() => {
-        isMountedRef.current = true;
-        reloadProjectMaterials(true); // Use the new enhanced function with force reload
-        loadInitialCompletionStatus(); // Load completion status on mount
-        loadIgnoredMaterials(); // Load ignored materials from storage
+    // ✅ OPTIMIZED: Simplified grouping function (removed duplicate - keeping the enhanced version below)
 
-        // Load current user type
-        const loadUserType = async () => {
-            try {
-                const userData = await getUserData();
-                setCurrentUserType(userData.userType);
-                console.log('🔍 Current user type loaded:', userData.userType);
-                console.log('🔍 Transfer button will be:', userData.userType === 'staff' ? 'HIDDEN' : 'VISIBLE');
-            } catch (error) {
-                console.error('Error loading user type:', error);
-                setCurrentUserType('staff'); // Default to staff
-            }
-        };
-        loadUserType();
-
-        // Cleanup: Cancel any pending requests when component unmounts
-        return () => {
-            isMountedRef.current = false;
-            if (abortControllerRef.current) {
-                abortControllerRef.current.abort();
-            }
-            // Clear animations to prevent memory leaks
-            cardAnimations.forEach(anim => {
-                anim.stopAnimation();
-            });
-        };
-    }, [projectId, materialAvailableParam, materialUsedParam]);
-
-    // Check for low stock materials when materials data changes
-    useEffect(() => {
-        if (availableMaterials.length > 0 || usedMaterials.length > 0) {
-            // Delay the check to ensure all data is loaded
-            const timer = setTimeout(() => {
-                checkLowStockMaterials();
-            }, 1000);
-            
-            return () => clearTimeout(timer);
-        }
-    }, [availableMaterials, usedMaterials, ignoredMaterials, lowStockThreshold]);
-
-    // Debug: Log when usedMaterials state changes (limited logging)
+    // Debug: Log when materials state changes (limited logging)
     useEffect(() => {
         if (__DEV__ && consoleLogCount < MAX_CONSOLE_LOGS) {
-            console.log('🔄 usedMaterials:', usedMaterials.length);
+            console.log('🔄 usedMaterials:', materials.used.length);
             consoleLogCount++;
         }
-    }, [usedMaterials]);
+    }, [materials.used]);
 
-    // Debug: Log when availableMaterials state changes (limited logging)
+    // Debug: Log when materials state changes (limited logging)
     useEffect(() => {
         if (__DEV__ && consoleLogCount < MAX_CONSOLE_LOGS) {
-            console.log('📦 availableMaterials:', availableMaterials.length);
+            console.log('📦 availableMaterials:', materials.available.length);
             consoleLogCount++;
         }
-    }, [availableMaterials]);
+    }, [materials.available]);
 
     // Debug: Log when activeTab changes (limited logging)
     useEffect(() => {
@@ -1855,14 +1588,12 @@ const Details = () => {
         fetchMiniSections();
     }, [sectionId, projectId]);
 
-    // ✅ NEW: Wrapper function to ensure groupMaterialsByName always has access to both arrays
-    const getGroupedMaterialsWithCompleteData = (materialsToDisplay: Material[], isUsedTab: boolean) => {
-        // Store the current arrays in a way that groupMaterialsByName can access them
-        // This ensures the function has access to both available and used materials for calculations
+    // ✅ OPTIMIZED: Wrapper function for material grouping
+    const getGroupedMaterialsWithCompleteData = (materialsToDisplay: any[], isUsedTab: boolean) => {
         console.log(`\n🔄 GROUPING MATERIALS WITH COMPLETE DATA:`);
         console.log(`   Materials to display: ${materialsToDisplay.length}`);
-        console.log(`   Available materials in state: ${availableMaterials.length}`);
-        console.log(`   Used materials in state: ${usedMaterials.length}`);
+        console.log(`   Available materials in state: ${materials.available.length}`);
+        console.log(`   Used materials in state: ${materials.used.length}`);
         console.log(`   Is used tab: ${isUsedTab}`);
         
         return groupMaterialsByName(materialsToDisplay, isUsedTab);
@@ -2139,14 +1870,14 @@ const Details = () => {
         console.log('  - User:', JSON.stringify(user, null, 2));
 
         console.log('\n📦 AVAILABLE MATERIALS CONTEXT:');
-        console.log('  - Total available materials:', availableMaterials.length);
-        availableMaterials.slice(0, 3).forEach((m, idx) => {
+        console.log('  - Total available materials:', materials.available.length);
+        materials.available.slice(0, 3).forEach((m, idx) => {
             console.log(`    ${idx + 1}. ${m.name} (_id: ${m._id}, qty: ${m.quantity})`);
         });
 
         console.log('\n🎯 MATERIAL USAGES TO PROCESS:');
         materialUsages.forEach((usage, index) => {
-            const selectedMaterial = availableMaterials.find(m => m._id === usage.materialId);
+            const selectedMaterial = materials.available.find(m => m._id === usage.materialId);
             console.log(`  ${index + 1}. Material Usage:`);
             console.log(`     - Material ID: "${usage.materialId}" (type: ${typeof usage.materialId})`);
             console.log(`     - Quantity: ${usage.quantity} (type: ${typeof usage.quantity})`);
@@ -2160,8 +1891,8 @@ const Details = () => {
             } else {
                 console.log(`     ❌ Material NOT FOUND in available materials!`);
                 console.log(`     🔍 Searching in available materials by ID...`);
-                const foundById = availableMaterials.find(m => String(m._id) === String(usage.materialId));
-                const foundByIdLoose = availableMaterials.find(m => m.id === parseInt(usage.materialId));
+                const foundById = materials.available.find(m => String(m._id) === String(usage.materialId));
+                const foundByIdLoose = materials.available.find(m => m.id === parseInt(usage.materialId));
                 console.log(`     - Found by string comparison: ${!!foundById}`);
                 console.log(`     - Found by ID number: ${!!foundByIdLoose}`);
             }
@@ -2278,8 +2009,8 @@ const Details = () => {
                 // Force refresh with a longer delay to ensure backend has processed
                 await new Promise(resolve => setTimeout(resolve, 500));
 
-                // Call reload with force refresh (bypasses debounce and loading check)
-                await reloadProjectMaterials(true);
+                // Call reload with force refresh
+                await reloadMaterials(1);
 
                 // Wait for state to update - increased delay
                 await new Promise(resolve => setTimeout(resolve, 500));
@@ -2433,7 +2164,7 @@ const Details = () => {
                         
                         // Refresh materials and update UI
                         await new Promise(resolve => setTimeout(resolve, 500));
-                        await reloadProjectMaterials(true);
+                        await reloadMaterials(1);
                         await new Promise(resolve => setTimeout(resolve, 500));
                         
                         // Stop loading animation
@@ -2539,7 +2270,7 @@ const Details = () => {
             }
 
             // Find the material details for cost calculation
-            const sourceMaterial = availableMaterials.find(m => m._id === variantId);
+            const sourceMaterial = materials.available.find(m => m._id === variantId);
             const perUnitCost = sourceMaterial?.price || 0;
             const totalTransferCost = perUnitCost * quantity;
 
@@ -2622,7 +2353,7 @@ const Details = () => {
                 
                 // Reload materials to reflect the transfer
                 console.log('\n🔄 Reloading materials after transfer...');
-                await reloadProjectMaterials(true);
+                await reloadMaterials(1);
                 
                 console.log('✅ MATERIAL TRANSFER COMPLETED SUCCESSFULLY');
                 console.log('========================================\n');
@@ -2734,14 +2465,14 @@ const Details = () => {
         console.log('GET CURRENT DATA - START');
         console.log('========================================');
         console.log('Active Tab:', activeTab);
-        console.log('availableMaterials.length:', availableMaterials.length);
-        console.log('usedMaterials.length:', usedMaterials.length);
+        console.log('materials.available.length:', materials.available.length);
+        console.log('materials.used.length:', materials.used.length);
 
         // Use the correct array based on active tab
-        let materials = activeTab === 'imported' ? availableMaterials : usedMaterials;
+        let materialsToDisplay = activeTab === 'imported' ? materials.available : materials.used;
 
-        console.log('Selected materials array:', activeTab === 'imported' ? 'availableMaterials' : 'usedMaterials');
-        console.log('Total materials before filtering:', materials.length);
+        console.log('Selected materials array:', activeTab === 'imported' ? 'available' : 'used');
+        console.log('Total materials before filtering:', materialsToDisplay.length);
         console.log('Current sectionId:', sectionId);
         console.log('Selected mini-section:', selectedMiniSection);
 
@@ -2755,7 +2486,7 @@ const Details = () => {
 
             // Log all materials for debugging
             console.log('Materials in usedMaterials array:');
-            materials.forEach((m, idx) => {
+            materialsToDisplay.forEach((m, idx) => {
                 console.log(`  ${idx + 1}. ${m.name} - Qty: ${m.quantity}`);
                 console.log('     sectionId:', m.sectionId);
                 console.log('     miniSectionId:', m.miniSectionId);
@@ -2769,7 +2500,7 @@ const Details = () => {
             /*
             // ✅ FIXED: More flexible section filtering
             console.log('Filtering by current sectionId:', sectionId);
-            materials = materials.filter(m => {
+            materialsToDisplay = materialsToDisplay.filter(m => {
                 // Match materials that belong to the current section
                 // Check both sectionId and miniSectionId for flexibility
                 const matchesSection = m.sectionId === sectionId || 
@@ -2782,12 +2513,12 @@ const Details = () => {
                 }
                 return matchesSection;
             });
-            console.log('After section filtering:', materials.length, 'materials');
+            console.log('After section filtering:', materialsToDisplay.length, 'materials');
 
             // SECOND: Filter by mini-section if one is selected
             if (selectedMiniSection && selectedMiniSection !== 'all-sections') {
                 console.log('Filtering by selected mini-section:', selectedMiniSection);
-                materials = materials.filter(m => {
+                materialsToDisplay = materialsToDisplay.filter(m => {
                     const matches = m.miniSectionId === selectedMiniSection;
                     if (matches) {
                         console.log(`  ✅ Mini-section match: ${m.name}`);
@@ -2796,21 +2527,21 @@ const Details = () => {
                     }
                     return matches;
                 });
-                console.log('After mini-section filtering:', materials.length, 'materials');
+                console.log('After mini-section filtering:', materialsToDisplay.length, 'materials');
             } else {
                 console.log('✓ No mini-section filter - showing all materials in current section');
             }
             */
 
             // ✅ NEW: If no materials found, show all used materials for debugging
-            if (materials.length === 0) {
+            if (materialsToDisplay.length === 0) {
                 console.log('⚠️ NO MATERIALS FOUND AFTER FILTERING!');
                 console.log('⚠️ This might be a filtering issue. Let\'s check:');
                 console.log('   - Current sectionId:', sectionId);
                 console.log('   - Available mini-sections:', miniSections.map(ms => ({ id: ms._id, name: ms.name })));
                 console.log('   - All used materials:');
                 
-                const allUsed = usedMaterials;
+                const allUsed = materials.used;
                 allUsed.forEach((m, idx) => {
                     console.log(`     ${idx + 1}. ${m.name}`);
                     console.log(`        sectionId: ${m.sectionId}`);
@@ -2820,18 +2551,18 @@ const Details = () => {
                 
                 // ✅ TEMPORARY: Show all used materials if filtering fails
                 console.log('🔧 TEMPORARY FIX: Showing all used materials to debug the issue');
-                materials = allUsed;
+                materialsToDisplay = allUsed;
             }
         }
 
-        console.log('Final materials count:', materials.length);
+        console.log('Final materials count:', materialsToDisplay.length);
         console.log('Final materials:');
-        materials.forEach((m, idx) => {
+        materialsToDisplay.forEach((m, idx) => {
             console.log(`  ${idx + 1}. ${m.name} - Qty: ${m.quantity} ${m.unit}`);
         });
         console.log('========================================\n');
 
-        return materials;
+        return materialsToDisplay;
     };
 
     const getGroupedData = () => {
@@ -2851,20 +2582,19 @@ const Details = () => {
         return Math.ceil(totalItems / itemsPerPage);
     };
 
+    // ✅ OPTIMIZED: Simple page change handler
     const handlePageChange = async (page: number) => {
-        setCurrentPage(page);
         // Scroll to top when page changes
         scrollViewRef.current?.scrollTo({ y: 0, animated: true });
         
         // Fetch new page data from API
-        await reloadProjectMaterials(true, page);
+        await fetchMaterials(page, 20, true);
     };
 
     // Reset pagination when tab changes or filters change and reload data
     useEffect(() => {
-        setCurrentPage(1);
         // Reload data with new filters
-        reloadProjectMaterials(true, 1);
+        fetchMaterials(1, 20, true);
     }, [activeTab, selectedMiniSection]);
 
     // Group materials by date for "Used Materials" tab
@@ -3209,7 +2939,7 @@ const Details = () => {
                 }
 
                 // Refresh project materials after adding (no toast)
-                await reloadProjectMaterials();
+                await reloadMaterials();
 
                 // Stop loading animation (show success toast after completion)
                 stopMaterialLoadingAnimation();
@@ -3398,7 +3128,7 @@ const Details = () => {
                 visible={showUsageForm}
                 onClose={() => setShowUsageForm(false)}
                 onSubmit={handleAddMaterialUsage}
-                availableMaterials={availableMaterials.filter(m => {
+                availableMaterials={materials.available.filter(m => {
                     // Show materials that have no sectionId (global) OR match current sectionId
                     const isAvailable = !m.sectionId || m.sectionId === sectionId;
                     if (!isAvailable) {
@@ -3595,7 +3325,7 @@ const Details = () => {
                     ) : activeTab === 'used' ? (
                         // Used Materials tab - display API data directly
                         (() => {
-                            if (usedMaterials.length === 0) {
+                            if (materials.used.length === 0) {
                                 return (
                                     <View style={styles.noMaterialsContainer}>
                                         {miniSections.length === 0 ? (
@@ -3698,9 +3428,9 @@ const Details = () => {
                                 </View>
                             ));
                         })()
-                    ) : availableMaterials.length > 0 ? (
+                    ) : materials.available.length > 0 ? (
                         // Available Materials tab - display API data directly
-                        getGroupedMaterialsWithCompleteData(availableMaterials, false).map((material, index) => (
+                        getGroupedMaterialsWithCompleteData(materials.available, false).map((material, index) => (
                             <MaterialCardEnhanced
                                 key={`${material.name}-${material.unit}-${JSON.stringify(material.specs || {})}-${material.totalCost || 0}`}
                                 material={material}

@@ -4,9 +4,8 @@ import axios from "axios";
 
 export const getProjectData = async (
   clientId: string,
-  page: number = 1,
-  limit: number = 10,
-  staffId?: string // Add optional staffId parameter
+  staffId?: string, // Add optional staffId parameter
+  excludeMaterials: boolean = true // ✅ NEW: Option to exclude material data for performance
 ) => {
   try {
     if (!clientId) {
@@ -16,61 +15,43 @@ export const getProjectData = async (
     console.log(
       "📝 Fetching projects for clientId:",
       clientId,
-      "page:",
-      page,
-      "limit:",
-      limit,
       "staffId:",
-      staffId || "none"
+      staffId || "none",
+      "excludeMaterials:",
+      excludeMaterials
     );
 
-    // Build URL with optional staffId parameter
-    let url = `${domain}/api/project?clientId=${clientId}&page=${page}&limit=${limit}`;
+    // Build URL with optional staffId parameter and material exclusion
+    let url = `${domain}/api/project?clientId=${clientId}`;
     if (staffId) {
       url += `&staffId=${staffId}`;
       console.log("🔍 Adding staff filtering to project request");
+    }
+    if (excludeMaterials) {
+      url += `&excludeMaterials=true`;
+      console.log("🚀 Excluding material data for better performance");
     }
 
     const res = await axios.get(url);
 
     console.log("📦 API Response:", JSON.stringify(res.data, null, 2));
 
-    // ✅ Handle paginated response structure
+    // Handle new response structure (no pagination)
     const responseData = res.data as any;
-    if (responseData.success && responseData.data) {
-      const projects = responseData.data.projects || [];
-      const meta = responseData.data.meta || {
-        page: 1,
-        limit: 10,
-        total: projects.length,
-        totalPages: 1,
-        hasNextPage: false,
-        hasPrevPage: false,
-      };
+    if (responseData.success && Array.isArray(responseData.data)) {
       console.log(
         "✅ Projects extracted:",
-        projects.length,
-        "Total:",
-        meta.total,
-        staffId ? "(filtered for staff)" : "(all client projects)"
+        responseData.data.length,
+        staffId ? "(filtered for staff)" : "(all client projects)",
+        excludeMaterials ? "(materials excluded)" : "(materials included)"
       );
-      return { projects, meta };
+      return responseData.data;
     }
 
-    // Fallback for old response format
+    // Fallback for direct array response
     console.log("⚠️ Using fallback response parsing");
     const projects = Array.isArray(res.data) ? res.data : [];
-    return {
-      projects,
-      meta: {
-        page: 1,
-        limit: 10,
-        total: projects.length,
-        totalPages: 1,
-        hasNextPage: false,
-        hasPrevPage: false,
-      },
-    };
+    return projects;
   } catch (error) {
     console.error("❌ Failed to fetch project data:", error);
     throw error;

@@ -125,20 +125,63 @@ const CompanyProfile: React.FC = () => {
             if (userDetailsString) {
                 const data = JSON.parse(userDetailsString);
                 console.log('🔍 Profile page - parsed data keys:', Object.keys(data || {}));
-                console.log('🔍 Profile page - has _id?', !!data?._id);
-                console.log('🔍 Profile page - has clientId?', !!data?.clientId);
-                // ✅ FIX: Use clientId field, NOT _id field
-                // _id = user's own ID, clientId = the client/company they belong to
-                let clientId = data.clientId || '';
+                console.log('🔍 Profile page - full user data:', JSON.stringify(data, null, 2));
+                
+                // ✅ ENHANCED: More robust clientId detection with better fallbacks
+                let clientId = '';
+                
+                console.log('🔍 Checking clientId sources:');
+                console.log('  - data.clientId:', data.clientId);
+                console.log('  - data._id:', data._id);
+                console.log('  - data.role:', data.role);
+                console.log('  - data.clients:', data.clients);
+                console.log('  - data.userType:', data.userType);
+                
+                // Method 1: Direct clientId field (most common for admin users)
+                if (data.clientId && data.clientId.trim() !== '' && data.clientId !== 'null' && data.clientId !== 'undefined') {
+                    clientId = data.clientId;
+                    console.log('✅ Using direct clientId:', clientId);
+                }
+                // Method 2: For staff users with clients array
+                else if (data.clients && Array.isArray(data.clients) && data.clients.length > 0) {
+                    const firstClient = data.clients[0];
+                    clientId = firstClient.clientId || firstClient._id || '';
+                    console.log('✅ Using clientId from clients array:', clientId);
+                }
+                // Method 3: For admin/client users, their _id IS the clientId
+                else if (data._id && (!data.role || data.role === 'admin' || data.userType === 'clients')) {
+                    clientId = data._id;
+                    console.log('✅ Using _id as clientId for admin/client user:', clientId);
+                }
+                // Method 4: Try getClientId function as fallback
+                else {
+                    console.log('⚠️ No clientId found in user data, trying getClientId function...');
+                    try {
+                        const fallbackClientId = await getClientId();
+                        if (fallbackClientId && fallbackClientId.trim() !== '' && fallbackClientId !== 'null' && fallbackClientId !== 'undefined') {
+                            clientId = fallbackClientId;
+                            console.log('✅ Using fallback clientId from getClientId():', clientId);
+                        }
+                    } catch (error) {
+                        console.error('❌ getClientId function failed:', error);
+                    }
+                }
                 
                 // Handle ObjectId objects (convert to string)
                 if (typeof clientId === 'object' && clientId !== null) {
                     clientId = clientId.toString();
                 }
                 
-                console.log('🔍 Profile page - User ID (_id):', data._id);
-                console.log('🔍 Profile page - Client ID (clientId):', clientId);
-                console.log('🔍 Profile page - These should be DIFFERENT!');
+                // Final validation
+                if (!clientId || clientId.trim() === '' || clientId === 'null' || clientId === 'undefined') {
+                    console.warn('⚠️ Final clientId validation failed, setting empty');
+                    clientId = '';
+                }
+                
+                console.log('🎯 Final clientId determined:', clientId);
+                console.log('🎯 ClientId type:', typeof clientId);
+                console.log('🎯 ClientId length:', clientId?.length);
+                console.log('🎯 ClientId is valid?', !!(clientId && clientId.trim() !== ''));
 
                 // Build full name from firstName and lastName
                 let fullName = 'User';
@@ -154,26 +197,38 @@ const CompanyProfile: React.FC = () => {
                     fullName = data.username;
                 }
 
-                setUserData({
+                const userData = {
                     name: fullName,
                     email: data.email || '',
                     clientId: clientId,
                     phone: data.phone || data.phoneNumber || '',
                     company: data.company || data.companyName || 'Construction Company',
-                });
+                };
+                
+                console.log('🎯 Setting userData:', userData);
+                setUserData(userData);
 
-                // Fetch client details if clientId exists
+                // Fetch client details if clientId exists and is valid
                 if (clientId && clientId.trim() !== '') {
                     console.log('🔍 Valid clientId found, fetching client data...');
                     await fetchClientData(clientId);
                 } else {
-                    console.warn('⚠️ No valid clientId found in user data');
-                    console.warn('⚠️ User data structure:', data);
+                    console.warn('⚠️ No valid clientId found - skipping client data fetch');
+                    console.warn('⚠️ User data structure:', {
+                        hasClientId: !!data.clientId,
+                        hasClients: !!(data.clients && data.clients.length > 0),
+                        hasId: !!data._id,
+                        role: data.role,
+                        userType: data.userType
+                    });
                     setLoadingClient(false);
                 }
+            } else {
+                console.warn('⚠️ No user data found in AsyncStorage');
+                setLoadingClient(false);
             }
         } catch (error) {
-            console.error('Error fetching user data:', error);
+            console.error('❌ Error fetching user data:', error);
             setLoadingClient(false);
         }
     };
@@ -184,43 +239,66 @@ const CompanyProfile: React.FC = () => {
             console.log('🔍 Fetching client data for ID:', clientId);
             console.log('🔍 API URL:', `${domain}/api/clients?id=${clientId}`);
             
-            // ✅ FIX: Use correct endpoint /api/clients (plural) and correct response structure
             const response = await axios.get(`${domain}/api/clients?id=${clientId}`);
 
-            console.log('🔍 Client API response:', response.data);
+            console.log('🔍 Client API response status:', response.status);
+            console.log('🔍 Client API response data:', JSON.stringify(response.data, null, 2));
             const responseData = response.data as any;
             
-            // ✅ FIX: API returns data in responseData.data, not responseData.clientData
-            if (responseData && responseData.success && responseData.data) {
+            // ✅ ENHANCED: Handle the correct API response format with better validation
+            if (responseData && responseData.success === true && responseData.data) {
                 const client = responseData.data;
-                setClientData({
+                console.log('✅ Client data found:', client);
+                console.log('✅ Client license value:', client.license);
+                console.log('✅ Client license type:', typeof client.license);
+                console.log('✅ Client isLicenseActive:', client.isLicenseActive);
+                console.log('✅ Client licenseExpiryDate:', client.licenseExpiryDate);
+                
+                // ✅ ENHANCED: Better field mapping with fallbacks
+                const clientDataToSet = {
                     _id: client._id,
-                    name: client.name,
+                    name: client.name || client.companyName,
                     email: client.email,
-                    phone: client.phoneNumber, // ✅ FIX: Use phoneNumber from Client model
+                    phone: client.phoneNumber || client.phone, // Handle both field names
                     address: client.address,
                     city: client.city,
                     state: client.state,
-                    country: client.country, // Note: country might not exist in Client model
-                    companyName: client.name, // ✅ FIX: Use name as company name
-                    gstNumber: client.gstNumber, // This field might not exist in Client model
-                    license: client.license || 0,
+                    country: client.country,
+                    companyName: client.name || client.companyName, // Use name as primary, companyName as fallback
+                    gstNumber: client.gstNumber,
+                    license: client.license !== undefined ? client.license : null, // Preserve 0 values
                     licenseExpiryDate: client.licenseExpiryDate,
-                    isLicenseActive: client.isLicenseActive || false,
-                });
-                console.log('✅ Client data set successfully:', client);
+                    isLicenseActive: client.isLicenseActive !== undefined ? client.isLicenseActive : false,
+                };
+                
+                console.log('✅ Setting client data:', clientDataToSet);
+                setClientData(clientDataToSet);
+                console.log('✅ Client data set successfully');
             } else {
-                console.warn('⚠️ No client data found in API response');
+                console.warn('⚠️ No client data found in API response or API failed');
                 console.warn('⚠️ Response structure:', responseData);
+                console.warn('⚠️ Success field:', responseData?.success);
+                console.warn('⚠️ Data field:', responseData?.data);
+                
+                // Set empty client data to show "No data" message
+                setClientData({});
             }
         } catch (error: any) {
             console.error('❌ Error fetching client data:', error);
             console.error('❌ Error response:', error.response?.data);
             console.error('❌ Error status:', error.response?.status);
+            console.error('❌ Error message:', error.message);
             
-            // If client not found, that's okay - just log it
+            // Set empty client data on error
+            setClientData({});
+            
+            // Handle specific error cases
             if (error.response?.status === 404) {
-                console.warn('⚠️ Client not found in database - this might be normal');
+                console.warn('⚠️ Client not found (404) - this might be normal for staff users');
+            } else if (error.response?.status === 400) {
+                console.warn('⚠️ Bad request (400) - invalid clientId format');
+            } else if (!error.response) {
+                console.warn('⚠️ Network error - server might be unreachable');
             }
         } finally {
             setLoadingClient(false);
@@ -229,37 +307,54 @@ const CompanyProfile: React.FC = () => {
 
     const fetchStats = async () => {
         try {
-            const clientId = await getClientId();
-            console.log('🔍 Profile page - getClientId() returned:', clientId);
-            console.log('🔍 Profile page - userData.clientId is:', userData.clientId);
-            console.log('🔍 Profile page - IDs match?', clientId === userData.clientId);
+            // ✅ ENHANCED: Use userData.clientId first, then fallback to getClientId()
+            let clientId = userData.clientId;
+            if (!clientId || clientId.trim() === '') {
+                clientId = await getClientId();
+            }
             
-            if (!clientId) {
-                console.warn('⚠️ No clientId found, cannot fetch stats');
+            console.log('🔍 Profile stats - clientId sources:');
+            console.log('  - userData.clientId:', userData.clientId);
+            console.log('  - getClientId() result:', clientId);
+            console.log('  - Final clientId for stats:', clientId);
+            
+            if (!clientId || clientId.trim() === '') {
+                console.warn('⚠️ No clientId found for stats, cannot fetch project data');
+                setStats({
+                    totalProjects: 0,
+                    totalSpent: 0,
+                });
                 return;
             }
 
-            // ✅ FIX: Properly destructure the response from getProjectData
             console.log('📊 Fetching project data for stats calculation...');
             
             // Check if user is staff and pass staffId for filtering
             const isCurrentUserStaff = isStaff(user);
             
-            console.log('🔍 Profile stats - fetching projects:', {
+            console.log('🔍 Profile stats - user info:', {
                 clientId,
                 isStaff: isCurrentUserStaff,
-                willFilter: !!isCurrentUserStaff
+                userId: user?._id,
+                userRole: user && 'role' in user ? user.role : 'N/A'
             });
             
-            // ✅ OPTIMIZED APPROACH: For staff users, fetch staff data with populated projects
+            // ✅ ENHANCED: Better project data fetching for different user types
             let projectsArray = [];
             if (isCurrentUserStaff && user) {
-                console.log('👤 Staff user - fetching staff data with populated projects for stats');
+                console.log('👤 Staff user - fetching staff-specific project data for stats');
                 
                 try {
                     // Fetch staff data with populated assignedProjects from ALL clients
                     const response = await axios.get(`${domain}/api/users/staff?id=${user._id}&getAllProjects=true`);
                     const responseData = response.data as any;
+                    
+                    console.log('📥 Staff API response for stats:', {
+                        status: response.status,
+                        success: responseData.success,
+                        hasData: !!responseData.data,
+                        assignedProjectsCount: responseData.data?.assignedProjects?.length || 0
+                    });
                     
                     if (responseData.success && responseData.data) {
                         const staffData = responseData.data;
@@ -281,7 +376,7 @@ const CompanyProfile: React.FC = () => {
                                 })
                                 .filter((project: any) => project !== null); // Filter out null/invalid projects
                             
-                            console.log('📊 Populated projects for staff stats:', projectsArray.length, 'projects');
+                            console.log('📊 Staff projects for stats:', projectsArray.length, 'projects');
                         } else {
                             console.log('⚠️ Staff has no assigned projects for stats');
                             projectsArray = [];
@@ -290,44 +385,67 @@ const CompanyProfile: React.FC = () => {
                         console.log('❌ Failed to fetch staff data for stats');
                         projectsArray = [];
                     }
-                } catch (error) {
-                    console.error('❌ Error fetching staff data for stats:', error);
+                } catch (staffError: any) {
+                    console.error('❌ Error fetching staff data for stats:', staffError);
+                    console.error('❌ Staff API error response:', staffError.response?.data);
                     projectsArray = [];
                 }
             } else {
-                // For non-staff users, get all client projects
-                const projectData = await getProjectData(clientId, 1, 1000);
-                console.log('📊 Raw project data response:', projectData);
+                console.log('👤 Non-staff user - fetching all client projects for stats');
                 
-                // Handle both old and new response formats
-                if (projectData && typeof projectData === 'object') {
+                try {
+                    // For non-staff users, get all client projects
+                    const projectData = await getProjectData(clientId);
+                    console.log('📊 Raw project data response:', {
+                        type: typeof projectData,
+                        isArray: Array.isArray(projectData),
+                        length: Array.isArray(projectData) ? projectData.length : 'N/A'
+                    });
+                    
+                    // Handle response format
                     if (Array.isArray(projectData)) {
-                        // Old format: direct array
                         projectsArray = projectData;
-                    } else if (projectData.projects && Array.isArray(projectData.projects)) {
-                        // New format: {projects, meta}
-                        projectsArray = projectData.projects;
+                    } else if (projectData && typeof projectData === 'object' && projectData.data && Array.isArray(projectData.data)) {
+                        projectsArray = projectData.data;
                     } else {
                         console.warn('⚠️ Unexpected project data format:', projectData);
                         projectsArray = [];
                     }
+                } catch (projectError: any) {
+                    console.error('❌ Error fetching project data for stats:', projectError);
+                    projectsArray = [];
                 }
             }
             
-            console.log('📊 Final projects array for stats:', projectsArray.length, 'projects');
+            console.log('📊 Final projects array for stats:', {
+                count: projectsArray.length,
+                firstProject: projectsArray[0] ? {
+                    name: projectsArray[0].name,
+                    spent: projectsArray[0].spent,
+                    hasSpentField: 'spent' in projectsArray[0]
+                } : 'No projects'
+            });
 
-            // Calculate stats from real data only
+            // ✅ ENHANCED: Calculate stats with better error handling
             let totalSpent = 0;
+            let validProjectsCount = 0;
 
             projectsArray.forEach((project: any, index: number) => {
-                console.log(`📊 Processing project ${index + 1}:`, project.name || project.title || 'Unnamed');
+                const projectName = project.name || project.title || `Project ${index + 1}`;
+                console.log(`📊 Processing project ${index + 1}: ${projectName}`);
                 
-                // ✅ CORRECT CALCULATION: Use project.spent field directly
-                const projectSpent = Number(project.spent) || 0;
-                console.log(`  - Project spent field: ₹${projectSpent}`);
+                // ✅ ENHANCED: Better spent calculation with validation
+                let projectSpent = 0;
+                if (project.spent !== undefined && project.spent !== null) {
+                    projectSpent = Number(project.spent) || 0;
+                    console.log(`  - Project spent field: ₹${projectSpent}`);
+                } else {
+                    console.log(`  - Project has no spent field`);
+                }
                 
                 // Add to total
                 totalSpent += projectSpent;
+                validProjectsCount++;
                 
                 // Debug: Also show material counts for reference
                 const availableMaterials = project.MaterialAvailable || [];
@@ -336,15 +454,21 @@ const CompanyProfile: React.FC = () => {
             });
 
             console.log('📊 Final stats calculated:');
-            console.log(`  - Total Projects: ${projectsArray.length}`);
+            console.log(`  - Total Projects: ${validProjectsCount}`);
             console.log(`  - Total Spent: ₹${totalSpent} (sum of project.spent fields)`);
 
             setStats({
-                totalProjects: projectsArray.length,
+                totalProjects: validProjectsCount,
                 totalSpent,
             });
-        } catch (error) {
+        } catch (error: any) {
             console.error('❌ Error fetching stats:', error);
+            console.error('❌ Stats error details:', {
+                message: error.message,
+                response: error.response?.data,
+                status: error.response?.status
+            });
+            
             // Set empty stats on error
             setStats({
                 totalProjects: 0,
@@ -390,9 +514,10 @@ const CompanyProfile: React.FC = () => {
     };
 
     const getLicenseStatus = () => {
-        if (!clientData.license && clientData.license !== 0) {
+        // Handle null, undefined, or missing license data
+        if (clientData.license === null || clientData.license === undefined) {
             return {
-                status: 'No License',
+                status: 'No License Data',
                 color: '#94A3B8',
                 bgColor: '#F8FAFC',
                 icon: 'alert-circle-outline'
@@ -428,7 +553,7 @@ const CompanyProfile: React.FC = () => {
         }
 
         return {
-            status: 'Unknown',
+            status: 'Unknown Status',
             color: '#94A3B8',
             bgColor: '#F8FAFC',
             icon: 'help-circle-outline'

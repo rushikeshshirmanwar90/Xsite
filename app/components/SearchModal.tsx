@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Material } from '../types/materialTypes';
+import { Material } from '@/types/materialTypes';
 
 export interface SearchModalProps {
   visible: boolean;

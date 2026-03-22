@@ -1,4 +1,4 @@
-import { Material } from '../types/materialTypes';
+import { Material } from '@/types/materialTypes';
 
 // Sample data for imported materials
 export const importedMaterials: Material[] = [

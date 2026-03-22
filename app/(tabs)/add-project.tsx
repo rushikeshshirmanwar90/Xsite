@@ -131,13 +131,11 @@ const ProjectScreen: React.FC = () => {
 
             console.log('📦 API Response:', JSON.stringify(res.data, null, 2));
 
-            // ✅ FIXED: Handle new response structure
+            // ✅ FIXED: Handle new response structure (simple array)
             const responseData = res.data as any;
-            if (responseData.success && responseData.data) {
-                // Extract projects from nested structure
-                const projectsArray = responseData.data.projects || [];
-                console.log('✅ Projects extracted:', projectsArray.length);
-                setProjects(Array.isArray(projectsArray) ? projectsArray : []);
+            if (responseData.success && Array.isArray(responseData.data)) {
+                console.log('✅ Projects extracted:', responseData.data.length);
+                setProjects(responseData.data);
             } else {
                 // Fallback for old response format
                 console.log('⚠️ Using fallback response parsing');
