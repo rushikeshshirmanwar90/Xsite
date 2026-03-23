@@ -102,7 +102,12 @@ const MiniSectionsAnalytics: React.FC = () => {
       let sectionEquipmentCosts: EquipmentExpense[] = [];
       try {
         console.log('🔧 Fetching equipment costs for section:', sectionId);
-        const equipmentResponse = await axios.get(`${domain}/api/equipment`, {
+        const equipmentResponse = await axios.get<{
+          success: boolean;
+          data: {
+            equipment: any[];
+          };
+        }>(`${domain}/api/equipment`, {
           params: {
             projectId: projectId,
             projectSectionId: sectionId

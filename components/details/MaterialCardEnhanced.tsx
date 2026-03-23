@@ -60,6 +60,29 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
     currentProjectId,
     userType = 'staff', // Default to 'staff' if not provided
 }) => {
+    // Format date to readable format (e.g., "15 Jan 2024")
+    const formatDate = (dateString: string): string => {
+        try {
+            const date = new Date(dateString);
+            
+            // Check if date is valid
+            if (isNaN(date.getTime())) {
+                return 'Invalid Date';
+            }
+            
+            // Format: "15 Jan 2024"
+            const day = date.getDate();
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const month = monthNames[date.getMonth()];
+            const year = date.getFullYear();
+            
+            return `${day} ${month} ${year}`;
+        } catch (error) {
+            console.error('Error formatting date:', error);
+            return 'Invalid Date';
+        }
+    };
+
     // Get mini-section name by ID
     const getMiniSectionName = (miniSectionId?: string): string => {
         if (!miniSectionId) return 'Unassigned';
@@ -337,7 +360,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                         </View>
                         <View style={styles.headerActions}>
                             <View style={styles.dateContainer}>
-                                <Text style={styles.dateText}>{material.date}</Text>
+                                <Text style={styles.dateText}>{formatDate(material.date)}</Text>
                             </View>
                             {/* Three-dot menu - Only show for imported materials and non-staff users */}
                             {activeTab === 'imported' && onTransferMaterial && !['staff', 'users'].includes(userType) && (
@@ -421,51 +444,43 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                             </View>
                         )}
 
-                        {/* Cost Information - Compact */}
+                        {/* Cost Information - Compact with Per Unit Cost */}
                         <View style={styles.costSectionCompact}>
                             <View style={styles.costRowCompact}>
-                                <Text style={styles.costLabelCompact}>
-                                    {activeTab === 'used' ? 'Total Used Cost:' : 'Per Unit:'}
-                                </Text>
+                                <Text style={styles.costLabelCompact}>Per Unit:</Text>
                                 <Text style={styles.costValueCompact}>
                                     ₹{(() => {
-                                        // FIXED: material.totalCost is actually the per unit cost
                                         const perUnitCost = Number(material.totalCost) || 0;
-                                        
-                                        // For used materials, show total used cost (per unit × quantity used)
-                                        // For imported materials, show per unit cost
-                                        const displayCost = activeTab === 'used' 
-                                            ? perUnitCost * material.totalQuantity  // Total cost for used quantity
-                                            : perUnitCost;  // Per unit cost for imported
-                                        
-                                        // Debug logging
-                                        if (__DEV__) {
-                                            console.log('🐛 COST DEBUG (FIXED):', {
-                                                materialName: material.name,
-                                                activeTab,
-                                                totalCostField: material.totalCost,
-                                                interpretedAsPerUnit: perUnitCost,
-                                                totalQuantity: material.totalQuantity,
-                                                totalImported: material.totalImported,
-                                                displayCost,
-                                                calculatedTotal: perUnitCost * (material.totalImported || material.totalQuantity)
-                                            });
-                                        }
-                                        
-                                        return displayCost.toLocaleString('en-IN', { maximumFractionDigits: 2 });
-                                    })()}{activeTab === 'imported' ? `/${material.unit}` : ''}
+                                        return perUnitCost.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+                                    })()}/{material.unit}
                                 </Text>
                             </View>
+                            
+                            {/* Only show middle column for "Used Materials" tab */}
+                            {activeTab === 'used' && (
+                                <>
+                                    <View style={styles.costDivider} />
+                                    <View style={styles.costRowCompact}>
+                                        <Text style={styles.costLabelCompact}>Used Cost:</Text>
+                                        <Text style={styles.costValueCompact}>
+                                            ₹{(() => {
+                                                const perUnitCost = Number(material.totalCost) || 0;
+                                                const displayCost = perUnitCost * material.totalQuantity;
+                                                return displayCost.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+                                            })()}
+                                        </Text>
+                                    </View>
+                                </>
+                            )}
+                            
                             <View style={styles.costDivider} />
                             <View style={styles.costRowCompact}>
                                 <Text style={styles.costLabelCompact}>Total:</Text>
                                 <Text style={styles.costValueCompact}>
                                     ₹{(() => {
-                                        // FIXED: Calculate total cost = per unit cost × total imported quantity
                                         const perUnitCost = Number(material.totalCost) || 0;
                                         const totalImported = Number(material.totalImported) || Number(material.totalQuantity) || 0;
                                         const totalCost = perUnitCost * totalImported;
-                                        
                                         return totalCost.toLocaleString('en-IN');
                                     })()}
                                 </Text>
@@ -1043,13 +1058,13 @@ const styles = StyleSheet.create({
         marginHorizontal: 8,
     },
     costLabelCompact: {
-        fontSize: 11,
+        fontSize: 10,
         color: '#6B7280',
         fontWeight: '500',
         marginBottom: 2,
     },
     costValueCompact: {
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: '600',
         color: '#1F2937',
     },

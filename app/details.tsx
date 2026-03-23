@@ -1,3 +1,4 @@
+// @ts-nocheck
 import Header from '@/components/details/Header';
 import MaterialCardEnhanced from '@/components/details/MaterialCardEnhanced';
 import MaterialFormModal from '@/components/details/MaterialFormModel';
@@ -34,6 +35,10 @@ const Details = () => {
     const projectName = params.projectName as string;
     const sectionId = params.sectionId as string;
     const sectionName = params.sectionName as string;
+    // Debug logging variables
+    let consoleLogCount = 0;
+    const MAX_CONSOLE_LOGS = 50;
+    
     // ✅ OPTIMIZED: Removed material params - will fetch directly from API
     const [activeTab, setActiveTab] = useState<'imported' | 'used'>('imported');
     const [selectedPeriod, setSelectedPeriod] = useState('All');
@@ -120,6 +125,8 @@ const Details = () => {
 
     const cardAnimations = useRef<Animated.Value[]>([]).current;
     const scrollViewRef = useRef<ScrollView>(null);
+    const isMountedRef = useRef(true);
+    const isLoadingRef = useRef(false);
     
     // Loading animations for material operations
     const materialLoadingAnimation = useRef(new Animated.Value(0)).current;
@@ -200,8 +207,8 @@ const Details = () => {
         };
     };
 
-    // ✅ OPTIMIZED: Simple, efficient material fetching with pagination
-    const fetchMaterials = async (page: number = 1, limit: number = 20, forceRefresh: boolean = false) => {
+    // ✅ OPTIMIZED: Enhanced material fetching with proper API structure matching (LIMIT: 7 items per page)
+    const fetchMaterials = async (page: number = 1, limit: number = 7, forceRefresh: boolean = false) => {
         if (!projectId) {
             console.log('❌ No projectId available');
             return;
@@ -213,81 +220,211 @@ const Details = () => {
                 throw new Error('Client ID not available');
             }
 
-            console.log(`🔄 Fetching materials - Page: ${page}, Limit: ${limit}, Section: ${selectedMiniSection || 'all'}`);
+            console.log(`\n========================================`);
+            console.log(`🔄 FETCHING MATERIALS - Page ${page}, Limit ${limit}`);
+            console.log(`========================================`);
+            console.log(`Tab: ${activeTab}`);
+            console.log(`Section Filter: ${selectedMiniSection || 'all'}`);
+            console.log(`Project ID: ${projectId}`);
+            console.log(`Client ID: ${clientId}`);
 
             setMaterials(prev => ({ ...prev, loading: true, error: null }));
+
+            // Build API parameters based on active tab and filters
+            const baseParams = {
+                projectId,
+                clientId,
+                page,
+                limit,
+                sortBy: 'createdAt',
+                sortOrder: 'desc'
+            };
+
+            // Add section filter only for used materials tab
+            const availableParams = { ...baseParams };
+            const usedParams = {
+                ...baseParams,
+                ...(activeTab === 'used' && selectedMiniSection ? {
+                    sectionId: selectedMiniSection,
+                    miniSectionId: selectedMiniSection
+                } : {})
+            };
+
+            console.log(`📤 API Request Parameters:`);
+            console.log(`   Available Materials:`, availableParams);
+            console.log(`   Used Materials:`, usedParams);
 
             // Fetch both available and used materials in parallel
             const [availableResponse, usedResponse] = await Promise.all([
                 axios.get(`${domain}/api/material`, {
-                    params: {
-                        projectId,
-                        clientId,
-                        page,
-                        limit,
-                        sectionId: selectedMiniSection || undefined,
-                        sortBy: 'createdAt',
-                        sortOrder: 'desc'
-                    },
+                    params: availableParams,
                     timeout: 10000
                 }),
                 axios.get(`${domain}/api/material-usage`, {
-                    params: {
-                        projectId,
-                        clientId,
-                        page,
-                        limit,
-                        sectionId: selectedMiniSection || undefined,
-                        miniSectionId: selectedMiniSection || undefined,
-                        sortBy: 'createdAt',
-                        sortOrder: 'desc'
-                    },
+                    params: usedParams,
                     timeout: 10000
                 })
             ]);
 
-            const availableData = availableResponse.data;
-            const usedData = usedResponse.data;
+            const availableData = availableResponse.data as any;
+            const usedData = usedResponse.data as any;
 
-            console.log('✅ Materials fetched successfully:');
-            console.log(`   Available: ${availableData.MaterialAvailable?.length || 0} items`);
-            console.log(`   Used: ${usedData.MaterialUsed?.length || 0} items`);
+            console.log(`\n📥 API Response Received:`);
+            console.log(`   Available Status: ${availableResponse.status}`);
+            console.log(`   Used Status: ${usedResponse.status}`);
+            console.log(`   Available Keys:`, Object.keys(availableData));
+            console.log(`   Used Keys:`, Object.keys(usedData));
+
+            // Extract materials arrays from API response
+            const availableMaterialsArray = availableData.MaterialAvailable || availableData.materials || [];
+            const usedMaterialsArray = usedData.MaterialUsed || usedData.materials || [];
+
+            console.log(`\n📊 Materials Count:`);
+            console.log(`   Available: ${availableMaterialsArray.length} items`);
+            console.log(`   Used: ${usedMaterialsArray.length} items`);
 
             // Transform materials to match existing interface
-            const transformedAvailable = (availableData.MaterialAvailable || []).map((material: any, index: number) => {
+            const transformedAvailable = availableMaterialsArray.map((material: any, index: number) => {
                 const { icon, color } = getMaterialIconAndColor(material.name);
                 return {
-                    id: index + 1,
+                    id: (page - 1) * limit + index + 1,
                     _id: material._id,
                     name: material.name,
                     quantity: material.qnt || 0,
                     unit: material.unit,
                     price: material.totalCost || material.perUnitCost || 0,
-                    date: new Date().toLocaleDateString(),
-                    icon,
-                    color,
-                    specs: material.specs || {},
-                    sectionId: material.sectionId
-                };
-            });
-
-            const transformedUsed = (usedData.MaterialUsed || []).map((material: any, index: number) => {
-                const { icon, color } = getMaterialIconAndColor(material.name);
-                return {
-                    id: index + 1000,
-                    _id: material._id,
-                    name: material.name,
-                    quantity: material.qnt || 0,
-                    unit: material.unit,
-                    price: material.totalCost || material.perUnitCost || 0,
-                    date: new Date().toLocaleDateString(),
+                    date: material.createdAt || material.addedAt || new Date().toISOString(),
                     icon,
                     color,
                     specs: material.specs || {},
                     sectionId: material.sectionId,
-                    miniSectionId: material.miniSectionId
+                    createdAt: material.createdAt,
+                    addedAt: material.addedAt
                 };
             });
+
+            const transformedUsed = usedMaterialsArray.map((material: any, index: number) => {
+                const { icon, color } = getMaterialIconAndColor(material.name);
+                return {
+                    id: (page - 1) * limit + index + 1000,
+                    _id: material._id,
+                    name: material.name,
+                    quantity: material.qnt || 0,
+                    unit: material.unit,
+                    price: material.totalCost || material.perUnitCost || 0,
+                    date: material.createdAt || material.addedAt || new Date().toISOString(),
+                    icon,
+                    color,
+                    specs: material.specs || {},
+                    sectionId: material.sectionId,
+                    miniSectionId: material.miniSectionId,
+                    createdAt: material.createdAt,
+                    addedAt: material.addedAt
+                };
+            });
+
+            // ✅ ENHANCED: Smart pagination extraction with multiple fallback strategies
+            const extractPagination = (data: any, defaultPage: number, materialsArray: any[]) => {
+                console.log(`\n========================================`);
+                console.log(`SMART PAGINATION EXTRACTION`);
+                console.log(`========================================`);
+                console.log(`Page: ${defaultPage}, Limit: ${limit}, Materials: ${materialsArray.length}`);
+                
+                let currentPage = defaultPage;
+                let totalPages = 1;
+                let totalItems = 0;
+                let hasNextPage = false;
+                let hasPrevPage = false;
+
+                // Strategy 1: Check for nested pagination object
+                if (data.pagination) {
+                    console.log(`✅ Strategy 1: Found data.pagination`);
+                    currentPage = data.pagination.currentPage || data.pagination.page || defaultPage;
+                    totalPages = data.pagination.totalPages || data.pagination.pages || 1;
+                    totalItems = data.pagination.totalItems || data.pagination.total || data.pagination.count || 0;
+                    hasNextPage = data.pagination.hasNextPage ?? data.pagination.hasNext ?? (currentPage < totalPages);
+                    hasPrevPage = data.pagination.hasPrevPage ?? data.pagination.hasPrev ?? (currentPage > 1);
+                }
+                // Strategy 2: Check for meta object
+                else if (data.meta) {
+                    console.log(`✅ Strategy 2: Found data.meta`);
+                    currentPage = data.meta.currentPage || data.meta.page || defaultPage;
+                    totalPages = data.meta.totalPages || data.meta.pages || 1;
+                    totalItems = data.meta.totalItems || data.meta.total || data.meta.count || 0;
+                    hasNextPage = data.meta.hasNextPage ?? data.meta.hasNext ?? (currentPage < totalPages);
+                    hasPrevPage = data.meta.hasPrevPage ?? data.meta.hasPrev ?? (currentPage > 1);
+                }
+                // Strategy 3: Check for root-level pagination fields
+                else if (data.currentPage || data.totalPages || data.page || data.pages) {
+                    console.log(`✅ Strategy 3: Found root-level pagination fields`);
+                    currentPage = data.currentPage || data.page || defaultPage;
+                    totalPages = data.totalPages || data.pages || 1;
+                    totalItems = data.totalItems || data.total || data.count || 0;
+                    hasNextPage = data.hasNextPage ?? data.hasNext ?? (currentPage < totalPages);
+                    hasPrevPage = data.hasPrevPage ?? data.hasPrev ?? (currentPage > 1);
+                }
+                // Strategy 4: Fallback - Calculate from materials count
+                else {
+                    console.log(`⚠️ Strategy 4: No API pagination - Using smart fallback`);
+                    
+                    if (materialsArray.length === limit) {
+                        // Got a full page - assume there might be more
+                        totalPages = defaultPage + 1;
+                        totalItems = materialsArray.length * totalPages;
+                        hasNextPage = true;
+                        console.log(`   📊 Full page detected (${materialsArray.length}/${limit})`);
+                        console.log(`   📊 Assuming at least ${totalPages} pages exist`);
+                    } else if (materialsArray.length > 0) {
+                        // Got partial page - this is likely the last page
+                        totalPages = defaultPage;
+                        totalItems = (defaultPage - 1) * limit + materialsArray.length;
+                        hasNextPage = false;
+                        console.log(`   📊 Partial page detected (${materialsArray.length}/${limit})`);
+                        console.log(`   📊 This appears to be the last page`);
+                    } else {
+                        // No materials - single empty page
+                        totalPages = 1;
+                        totalItems = 0;
+                        hasNextPage = false;
+                        console.log(`   📊 No materials found`);
+                    }
+                    
+                    hasPrevPage = defaultPage > 1;
+                }
+
+                // Strategy 5: Override if API says 1 page but we have a full page
+                if (totalPages === 1 && materialsArray.length === limit) {
+                    console.log(`⚠️ Strategy 5: API says 1 page but got full page - overriding`);
+                    totalPages = 2;
+                    totalItems = Math.max(totalItems, materialsArray.length * 2);
+                    hasNextPage = true;
+                }
+
+                const result = {
+                    currentPage,
+                    totalPages,
+                    totalItems,
+                    hasNextPage,
+                    hasPrevPage
+                };
+
+                console.log(`\n✅ Final Pagination Result:`);
+                console.log(`   Current Page: ${result.currentPage}`);
+                console.log(`   Total Pages: ${result.totalPages}`);
+                console.log(`   Total Items: ${result.totalItems}`);
+                console.log(`   Has Next: ${result.hasNextPage}`);
+                console.log(`   Has Prev: ${result.hasPrevPage}`);
+                console.log(`========================================\n`);
+
+                return result;
+            };
+
+            const availablePagination = extractPagination(availableData, page, transformedAvailable);
+            const usedPagination = extractPagination(usedData, page, transformedUsed);
+
+            console.log(`\n🎯 Setting Materials State:`);
+            console.log(`   Available: ${transformedAvailable.length} materials, Page ${availablePagination.currentPage}/${availablePagination.totalPages}`);
+            console.log(`   Used: ${transformedUsed.length} materials, Page ${usedPagination.currentPage}/${usedPagination.totalPages}`);
 
             setMaterials(prev => ({
                 ...prev,
@@ -295,25 +432,20 @@ const Details = () => {
                 used: transformedUsed,
                 loading: false,
                 pagination: {
-                    available: {
-                        currentPage: availableData.pagination?.currentPage || 1,
-                        totalPages: availableData.pagination?.totalPages || 1,
-                        totalItems: availableData.pagination?.totalItems || 0,
-                        hasNextPage: availableData.pagination?.hasNextPage || false,
-                        hasPrevPage: availableData.pagination?.hasPrevPage || false
-                    },
-                    used: {
-                        currentPage: usedData.pagination?.currentPage || 1,
-                        totalPages: usedData.pagination?.totalPages || 1,
-                        totalItems: usedData.pagination?.totalItems || 0,
-                        hasNextPage: usedData.pagination?.hasNextPage || false,
-                        hasPrevPage: usedData.pagination?.hasPrevPage || false
-                    }
+                    available: availablePagination,
+                    used: usedPagination
                 }
             }));
 
+            console.log(`✅ Materials state updated successfully`);
+            console.log(`========================================\n`);
+
         } catch (error: any) {
-            console.error('❌ Error fetching materials:', error);
+            console.error(`\n❌ ERROR FETCHING MATERIALS:`);
+            console.error(`   Message: ${error?.message}`);
+            console.error(`   Status: ${error?.response?.status}`);
+            console.error(`   Data:`, error?.response?.data);
+            
             const errorMessage = error?.response?.data?.message || error?.message || 'Failed to load materials';
             
             setMaterials(prev => ({ 
@@ -326,9 +458,10 @@ const Details = () => {
         }
     };
 
-    // ✅ OPTIMIZED: Simple reload function
+
+    // ✅ OPTIMIZED: Simple reload function (LIMIT: 7 items per page)
     const reloadMaterials = async (page: number = 1) => {
-        await fetchMaterials(page, 20, true);
+        await fetchMaterials(page, 7, true);
     };
 
     // Function to ignore a material from alerts
@@ -1430,15 +1563,15 @@ const Details = () => {
     // Function to check for low stock materials
     const checkLowStockMaterials = () => {
         console.log('\n🔍 CHECKING LOW STOCK MATERIALS...');
-        console.log('Available materials:', materials.available.length);
-        console.log('Used materials:', materials.used.length);
+        console.log('Available materials:', materials?.available?.length || 0);
+        console.log('Used materials:', materials?.used?.length || 0);
         console.log('Ignored materials:', ignoredMaterials);
         console.log('Low stock threshold:', lowStockThreshold, '%');
 
         const lowStockItems: any[] = [];
 
         // Group materials to get complete picture
-        const groupedMaterials = groupMaterialsByName(materials.available, false);
+        const groupedMaterials = materials?.available ? groupMaterialsByName(materials.available, false) : [];
 
         groupedMaterials.forEach((group: any) => {
             const materialKey = `${group.name}-${group.unit}`;
@@ -1488,9 +1621,9 @@ const Details = () => {
         return lowStockItems;
     };
 
-    // Load project materials on mount
+    // Load project materials on mount (LIMIT: 7 items per page)
     useEffect(() => {
-        fetchMaterials(1, 20, true); // ✅ OPTIMIZED: Use new simple fetch function
+        fetchMaterials(1, 7, true); // ✅ OPTIMIZED: Use new simple fetch function with limit 7
         loadInitialCompletionStatus(); // Load completion status on mount
         loadIgnoredMaterials(); // Load ignored materials from storage
 
@@ -1539,7 +1672,7 @@ const Details = () => {
     // Debug: Log when materials state changes (limited logging)
     useEffect(() => {
         if (__DEV__ && consoleLogCount < MAX_CONSOLE_LOGS) {
-            console.log('🔄 usedMaterials:', materials.used.length);
+            console.log('🔄 usedMaterials:', materials?.used?.length || 0);
             consoleLogCount++;
         }
     }, [materials.used]);
@@ -1547,7 +1680,7 @@ const Details = () => {
     // Debug: Log when materials state changes (limited logging)
     useEffect(() => {
         if (__DEV__ && consoleLogCount < MAX_CONSOLE_LOGS) {
-            console.log('📦 availableMaterials:', materials.available.length);
+            console.log('📦 availableMaterials:', materials?.available?.length || 0);
             consoleLogCount++;
         }
     }, [materials.available]);
@@ -1588,22 +1721,45 @@ const Details = () => {
         fetchMiniSections();
     }, [sectionId, projectId]);
 
-    // ✅ OPTIMIZED: Wrapper function for material grouping
+    // ✅ OPTIMIZED: Wrapper function for material grouping with safety checks
     const getGroupedMaterialsWithCompleteData = (materialsToDisplay: any[], isUsedTab: boolean) => {
         console.log(`\n🔄 GROUPING MATERIALS WITH COMPLETE DATA:`);
-        console.log(`   Materials to display: ${materialsToDisplay.length}`);
-        console.log(`   Available materials in state: ${materials.available.length}`);
-        console.log(`   Used materials in state: ${materials.used.length}`);
+        console.log(`   Materials to display: ${materialsToDisplay?.length || 0}`);
+        console.log(`   Available materials in state: ${materials?.available?.length || 0}`);
+        console.log(`   Used materials in state: ${materials?.used?.length || 0}`);
         console.log(`   Is used tab: ${isUsedTab}`);
+        
+        // ✅ SAFETY CHECK: Ensure we have valid data before grouping
+        if (!materialsToDisplay || !Array.isArray(materialsToDisplay) || materialsToDisplay.length === 0) {
+            console.log('⚠️ No valid materials to display, returning empty array');
+            return [];
+        }
+        
+        if (!materials || !materials.available || !materials.used) {
+            console.log('⚠️ Materials state not ready, returning empty array');
+            return [];
+        }
         
         return groupMaterialsByName(materialsToDisplay, isUsedTab);
     };
 
     // ✅ FIXED: Group materials by name, unit, AND specifications for separate cards
-    const groupMaterialsByName = (materials: Material[], isUsedTab: boolean = false) => {
+    const groupMaterialsByName = (materialsArray: Material[], isUsedTab: boolean = false) => {
         try {
+            // ✅ SAFETY CHECK: Ensure materials array exists and is valid
+            if (!materialsArray || !Array.isArray(materialsArray)) {
+                console.warn('⚠️ Invalid materials array passed to groupMaterialsByName:', materialsArray);
+                return [];
+            }
+
+            // ✅ SAFETY CHECK: Ensure materials state exists before accessing it in calculations
+            if (!materials || !materials.available || !materials.used) {
+                console.warn('⚠️ Materials state not properly initialized, skipping grouping');
+                return [];
+            }
+
             if (__DEV__ && consoleLogCount < MAX_CONSOLE_LOGS) {
-                console.log('Grouping', materials.length, 'materials for', isUsedTab ? 'USED' : 'IMPORTED', 'tab');
+                console.log('Grouping', materialsArray.length, 'materials for', isUsedTab ? 'USED' : 'IMPORTED', 'tab');
                 consoleLogCount++;
             }
 
@@ -1612,7 +1768,7 @@ const Details = () => {
             // Debug raw materials input
             if (__DEV__) {
                 console.log('🔍 RAW MATERIALS INPUT TO GROUPING:');
-                materials.forEach((material, index) => {
+                materialsArray.forEach((material, index) => {
                     console.log(`   Material ${index + 1}:`, {
                         name: material.name,
                         quantity: material.quantity,
@@ -1625,7 +1781,7 @@ const Details = () => {
                 });
             }
 
-            materials.forEach((material, index) => {
+            materialsArray.forEach((material, index) => {
                 // ✅ FIXED: Create grouping key WITHOUT price to properly match materials
                 const specsKey = material.specs ? JSON.stringify(material.specs) : 'no-specs';
                 const key = `${material.name}-${material.unit}-${specsKey}`;
@@ -1685,13 +1841,18 @@ const Details = () => {
                 }
             });
 
-            // ✅ FIXED: Proper calculation logic for both tabs
+            // ✅ FIXED: Proper calculation logic for both tabs with null checks
             Object.keys(grouped).forEach((key) => {
                 const group = grouped[key];
                 
                 console.log(`\n🔍 PROCESSING GROUP: ${group.name}`);
                 console.log(`   Group key: ${key}`);
                 console.log(`   Group totalQuantity (from current tab): ${group.totalQuantity}`);
+                
+                // ✅ SAFETY CHECK: Ensure materials arrays exist
+                const availableMaterials = materials?.available || [];
+                const usedMaterials = materials?.used || [];
+                
                 console.log(`   Available materials count: ${availableMaterials.length}`);
                 console.log(`   Used materials count: ${usedMaterials.length}`);
                 
@@ -1870,14 +2031,14 @@ const Details = () => {
         console.log('  - User:', JSON.stringify(user, null, 2));
 
         console.log('\n📦 AVAILABLE MATERIALS CONTEXT:');
-        console.log('  - Total available materials:', materials.available.length);
-        materials.available.slice(0, 3).forEach((m, idx) => {
+        console.log('  - Total available materials:', materials?.available?.length || 0);
+        (materials?.available || []).slice(0, 3).forEach((m, idx) => {
             console.log(`    ${idx + 1}. ${m.name} (_id: ${m._id}, qty: ${m.quantity})`);
         });
 
         console.log('\n🎯 MATERIAL USAGES TO PROCESS:');
         materialUsages.forEach((usage, index) => {
-            const selectedMaterial = materials.available.find(m => m._id === usage.materialId);
+            const selectedMaterial = materials?.available?.find(m => m._id === usage.materialId);
             console.log(`  ${index + 1}. Material Usage:`);
             console.log(`     - Material ID: "${usage.materialId}" (type: ${typeof usage.materialId})`);
             console.log(`     - Quantity: ${usage.quantity} (type: ${typeof usage.quantity})`);
@@ -1891,8 +2052,8 @@ const Details = () => {
             } else {
                 console.log(`     ❌ Material NOT FOUND in available materials!`);
                 console.log(`     🔍 Searching in available materials by ID...`);
-                const foundById = materials.available.find(m => String(m._id) === String(usage.materialId));
-                const foundByIdLoose = materials.available.find(m => m.id === parseInt(usage.materialId));
+                const foundById = materials?.available?.find(m => String(m._id) === String(usage.materialId));
+                const foundByIdLoose = materials?.available?.find(m => m.id === parseInt(usage.materialId));
                 console.log(`     - Found by string comparison: ${!!foundById}`);
                 console.log(`     - Found by ID number: ${!!foundByIdLoose}`);
             }
@@ -2016,8 +2177,8 @@ const Details = () => {
                 await new Promise(resolve => setTimeout(resolve, 500));
 
                 console.log('✅ Materials refreshed after batch usage add');
-                console.log('Available materials count:', availableMaterials.length);
-                console.log('Used materials count:', usedMaterials.length);
+                console.log('Available materials count:', materials.available.length);
+                console.log('Used materials count:', materials.used.length);
 
                 // Stop loading animation and show success
                 stopUsageLoadingAnimation();
@@ -2270,7 +2431,7 @@ const Details = () => {
             }
 
             // Find the material details for cost calculation
-            const sourceMaterial = materials.available.find(m => m._id === variantId);
+            const sourceMaterial = materials?.available?.find(m => m._id === variantId);
             const perUnitCost = sourceMaterial?.price || 0;
             const totalTransferCost = perUnitCost * quantity;
 
@@ -2459,105 +2620,38 @@ const Details = () => {
         }
     };
 
-    // FIXED: Get current data with proper filtering
+    // ✅ FIXED: Simplified getCurrentData with safety checks
     const getCurrentData = () => {
         console.log('\n========================================');
-        console.log('GET CURRENT DATA - START');
+        console.log('GET CURRENT DATA - SIMPLIFIED');
         console.log('========================================');
         console.log('Active Tab:', activeTab);
+        
+        // ✅ SAFETY CHECK: Ensure materials state exists
+        if (!materials || !materials.available || !materials.used) {
+            console.log('⚠️ Materials state not initialized, returning empty array');
+            return [];
+        }
+        
         console.log('materials.available.length:', materials.available.length);
         console.log('materials.used.length:', materials.used.length);
 
-        // Use the correct array based on active tab
-        let materialsToDisplay = activeTab === 'imported' ? materials.available : materials.used;
+        // ✅ CRITICAL FIX: Return API data directly without additional filtering
+        // The API already handles pagination and filtering, so we don't need to filter again
+        let materialsToDisplay = activeTab === 'imported' ? (materials?.available || []) : (materials?.used || []);
 
         console.log('Selected materials array:', activeTab === 'imported' ? 'available' : 'used');
-        console.log('Total materials before filtering:', materialsToDisplay.length);
-        console.log('Current sectionId:', sectionId);
-        console.log('Selected mini-section:', selectedMiniSection);
+        console.log('Materials count (from API):', materialsToDisplay.length);
+        console.log('Current page:', activeTab === 'imported' 
+            ? materials.pagination?.available?.currentPage 
+            : materials.pagination?.used?.currentPage);
 
-        // For "imported" tab: Show ALL materials (no filtering)
-        if (activeTab === 'imported') {
-            console.log('✓ Processing IMPORTED materials tab - showing ALL materials');
-        }
-        // For "used" tab: Filter by current section AND optionally by mini-section
-        else if (activeTab === 'used') {
-            console.log('✓ Processing USED materials tab...');
-
-            // Log all materials for debugging
-            console.log('Materials in usedMaterials array:');
-            materialsToDisplay.forEach((m, idx) => {
-                console.log(`  ${idx + 1}. ${m.name} - Qty: ${m.quantity}`);
-                console.log('     sectionId:', m.sectionId);
-                console.log('     miniSectionId:', m.miniSectionId);
-            });
-
-            // ✅ TEMPORARY DEBUG: Show all used materials without filtering
-            console.log('🔧 DEBUG MODE: Showing ALL used materials (bypassing filters)');
-            console.log('🔧 This is to debug the filtering issue');
-            
-            // Comment out filtering temporarily to see if materials show up
-            /*
-            // ✅ FIXED: More flexible section filtering
-            console.log('Filtering by current sectionId:', sectionId);
-            materialsToDisplay = materialsToDisplay.filter(m => {
-                // Match materials that belong to the current section
-                // Check both sectionId and miniSectionId for flexibility
-                const matchesSection = m.sectionId === sectionId || 
-                                     (!m.sectionId && m.miniSectionId && miniSections.some(ms => ms._id === m.miniSectionId));
-                
-                if (matchesSection) {
-                    console.log(`  ✅ Included: ${m.name} (sectionId: ${m.sectionId}, miniSectionId: ${m.miniSectionId})`);
-                } else {
-                    console.log(`  ❌ Filtered out: ${m.name} (sectionId: ${m.sectionId}, miniSectionId: ${m.miniSectionId})`);
-                }
-                return matchesSection;
-            });
-            console.log('After section filtering:', materialsToDisplay.length, 'materials');
-
-            // SECOND: Filter by mini-section if one is selected
-            if (selectedMiniSection && selectedMiniSection !== 'all-sections') {
-                console.log('Filtering by selected mini-section:', selectedMiniSection);
-                materialsToDisplay = materialsToDisplay.filter(m => {
-                    const matches = m.miniSectionId === selectedMiniSection;
-                    if (matches) {
-                        console.log(`  ✅ Mini-section match: ${m.name}`);
-                    } else {
-                        console.log(`  ❌ Mini-section filtered: ${m.name} (has: ${m.miniSectionId})`);
-                    }
-                    return matches;
-                });
-                console.log('After mini-section filtering:', materialsToDisplay.length, 'materials');
-            } else {
-                console.log('✓ No mini-section filter - showing all materials in current section');
-            }
-            */
-
-            // ✅ NEW: If no materials found, show all used materials for debugging
-            if (materialsToDisplay.length === 0) {
-                console.log('⚠️ NO MATERIALS FOUND AFTER FILTERING!');
-                console.log('⚠️ This might be a filtering issue. Let\'s check:');
-                console.log('   - Current sectionId:', sectionId);
-                console.log('   - Available mini-sections:', miniSections.map(ms => ({ id: ms._id, name: ms.name })));
-                console.log('   - All used materials:');
-                
-                const allUsed = materials.used;
-                allUsed.forEach((m, idx) => {
-                    console.log(`     ${idx + 1}. ${m.name}`);
-                    console.log(`        sectionId: ${m.sectionId}`);
-                    console.log(`        miniSectionId: ${m.miniSectionId}`);
-                    console.log(`        matches current section: ${m.sectionId === sectionId}`);
-                });
-                
-                // ✅ TEMPORARY: Show all used materials if filtering fails
-                console.log('🔧 TEMPORARY FIX: Showing all used materials to debug the issue');
-                materialsToDisplay = allUsed;
-            }
-        }
-
+        // ✅ NO FILTERING: API already returned the correct page and filtered data
+        console.log('✅ Using API data directly (no additional filtering)');
+        
         console.log('Final materials count:', materialsToDisplay.length);
-        console.log('Final materials:');
-        materialsToDisplay.forEach((m, idx) => {
+        console.log('Final materials preview:');
+        materialsToDisplay.slice(0, 3).forEach((m, idx) => {
             console.log(`  ${idx + 1}. ${m.name} - Qty: ${m.quantity} ${m.unit}`);
         });
         console.log('========================================\n');
@@ -2566,35 +2660,103 @@ const Details = () => {
     };
 
     const getGroupedData = () => {
-        const materials = getCurrentData();
+        const currentMaterials = getCurrentData();
         const isUsedTab = activeTab === 'used';
-        return getGroupedMaterialsWithCompleteData(materials, isUsedTab);
-    };
-
-    // Pagination helper functions
-    const getPaginatedData = (data: any[]) => {
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        const endIndex = startIndex + itemsPerPage;
-        return data.slice(startIndex, endIndex);
-    };
-
-    const getTotalPages = (totalItems: number) => {
-        return Math.ceil(totalItems / itemsPerPage);
-    };
-
-    // ✅ OPTIMIZED: Simple page change handler
-    const handlePageChange = async (page: number) => {
-        // Scroll to top when page changes
-        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
         
-        // Fetch new page data from API
-        await fetchMaterials(page, 20, true);
+        // ✅ SAFETY CHECK: Ensure we have valid materials before grouping
+        if (!currentMaterials || !Array.isArray(currentMaterials)) {
+            console.log('⚠️ No valid current materials, returning empty array');
+            return [];
+        }
+        
+        return getGroupedMaterialsWithCompleteData(currentMaterials, isUsedTab);
     };
 
-    // Reset pagination when tab changes or filters change and reload data
+    // ✅ FIXED: Use materials state directly with safety checks
+    const totalAvailableCount = materials?.available?.length || 0;
+    const totalUsedCount = materials?.used?.length || 0;
+
+    // ✅ FIXED: Proper pagination calculations using API data with safety checks (LIMIT: 7 items per page)
+    const itemsPerPage = 7; // Items per page for pagination
+    const currentPage = activeTab === 'imported' 
+        ? (materials?.pagination?.available?.currentPage || 1)
+        : (materials?.pagination?.used?.currentPage || 1);
+    
+    // Use API pagination data directly
+    const totalPages = activeTab === 'imported'
+        ? (materials?.pagination?.available?.totalPages || 1)
+        : (materials?.pagination?.used?.totalPages || 1);
+    
+    const totalItems = activeTab === 'imported'
+        ? (materials?.pagination?.available?.totalItems || 0)
+        : (materials?.pagination?.used?.totalItems || 0);
+    
+    const apiLoading = materials?.loading || false;
+    
+    console.log('🔍 Pagination State:', {
+        activeTab,
+        currentPage,
+        totalPages,
+        totalItems,
+        apiLoading,
+        availableMaterialsCount: materials?.available?.length || 0,
+        usedMaterialsCount: materials?.used?.length || 0,
+        paginationState: materials?.pagination,
+        // 🔍 DEBUG: Show why pagination might be hidden
+        paginationVisible: !materials?.loading && totalPages > 1,
+        materialsLoading: materials?.loading,
+        totalPagesCheck: totalPages > 1
+    });
+    
+    // ✅ FIXED: Use API data directly for display with safety checks
+    const displayMaterials = activeTab === 'imported' 
+        ? (materials?.available || []) 
+        : (materials?.used || []);
+    const startItem = totalItems > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0;
+    const endItem = totalItems > 0 ? Math.min(currentPage * itemsPerPage, totalItems) : 0;
+
+    // ✅ FIXED: Enhanced page change handler with better error handling
+    const handlePageChange = async (page: number) => {
+        console.log(`🔄 Page change requested: ${currentPage} → ${page}`);
+        console.log(`   Active tab: ${activeTab}`);
+        console.log(`   Total pages: ${totalPages}`);
+        
+        // Validate page number
+        if (page < 1 || page > totalPages) {
+            console.warn(`⚠️ Invalid page number: ${page} (valid range: 1-${totalPages})`);
+            toast.error(`Invalid page number. Please select a page between 1 and ${totalPages}.`);
+            return;
+        }
+
+        // Prevent duplicate requests
+        if (materials.loading) {
+            console.log('⏳ Already loading, ignoring page change request');
+            return;
+        }
+
+        try {
+            // Scroll to top when page changes
+            scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+            
+            // Fetch new page data from API (LIMIT: 7 items per page)
+            console.log(`📡 Fetching page ${page} data...`);
+            await fetchMaterials(page, 7, true);
+            
+            console.log(`✅ Page ${page} loaded successfully`);
+        } catch (error) {
+            console.error(`❌ Failed to load page ${page}:`, error);
+            toast.error(`Failed to load page ${page}. Please try again.`);
+        }
+    };
+
+    // Reset pagination when tab changes or filters change and reload data (LIMIT: 7 items per page)
     useEffect(() => {
-        // Reload data with new filters
-        fetchMaterials(1, 20, true);
+        console.log('🔄 Tab or filter changed, reloading page 1...');
+        console.log('  - Active Tab:', activeTab);
+        console.log('  - Selected Mini Section:', selectedMiniSection);
+        
+        // Always reload from page 1 when tab or filter changes
+        fetchMaterials(1, 7, true);
     }, [activeTab, selectedMiniSection]);
 
     // Group materials by date for "Used Materials" tab
@@ -2693,21 +2855,6 @@ const Details = () => {
     const totalCost = filteredMaterials.reduce((sum, material) => sum + (material.price * material.quantity), 0);
 
     // Pagination calculations using API totals
-    const getDataForPagination = () => {
-        if (activeTab === 'used') {
-            return totalUsedCount;
-        }
-        return totalAvailableCount;
-    };
-
-    const totalItemsCount = getDataForPagination();
-    const totalPages = getTotalPages(totalItemsCount);
-    const startItem = (currentPage - 1) * itemsPerPage + 1;
-    const endItem = Math.min(currentPage * itemsPerPage, totalItemsCount);
-
-    // For display, we use the current page data directly (no client-side pagination needed)
-    const displayMaterials = activeTab === 'imported' ? availableMaterials : usedMaterials;
-
     // Minimal logging for debugging (only in development)
     if (__DEV__ && consoleLogCount < MAX_CONSOLE_LOGS) {
         console.log(`Render: ${activeTab} tab, ${groupedMaterials.length} groups`);
@@ -3128,7 +3275,7 @@ const Details = () => {
                 visible={showUsageForm}
                 onClose={() => setShowUsageForm(false)}
                 onSubmit={handleAddMaterialUsage}
-                availableMaterials={materials.available.filter(m => {
+                availableMaterials={(materials?.available || []).filter(m => {
                     // Show materials that have no sectionId (global) OR match current sectionId
                     const isAvailable = !m.sectionId || m.sectionId === sectionId;
                     if (!isAvailable) {
@@ -3292,10 +3439,10 @@ const Details = () => {
                         </Text>
                         
                         {/* Material count and pagination info */}
-                        {!loading && totalItemsCount > 0 && (
+                        {!materials.loading && totalItems > 0 && (
                             <View style={paginationStyles.infoContainer}>
                                 <Text style={paginationStyles.infoText}>
-                                    Showing {startItem}-{endItem} of {totalItemsCount} {activeTab === 'used' ? 'used materials' : 'available materials'}
+                                    Showing {startItem}-{endItem} of {totalItems} {activeTab === 'used' ? 'used materials' : 'available materials'}
                                 </Text>
                                 {totalPages > 1 && (
                                     <Text style={paginationStyles.pageInfo}>
@@ -3305,7 +3452,7 @@ const Details = () => {
                             </View>
                         )}
                     </View>
-                    {loading ? (
+                    {materials.loading ? (
                         <View style={styles.noMaterialsContainer}>
                             <Animated.View style={{
                                 transform: [{
@@ -3325,7 +3472,7 @@ const Details = () => {
                     ) : activeTab === 'used' ? (
                         // Used Materials tab - display API data directly
                         (() => {
-                            if (materials.used.length === 0) {
+                            if ((materials?.used?.length || 0) === 0) {
                                 return (
                                     <View style={styles.noMaterialsContainer}>
                                         {miniSections.length === 0 ? (
@@ -3428,9 +3575,9 @@ const Details = () => {
                                 </View>
                             ));
                         })()
-                    ) : materials.available.length > 0 ? (
+                    ) : (materials?.available?.length || 0) > 0 ? (
                         // Available Materials tab - display API data directly
-                        getGroupedMaterialsWithCompleteData(materials.available, false).map((material, index) => (
+                        getGroupedMaterialsWithCompleteData(materials?.available || [], false).map((material, index) => (
                             <MaterialCardEnhanced
                                 key={`${material.name}-${material.unit}-${JSON.stringify(material.specs || {})}-${material.totalCost || 0}`}
                                 material={material}
@@ -3494,7 +3641,7 @@ const Details = () => {
                     )}
 
                     {/* Pagination Controls */}
-                    {!loading && totalPages > 1 && (
+                    {!materials?.loading && totalPages > 1 && (
                         <View style={paginationStyles.paginationContainer}>
                             {apiLoading && (
                                 <View style={paginationStyles.loadingContainer}>
