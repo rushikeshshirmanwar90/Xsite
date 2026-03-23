@@ -513,6 +513,9 @@ const CompanyProfile: React.FC = () => {
         return `₹${amount.toLocaleString('en-IN')}`;
     };
 
+    // Get license access status
+    const licenseAccess = checkLicenseAccess();
+
     const getLicenseStatus = () => {
         // Handle null, undefined, or missing license data
         if (clientData.license === null || clientData.license === undefined) {
@@ -558,6 +561,33 @@ const CompanyProfile: React.FC = () => {
             bgColor: '#F8FAFC',
             icon: 'help-circle-outline'
         };
+    };
+
+    // Check if current user should have access based on license
+    const checkLicenseAccess = () => {
+        if (isCurrentUserStaff) {
+            // Staff users' access depends on their assigned clients' licenses
+            // For now, we'll allow access but could implement more complex logic
+            return { hasAccess: true, message: '' };
+        }
+
+        // For admin/client users, check their client's license
+        if (clientData.license === -1) {
+            return { hasAccess: true, message: '' }; // Lifetime access
+        }
+
+        if (clientData.license > 0 && clientData.isLicenseActive) {
+            return { hasAccess: true, message: '' }; // Active license
+        }
+
+        if (clientData.license === 0 || !clientData.isLicenseActive) {
+            return { 
+                hasAccess: false, 
+                message: 'Your license has expired. Please contact support to renew your subscription.' 
+            };
+        }
+
+        return { hasAccess: true, message: '' }; // Default to allow access
     };
 
     const onRefresh = async () => {
@@ -696,6 +726,36 @@ const CompanyProfile: React.FC = () => {
                     />
                 }
             >
+                {/* License Expiry Warning - Show at top if license is expired or expiring soon */}
+                {!isCurrentUserStaff && !licenseAccess.hasAccess && (
+                    <View style={styles.expiredLicenseWarning}>
+                        <View style={styles.expiredLicenseHeader}>
+                            <Ionicons name="warning" size={24} color="#EF4444" />
+                            <Text style={styles.expiredLicenseTitle}>License Expired</Text>
+                        </View>
+                        <Text style={styles.expiredLicenseMessage}>
+                            {licenseAccess.message}
+                        </Text>
+                        <TouchableOpacity style={styles.contactSupportButton}>
+                            <Ionicons name="call" size={16} color="#FFFFFF" />
+                            <Text style={styles.contactSupportText}>Contact Support</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+
+                {/* License Expiring Soon Warning */}
+                {!isCurrentUserStaff && licenseAccess.hasAccess && clientData.license > 0 && clientData.license <= 7 && (
+                    <View style={styles.expiringSoonWarning}>
+                        <View style={styles.expiringSoonHeader}>
+                            <Ionicons name="time" size={20} color="#F59E0B" />
+                            <Text style={styles.expiringSoonTitle}>License Expiring Soon</Text>
+                        </View>
+                        <Text style={styles.expiringSoonMessage}>
+                            Your license expires in {clientData.license} {clientData.license === 1 ? 'day' : 'days'}. 
+                            Please renew to avoid service interruption.
+                        </Text>
+                    </View>
+                )}
                 {/* Header with Gradient */}
                 <LinearGradient
                     colors={['#3B82F6', '#2563EB']}
@@ -2275,6 +2335,74 @@ const styles = StyleSheet.create({
         color: '#EF4444',
         flex: 1,
         lineHeight: 16,
+    },
+    // License expiry warning styles
+    expiredLicenseWarning: {
+        backgroundColor: '#FEF2F2',
+        borderColor: '#FECACA',
+        borderWidth: 1,
+        borderRadius: 12,
+        padding: 16,
+        margin: 16,
+        marginTop: 8,
+    },
+    expiredLicenseHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    expiredLicenseTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#EF4444',
+        marginLeft: 8,
+    },
+    expiredLicenseMessage: {
+        fontSize: 14,
+        color: '#7F1D1D',
+        lineHeight: 20,
+        marginBottom: 12,
+    },
+    contactSupportButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#EF4444',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 8,
+        gap: 6,
+    },
+    contactSupportText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#FFFFFF',
+    },
+    // License expiring soon warning styles
+    expiringSoonWarning: {
+        backgroundColor: '#FFFBEB',
+        borderColor: '#FED7AA',
+        borderWidth: 1,
+        borderRadius: 12,
+        padding: 16,
+        margin: 16,
+        marginTop: 8,
+    },
+    expiringSoonHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    expiringSoonTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#F59E0B',
+        marginLeft: 8,
+    },
+    expiringSoonMessage: {
+        fontSize: 13,
+        color: '#92400E',
+        lineHeight: 18,
     },
 });
 
