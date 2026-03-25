@@ -47,6 +47,7 @@ interface MaterialCardEnhancedProps {
     showMiniSectionLabel?: boolean;
     currentProjectId?: string;
     userType?: string; // Add userType prop to control transfer button visibility
+    onRefresh?: () => void; // Add refresh callback
 }
 
 const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
@@ -59,6 +60,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
     showMiniSectionLabel = false,
     currentProjectId,
     userType = 'staff', // Default to 'staff' if not provided
+    onRefresh, // Add refresh callback
 }) => {
     // Format date to readable format (e.g., "15 Jan 2024")
     const formatDate = (dateString: string): string => {
@@ -103,7 +105,13 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const [availableProjects, setAvailableProjects] = useState<Project[]>([]);
     const [loadingProjects, setLoadingProjects] = useState(false);
-    const [variantSelectionMode, setVariantSelectionMode] = useState<'usage' | 'transfer'>('usage');
+    const [variantSelectionMode, setVariantSelectionMode] = useState<'usage' | 'transfer' | 'addStock'>('usage');
+    
+    // Add Stock functionality states
+    const [showAddStockModal, setShowAddStockModal] = useState(false);
+    const [selectedStockVariant, setSelectedStockVariant] = useState<MaterialVariant | null>(null);
+    const [addStockQuantity, setAddStockQuantity] = useState('');
+    const [addStockCost, setAddStockCost] = useState('');
 
     // Transfer functionality functions
     const fetchAvailableProjects = async () => {
@@ -266,6 +274,12 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
             setShowVariantSelector(false);
             fetchAvailableProjects();
             setShowProjectSelector(true);
+        } else if (variantSelectionMode === 'addStock') {
+            setSelectedStockVariant(variant);
+            setAddStockQuantity('');
+            setAddStockCost('');
+            setShowVariantSelector(false);
+            setShowAddStockModal(true);
         }
     };
 
@@ -310,6 +324,114 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
             suggested * 2,
             suggested * 5
         ];
+    };
+
+    // Add Stock functionality
+    const handleOpenAddStockModal = () => {
+        setShowOptionsMenu(false);
+        
+        if (material.variants.length === 1) {
+            setSelectedStockVariant(material.variants[0]);
+            setAddStockQuantity('');
+            setAddStockCost('');
+            setShowAddStockModal(true);
+        } else {
+            // Multiple variants, show selector first
+            setVariantSelectionMode('addStock');
+            setShowVariantSelector(true);
+        }
+    };
+
+    const handleAddStock = async () => {
+        if (!selectedStockVariant || !addStockQuantity || parseFloat(addStockQuantity) <= 0) {
+            Alert.alert('Error', 'Please enter a valid quantity');
+            return;
+        }
+
+        const quantity = parseFloat(addStockQuantity);
+        const perUnitCost = addStockCost ? parseFloat(addStockCost) : 0;
+
+        if (perUnitCost < 0) {
+            Alert.alert('Error', 'Cost cannot be negative');
+            return;
+        }
+
+        Alert.alert(
+            'Confirm Add Stock',
+            `Add ${quantity} ${material.unit} of ${material.name}${perUnitCost > 0 ? ` at ₹${perUnitCost}/${material.unit}` : ''}?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Add Stock',
+                    style: 'default',
+                    onPress: async () => {
+                        try {
+                            // Import required modules
+                            const { domain } = await import('@/lib/domain');
+                            const { getClientId } = await import('@/functions/clientId');
+                            
+                            const clientId = await getClientId();
+                            
+                            if (!clientId) {
+                                throw new Error('Client ID not found');
+                            }
+
+                            console.log('📤 Sending add stock request...');
+                            console.log('Material ID:', selectedStockVariant._id);
+                            console.log('Quantity:', quantity);
+                            console.log('Per Unit Cost:', perUnitCost);
+                            console.log('Client ID:', clientId);
+
+                            // Call API to add stock
+                            const response = await fetch(`${domain}/api/material/add-stock`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    materialId: selectedStockVariant._id,
+                                    quantity: quantity,
+                                    perUnitCost: perUnitCost > 0 ? perUnitCost : undefined,
+                                    clientId: clientId,
+                                }),
+                            });
+
+                            const result = await response.json();
+
+                            console.log('📥 API Response:', result);
+
+                            if (!response.ok) {
+                                throw new Error(result.error || `API error: ${response.status}`);
+                            }
+
+                            if (result.success) {
+                                const message = result.action === 'created'
+                                    ? `New material entry created!\n\nAdded ${quantity} ${material.unit} at ₹${perUnitCost}/${material.unit}\n\nNote: A separate entry was created because the cost is different from existing stock.`
+                                    : `Successfully added ${quantity} ${material.unit} to stock`;
+                                
+                                Alert.alert('Success', message);
+                                
+                                // Reset states
+                                setShowAddStockModal(false);
+                                setSelectedStockVariant(null);
+                                setAddStockQuantity('');
+                                setAddStockCost('');
+                                
+                                // Trigger refresh
+                                if (onRefresh) {
+                                    onRefresh();
+                                }
+                            } else {
+                                throw new Error(result.error || 'Failed to add stock');
+                            }
+                        } catch (error: any) {
+                            console.error('Error adding stock:', error);
+                            Alert.alert('Error', error.message || 'Failed to add stock');
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     // Transfer functionality - REMOVED
@@ -450,7 +572,10 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 <Text style={styles.costLabelCompact}>Per Unit:</Text>
                                 <Text style={styles.costValueCompact}>
                                     ₹{(() => {
-                                        const perUnitCost = Number(material.totalCost) || 0;
+                                        // ✅ CRITICAL FIX: Calculate per-unit cost correctly
+                                        const totalCost = Number(material.totalCost) || 0;
+                                        const totalQty = Number(material.totalQuantity) || 1;
+                                        const perUnitCost = totalQty > 0 ? totalCost / totalQty : 0;
                                         return perUnitCost.toLocaleString('en-IN', { maximumFractionDigits: 2 });
                                     })()}/{material.unit}
                                 </Text>
@@ -464,9 +589,9 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                         <Text style={styles.costLabelCompact}>Used Cost:</Text>
                                         <Text style={styles.costValueCompact}>
                                             ₹{(() => {
-                                                const perUnitCost = Number(material.totalCost) || 0;
-                                                const displayCost = perUnitCost * material.totalQuantity;
-                                                return displayCost.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+                                                // ✅ CRITICAL FIX: Used cost is just the totalCost (already calculated correctly in grouping)
+                                                const usedCost = Number(material.totalCost) || 0;
+                                                return usedCost.toLocaleString('en-IN', { maximumFractionDigits: 2 });
                                             })()}
                                         </Text>
                                     </View>
@@ -478,10 +603,13 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 <Text style={styles.costLabelCompact}>Total:</Text>
                                 <Text style={styles.costValueCompact}>
                                     ₹{(() => {
-                                        const perUnitCost = Number(material.totalCost) || 0;
+                                        // ✅ CRITICAL FIX: Calculate total cost correctly
+                                        const totalCost = Number(material.totalCost) || 0;
+                                        const totalQty = Number(material.totalQuantity) || 1;
+                                        const perUnitCost = totalQty > 0 ? totalCost / totalQty : 0;
                                         const totalImported = Number(material.totalImported) || Number(material.totalQuantity) || 0;
-                                        const totalCost = perUnitCost * totalImported;
-                                        return totalCost.toLocaleString('en-IN');
+                                        const totalImportedCost = perUnitCost * totalImported;
+                                        return totalImportedCost.toLocaleString('en-IN');
                                     })()}
                                 </Text>
                             </View>
@@ -666,6 +794,18 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                     <View style={styles.optionsMenu}>
                         <TouchableOpacity
                             style={styles.optionItem}
+                            onPress={handleOpenAddStockModal}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons name="add-circle" size={20} color="#059669" />
+                            <Text style={styles.optionText}>Add Stock</Text>
+                            <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+                        </TouchableOpacity>
+                        
+                        <View style={styles.optionDivider} />
+                        
+                        <TouchableOpacity
+                            style={styles.optionItem}
                             onPress={handleOpenTransferModal}
                             activeOpacity={0.7}
                         >
@@ -841,6 +981,144 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 (!transferQuantity || parseFloat(transferQuantity) <= 0) && styles.transferButtonTextDisabled
                             ]}>
                                 Transfer Material
+                            </Text>
+                        </TouchableOpacity>
+                    </ScrollView>
+                </View>
+            </Modal>
+
+            {/* Add Stock Modal */}
+            <Modal
+                visible={showAddStockModal}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setShowAddStockModal(false)}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalHeader}>
+                        <TouchableOpacity onPress={() => setShowAddStockModal(false)}>
+                            <Ionicons name="close" size={24} color="#374151" />
+                        </TouchableOpacity>
+                        <Text style={styles.modalTitle}>Add Stock</Text>
+                        <View style={{ width: 24 }} />
+                    </View>
+
+                    <ScrollView style={styles.modalContent}>
+                        {/* Material Info */}
+                        <View style={styles.usageMaterialInfo}>
+                            <View style={[styles.iconContainerLarge, { backgroundColor: material.color + '20' }]}>
+                                <Ionicons name={material.icon} size={32} color={material.color} />
+                            </View>
+                            <View style={styles.usageMaterialDetails}>
+                                <Text style={styles.usageMaterialName}>{material.name}</Text>
+                                {selectedStockVariant && (
+                                    <Text style={styles.usageMaterialSpecs}>
+                                        {formatSpecs(selectedStockVariant.specs)}
+                                    </Text>
+                                )}
+                                <Text style={styles.usageMaterialAvailable}>
+                                    Current Stock: {selectedStockVariant?.quantity || 0} {material.unit}
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* Quantity Input */}
+                        <View style={styles.inputSection}>
+                            <Text style={styles.inputLabel}>Quantity to Add ({material.unit}) *</Text>
+                            <TextInput
+                                style={styles.quantityInput}
+                                value={addStockQuantity}
+                                onChangeText={setAddStockQuantity}
+                                keyboardType="decimal-pad"
+                                placeholder="Enter quantity"
+                                placeholderTextColor="#9CA3AF"
+                            />
+                        </View>
+
+                        {/* Cost Input */}
+                        <View style={styles.inputSection}>
+                            <Text style={styles.inputLabel}>Per Unit Cost (₹/{material.unit}) - Optional</Text>
+                            <TextInput
+                                style={styles.quantityInput}
+                                value={addStockCost}
+                                onChangeText={setAddStockCost}
+                                keyboardType="decimal-pad"
+                                placeholder="Enter cost per unit"
+                                placeholderTextColor="#9CA3AF"
+                            />
+                            <Text style={styles.inputHint}>
+                                Leave empty if cost remains the same
+                            </Text>
+                        </View>
+
+                        {/* Quick Add Buttons */}
+                        <View style={styles.quickAddSection}>
+                            <Text style={styles.quickAddLabel}>Quick Add:</Text>
+                            <View style={styles.quickAddButtons}>
+                                {getQuickAddButtons().map((qty) => (
+                                    <TouchableOpacity
+                                        key={qty}
+                                        style={styles.quickAddButton}
+                                        onPress={() => setAddStockQuantity(qty.toString())}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Text style={styles.quickAddButtonText}>{qty}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </View>
+
+                        {/* Summary */}
+                        {addStockQuantity && parseFloat(addStockQuantity) > 0 && (
+                            <View style={styles.addStockSummary}>
+                                <View style={styles.summaryRow}>
+                                    <Text style={styles.summaryLabel}>New Total:</Text>
+                                    <Text style={styles.summaryValue}>
+                                        {(selectedStockVariant?.quantity || 0) + parseFloat(addStockQuantity)} {material.unit}
+                                    </Text>
+                                </View>
+                                {addStockCost && parseFloat(addStockCost) > 0 && (
+                                    <>
+                                        <View style={styles.summaryRow}>
+                                            <Text style={styles.summaryLabel}>Total Cost:</Text>
+                                            <Text style={styles.summaryValue}>
+                                                ₹{(parseFloat(addStockQuantity) * parseFloat(addStockCost)).toLocaleString('en-IN')}
+                                            </Text>
+                                        </View>
+                                        {/* Warning if cost is different */}
+                                        {selectedStockVariant && Math.abs(parseFloat(addStockCost) - (selectedStockVariant.cost || 0)) > 0.01 && (
+                                            <View style={styles.costWarning}>
+                                                <Ionicons name="information-circle" size={16} color="#D97706" />
+                                                <Text style={styles.costWarningText}>
+                                                    Different cost detected! A new material entry will be created to track this separately.
+                                                </Text>
+                                            </View>
+                                        )}
+                                    </>
+                                )}
+                            </View>
+                        )}
+
+                        {/* Add Stock Button */}
+                        <TouchableOpacity
+                            style={[
+                                styles.confirmButton,
+                                (!addStockQuantity || parseFloat(addStockQuantity) <= 0) && styles.confirmButtonDisabled
+                            ]}
+                            onPress={handleAddStock}
+                            activeOpacity={0.8}
+                            disabled={!addStockQuantity || parseFloat(addStockQuantity) <= 0}
+                        >
+                            <Ionicons
+                                name="add-circle"
+                                size={20}
+                                color={addStockQuantity && parseFloat(addStockQuantity) > 0 ? "#FFFFFF" : "#9CA3AF"}
+                            />
+                            <Text style={[
+                                styles.confirmButtonText,
+                                (!addStockQuantity || parseFloat(addStockQuantity) <= 0) && styles.confirmButtonTextDisabled
+                            ]}>
+                                Add to Stock
                             </Text>
                         </TouchableOpacity>
                     </ScrollView>
@@ -1429,6 +1707,59 @@ const styles = StyleSheet.create({
     },
     transferButtonTextDisabled: {
         color: '#9CA3AF',
+    },
+    // Add Stock modal styles
+    addStockSummary: {
+        backgroundColor: '#F0FDF4',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 24,
+        borderWidth: 1,
+        borderColor: '#BBF7D0',
+    },
+    summaryRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    summaryLabel: {
+        fontSize: 14,
+        color: '#166534',
+        fontWeight: '500',
+    },
+    summaryValue: {
+        fontSize: 16,
+        color: '#166534',
+        fontWeight: '700',
+    },
+    inputHint: {
+        fontSize: 12,
+        color: '#6B7280',
+        marginTop: 4,
+        fontStyle: 'italic',
+    },
+    optionDivider: {
+        height: 1,
+        backgroundColor: '#E5E7EB',
+        marginVertical: 4,
+    },
+    costWarning: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        backgroundColor: '#FFFBEB',
+        padding: 12,
+        borderRadius: 8,
+        marginTop: 12,
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+        gap: 8,
+    },
+    costWarningText: {
+        flex: 1,
+        fontSize: 12,
+        color: '#92400E',
+        lineHeight: 16,
     },
 
 });

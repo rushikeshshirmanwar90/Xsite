@@ -96,7 +96,8 @@ const Index: React.FC = () => {
                 
                 try {
                     // Fetch staff data with populated projects in one API call
-                    const response = await axios.get(`${domain}/api/users/staff?id=${user._id}&getAllProjects=true`);
+                    // Use skipCache=true to ensure fresh data with license status
+                    const response = await axios.get(`${domain}/api/users/staff?id=${user._id}&getAllProjects=true&skipCache=true`);
                     const responseData = response.data as any;
                     
                     if (responseData.success && responseData.data) {
@@ -109,11 +110,15 @@ const Index: React.FC = () => {
                                 .map((assignment: any) => {
                                     const projectData = assignment.projectData || assignment.projectId;
                                     if (projectData && projectData._id) {
-                                        // Add client information to the project data
+                                        // Add client information AND license status to the project data
                                         return {
                                             ...projectData,
                                             clientName: assignment.clientName || 'Unknown Client',
-                                            clientId: assignment.clientId
+                                            clientId: assignment.clientId,
+                                            // License status fields are already in projectData from backend
+                                            isAccessible: projectData.isAccessible,
+                                            licenseStatus: projectData.licenseStatus,
+                                            blockReason: projectData.blockReason
                                         };
                                     }
                                     return null;
@@ -121,6 +126,18 @@ const Index: React.FC = () => {
                                 .filter((project: any) => project !== null);
                             
                             console.log(`📊 Found ${populatedProjects.length} populated projects for staff user`);
+                            console.log('🔍 Sample project with license status:', populatedProjects[0]);
+                            
+                            // Debug: Log all projects with their license status
+                            populatedProjects.forEach((proj: any, idx: number) => {
+                                console.log(`Project ${idx + 1}: ${proj.name}`, {
+                                    isAccessible: proj.isAccessible,
+                                    licenseStatus: proj.licenseStatus,
+                                    blockReason: proj.blockReason,
+                                    clientName: proj.clientName
+                                });
+                            });
+                            
                             setProjects(populatedProjects);
                             return;
                         } else {
@@ -141,7 +158,8 @@ const Index: React.FC = () => {
                 // For non-staff users (admin/client), fetch all client projects
                 console.log('👔 Admin/Client user detected - fetching all client projects');
                 
-                const projectData = await getProjectData(clientId);
+                const userRole = user && 'role' in user ? 'staff' : 'admin';
+                const projectData = await getProjectData(clientId, undefined, true, userRole);
                 const projectsArray = Array.isArray(projectData) ? projectData : [];
                 setProjects(projectsArray);
             } else {

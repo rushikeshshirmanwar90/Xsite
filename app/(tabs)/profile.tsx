@@ -237,9 +237,14 @@ const CompanyProfile: React.FC = () => {
         try {
             setLoadingClient(true);
             console.log('🔍 Fetching client data for ID:', clientId);
-            console.log('🔍 API URL:', `${domain}/api/clients?id=${clientId}`);
             
-            const response = await axios.get(`${domain}/api/clients?id=${clientId}`);
+            // Add skipCache parameter to force fresh data from database
+            const response = await axios.get(`${domain}/api/clients?id=${clientId}&skipCache=true`, {
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            });
 
             console.log('🔍 Client API response status:', response.status);
             console.log('🔍 Client API response data:', JSON.stringify(response.data, null, 2));
@@ -254,6 +259,25 @@ const CompanyProfile: React.FC = () => {
                 console.log('✅ Client isLicenseActive:', client.isLicenseActive);
                 console.log('✅ Client licenseExpiryDate:', client.licenseExpiryDate);
                 
+                // ✅ CRITICAL FIX: Handle license field properly
+                // The license field might be missing from cached data, so we need to handle it carefully
+                let licenseValue = null;
+                
+                if (client.license !== undefined && client.license !== null) {
+                    // License field exists - use it
+                    licenseValue = client.license;
+                    console.log('✅ License field found in response:', licenseValue);
+                } else if (client.isLicenseActive === true && !client.license) {
+                    // Edge case: isLicenseActive is true but license is missing (old cached data)
+                    console.warn('⚠️ License field missing but isLicenseActive is true - possible cache issue');
+                    console.warn('⚠️ Setting license to null to trigger "No License Data" message');
+                    licenseValue = null;
+                } else {
+                    // No license data at all
+                    console.warn('⚠️ No license field in response');
+                    licenseValue = null;
+                }
+                
                 // ✅ ENHANCED: Better field mapping with fallbacks
                 const clientDataToSet = {
                     _id: client._id,
@@ -266,12 +290,13 @@ const CompanyProfile: React.FC = () => {
                     country: client.country,
                     companyName: client.name || client.companyName, // Use name as primary, companyName as fallback
                     gstNumber: client.gstNumber,
-                    license: client.license !== undefined ? client.license : null, // Preserve 0 values
+                    license: licenseValue, // Use the properly handled license value
                     licenseExpiryDate: client.licenseExpiryDate,
                     isLicenseActive: client.isLicenseActive !== undefined ? client.isLicenseActive : false,
                 };
                 
                 console.log('✅ Setting client data:', clientDataToSet);
+                console.log('✅ Final license value being set:', clientDataToSet.license);
                 setClientData(clientDataToSet);
                 console.log('✅ Client data set successfully');
             } else {
@@ -513,6 +538,46 @@ const CompanyProfile: React.FC = () => {
         return `₹${amount.toLocaleString('en-IN')}`;
     };
 
+    // Check if current user should have access based on license
+    const checkLicenseAccess = () => {
+        if (isCurrentUserStaff) {
+            // Staff users' access depends on their assigned clients' licenses
+            // For now, we'll allow access but could implement more complex logic
+            return { hasAccess: true, message: '' };
+        }
+
+        // For admin/client users, check their client's license
+        // License value meanings:
+        // -1 = Lifetime access (always active)
+        // 0 = Expired (no access)
+        // >0 = Active with N days remaining
+        
+        if (clientData.license === -1) {
+            return { hasAccess: true, message: '' }; // Lifetime access
+        }
+
+        if (clientData.license === 0) {
+            return { 
+                hasAccess: false, 
+                message: 'Your license has expired. Please contact support to renew your subscription.' 
+            };
+        }
+
+        if (clientData.license > 0) {
+            return { hasAccess: true, message: '' }; // Active license with days remaining
+        }
+
+        // Fallback for undefined/null license data
+        if (clientData.license === null || clientData.license === undefined) {
+            return { 
+                hasAccess: false, 
+                message: 'License information not available. Please contact support.' 
+            };
+        }
+
+        return { hasAccess: true, message: '' }; // Default fallback
+    };
+
     // Get license access status
     const licenseAccess = checkLicenseAccess();
 
@@ -527,15 +592,17 @@ const CompanyProfile: React.FC = () => {
             };
         }
 
+        // Lifetime access (-1) - Enhanced styling
         if (clientData.license === -1) {
             return {
-                status: 'Lifetime Access',
+                status: '♾️ Lifetime',
                 color: '#10B981',
                 bgColor: '#ECFDF5',
                 icon: 'infinite-outline'
             };
         }
 
+        // Expired (0)
         if (clientData.license === 0) {
             return {
                 status: 'License Expired',
@@ -545,16 +612,20 @@ const CompanyProfile: React.FC = () => {
             };
         }
 
+        // Active with days remaining (>0)
         if (clientData.license > 0) {
             const daysText = clientData.license === 1 ? 'day' : 'days';
+            const isExpiringSoon = clientData.license <= 7;
+            
             return {
                 status: `${clientData.license} ${daysText} left`,
-                color: clientData.license <= 7 ? '#F59E0B' : '#3B82F6',
-                bgColor: clientData.license <= 7 ? '#FEF3C7' : '#EFF6FF',
-                icon: clientData.license <= 7 ? 'warning-outline' : 'time-outline'
+                color: isExpiringSoon ? '#F59E0B' : '#3B82F6',
+                bgColor: isExpiringSoon ? '#FEF3C7' : '#EFF6FF',
+                icon: isExpiringSoon ? 'warning-outline' : 'time-outline'
             };
         }
 
+        // Fallback for unexpected values
         return {
             status: 'Unknown Status',
             color: '#94A3B8',
@@ -564,32 +635,6 @@ const CompanyProfile: React.FC = () => {
     };
 
     // Check if current user should have access based on license
-    const checkLicenseAccess = () => {
-        if (isCurrentUserStaff) {
-            // Staff users' access depends on their assigned clients' licenses
-            // For now, we'll allow access but could implement more complex logic
-            return { hasAccess: true, message: '' };
-        }
-
-        // For admin/client users, check their client's license
-        if (clientData.license === -1) {
-            return { hasAccess: true, message: '' }; // Lifetime access
-        }
-
-        if (clientData.license > 0 && clientData.isLicenseActive) {
-            return { hasAccess: true, message: '' }; // Active license
-        }
-
-        if (clientData.license === 0 || !clientData.isLicenseActive) {
-            return { 
-                hasAccess: false, 
-                message: 'Your license has expired. Please contact support to renew your subscription.' 
-            };
-        }
-
-        return { hasAccess: true, message: '' }; // Default to allow access
-    };
-
     const onRefresh = async () => {
         console.log('🔄 Manual refresh triggered...');
         setRefreshing(true);
@@ -891,9 +936,11 @@ const CompanyProfile: React.FC = () => {
                                             <View style={styles.licenseDetailRow}>
                                                 <Text style={styles.licenseDetailLabel}>Status:</Text>
                                                 <Text style={[styles.licenseDetailValue, { 
-                                                    color: clientData.isLicenseActive ? '#10B981' : '#EF4444' 
+                                                    color: clientData.license === -1 ? '#10B981' : 
+                                                           clientData.license > 0 ? '#10B981' : '#EF4444'
                                                 }]}>
-                                                    {clientData.isLicenseActive ? 'Active' : 'Inactive'}
+                                                    {clientData.license === -1 ? 'Active (Lifetime)' : 
+                                                     clientData.license > 0 ? 'Active' : 'Inactive'}
                                                 </Text>
                                             </View>
                                         </View>
@@ -919,11 +966,16 @@ const CompanyProfile: React.FC = () => {
                                     )}
 
                                     {clientData.license === -1 && (
-                                        <View style={[styles.licenseWarning, { backgroundColor: '#ECFDF5', borderColor: '#BBF7D0' }]}>
-                                            <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                                            <Text style={[styles.licenseWarningText, { color: '#10B981' }]}>
-                                                You have lifetime access to all features.
-                                            </Text>
+                                        <View style={[styles.licenseWarning, { backgroundColor: '#ECFDF5', borderColor: '#10B981', borderWidth: 2 }]}>
+                                            <Ionicons name="shield-checkmark" size={20} color="#10B981" />
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={[styles.licenseWarningText, { color: '#10B981', fontWeight: '700', fontSize: 14 }]}>
+                                                    🎉 Lifetime Access Activated!
+                                                </Text>
+                                                <Text style={[styles.licenseWarningText, { color: '#059669', fontSize: 12, marginTop: 4 }]}>
+                                                    You have unlimited access to all features forever. No expiration date!
+                                                </Text>
+                                            </View>
                                         </View>
                                     )}
                                 </>

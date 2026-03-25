@@ -206,15 +206,17 @@ const AnalyticsDashboard: React.FC = () => {
       // Check if user is staff and pass staffId for filtering
       const isStaff = user && 'role' in user;
       const staffId = isStaff ? user._id : undefined;
+      const userRole = isStaff ? 'staff' : 'admin';
       
       console.log('🔍 Dashboard fetching projects:', {
         clientId,
         isStaff,
         staffId,
+        userRole,
         willFilter: !!staffId
       });
 
-      const projectData = await getProjectData(clientId, staffId); // Get all projects with staff filtering
+      const projectData = await getProjectData(clientId, staffId, true, userRole); // Get all projects with staff filtering and license status
       
       // Handle the response structure from getProjectData
       const projectsArray: Project[] = Array.isArray(projectData) ? projectData : [];

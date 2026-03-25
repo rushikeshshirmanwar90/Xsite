@@ -1,4 +1,3 @@
-// @ts-nocheck
 import Header from '@/components/details/Header';
 import MaterialCardEnhanced from '@/components/details/MaterialCardEnhanced';
 import MaterialFormModal from '@/components/details/MaterialFormModel';
@@ -30,16 +29,12 @@ const Details = () => {
     const router = useRouter();
     const { user } = useAuth();
     const { sendProjectNotification } = useSimpleNotifications();
-    
     const projectId = params.projectId as string;
     const projectName = params.projectName as string;
     const sectionId = params.sectionId as string;
     const sectionName = params.sectionName as string;
-    // Debug logging variables
     let consoleLogCount = 0;
     const MAX_CONSOLE_LOGS = 50;
-    
-    // ✅ OPTIMIZED: Removed material params - will fetch directly from API
     const [activeTab, setActiveTab] = useState<'imported' | 'used'>('imported');
     const [selectedPeriod, setSelectedPeriod] = useState('All');
     const [showMaterialForm, setShowMaterialForm] = useState(false);
@@ -51,8 +46,28 @@ const Details = () => {
     const [showStartPicker, setShowStartPicker] = useState(false);
     const [showEndPicker, setShowEndPicker] = useState(false);
 
-    // ✅ OPTIMIZED: Simple state management for materials
-    const [materials, setMaterials] = useState({
+    const [materials, setMaterials] = useState<{
+        available: Material[];
+        used: Material[];
+        loading: boolean;
+        error: string | null;
+        pagination: {
+            available: {
+                currentPage: number;
+                totalPages: number;
+                totalItems: number;
+                hasNextPage: boolean;
+                hasPrevPage: boolean;
+            };
+            used: {
+                currentPage: number;
+                totalPages: number;
+                totalItems: number;
+                hasNextPage: boolean;
+                hasPrevPage: boolean;
+            };
+        };
+    }>({
         available: [],
         used: [],
         loading: false,
@@ -76,7 +91,6 @@ const Details = () => {
     });
 
     const [miniSections, setMiniSections] = useState<Section[]>([]);
-    const [loading, setLoading] = useState(false);
     const [showAddSectionModal, setShowAddSectionModal] = useState(false);
     const [newSectionName, setNewSectionName] = useState('');
     const [newSectionDesc, setNewSectionDesc] = useState('');
@@ -86,12 +100,13 @@ const Details = () => {
     const [miniSectionCompletions, setMiniSectionCompletions] = useState<{[key: string]: boolean}>({});
     const [isUpdatingCompletion, setIsUpdatingCompletion] = useState(false);
     const [currentUserType, setCurrentUserType] = useState<string>('staff'); // Track current user type
-    
+
     // Low stock alert system
     const [lowStockThreshold, setLowStockThreshold] = useState(10); // Default 10% threshold
     const [ignoredMaterials, setIgnoredMaterials] = useState<string[]>([]);
     const [lowStockMaterials, setLowStockMaterials] = useState<any[]>([]);
     const [showLowStockAlert, setShowLowStockAlert] = useState(false);
+    const [alertDismissedAt, setAlertDismissedAt] = useState<number | null>(null);
 
     // Log section completion status changes and button states
     useEffect(() => {
@@ -207,8 +222,7 @@ const Details = () => {
         };
     };
 
-    // ✅ OPTIMIZED: Enhanced material fetching with proper API structure matching (LIMIT: 7 items per page)
-    const fetchMaterials = async (page: number = 1, limit: number = 7, forceRefresh: boolean = false) => {
+    const fetchMaterials = async (page: number = 1, limit: number = 20, forceRefresh: boolean = false) => {
         if (!projectId) {
             console.log('❌ No projectId available');
             return;
@@ -221,7 +235,7 @@ const Details = () => {
             }
 
             console.log(`\n========================================`);
-            console.log(`🔄 FETCHING MATERIALS - Page ${page}, Limit ${limit}`);
+            console.log(`🔄 FETCHING MATERIALS - Page ${page}, Limit ${limit}, Force: ${forceRefresh}`);
             console.log(`========================================`);
             console.log(`Tab: ${activeTab}`);
             console.log(`Section Filter: ${selectedMiniSection || 'all'}`);
@@ -231,14 +245,26 @@ const Details = () => {
             setMaterials(prev => ({ ...prev, loading: true, error: null }));
 
             // Build API parameters based on active tab and filters
+            // ✅ SORT BY NEWEST FIRST: Sort by createdAt/addedAt in descending order
             const baseParams = {
                 projectId,
                 clientId,
                 page,
                 limit,
-                sortBy: 'createdAt',
-                sortOrder: 'desc'
+                sortBy: 'createdAt', // Primary sort: creation date
+                sortOrder: 'desc',   // Descending = newest first (most recent at top)
+                // ✅ CACHE BUSTING: Add timestamp when force refresh is requested
+                ...(forceRefresh ? { _t: Date.now() } : {})
             };
+
+            console.log(`\n========================================`);
+            console.log(`🔄 FETCHING MATERIALS WITH SORTING`);
+            console.log(`========================================`);
+            console.log(`📊 Sort Configuration:`);
+            console.log(`   Sort By: createdAt (newest first)`);
+            console.log(`   Sort Order: desc (descending)`);
+            console.log(`   Expected: Most recently added materials at top`);
+            console.log(`========================================\n`);
 
             // Add section filter only for used materials tab
             const availableParams = { ...baseParams };
@@ -253,6 +279,9 @@ const Details = () => {
             console.log(`📤 API Request Parameters:`);
             console.log(`   Available Materials:`, availableParams);
             console.log(`   Used Materials:`, usedParams);
+            if (forceRefresh) {
+                console.log(`   🔄 Cache busting enabled with timestamp: ${baseParams._t}`);
+            }
 
             // Fetch both available and used materials in parallel
             const [availableResponse, usedResponse] = await Promise.all([
@@ -282,17 +311,50 @@ const Details = () => {
             console.log(`\n📊 Materials Count:`);
             console.log(`   Available: ${availableMaterialsArray.length} items`);
             console.log(`   Used: ${usedMaterialsArray.length} items`);
+            
+            // ✅ LOG FIRST FEW MATERIALS TO VERIFY SORT ORDER
+            if (availableMaterialsArray.length > 0) {
+                console.log(`\n📋 First 3 Available Materials (should be newest first):`);
+                availableMaterialsArray.slice(0, 3).forEach((m: any, idx: number) => {
+                    console.log(`   ${idx + 1}. ${m.name} - Created: ${m.createdAt || m.addedAt || 'N/A'}`);
+                });
+            }
 
             // Transform materials to match existing interface
+            // ✅ IMPORTANT: Transformation preserves API order (newest first from backend)
             const transformedAvailable = availableMaterialsArray.map((material: any, index: number) => {
                 const { icon, color } = getMaterialIconAndColor(material.name);
+                
+                // ✅ CRITICAL FIX: Properly extract per-unit cost from API response
+                let perUnitCost = 0;
+                const quantity = material.qnt || 0;
+                const totalCost = material.totalCost || 0;
+                
+                // Priority 1: Use perUnitCost if available
+                if (material.perUnitCost !== undefined && material.perUnitCost !== null && !isNaN(Number(material.perUnitCost))) {
+                    perUnitCost = Number(material.perUnitCost);
+                    console.log(`✅ Using API perUnitCost for ${material.name}: ₹${perUnitCost}`);
+                } 
+                // Priority 2: Calculate from totalCost / quantity
+                else if (totalCost > 0 && quantity > 0) {
+                    perUnitCost = totalCost / quantity;
+                    console.log(`⚠️ Calculated perUnitCost for ${material.name}: ₹${totalCost} / ${quantity} = ₹${perUnitCost}`);
+                }
+                // Priority 3: Use cost field if available (legacy support)
+                else if (material.cost !== undefined && material.cost !== null && !isNaN(Number(material.cost))) {
+                    perUnitCost = Number(material.cost);
+                    console.log(`⚠️ Using legacy cost field for ${material.name}: ₹${perUnitCost}`);
+                }
+                
                 return {
                     id: (page - 1) * limit + index + 1,
                     _id: material._id,
                     name: material.name,
-                    quantity: material.qnt || 0,
+                    quantity: quantity,
                     unit: material.unit,
-                    price: material.totalCost || material.perUnitCost || 0,
+                    price: perUnitCost, // ✅ CRITICAL: This is per-unit cost, NOT total cost
+                    perUnitCost: perUnitCost, // ✅ Store per-unit cost explicitly
+                    totalCost: totalCost, // ✅ Store total cost for reference
                     date: material.createdAt || material.addedAt || new Date().toISOString(),
                     icon,
                     color,
@@ -305,13 +367,37 @@ const Details = () => {
 
             const transformedUsed = usedMaterialsArray.map((material: any, index: number) => {
                 const { icon, color } = getMaterialIconAndColor(material.name);
+                
+                // ✅ CRITICAL FIX: Properly extract per-unit cost from API response
+                let perUnitCost = 0;
+                const quantity = material.qnt || 0;
+                const totalCost = material.totalCost || 0;
+                
+                // Priority 1: Use perUnitCost if available
+                if (material.perUnitCost !== undefined && material.perUnitCost !== null && !isNaN(Number(material.perUnitCost))) {
+                    perUnitCost = Number(material.perUnitCost);
+                    console.log(`✅ Using API perUnitCost for ${material.name}: ₹${perUnitCost}`);
+                } 
+                // Priority 2: Calculate from totalCost / quantity
+                else if (totalCost > 0 && quantity > 0) {
+                    perUnitCost = totalCost / quantity;
+                    console.log(`⚠️ Calculated perUnitCost for ${material.name}: ₹${totalCost} / ${quantity} = ₹${perUnitCost}`);
+                }
+                // Priority 3: Use cost field if available (legacy support)
+                else if (material.cost !== undefined && material.cost !== null && !isNaN(Number(material.cost))) {
+                    perUnitCost = Number(material.cost);
+                    console.log(`⚠️ Using legacy cost field for ${material.name}: ₹${perUnitCost}`);
+                }
+                
                 return {
                     id: (page - 1) * limit + index + 1000,
                     _id: material._id,
                     name: material.name,
-                    quantity: material.qnt || 0,
+                    quantity: quantity,
                     unit: material.unit,
-                    price: material.totalCost || material.perUnitCost || 0,
+                    price: perUnitCost, // ✅ CRITICAL: This is per-unit cost, NOT total cost
+                    perUnitCost: perUnitCost, // ✅ Store per-unit cost explicitly
+                    totalCost: totalCost, // ✅ Store total cost for reference
                     date: material.createdAt || material.addedAt || new Date().toISOString(),
                     icon,
                     color,
@@ -329,7 +415,7 @@ const Details = () => {
                 console.log(`SMART PAGINATION EXTRACTION`);
                 console.log(`========================================`);
                 console.log(`Page: ${defaultPage}, Limit: ${limit}, Materials: ${materialsArray.length}`);
-                
+
                 let currentPage = defaultPage;
                 let totalPages = 1;
                 let totalItems = 0;
@@ -425,6 +511,15 @@ const Details = () => {
             console.log(`\n🎯 Setting Materials State:`);
             console.log(`   Available: ${transformedAvailable.length} materials, Page ${availablePagination.currentPage}/${availablePagination.totalPages}`);
             console.log(`   Used: ${transformedUsed.length} materials, Page ${usedPagination.currentPage}/${usedPagination.totalPages}`);
+            
+            // ✅ VERIFY SORT ORDER: Log first material to confirm newest is at top
+            if (transformedAvailable.length > 0) {
+                const firstMaterial = transformedAvailable[0];
+                console.log(`\n✅ SORT ORDER VERIFICATION:`);
+                console.log(`   First material (should be newest): ${firstMaterial.name}`);
+                console.log(`   Created at: ${firstMaterial.createdAt || firstMaterial.addedAt || 'N/A'}`);
+                console.log(`   This should be the most recently added material`);
+            }
 
             setMaterials(prev => ({
                 ...prev,
@@ -458,13 +553,11 @@ const Details = () => {
         }
     };
 
-
-    // ✅ OPTIMIZED: Simple reload function (LIMIT: 7 items per page)
-    const reloadMaterials = async (page: number = 1) => {
-        await fetchMaterials(page, 7, true);
+    const reloadMaterials = async (page: number = 1, forceRefresh: boolean = true) => {
+        // Always force refresh by default to avoid cache issues
+        await fetchMaterials(page, 20, forceRefresh);
     };
 
-    // Function to ignore a material from alerts
     const ignoreMaterial = async (materialKey: string, materialName: string) => {
         try {
             const updatedIgnored = [...ignoredMaterials, materialKey];
@@ -501,32 +594,55 @@ const Details = () => {
         }
     };
 
-    // Function to reset ignored materials (for testing/admin)
-    const resetIgnoredMaterials = async () => {
+    // ✅ NEW: Function to load alert dismissal timestamp
+    const loadAlertDismissalTime = async () => {
         try {
-            setIgnoredMaterials([]);
-            await AsyncStorage.removeItem(`ignored_materials_${projectId}`);
-            toast.success('Ignored materials list cleared');
-            console.log('✅ Ignored materials reset');
-            
-            // Recheck low stock after reset
-            setTimeout(() => {
-                checkLowStockMaterials();
-            }, 500);
+            const stored = await AsyncStorage.getItem(`low_stock_alert_dismissed_${projectId}`);
+            if (stored) {
+                const dismissedAt = parseInt(stored, 10);
+                setAlertDismissedAt(dismissedAt);
+                console.log('✅ Loaded alert dismissal time:', new Date(dismissedAt).toLocaleString());
+            }
         } catch (error) {
-            console.error('❌ Error resetting ignored materials:', error);
-            toast.error('Failed to reset ignored materials');
+            console.error('❌ Error loading alert dismissal time:', error);
         }
     };
 
-    // Function to get alert message based on stock level
-    const getStockAlertMessage = (stockPercentage: number, materialName: string) => {
-        if (stockPercentage <= 3) {
-            return `🚨 Critical: ${materialName} is almost out of stock (${stockPercentage.toFixed(1)}% remaining)`;
-        } else if (stockPercentage <= 7) {
-            return `⚠️ Warning: ${materialName} is running low (${stockPercentage.toFixed(1)}% remaining)`;
-        } else {
-            return `📉 Low Stock: ${materialName} needs restocking soon (${stockPercentage.toFixed(1)}% remaining)`;
+    // ✅ NEW: Function to check if alert should be shown (15 hours have passed)
+    const shouldShowAlert = () => {
+        if (!alertDismissedAt) {
+            // Never dismissed before, can show
+            return true;
+        }
+
+        const now = Date.now();
+        const fifteenHoursInMs = 15 * 60 * 60 * 1000; // 15 hours in milliseconds
+        const timeSinceDismissal = now - alertDismissedAt;
+
+        const shouldShow = timeSinceDismissal >= fifteenHoursInMs;
+        
+        if (!shouldShow) {
+            const remainingTime = fifteenHoursInMs - timeSinceDismissal;
+            const remainingHours = Math.floor(remainingTime / (60 * 60 * 1000));
+            const remainingMinutes = Math.floor((remainingTime % (60 * 60 * 1000)) / (60 * 1000));
+            console.log(`⏰ Alert suppressed. Time remaining: ${remainingHours}h ${remainingMinutes}m`);
+        }
+
+        return shouldShow;
+    };
+
+    // ✅ UPDATED: Function to dismiss popup only (icon remains visible)
+    const dismissAlertFor15Hours = async () => {
+        try {
+            const now = Date.now();
+            await AsyncStorage.setItem(`low_stock_alert_dismissed_${projectId}`, now.toString());
+            setAlertDismissedAt(now);
+            setShowLowStockAlert(false);
+            
+            const nextAlertTime = new Date(now + (15 * 60 * 60 * 1000));
+            console.log('✅ Alert popup dismissed until:', nextAlertTime.toLocaleString());
+        } catch (error) {
+            console.error('❌ Error dismissing alert:', error);
         }
     };
 
@@ -1257,24 +1373,12 @@ const Details = () => {
         }
     };
 
-    // Enhanced Function to log material activity with multi-user notifications
     const logMaterialActivity = async (
         materials: any[],
         activity: 'imported' | 'used' | 'transferred',
         message: string = ''
     ) => {
         try {
-            console.log('\n========================================');
-            console.log('🔔 ENHANCED MATERIAL ACTIVITY LOGGING');
-            console.log('========================================');
-            console.log('📋 Input Parameters:');
-            console.log('   - Activity Type:', activity);
-            console.log('   - Materials Count:', materials.length);
-            console.log('   - Message:', message);
-            console.log('   - Project ID:', projectId);
-            console.log('   - Project Name:', projectName);
-            console.log('   - Section Name:', sectionName);
-
             const user = await getUserData();
             const clientId = await getClientIdFromStorage();
 
@@ -1562,7 +1666,9 @@ const Details = () => {
 
     // Function to check for low stock materials
     const checkLowStockMaterials = () => {
-        console.log('\n🔍 CHECKING LOW STOCK MATERIALS...');
+        console.log('\n========================================');
+        console.log('🔍 CHECKING LOW STOCK MATERIALS');
+        console.log('========================================');
         console.log('Available materials:', materials?.available?.length || 0);
         console.log('Used materials:', materials?.used?.length || 0);
         console.log('Ignored materials:', ignoredMaterials);
@@ -1570,8 +1676,16 @@ const Details = () => {
 
         const lowStockItems: any[] = [];
 
+        // ✅ SAFETY CHECK: Ensure we have materials to check
+        if (!materials || !materials.available || materials.available.length === 0) {
+            console.log('⚠️ No materials available to check for low stock');
+            return lowStockItems;
+        }
+
         // Group materials to get complete picture
-        const groupedMaterials = materials?.available ? groupMaterialsByName(materials.available, false) : [];
+        const groupedMaterials = groupMaterialsByName(materials.available, false);
+
+        console.log(`\n📦 Checking ${groupedMaterials.length} grouped materials for low stock...`);
 
         groupedMaterials.forEach((group: any) => {
             const materialKey = `${group.name}-${group.unit}`;
@@ -1582,50 +1696,77 @@ const Details = () => {
                 return;
             }
 
-            // Calculate total imported and current available
-            const totalImported = group.totalImported || group.totalQuantity;
-            const currentAvailable = group.currentlyAvailable || group.totalQuantity;
+            // ✅ CRITICAL: Use the correct values from grouped materials
+            // totalImported = total quantity originally imported (available + used)
+            // currentlyAvailable = quantity still available (not used yet)
+            const totalImported = group.totalImported || 0;
+            const currentAvailable = group.currentlyAvailable || group.totalQuantity || 0;
             
             if (totalImported > 0) {
                 const stockPercentage = (currentAvailable / totalImported) * 100;
                 
-                console.log(`📊 ${group.name}:`, {
-                    totalImported,
-                    currentAvailable,
-                    stockPercentage: stockPercentage.toFixed(1) + '%',
-                    threshold: lowStockThreshold + '%',
-                    isLowStock: stockPercentage <= lowStockThreshold
-                });
+                console.log(`\n📊 ${group.name}:`);
+                console.log(`   Total Imported: ${totalImported} ${group.unit}`);
+                console.log(`   Currently Available: ${currentAvailable} ${group.unit}`);
+                console.log(`   Stock Percentage: ${stockPercentage.toFixed(1)}%`);
+                console.log(`   Threshold: ${lowStockThreshold}%`);
+                console.log(`   Is Low Stock: ${stockPercentage <= lowStockThreshold ? 'YES ⚠️' : 'NO ✅'}`);
 
+                // ✅ Check if stock is at or below threshold
                 if (stockPercentage <= lowStockThreshold) {
+                    const alertLevel = stockPercentage <= 3 ? 'critical' : stockPercentage <= 7 ? 'warning' : 'low';
+                    
                     lowStockItems.push({
                         ...group,
                         materialKey,
                         totalImported,
                         currentAvailable,
                         stockPercentage,
-                        alertLevel: stockPercentage <= 3 ? 'critical' : stockPercentage <= 7 ? 'warning' : 'low'
+                        alertLevel
                     });
+                    
+                    console.log(`   🚨 ALERT LEVEL: ${alertLevel.toUpperCase()}`);
                 }
+            } else {
+                console.log(`\n⚠️ ${group.name}: No import data (totalImported = 0)`);
             }
         });
 
-        console.log(`🚨 Found ${lowStockItems.length} low stock materials`);
+        console.log(`\n========================================`);
+        console.log(`🚨 FOUND ${lowStockItems.length} LOW STOCK MATERIALS`);
+        console.log(`========================================`);
+        
+        if (lowStockItems.length > 0) {
+            console.log('\n📋 Low Stock Materials:');
+            lowStockItems.forEach((item, index) => {
+                console.log(`   ${index + 1}. ${item.name}`);
+                console.log(`      - Available: ${item.currentAvailable} / ${item.totalImported} ${item.unit}`);
+                console.log(`      - Stock: ${item.stockPercentage.toFixed(1)}%`);
+                console.log(`      - Alert Level: ${item.alertLevel}`);
+            });
+        }
+        console.log(`========================================\n`);
+
         setLowStockMaterials(lowStockItems);
         
-        // Show alert if there are new low stock items
-        if (lowStockItems.length > 0 && !showLowStockAlert) {
+        // ✅ Show alert automatically if there are new low stock items
+        // Only show if alert is not already visible AND 15 hours have passed since last dismissal
+        if (lowStockItems.length > 0 && !showLowStockAlert && shouldShowAlert()) {
+            console.log('🔔 Showing low stock alert modal...');
             setShowLowStockAlert(true);
+        } else if (lowStockItems.length > 0 && !shouldShowAlert()) {
+            console.log('⏰ Low stock detected but alert is suppressed (15-hour cooldown active)');
         }
 
         return lowStockItems;
     };
 
-    // Load project materials on mount (LIMIT: 7 items per page)
+    // Load project materials on mount (LIMIT: 20 items per page to account for grouping)
     useEffect(() => {
-        fetchMaterials(1, 7, true); // ✅ OPTIMIZED: Use new simple fetch function with limit 7
+        fetchMaterials(1, 20, true); // ✅ OPTIMIZED: Increased limit to 20 to account for material grouping
         loadInitialCompletionStatus(); // Load completion status on mount
         loadIgnoredMaterials(); // Load ignored materials from storage
+        loadAlertDismissalTime(); // ✅ NEW: Load alert dismissal timestamp
 
         // Load current user type
         const loadUserType = async () => {
@@ -1641,6 +1782,15 @@ const Details = () => {
         };
         loadUserType();
     }, [projectId]);
+
+    // ✅ NEW: Check for low stock materials whenever materials change
+    useEffect(() => {
+        // Only check when we have both available and used materials loaded
+        if (!materials.loading && materials.available.length > 0) {
+            console.log('🔍 Checking for low stock materials...');
+            checkLowStockMaterials();
+        }
+    }, [materials.available, materials.used, materials.loading, ignoredMaterials]);
 
     // Load initial completion status for section and mini-sections
     const loadInitialCompletionStatus = async () => {
@@ -1667,9 +1817,6 @@ const Details = () => {
         }
     };
 
-    // ✅ OPTIMIZED: Simplified grouping function (removed duplicate - keeping the enhanced version below)
-
-    // Debug: Log when materials state changes (limited logging)
     useEffect(() => {
         if (__DEV__ && consoleLogCount < MAX_CONSOLE_LOGS) {
             console.log('🔄 usedMaterials:', materials?.used?.length || 0);
@@ -1782,9 +1929,11 @@ const Details = () => {
             }
 
             materialsArray.forEach((material, index) => {
-                // ✅ FIXED: Create grouping key WITHOUT price to properly match materials
+                // ✅ FIXED: Create grouping key WITH price to create separate cards for different costs
                 const specsKey = material.specs ? JSON.stringify(material.specs) : 'no-specs';
-                const key = `${material.name}-${material.unit}-${specsKey}`;
+                const perUnitCost = material.perUnitCost || material.price || 0;
+                const priceKey = perUnitCost.toFixed(2); // Round to 2 decimals for consistent grouping
+                const key = `${material.name}-${material.unit}-${specsKey}-${priceKey}`;
 
                 if (!grouped[key]) {
                     grouped[key] = {
@@ -1792,7 +1941,9 @@ const Details = () => {
                         unit: material.unit,
                         icon: material.icon,
                         color: material.color,
-                        date: material.date,
+                        date: material.date, // Will be updated to most recent date
+                        createdAt: material.createdAt, // ✅ NEW: Track creation date
+                        addedAt: material.addedAt, // ✅ NEW: Track added date
                         specs: material.specs || {},
                         variants: [],
                         totalQuantity: 0,
@@ -1802,6 +1953,15 @@ const Details = () => {
                         currentlyAvailable: 0,
                         miniSectionId: material.miniSectionId,
                     };
+                } else {
+                    // ✅ CRITICAL FIX: Update to most recent date when grouping
+                    const currentDate = new Date(grouped[key].date || 0);
+                    const newDate = new Date(material.date || 0);
+                    if (newDate > currentDate) {
+                        grouped[key].date = material.date;
+                        grouped[key].createdAt = material.createdAt;
+                        grouped[key].addedAt = material.addedAt;
+                    }
                 }
 
                 const variantId = (material as any)._id || material.id.toString();
@@ -1820,6 +1980,8 @@ const Details = () => {
                         materialName: material.name,
                         materialQuantity: material.quantity,
                         materialPrice: material.price,
+                        materialPerUnitCost: material.perUnitCost,
+                        materialTotalCost: (material as any).totalCost,
                         materialPriceType: typeof material.price,
                         groupKey: key,
                         beforeQuantity: grouped[key].totalQuantity,
@@ -1828,12 +1990,19 @@ const Details = () => {
                 }
 
                 grouped[key].totalQuantity += material.quantity;
-                grouped[key].totalCost += material.price;
+                // ✅ CRITICAL FIX: Calculate total cost correctly
+                // Use perUnitCost (which is stored in material.price) multiplied by quantity
+                const materialPerUnitCost = material.perUnitCost || material.price || 0;
+                const materialTotalCost = materialPerUnitCost * material.quantity;
+                grouped[key].totalCost += materialTotalCost;
 
                 // Debug logging after addition
                 if (__DEV__) {
                     console.log('🔍 AFTER ADDITION:', {
                         materialName: material.name,
+                        materialQuantity: material.quantity,
+                        materialPerUnitCost: materialPerUnitCost,
+                        materialTotalCost: materialTotalCost,
                         afterQuantity: grouped[key].totalQuantity,
                         afterCost: grouped[key].totalCost,
                         expectedPerUnit: grouped[key].totalQuantity > 0 ? (grouped[key].totalCost / grouped[key].totalQuantity) : 0
@@ -1855,15 +2024,16 @@ const Details = () => {
                 
                 console.log(`   Available materials count: ${availableMaterials.length}`);
                 console.log(`   Used materials count: ${usedMaterials.length}`);
-                
-                // Calculate available quantity (current stock) for this material
+
                 const availableQuantity = availableMaterials
                     .filter(m => {
                         const mSpecsKey = m.specs ? JSON.stringify(m.specs) : 'no-specs';
-                        const mKey = `${m.name}-${m.unit}-${mSpecsKey}`;
+                        const mPerUnitCost = m.perUnitCost || m.price || 0;
+                        const mPriceKey = mPerUnitCost.toFixed(2);
+                        const mKey = `${m.name}-${m.unit}-${mSpecsKey}-${mPriceKey}`;
                         const matches = mKey === key;
                         if (matches) {
-                            console.log(`     ✅ Available match: ${m.name} (${m.quantity} ${m.unit})`);
+                            console.log(`     ✅ Available match: ${m.name} (${m.quantity} ${m.unit}) @ ₹${mPriceKey}`);
                         }
                         return matches;
                     })
@@ -1876,10 +2046,12 @@ const Details = () => {
                 const usedQuantity = usedMaterials
                     .filter(m => {
                         const mSpecsKey = m.specs ? JSON.stringify(m.specs) : 'no-specs';
-                        const mKey = `${m.name}-${m.unit}-${mSpecsKey}`;
+                        const mPerUnitCost = m.perUnitCost || m.price || 0;
+                        const mPriceKey = mPerUnitCost.toFixed(2);
+                        const mKey = `${m.name}-${m.unit}-${mSpecsKey}-${mPriceKey}`;
                         const matches = mKey === key;
                         if (matches) {
-                            console.log(`     ✅ Used match: ${m.name} (${m.quantity} ${m.unit})`);
+                            console.log(`     ✅ Used match: ${m.name} (${m.quantity} ${m.unit}) @ ₹${mPriceKey}`);
                         }
                         return matches;
                     })
@@ -1940,6 +2112,40 @@ const Details = () => {
 
             const result = Object.values(grouped);
             
+            // ✅ CRITICAL FIX: Sort grouped materials by newest first
+            // After grouping, we need to re-sort by the most recent createdAt in each group
+            result.sort((a: any, b: any) => {
+                // Get the most recent date from variants in each group
+                const getLatestDate = (group: any) => {
+                    if (!group.variants || group.variants.length === 0) return new Date(0);
+                    
+                    // Find the variant with the most recent date
+                    const dates = group.variants
+                        .map((v: any) => {
+                            // Try to get date from the original material data
+                            const dateStr = group.date || group.createdAt || group.addedAt;
+                            return dateStr ? new Date(dateStr) : new Date(0);
+                        })
+                        .filter((d: Date) => !isNaN(d.getTime()));
+                    
+                    return dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : new Date(0);
+                };
+                
+                const dateA = getLatestDate(a);
+                const dateB = getLatestDate(b);
+                
+                // Sort descending (newest first)
+                return dateB.getTime() - dateA.getTime();
+            });
+            
+            console.log('\n✅ MATERIALS SORTED BY NEWEST FIRST');
+            if (result.length > 0) {
+                console.log(`   First material: ${result[0].name} (${result[0].date})`);
+                if (result.length > 1) {
+                    console.log(`   Second material: ${result[1].name} (${result[1].date})`);
+                }
+            }
+            
             // Debug final grouped results
             if (__DEV__) {
                 console.log('🎯 FINAL GROUPED RESULTS:');
@@ -1953,6 +2159,7 @@ const Details = () => {
                     console.log(`     Currently Available: ${group.currentlyAvailable}`);
                     console.log(`     Total Used: ${group.totalUsed}`);
                     console.log(`     Variants: ${group.variants.length}`);
+                    console.log(`     Date: ${group.date}`); // ✅ Show date for verification
                 });
             }
             
@@ -2030,34 +2237,26 @@ const Details = () => {
         console.log('  - Number of materials:', materialUsages.length);
         console.log('  - User:', JSON.stringify(user, null, 2));
 
-        console.log('\n📦 AVAILABLE MATERIALS CONTEXT:');
-        console.log('  - Total available materials:', materials?.available?.length || 0);
-        (materials?.available || []).slice(0, 3).forEach((m, idx) => {
-            console.log(`    ${idx + 1}. ${m.name} (_id: ${m._id}, qty: ${m.quantity})`);
-        });
-
         console.log('\n🎯 MATERIAL USAGES TO PROCESS:');
         materialUsages.forEach((usage, index) => {
-            const selectedMaterial = materials?.available?.find(m => m._id === usage.materialId);
             console.log(`  ${index + 1}. Material Usage:`);
             console.log(`     - Material ID: "${usage.materialId}" (type: ${typeof usage.materialId})`);
             console.log(`     - Quantity: ${usage.quantity} (type: ${typeof usage.quantity})`);
-            
-            if (selectedMaterial) {
-                console.log(`     - Material Name: ${selectedMaterial.name}`);
-                console.log(`     - Available Quantity: ${selectedMaterial.quantity} ${selectedMaterial.unit}`);
-                console.log(`     - Unit Cost: ${selectedMaterial.price || 0}`);
-                console.log(`     - Section ID: ${selectedMaterial.sectionId || 'none'}`);
-                console.log(`     ✅ Material found in available materials`);
-            } else {
-                console.log(`     ❌ Material NOT FOUND in available materials!`);
-                console.log(`     🔍 Searching in available materials by ID...`);
-                const foundById = materials?.available?.find(m => String(m._id) === String(usage.materialId));
-                const foundByIdLoose = materials?.available?.find(m => m.id === parseInt(usage.materialId));
-                console.log(`     - Found by string comparison: ${!!foundById}`);
-                console.log(`     - Found by ID number: ${!!foundByIdLoose}`);
-            }
         });
+
+        // ✅ FIXED: Skip frontend validation - let backend handle it
+        // The backend API has comprehensive validation that checks:
+        // - Material exists in database
+        // - Sufficient quantity available
+        // - Correct section permissions
+        // - Valid cost calculations
+        // Frontend validation was causing issues due to:
+        // - State synchronization between parent/child components
+        // - Pagination (only 7 items loaded at a time)
+        // - Timing issues with async state updates
+        console.log('✅ Skipping frontend validation - backend will validate materials');
+        console.log('   Backend provides better error messages and handles all edge cases');
+
 
         // Create the API payload
         const apiPayload = {
@@ -2162,35 +2361,37 @@ const Details = () => {
                     console.log('✅ Material usage logged by batch API - no additional logging needed');
                 }
 
-                // Refresh materials from API to get the latest data
-                console.log('\n========================================');
-                console.log('REFRESHING MATERIALS AFTER BATCH USAGE ADD');
-                console.log('========================================\n');
-
-                // Force refresh with a longer delay to ensure backend has processed
-                await new Promise(resolve => setTimeout(resolve, 500));
-
-                // Call reload with force refresh
-                await reloadMaterials(1);
-
-                // Wait for state to update - increased delay
-                await new Promise(resolve => setTimeout(resolve, 500));
-
-                console.log('✅ Materials refreshed after batch usage add');
-                console.log('Available materials count:', materials.available.length);
-                console.log('Used materials count:', materials.used.length);
-
                 // Stop loading animation and show success
                 stopUsageLoadingAnimation();
                 toast.dismiss(loadingToast);
 
                 // Only update UI if component is still mounted
                 if (isMountedRef.current) {
+                    // ✅ CRITICAL FIX: Close the form first to reset its state
+                    setShowUsageForm(false);
+                    
+                    // Refresh materials from API to get the latest data
+                    console.log('\n========================================');
+                    console.log('REFRESHING MATERIALS AFTER BATCH USAGE ADD');
+                    console.log('========================================\n');
+
+                    // ✅ OPTIMIZED: Quick refresh since backend updates cache directly
+                    // Short delay for backend to update cache
+                    await new Promise(resolve => setTimeout(resolve, 500));
+
+                    // Force refresh materials
+                    console.log('🔄 Force refreshing materials...');
+                    await reloadMaterials(1);
+
+                    // Short delay for state update
+                    await new Promise(resolve => setTimeout(resolve, 300));
+
+                    console.log('✅ Materials refreshed after batch usage add');
+                    console.log('Available materials count:', materials?.available?.length || 0);
+                    console.log('Used materials count:', materials?.used?.length || 0);
+                    
                     // Switch to "used" tab to show the newly added usage
                     setActiveTab('used');
-
-                    // Close the usage form
-                    setShowUsageForm(false);
 
                     // Show success message with material count
                     toast.success(`✅ ${materialUsages.length} material usages recorded! Check the "Used Materials" tab.`);
@@ -2620,8 +2821,8 @@ const Details = () => {
         }
     };
 
-    // ✅ FIXED: Simplified getCurrentData with safety checks
-    const getCurrentData = () => {
+    // ✅ FIXED: Simplified getCurrentData with safety checks and proper typing
+    const getCurrentData = (): Material[] => {
         console.log('\n========================================');
         console.log('GET CURRENT DATA - SIMPLIFIED');
         console.log('========================================');
@@ -2630,7 +2831,7 @@ const Details = () => {
         // ✅ SAFETY CHECK: Ensure materials state exists
         if (!materials || !materials.available || !materials.used) {
             console.log('⚠️ Materials state not initialized, returning empty array');
-            return [];
+            return [] as Material[];
         }
         
         console.log('materials.available.length:', materials.available.length);
@@ -2638,7 +2839,7 @@ const Details = () => {
 
         // ✅ CRITICAL FIX: Return API data directly without additional filtering
         // The API already handles pagination and filtering, so we don't need to filter again
-        let materialsToDisplay = activeTab === 'imported' ? (materials?.available || []) : (materials?.used || []);
+        const materialsToDisplay: Material[] = activeTab === 'imported' ? (materials?.available || []) : (materials?.used || []);
 
         console.log('Selected materials array:', activeTab === 'imported' ? 'available' : 'used');
         console.log('Materials count (from API):', materialsToDisplay.length);
@@ -2672,12 +2873,9 @@ const Details = () => {
         return getGroupedMaterialsWithCompleteData(currentMaterials, isUsedTab);
     };
 
-    // ✅ FIXED: Use materials state directly with safety checks
-    const totalAvailableCount = materials?.available?.length || 0;
-    const totalUsedCount = materials?.used?.length || 0;
-
-    // ✅ FIXED: Proper pagination calculations using API data with safety checks (LIMIT: 7 items per page)
-    const itemsPerPage = 7; // Items per page for pagination
+    // ✅ FIXED: Proper pagination calculations using API data with safety checks
+    // ✅ PAGINATION FIX: Account for material grouping when determining if pagination is needed
+    const itemsPerPage = 20; // Items per page for pagination (API level) - Increased to account for grouping
     const currentPage = activeTab === 'imported' 
         ? (materials?.pagination?.available?.currentPage || 1)
         : (materials?.pagination?.used?.currentPage || 1);
@@ -2693,6 +2891,16 @@ const Details = () => {
     
     const apiLoading = materials?.loading || false;
     
+    // ✅ CRITICAL FIX: Calculate actual displayed groups after grouping
+    const groupedMaterialsCount = getGroupedData().length;
+    const displayMaterials = activeTab === 'imported' 
+        ? (materials?.available || []) 
+        : (materials?.used || []);
+    
+    // ✅ PAGINATION VISIBILITY: Only show pagination if there are actually more pages
+    // AND if we have enough grouped materials to warrant pagination
+    const shouldShowPagination = !materials?.loading && totalPages > 1 && groupedMaterialsCount > 0;
+    
     console.log('🔍 Pagination State:', {
         activeTab,
         currentPage,
@@ -2701,6 +2909,8 @@ const Details = () => {
         apiLoading,
         availableMaterialsCount: materials?.available?.length || 0,
         usedMaterialsCount: materials?.used?.length || 0,
+        groupedMaterialsCount, // ✅ NEW: Show grouped count
+        shouldShowPagination, // ✅ NEW: Show if pagination should be visible
         paginationState: materials?.pagination,
         // 🔍 DEBUG: Show why pagination might be hidden
         paginationVisible: !materials?.loading && totalPages > 1,
@@ -2708,10 +2918,6 @@ const Details = () => {
         totalPagesCheck: totalPages > 1
     });
     
-    // ✅ FIXED: Use API data directly for display with safety checks
-    const displayMaterials = activeTab === 'imported' 
-        ? (materials?.available || []) 
-        : (materials?.used || []);
     const startItem = totalItems > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0;
     const endItem = totalItems > 0 ? Math.min(currentPage * itemsPerPage, totalItems) : 0;
 
@@ -2738,9 +2944,9 @@ const Details = () => {
             // Scroll to top when page changes
             scrollViewRef.current?.scrollTo({ y: 0, animated: true });
             
-            // Fetch new page data from API (LIMIT: 7 items per page)
+            // Fetch new page data from API (LIMIT: 20 items per page to account for grouping)
             console.log(`📡 Fetching page ${page} data...`);
-            await fetchMaterials(page, 7, true);
+            await fetchMaterials(page, 20, true);
             
             console.log(`✅ Page ${page} loaded successfully`);
         } catch (error) {
@@ -2756,7 +2962,7 @@ const Details = () => {
         console.log('  - Selected Mini Section:', selectedMiniSection);
         
         // Always reload from page 1 when tab or filter changes
-        fetchMaterials(1, 7, true);
+        fetchMaterials(1, 20, true);
     }, [activeTab, selectedMiniSection]);
 
     // Group materials by date for "Used Materials" tab
@@ -2868,11 +3074,11 @@ const Details = () => {
         return section ? section.name : 'Unassigned';
     };
 
-    const addMaterialRequest = async (materials: MaterialEntry[], message: string) => {
+    const addMaterialRequest = async (materialsToAdd: MaterialEntry[], message: string) => {
         console.log("=== MATERIAL REQUEST SUBMISSION ===");
         console.log("1. projectId:", projectId);
         console.log("2. message:", message);
-        console.log("3. materials:", materials);
+        console.log("3. materials:", materialsToAdd);
         console.log("=====================================");
 
         // Prevent duplicate submissions
@@ -2887,7 +3093,7 @@ const Details = () => {
             return;
         }
 
-        if (!materials || materials.length === 0) {
+        if (!materialsToAdd || materialsToAdd.length === 0) {
             toast.error("No materials to send");
             return;
         }
@@ -2896,7 +3102,7 @@ const Details = () => {
         startMaterialLoadingAnimation();
 
         // Transform materials to match API format
-        const formattedMaterials = materials.map((material: any) => ({
+        const formattedMaterials = materialsToAdd.map((material: any) => ({
             projectId: projectId,
             materialName: material.materialName,
             unit: material.unit,
@@ -2915,20 +3121,49 @@ const Details = () => {
 
             const responseData = res.data as any;
 
+            console.log('\n========================================');
+            console.log('📥 RAW API RESPONSE');
+            console.log('========================================');
+            console.log('Status:', res.status);
+            console.log('Response data type:', typeof responseData);
+            console.log('Response data:', JSON.stringify(responseData, null, 2));
+            console.log('responseData.success:', responseData.success, '(type:', typeof responseData.success, ')');
+            console.log('responseData.results:', responseData.results);
+            console.log('responseData.results type:', typeof responseData.results);
+            console.log('responseData.results is array:', Array.isArray(responseData.results));
+            console.log('responseData.error:', responseData.error);
+            console.log('========================================\n');
+
             // Check response
-            if (responseData.success) {
+            if (responseData.success && responseData.results && Array.isArray(responseData.results)) {
                 console.log("=== ADD MATERIAL SUCCESS ===");
                 console.log("Response:", responseData);
                 console.log("Results:", responseData.results);
                 console.log("===========================");
 
                 // Count successful additions
-                const successCount = responseData.results?.filter((r: any) => r.success).length || 0;
-                const failCount = responseData.results?.filter((r: any) => !r.success).length || 0;
+                const successCount = responseData.results.filter((r: any) => r.success).length || 0;
+                const failCount = responseData.results.filter((r: any) => !r.success).length || 0;
+
+                console.log('\n🔍 RESPONSE ANALYSIS:');
+                console.log(`   - Total results: ${responseData.results.length}`);
+                console.log(`   - Success count: ${successCount}`);
+                console.log(`   - Fail count: ${failCount}`);
+                
+                // Log each result for debugging
+                responseData.results.forEach((result: any, index: number) => {
+                    console.log(`\n   Result ${index + 1}:`);
+                    console.log(`     - Success: ${result.success}`);
+                    console.log(`     - Action: ${result.action || 'N/A'}`);
+                    console.log(`     - Message: ${result.message || 'N/A'}`);
+                    console.log(`     - Error: ${result.error || 'N/A'}`);
+                    console.log(`     - Material: ${result.material?.name || result.input?.materialName || 'N/A'}`);
+                });
+                console.log('\n===========================\n');
 
                 if (successCount > 0) {
                     // Log material activity ONLY for successful materials (no toast)
-                    const successfulResults = responseData.results?.filter((r: any) => r.success) || [];
+                    const successfulResults = responseData.results.filter((r: any) => r.success) || [];
                     
                     console.log('🔍 DEBUG: Successful Results Structure:');
                     successfulResults.forEach((result: any, index: number) => {
@@ -2990,43 +3225,14 @@ const Details = () => {
 
                     // Only log activity if we have successful materials
                     if (successfulMaterials.length > 0) {
-                        console.log('🔔 LOGGING BOTH DETAILED AND GENERAL ACTIVITIES FOR ALL USERS');
+                        console.log('🔔 LOGGING GENERAL ACTIVITY FOR ALL USERS');
                         console.log('  - User type: ALL (admin and staff get same notifications)');
                         console.log('  - Successful materials count:', successfulMaterials.length);
                         
-                        // 1. Log detailed material activity (shows specific materials imported)
-                        try {
-                            console.log('\n🔔 STEP 1: Logging detailed material activity...');
-                            
-                            // Validate materials before logging
-                            const validMaterials = successfulMaterials.filter((material: any) => {
-                                const isValid = material.name && material.unit && typeof material.qnt === 'number' && material.qnt > 0;
-                                if (!isValid) {
-                                    console.warn('⚠️ Invalid material detected:', material);
-                                }
-                                return isValid;
-                            });
-                            
-                            console.log('📋 Valid materials for detailed logging:', validMaterials.length, 'out of', successfulMaterials.length);
-                            validMaterials.forEach((m: any, index: number) => {
-                                console.log(`  ${index + 1}. ${m.name} (${m.qnt} ${m.unit} - ₹${m.totalCost})`);
-                            });
-                            
-                            if (validMaterials.length > 0) {
-                                await logMaterialActivity(validMaterials, 'imported', message);
-                                console.log('✅ STEP 1 COMPLETED: Detailed material activity logged successfully');
-                            } else {
-                                console.error('❌ STEP 1 SKIPPED: No valid materials to log');
-                            }
-                        } catch (activityError) {
-                            console.error('❌ STEP 1 FAILED: Failed to log detailed material activity:', activityError);
-                            // Don't fail the whole operation if activity logging fails
-                        }
-
-                        // 2. Log general activity (shows generic "imported materials to project" message)
+                        // Log general activity (shows "imported materials to project" message)
                         const totalCost = successfulMaterials.reduce((sum: number, m: any) => sum + (m.totalCost || 0), 0);
                         try {
-                            console.log('\n🔔 STEP 2: Logging general activity...');
+                            console.log('\n🔔 Logging general activity...');
                             console.log('📋 General activity details:');
                             console.log('   - Project ID:', projectId);
                             console.log('   - Project Name:', projectName);
@@ -3040,14 +3246,11 @@ const Details = () => {
                                 totalCost,
                                 message
                             );
-                            console.log('✅ STEP 2 COMPLETED: General activity logged successfully');
+                            console.log('✅ General activity logged successfully');
                         } catch (generalActivityError) {
-                            console.error('❌ STEP 2 FAILED: Failed to log general activity:', generalActivityError);
+                            console.error('❌ Failed to log general activity:', generalActivityError);
                             // Don't fail the whole operation if general activity logging fails
                         }
-
-                        console.log('🎉 BOTH ACTIVITY TYPES LOGGED - Staff and Admin will see same notifications');
-                        
                         // 🔔 NEW: Send simple notification for material addition
                         try {
                             console.log('\n🔔 STEP 3: Sending simple notification...');
@@ -3085,33 +3288,99 @@ const Details = () => {
                     }
                 }
 
-                // Refresh project materials after adding (no toast)
-                await reloadMaterials();
+                // ✅ OPTIMIZED: Quick refresh since backend updates cache directly
+                console.log('\n========================================');
+                console.log('🔄 REFRESHING MATERIALS AFTER ADD');
+                console.log('========================================');
+                console.log('⏱️ Backend is updating cache directly...');
+                
+                // Short delay for backend to update cache (much faster now!)
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                console.log('🔄 Refreshing materials with cache busting...');
+                // Force refresh to get updated cache
+                await reloadMaterials(1);
+                
+                // Short delay for state update
+                await new Promise(resolve => setTimeout(resolve, 300));
+                
+                console.log('✅ Materials refreshed successfully');
+                console.log('   - Available materials:', materials?.available?.length || 0);
+                console.log('   - Used materials:', materials?.used?.length || 0);
+                console.log('========================================\n');
 
                 // Stop loading animation (show success toast after completion)
                 stopMaterialLoadingAnimation();
 
-                // Show success toast for successful additions
-                if (successCount > 0) {
+                // Show appropriate toast messages
+                if (successCount > 0 && failCount === 0) {
+                    // All materials added successfully
                     toast.success(`🎉 Successfully added ${successCount} material${successCount === 1 ? '' : 's'} to your project!`);
+                } else if (successCount > 0 && failCount > 0) {
+                    // Some succeeded, some failed
+                    toast.success(`✅ Added ${successCount} material${successCount === 1 ? '' : 's'}`);
+                    toast.error(`❌ Failed to add ${failCount} material${failCount === 1 ? '' : 's'}`);
+                } else if (failCount > 0) {
+                    // All failed
+                    toast.error(`❌ Failed to add ${failCount} material${failCount > 1 ? 's' : ''}`);
                 }
-
-                if (failCount > 0) {
-                    toast.error(`Failed to add ${failCount} material${failCount > 1 ? 's' : ''}`);
-                }
+            } else if (responseData.success) {
+                console.warn('⚠️ API returned success but no results array');
+                console.log('Response data:', JSON.stringify(responseData, null, 2));
+                
+                // Still refresh materials since backend says success
+                console.log('🔄 Refreshing materials anyway...');
+                await new Promise(resolve => setTimeout(resolve, 500));
+                await reloadMaterials(1);
+                await new Promise(resolve => setTimeout(resolve, 300));
+                
+                stopMaterialLoadingAnimation();
+                toast.success('✅ Material added successfully');
             } else {
-                throw new Error(responseData.error || 'Failed to add materials');
+                // API returned success: false
+                console.error('❌ API returned success: false');
+                console.log('Response data:', JSON.stringify(responseData, null, 2));
+                
+                const errorMsg = typeof responseData.error === 'string' 
+                    ? responseData.error 
+                    : (responseData.message || 'Failed to add materials');
+                
+                stopMaterialLoadingAnimation();
+                toast.error(errorMsg);
+                throw new Error(errorMsg);
             }
 
         } catch (error) {
+            console.log('\n========================================');
+            console.log('❌ CAUGHT ERROR IN addMaterialRequest');
+            console.log('========================================');
             console.error("Material request error:", error);
+            console.log('Error type:', typeof error);
+            console.log('Error name:', (error as any)?.name);
+            console.log('Error message:', (error as any)?.message);
+            
+            // ✅ FIXED: More defensive check for error object
+            const hasResponse = error && typeof error === 'object' && 'response' in error;
+            console.log('Has response:', hasResponse);
+            
+            if (hasResponse) {
+                const axiosError = error as { response?: { status?: number, data?: any, statusText?: string } };
+                console.log('Response status:', axiosError.response?.status);
+                // ✅ FIXED: Safe JSON.stringify with try-catch
+                try {
+                    console.log('Response data:', JSON.stringify(axiosError.response?.data, null, 2));
+                } catch (stringifyError) {
+                    console.log('Response data (could not stringify):', axiosError.response?.data);
+                }
+            }
+            console.log('========================================\n');
 
             // Stop loading animation and show error
             stopMaterialLoadingAnimation();
             toast.dismiss(); // Dismiss loading toast
 
             // Enhanced error logging for debugging
-            if (error && typeof error === 'object' && 'response' in error) {
+            if (hasResponse) {
                 const axiosError = error as { response?: { status?: number, data?: any, statusText?: string } };
                 console.error("=== API ERROR DETAILS ===");
                 console.error("Status:", axiosError.response?.status);
@@ -3123,9 +3392,18 @@ const Details = () => {
                     axiosError.response?.data?.error ||
                     `API Error: ${axiosError.response?.status}`;
                 toast.error(errorMessage);
+                throw new Error(errorMessage); // ✅ FIXED: Throw error to propagate to MaterialFormModal
             } else {
                 console.error("Non-Axios error:", error);
-                toast.error("Failed to add materials");
+                const errorMsg = (error as any)?.message || "Failed to add materials";
+                toast.error(errorMsg);
+                
+                // ✅ FIXED: Always throw a proper Error object
+                if (error instanceof Error) {
+                    throw error;
+                } else {
+                    throw new Error(errorMsg);
+                }
             }
         }
     };
@@ -3261,13 +3539,32 @@ const Details = () => {
                 visible={showMaterialForm}
                 onClose={() => setShowMaterialForm(false)}
                 onSubmit={async (materials, message) => {
+                    console.log('🎯 MaterialFormModal onSubmit called');
                     try {
                         await addMaterialRequest(materials, message);
+                        console.log('✅ addMaterialRequest completed successfully');
                         setShowMaterialForm(false);
                     } catch (error) {
-                        console.error('Error in material form submission:', error);
-                        // Don't close the form if there's an error
-                        throw error; // Re-throw to let MaterialFormModal handle it
+                        // ✅ FIXED: Defensive error logging to prevent crashes
+                        console.error('❌ Error caught in MaterialFormModal onSubmit:', error);
+                        
+                        if (error && typeof error === 'object') {
+                            console.error('Error type:', typeof error);
+                            console.error('Error message:', (error as any)?.message || 'No message');
+                            console.error('Error stack:', (error as any)?.stack || 'No stack trace');
+                        } else {
+                            console.error('Error is not an object:', error);
+                        }
+                        
+                        // Re-throw to let MaterialFormModal show error
+                        // ✅ FIXED: Ensure we always throw a proper Error object
+                        if (error instanceof Error) {
+                            throw error;
+                        } else if (error && typeof error === 'object' && (error as any).message) {
+                            throw new Error((error as any).message);
+                        } else {
+                            throw new Error('Failed to add materials');
+                        }
                     }
                 }}
             />
@@ -3570,6 +3867,7 @@ const Details = () => {
                                             miniSections={miniSections}
                                             showMiniSectionLabel={!selectedMiniSection}
                                             userType={currentUserType}
+                                            onRefresh={() => reloadMaterials(1, true)}
                                         />
                                     ))}
                                 </View>
@@ -3589,6 +3887,7 @@ const Details = () => {
                                 miniSections={miniSections}
                                 showMiniSectionLabel={false}
                                 userType={currentUserType}
+                                onRefresh={() => reloadMaterials(1, true)}
                             />
                         ))
                     ) : (
@@ -3641,7 +3940,7 @@ const Details = () => {
                     )}
 
                     {/* Pagination Controls */}
-                    {!materials?.loading && totalPages > 1 && (
+                    {shouldShowPagination && (
                         <View style={paginationStyles.paginationContainer}>
                             {apiLoading && (
                                 <View style={paginationStyles.loadingContainer}>
@@ -3766,7 +4065,7 @@ const Details = () => {
                 </View>
             </ScrollView>
 
-            {/* Floating Low Stock Alert Indicator */}
+            {/* Floating Low Stock Alert Indicator - Always visible when there are low stock materials */}
             {lowStockMaterials.length > 0 && !showLowStockAlert && (
                 <TouchableOpacity
                     style={{
@@ -4207,7 +4506,7 @@ const Details = () => {
                                     shadowRadius: 2,
                                     elevation: 2,
                                 }}
-                                onPress={() => setShowLowStockAlert(false)}
+                                onPress={dismissAlertFor15Hours}
                                 activeOpacity={0.9}
                             >
                                 <Text style={{ 

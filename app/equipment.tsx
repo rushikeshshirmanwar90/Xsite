@@ -64,16 +64,6 @@ interface ApiResponse<T = any> {
     data: T;
 }
 
-interface EquipmentListResponse {
-    equipment: Equipment[];
-    meta: {
-        total: number;
-        page: number;
-        limit: number;
-        totalPages: number;
-    };
-}
-
 // Function to get equipment icon and color based on category and type
 const getEquipmentIconAndColor = (category: string, type: string) => {
     const categoryMap: { [key: string]: { icon: keyof typeof Ionicons.glyphMap, color: string } } = {
@@ -282,7 +272,7 @@ const EquipmentManagement = () => {
                 return;
             }
 
-            const response = await axios.get<ApiResponse<EquipmentListResponse>>(`${domain}/api/equipment`, {
+            const response = await axios.get<ApiResponse<Equipment[]>>(`${domain}/api/equipment`, {
                 params: {
                     projectId,
                     projectSectionId: sectionId,
@@ -291,7 +281,7 @@ const EquipmentManagement = () => {
             });
 
             if (response.data && response.data.success) {
-                const equipmentData = response.data.data.equipment || [];
+                const equipmentData = response.data.data || [];
                 setEquipment(equipmentData);
                 setTotalCount(equipmentData.length);
 

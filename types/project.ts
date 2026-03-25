@@ -17,6 +17,9 @@ export interface Project {
   clientName?: string; // Added for staff users to show client name
   clientId?: string; // Added for staff users to show client ID
   hasOnlyOneBuilding?: boolean; // Added for single building projects
+  isAccessible?: boolean; // Added for license control - indicates if staff can access this project
+  licenseStatus?: string; // Added for license control - 'active', 'expired', 'lifetime', 'unknown'
+  blockReason?: string; // Added for license control - reason why project is blocked
 }
 
 export interface MaterialItem {

@@ -17,6 +17,16 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userT
     const [isUpdatingCompletion, setIsUpdatingCompletion] = useState(false);
     const [showOptionsMenu, setShowOptionsMenu] = useState(false);
 
+    // Debug: Log project license status
+    useEffect(() => {
+        console.log(`🎴 ProjectCard for "${project.name}":`, {
+            isAccessible: project.isAccessible,
+            licenseStatus: project.licenseStatus,
+            blockReason: project.blockReason,
+            userType: userType
+        });
+    }, [project.name, project.isAccessible, project.licenseStatus, userType]);
+
     const formatCurrency = (amount: number): string => {
         return new Intl.NumberFormat('en-IN', {
             style: 'currency',
@@ -203,13 +213,40 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userT
                 </View>
 
                 <TouchableOpacity
-                    style={[styles.viewButton, { backgroundColor: '#0EA5E9' }]}
-                    onPress={() => onViewDetails(project)}
+                    style={[styles.viewButton, { backgroundColor: project.isAccessible === false ? '#EF4444' : '#0EA5E9' }]}
+                    onPress={() => {
+                        if (project.isAccessible === false) {
+                            Alert.alert(
+                                "Project Blocked",
+                                project.blockReason || "This project's client license has expired. Please contact the client to renew their subscription.",
+                                [{ text: "OK" }]
+                            );
+                        } else {
+                            onViewDetails(project);
+                        }
+                    }}
                     activeOpacity={0.8}
                 >
-                    <Text style={styles.viewButtonText}>View Details</Text>
-                    <Ionicons name="arrow-forward" size={16} color="white" />
+                    {project.isAccessible === false ? (
+                        <>
+                            <Ionicons name="lock-closed" size={16} color="white" />
+                            <Text style={styles.viewButtonText}>Project Blocked</Text>
+                        </>
+                    ) : (
+                        <>
+                            <Text style={styles.viewButtonText}>View Details</Text>
+                            <Ionicons name="arrow-forward" size={16} color="white" />
+                        </>
+                    )}
                 </TouchableOpacity>
+                
+                {/* Show block reason below button if project is blocked */}
+                {project.isAccessible === false && project.blockReason && (
+                    <View style={styles.blockReasonContainer}>
+                        <Ionicons name="information-circle" size={16} color="#DC2626" />
+                        <Text style={styles.blockReasonText}>{project.blockReason}</Text>
+                    </View>
+                )}
             </View>
             
             {/* Options Menu Modal - Only for admin users */}
@@ -733,6 +770,25 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         fontWeight: '400',
         letterSpacing: 0.3,
+    },
+    // Block reason styles
+    blockReasonContainer: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        marginTop: 12,
+        padding: 12,
+        backgroundColor: '#FEF2F2',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#FEE2E2',
+        gap: 8,
+    },
+    blockReasonText: {
+        flex: 1,
+        fontSize: 12,
+        color: '#DC2626',
+        lineHeight: 18,
+        fontWeight: '500',
     },
     // Options menu styles
     optionsButton: {

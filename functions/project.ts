@@ -5,7 +5,8 @@ import axios from "axios";
 export const getProjectData = async (
   clientId: string,
   staffId?: string, // Add optional staffId parameter
-  excludeMaterials: boolean = true // ✅ NEW: Option to exclude material data for performance
+  excludeMaterials: boolean = true, // ✅ NEW: Option to exclude material data for performance
+  userRole?: string // ✅ NEW: User role for license filtering
 ) => {
   try {
     if (!clientId) {
@@ -18,7 +19,9 @@ export const getProjectData = async (
       "staffId:",
       staffId || "none",
       "excludeMaterials:",
-      excludeMaterials
+      excludeMaterials,
+      "userRole:",
+      userRole || "admin"
     );
 
     // Build URL with optional staffId parameter and material exclusion
@@ -30,6 +33,10 @@ export const getProjectData = async (
     if (excludeMaterials) {
       url += `&excludeMaterials=true`;
       console.log("🚀 Excluding material data for better performance");
+    }
+    if (userRole) {
+      url += `&userRole=${userRole}`;
+      console.log("🔐 Adding user role for license filtering");
     }
 
     const res = await axios.get(url);
