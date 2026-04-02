@@ -8,7 +8,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "xsite",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.codewithrushi.xsite"

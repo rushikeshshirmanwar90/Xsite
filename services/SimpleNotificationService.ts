@@ -2,9 +2,22 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
+// import * as Notifications from 'expo-notifications'; // TEMPORARILY DISABLED - Requires development build
 import axios from 'axios';
 import { domain } from '@/lib/domain';
+
+// Mock Notifications object for Expo Go compatibility
+const Notifications = {
+  setNotificationHandler: () => {},
+  getPermissionsAsync: async () => ({ status: 'denied' }),
+  requestPermissionsAsync: async () => ({ status: 'denied' }),
+  setNotificationChannelAsync: async () => {},
+  getExpoPushTokenAsync: async () => ({ data: 'mock-token' }),
+  scheduleNotificationAsync: async () => 'mock-id',
+  AndroidImportance: { MAX: 4 },
+  AndroidNotificationPriority: { HIGH: 1 },
+  SchedulableTriggerInputTypes: { TIME_INTERVAL: 'timeInterval' },
+};
 
 // Simple notification service for project activities
 export class SimpleNotificationService {
