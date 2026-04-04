@@ -222,7 +222,7 @@ const Details = () => {
         };
     };
 
-    const fetchMaterials = async (page: number = 1, limit: number = 20, forceRefresh: boolean = false) => {
+    const fetchMaterials = async (page: number = 1, limit: number = 10, forceRefresh: boolean = false) => {
         if (!projectId) {
             console.log('❌ No projectId available');
             return;
@@ -415,6 +415,8 @@ const Details = () => {
                 console.log(`SMART PAGINATION EXTRACTION`);
                 console.log(`========================================`);
                 console.log(`Page: ${defaultPage}, Limit: ${limit}, Materials: ${materialsArray.length}`);
+                console.log(`Full API Response Keys:`, Object.keys(data));
+                console.log(`Full API Response:`, JSON.stringify(data, null, 2));
 
                 let currentPage = defaultPage;
                 let totalPages = 1;
@@ -422,14 +424,22 @@ const Details = () => {
                 let hasNextPage = false;
                 let hasPrevPage = false;
 
-                // Strategy 1: Check for nested pagination object
+                // Strategy 1: Check for nested pagination object (BACKEND USES THIS)
                 if (data.pagination) {
                     console.log(`✅ Strategy 1: Found data.pagination`);
+                    console.log(`   Pagination object:`, JSON.stringify(data.pagination, null, 2));
                     currentPage = data.pagination.currentPage || data.pagination.page || defaultPage;
                     totalPages = data.pagination.totalPages || data.pagination.pages || 1;
                     totalItems = data.pagination.totalItems || data.pagination.total || data.pagination.count || 0;
                     hasNextPage = data.pagination.hasNextPage ?? data.pagination.hasNext ?? (currentPage < totalPages);
                     hasPrevPage = data.pagination.hasPrevPage ?? data.pagination.hasPrev ?? (currentPage > 1);
+                    
+                    console.log(`   ✅ Extracted from data.pagination:`);
+                    console.log(`      currentPage: ${currentPage}`);
+                    console.log(`      totalPages: ${totalPages}`);
+                    console.log(`      totalItems: ${totalItems}`);
+                    console.log(`      hasNextPage: ${hasNextPage}`);
+                    console.log(`      hasPrevPage: ${hasPrevPage}`);
                 }
                 // Strategy 2: Check for meta object
                 else if (data.meta) {
@@ -555,7 +565,7 @@ const Details = () => {
 
     const reloadMaterials = async (page: number = 1, forceRefresh: boolean = true) => {
         // Always force refresh by default to avoid cache issues
-        await fetchMaterials(page, 20, forceRefresh);
+        await fetchMaterials(page, 10, forceRefresh);
     };
 
     const ignoreMaterial = async (materialKey: string, materialName: string) => {
@@ -1761,9 +1771,9 @@ const Details = () => {
         return lowStockItems;
     };
 
-    // Load project materials on mount (LIMIT: 20 items per page to account for grouping)
+    // Load project materials on mount (LIMIT: 10 items per page)
     useEffect(() => {
-        fetchMaterials(1, 20, true); // ✅ OPTIMIZED: Increased limit to 20 to account for material grouping
+        fetchMaterials(1, 10, true); // ✅ OPTIMIZED: 10 items per page for better UX
         loadInitialCompletionStatus(); // Load completion status on mount
         loadIgnoredMaterials(); // Load ignored materials from storage
         loadAlertDismissalTime(); // ✅ NEW: Load alert dismissal timestamp
@@ -2128,7 +2138,7 @@ const Details = () => {
                         })
                         .filter((d: Date) => !isNaN(d.getTime()));
                     
-                    return dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : new Date(0);
+                    return dates.length > 0 ? new Date(Math.max(...dates.map((d: Date) => d.getTime()))) : new Date(0);
                 };
                 
                 const dateA = getLatestDate(a);
@@ -2875,7 +2885,7 @@ const Details = () => {
 
     // ✅ FIXED: Proper pagination calculations using API data with safety checks
     // ✅ PAGINATION FIX: Account for material grouping when determining if pagination is needed
-    const itemsPerPage = 20; // Items per page for pagination (API level) - Increased to account for grouping
+    const itemsPerPage = 10; // Items per page for pagination (API level)
     const currentPage = activeTab === 'imported' 
         ? (materials?.pagination?.available?.currentPage || 1)
         : (materials?.pagination?.used?.currentPage || 1);
@@ -2944,9 +2954,9 @@ const Details = () => {
             // Scroll to top when page changes
             scrollViewRef.current?.scrollTo({ y: 0, animated: true });
             
-            // Fetch new page data from API (LIMIT: 20 items per page to account for grouping)
+            // Fetch new page data from API (LIMIT: 10 items per page)
             console.log(`📡 Fetching page ${page} data...`);
-            await fetchMaterials(page, 20, true);
+            await fetchMaterials(page, 10, true);
             
             console.log(`✅ Page ${page} loaded successfully`);
         } catch (error) {
@@ -2962,7 +2972,7 @@ const Details = () => {
         console.log('  - Selected Mini Section:', selectedMiniSection);
         
         // Always reload from page 1 when tab or filter changes
-        fetchMaterials(1, 20, true);
+        fetchMaterials(1, 10, true);
     }, [activeTab, selectedMiniSection]);
 
     // Group materials by date for "Used Materials" tab

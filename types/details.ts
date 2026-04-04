@@ -7,6 +7,8 @@ export interface Material {
   quantity: number;
   unit: string;
   price: number;
+  perUnitCost?: number; // Per-unit cost (same as price, but explicit)
+  totalCost?: number; // Total cost for the quantity
   date: string;
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
