@@ -202,7 +202,7 @@ const CompanyProfile: React.FC = () => {
                     email: data.email || '',
                     clientId: clientId,
                     phone: data.phone || data.phoneNumber || '',
-                    company: data.company || data.companyName || 'Construction Company',
+                    company: data.company || data.companyName || '', // Don't set fallback here
                 };
                 
                 console.log('🎯 Setting userData:', userData);
@@ -817,10 +817,10 @@ const CompanyProfile: React.FC = () => {
                     </View>
                     <Text style={styles.userName}>{userData.name || 'User'}</Text>
                     <Text style={styles.userEmail}>{userData.email || 'email@example.com'}</Text>
-                    {userData.company && !isCurrentUserStaff && (
+                    {!isCurrentUserStaff && (clientData.companyName || userData.company) && (
                         <View style={styles.companyBadge}>
                             <Ionicons name="business" size={14} color="#3B82F6" />
-                            <Text style={styles.companyText}>{userData.company}</Text>
+                            <Text style={styles.companyText}>{clientData.companyName || userData.company}</Text>
                         </View>
                     )}
                     

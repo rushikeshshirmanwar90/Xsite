@@ -61,6 +61,192 @@ export class PDFReportGenerator {
         return grouped;
     }
 
+    // ✅ NEW: Group labor data by date
+    private groupLaborByDate(laborData: any[]): { [date: string]: any[] } {
+        const grouped: { [date: string]: any[] } = {};
+        
+        laborData.forEach(labor => {
+            // Labor entries have a 'date' or 'createdAt' field
+            const dateStr = labor.date || labor.createdAt;
+            if (!dateStr) return; // Skip if no date
+            
+            const date = new Date(dateStr).toISOString().split('T')[0]; // YYYY-MM-DD format
+            if (!grouped[date]) {
+                grouped[date] = [];
+            }
+            grouped[date].push(labor);
+        });
+
+        return grouped;
+    }
+
+    // ✅ NEW: Group equipment data by date
+    private groupEquipmentByDate(equipmentData: any[]): { [date: string]: any[] } {
+        const grouped: { [date: string]: any[] } = {};
+        
+        equipmentData.forEach(equipment => {
+            // Equipment entries have a 'date' or 'createdAt' field
+            const dateStr = equipment.date || equipment.createdAt;
+            if (!dateStr) return; // Skip if no date
+            
+            const date = new Date(dateStr).toISOString().split('T')[0]; // YYYY-MM-DD format
+            if (!grouped[date]) {
+                grouped[date] = [];
+            }
+            grouped[date].push(equipment);
+        });
+
+        return grouped;
+    }
+
+    // ✅ NEW: Generate labor entry HTML
+    private generateLaborHTML(laborEntries: any[]): string {
+        if (!laborEntries || laborEntries.length === 0) return '';
+
+        const totalLaborCost = laborEntries.reduce((sum, labor) => sum + (Number(labor.totalCost) || 0), 0);
+
+        return `
+            <div style="margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                <div style="background-color: #fef3c7; padding: 12px; border-bottom: 1px solid #e2e8f0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <span style="background-color: #F59E0B; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
+                                👷 LABOR COSTS
+                            </span>
+                            <span style="margin-left: 10px; font-weight: 600; color: #374151;">
+                                ${laborEntries.length} ${laborEntries.length === 1 ? 'entry' : 'entries'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background-color: #f8fafc;">
+                            <th style="padding: 10px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Category</th>
+                            <th style="padding: 10px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Type</th>
+                            <th style="padding: 10px; text-align: center; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Count</th>
+                            <th style="padding: 10px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Per Labor Cost</th>
+                            <th style="padding: 10px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Total Cost</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${laborEntries.map(labor => `
+                            <tr>
+                                <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">
+                                    <div style="display: flex; align-items: center;">
+                                        <div style="width: 8px; height: 8px; background-color: #F59E0B; border-radius: 50%; margin-right: 8px;"></div>
+                                        <strong>${labor.category || 'Unknown Category'}</strong>
+                                    </div>
+                                </td>
+                                <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">
+                                    ${labor.type || 'Unknown Type'}
+                                </td>
+                                <td style="padding: 8px; border-bottom: 1px solid #f1f5f9; text-align: center;">
+                                    ${labor.count || 0}
+                                </td>
+                                <td style="padding: 8px; border-bottom: 1px solid #f1f5f9; text-align: right;">
+                                    ${this.formatCurrency(Number(labor.perLaborCost) || 0)}
+                                </td>
+                                <td style="padding: 8px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: bold;">
+                                    ${this.formatCurrency(Number(labor.totalCost) || 0)}
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background-color: #fef3c7; font-weight: bold;">
+                            <td style="padding: 10px; border-top: 2px solid #e2e8f0;" colspan="4">
+                                Day Labor Total
+                            </td>
+                            <td style="padding: 10px; text-align: right; border-top: 2px solid #e2e8f0; color: #F59E0B;">
+                                ${this.formatCurrency(totalLaborCost)}
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        `;
+    }
+
+    // ✅ NEW: Generate equipment entry HTML
+    private generateEquipmentHTML(equipmentEntries: any[]): string {
+        if (!equipmentEntries || equipmentEntries.length === 0) return '';
+
+        const totalEquipmentCost = equipmentEntries.reduce((sum, equipment) => sum + (Number(equipment.totalCost) || 0), 0);
+
+        return `
+            <div style="margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                <div style="background-color: #fef3c7; padding: 12px; border-bottom: 1px solid #e2e8f0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <span style="background-color: #F59E0B; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
+                                🚜 EQUIPMENT COSTS
+                            </span>
+                            <span style="margin-left: 10px; font-weight: 600; color: #374151;">
+                                ${equipmentEntries.length} ${equipmentEntries.length === 1 ? 'entry' : 'entries'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background-color: #f8fafc;">
+                            <th style="padding: 10px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Equipment Type</th>
+                            <th style="padding: 10px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Category</th>
+                            <th style="padding: 10px; text-align: center; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Quantity</th>
+                            <th style="padding: 10px; text-align: center; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Cost Type</th>
+                            <th style="padding: 10px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Per Unit</th>
+                            <th style="padding: 10px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Total Cost</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${equipmentEntries.map(equipment => `
+                            <tr>
+                                <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">
+                                    <div style="display: flex; align-items: center;">
+                                        <div style="width: 8px; height: 8px; background-color: #F59E0B; border-radius: 50%; margin-right: 8px;"></div>
+                                        <strong>${equipment.type || 'Unknown Equipment'}</strong>
+                                    </div>
+                                </td>
+                                <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">
+                                    ${equipment.category || 'Unknown Category'}
+                                </td>
+                                <td style="padding: 8px; border-bottom: 1px solid #f1f5f9; text-align: center;">
+                                    ${equipment.quantity || 0}
+                                </td>
+                                <td style="padding: 8px; border-bottom: 1px solid #f1f5f9; text-align: center;">
+                                    <span style="background-color: ${equipment.costType === 'rental' ? '#EFF6FF' : equipment.costType === 'purchase' ? '#F0FDF4' : '#FEF3C7'}; 
+                                                 color: ${equipment.costType === 'rental' ? '#3B82F6' : equipment.costType === 'purchase' ? '#10B981' : '#F59E0B'}; 
+                                                 padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">
+                                        ${(equipment.costType || 'rental').toUpperCase()}
+                                    </span>
+                                </td>
+                                <td style="padding: 8px; border-bottom: 1px solid #f1f5f9; text-align: right;">
+                                    ${this.formatCurrency(Number(equipment.perUnitCost) || 0)}
+                                </td>
+                                <td style="padding: 8px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: bold;">
+                                    ${this.formatCurrency(Number(equipment.totalCost) || 0)}
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background-color: #fef3c7; font-weight: bold;">
+                            <td style="padding: 10px; border-top: 2px solid #e2e8f0;" colspan="5">
+                                Day Equipment Total
+                            </td>
+                            <td style="padding: 10px; text-align: right; border-top: 2px solid #e2e8f0; color: #F59E0B;">
+                                ${this.formatCurrency(totalEquipmentCost)}
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        `;
+    }
+
     // Format date for display
     private formatDate(dateString: string): string {
         const date = new Date(dateString + 'T00:00:00');
@@ -120,44 +306,32 @@ export class PDFReportGenerator {
         const locationPath = createLocationPath();
         const hasLocationDetails = activity.sectionName || activity.miniSectionName;
         
-        // ✅ NEW: Get the best available location name for display
+        // ✅ SIMPLIFIED: Trust the API data first, minimal fallback logic
         const getLocationDisplayName = () => {
-            // If we have a specific mini-section name that's not generic, use it
+            // Priority 1: Use mini-section name from API (already validated and fetched from DB)
             if (activity.miniSectionName && 
+                activity.miniSectionName.trim() !== '' &&
                 activity.miniSectionName !== 'Mini-section' && 
                 activity.miniSectionName !== 'mini-section' &&
+                activity.miniSectionName !== 'undefined' &&
+                activity.miniSectionName !== 'null' &&
                 !activity.miniSectionName.toLowerCase().includes('unknown')) {
                 return activity.miniSectionName;
             }
             
-            // Otherwise use section name if available
+            // Priority 2: Use section name from API if mini-section not available
             if (activity.sectionName && 
+                activity.sectionName.trim() !== '' &&
                 activity.sectionName !== 'Unknown Section' &&
+                activity.sectionName !== 'Section' &&
+                activity.sectionName !== 'undefined' &&
+                activity.sectionName !== 'null' &&
                 !activity.sectionName.toLowerCase().includes('unknown')) {
                 return activity.sectionName;
             }
             
-            // Try to extract from message as last resort
-            if (activity.message) {
-                const messageStr = activity.message;
-                
-                // Look for patterns like "Used 2 materials in first-slab (₹780)"
-                const locationMatch = messageStr.match(/in ([^(]+) \(/);
-                if (locationMatch) {
-                    const extractedName = locationMatch[1].trim();
-                    if (extractedName && !extractedName.toLowerCase().includes('mini-section')) {
-                        return extractedName;
-                    }
-                }
-                
-                // Look for slab/floor patterns
-                const slabMatch = messageStr.match(/in ([a-zA-Z0-9]+[- ]?(?:slab|floor|section))/i);
-                if (slabMatch) {
-                    return slabMatch[1].trim();
-                }
-            }
-            
-            return 'Unknown Location';
+            // Priority 3: Fallback to generic name
+            return 'Construction Area';
         };
         
         const displayLocationName = getLocationDisplayName();
@@ -305,7 +479,17 @@ export class PDFReportGenerator {
         console.log('  - Equipment data sample:', equipmentData?.slice(0, 2));
         
         const groupedActivities = this.groupActivitiesByDate(activities);
-        const sortedDates = Object.keys(groupedActivities).sort((a, b) => b.localeCompare(a)); // Latest first
+        // ✅ NEW: Group labor and equipment by date
+        const groupedLabor = this.groupLaborByDate(laborData || []);
+        const groupedEquipment = this.groupEquipmentByDate(equipmentData || []);
+        
+        // ✅ NEW: Get all unique dates from activities, labor, and equipment
+        const allDates = new Set([
+            ...Object.keys(groupedActivities),
+            ...Object.keys(groupedLabor),
+            ...Object.keys(groupedEquipment)
+        ]);
+        const sortedDates = Array.from(allDates).sort((a, b) => b.localeCompare(a)); // Latest first
 
         // Calculate summary statistics with new cost structure
         const totalActivities = activities.length;
@@ -409,22 +593,25 @@ export class PDFReportGenerator {
             </div>
         `;
 
+        // ✅ UPDATED: Generate daily sections with materials, labor, and equipment integrated
         const activitiesHTML = sortedDates.map(date => {
-            const dayActivities = groupedActivities[date];
-            const dayTotal = dayActivities.reduce((sum, activity) => {
-                // ✅ FIXED: Only count imported materials in daily totals
+            const dayActivities = groupedActivities[date] || [];
+            const dayLabor = groupedLabor[date] || [];
+            const dayEquipment = groupedEquipment[date] || [];
+            
+            // Calculate day totals for all cost types
+            const dayMaterialTotal = dayActivities.reduce((sum, activity) => {
+                // Only count imported materials in daily totals
                 if (activity.activity !== 'imported') {
-                    return sum; // Skip used materials - they don't add to cost
+                    return sum;
                 }
                 
                 return sum + activity.materials.reduce((matSum, material) => {
-                    // ✅ UPDATED: Use new cost structure with fallback to legacy
                     if (material.totalCost !== undefined) {
                         return matSum + Number(material.totalCost);
                     } else if (material.perUnitCost !== undefined) {
                         return matSum + (Number(material.perUnitCost) * Number(material.qnt));
                     } else if (material.cost !== undefined) {
-                        // ✅ LEGACY: For imported materials, cost field contains per-unit cost
                         const costValue = Number(material.cost) || 0;
                         const quantity = Number(material.qnt) || 0;
                         return matSum + (costValue * quantity);
@@ -433,19 +620,69 @@ export class PDFReportGenerator {
                 }, 0);
             }, 0);
 
+            const dayLaborTotal = dayLabor.reduce((sum, labor) => sum + (Number(labor.totalCost) || 0), 0);
+            const dayEquipmentTotal = dayEquipment.reduce((sum, equipment) => sum + (Number(equipment.totalCost) || 0), 0);
+            const dayTotal = dayMaterialTotal + dayLaborTotal + dayEquipmentTotal;
+
+            const totalEntries = dayActivities.length + dayLabor.length + dayEquipment.length;
+
             return `
                 <div style="page-break-inside: avoid; margin-bottom: 32px;">
                     <div style="background-color: #1e293b; color: white; padding: 16px; border-radius: 8px 8px 0 0; margin-bottom: 0;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <h2 style="margin: 0; font-size: 18px;">${this.formatDate(date)}</h2>
                             <div style="text-align: right;">
-                                <div style="font-size: 14px; opacity: 0.9;">${dayActivities.length} activities</div>
+                                <div style="font-size: 14px; opacity: 0.9;">
+                                    ${totalEntries} ${totalEntries === 1 ? 'entry' : 'entries'} 
+                                    ${dayActivities.length > 0 ? `(${dayActivities.length} material` : ''}${dayActivities.length > 0 && (dayLabor.length > 0 || dayEquipment.length > 0) ? ', ' : ''}${dayLabor.length > 0 ? `${dayLabor.length} labor` : ''}${dayLabor.length > 0 && dayEquipment.length > 0 ? ', ' : ''}${dayEquipment.length > 0 ? `${dayEquipment.length} equipment` : ''}${dayActivities.length > 0 ? ')' : ''}
+                                </div>
                                 ${dayTotal > 0 ? `<div style="font-size: 16px; font-weight: bold;">${this.formatCurrency(dayTotal)}</div>` : ''}
                             </div>
                         </div>
                     </div>
                     <div style="border: 1px solid #e2e8f0; border-top: none; padding: 16px; border-radius: 0 0 8px 8px;">
-                        ${dayActivities.map(activity => this.generateMaterialActivityHTML(activity)).join('')}
+                        ${dayActivities.length > 0 ? `
+                            <div style="margin-bottom: ${dayLabor.length > 0 || dayEquipment.length > 0 ? '24px' : '0'};">
+                                <h3 style="color: #374151; font-size: 14px; margin: 0 0 12px 0; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
+                                    📦 Material Activities (${dayActivities.length})
+                                </h3>
+                                ${dayActivities.map(activity => this.generateMaterialActivityHTML(activity)).join('')}
+                            </div>
+                        ` : ''}
+                        
+                        ${dayLabor.length > 0 ? `
+                            <div style="margin-bottom: ${dayEquipment.length > 0 ? '24px' : '0'};">
+                                <h3 style="color: #374151; font-size: 14px; margin: 0 0 12px 0; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
+                                    👷 Labor Costs (${dayLabor.length})
+                                </h3>
+                                ${this.generateLaborHTML(dayLabor)}
+                            </div>
+                        ` : ''}
+                        
+                        ${dayEquipment.length > 0 ? `
+                            <div>
+                                <h3 style="color: #374151; font-size: 14px; margin: 0 0 12px 0; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
+                                    🚜 Equipment Costs (${dayEquipment.length})
+                                </h3>
+                                ${this.generateEquipmentHTML(dayEquipment)}
+                            </div>
+                        ` : ''}
+                        
+                        ${dayTotal > 0 ? `
+                            <div style="margin-top: 16px; padding: 12px; background-color: #f0f9ff; border-radius: 6px; border-left: 4px solid #3B82F6;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <div style="font-size: 14px; font-weight: 600; color: #374151;">Day Total</div>
+                                        <div style="font-size: 11px; color: #6b7280; margin-top: 2px;">
+                                            ${dayMaterialTotal > 0 ? `Materials: ${this.formatCurrency(dayMaterialTotal)}` : ''}${dayMaterialTotal > 0 && (dayLaborTotal > 0 || dayEquipmentTotal > 0) ? ' • ' : ''}${dayLaborTotal > 0 ? `Labor: ${this.formatCurrency(dayLaborTotal)}` : ''}${dayLaborTotal > 0 && dayEquipmentTotal > 0 ? ' • ' : ''}${dayEquipmentTotal > 0 ? `Equipment: ${this.formatCurrency(dayEquipmentTotal)}` : ''}
+                                        </div>
+                                    </div>
+                                    <div style="font-size: 20px; font-weight: bold; color: #3B82F6;">
+                                        ${this.formatCurrency(dayTotal)}
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
                     </div>
                 </div>
             `;
@@ -547,143 +784,10 @@ export class PDFReportGenerator {
                     ${activitiesHTML}
                 ` : `
                     <div style="text-align: center; padding: 40px; background-color: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
-                        <h3 style="color: #6b7280; margin-bottom: 8px;">No Activities Found</h3>
-                        <p style="color: #9ca3af; margin: 0;">No material activities were recorded during the selected period.</p>
+                        <h3 style="color: #6b7280; margin-bottom: 8px;">No Data Found</h3>
+                        <p style="color: #9ca3af; margin: 0;">No material activities, labor entries, or equipment entries were recorded during the selected period.</p>
                     </div>
                 `}
-
-                ${(laborData && laborData.length > 0) ? `
-                    <div style="page-break-inside: avoid; margin-top: 32px;">
-                        <h2 style="color: #1e293b; margin-bottom: 20px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
-                            Labor Costs Summary
-                        </h2>
-                        <div style="background-color: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0;">
-                            <table style="width: 100%; border-collapse: collapse;">
-                                <thead>
-                                    <tr style="background-color: #f0f9ff;">
-                                        <th style="padding: 12px; text-align: left; font-size: 14px; color: #374151; border-bottom: 2px solid #e2e8f0;">Category</th>
-                                        <th style="padding: 12px; text-align: left; font-size: 14px; color: #374151; border-bottom: 2px solid #e2e8f0;">Type</th>
-                                        <th style="padding: 12px; text-align: center; font-size: 14px; color: #374151; border-bottom: 2px solid #e2e8f0;">Count</th>
-                                        <th style="padding: 12px; text-align: right; font-size: 14px; color: #374151; border-bottom: 2px solid #e2e8f0;">Per Labor Cost</th>
-                                        <th style="padding: 12px; text-align: right; font-size: 14px; color: #374151; border-bottom: 2px solid #e2e8f0;">Total Cost</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${laborData.map(labor => `
-                                        <tr>
-                                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9;">
-                                                <div style="display: flex; align-items: center;">
-                                                    <div style="width: 8px; height: 8px; background-color: #F59E0B; border-radius: 50%; margin-right: 8px;"></div>
-                                                    <strong>${labor.category || 'Unknown Category'}</strong>
-                                                </div>
-                                            </td>
-                                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9;">
-                                                ${labor.type || 'Unknown Type'}
-                                            </td>
-                                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; text-align: center;">
-                                                ${labor.count || 0}
-                                            </td>
-                                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; text-align: right;">
-                                                ${this.formatCurrency(Number(labor.perLaborCost) || 0)}
-                                            </td>
-                                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: bold;">
-                                                ${this.formatCurrency(Number(labor.totalCost) || 0)}
-                                            </td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                                <tfoot>
-                                    <tr style="background-color: #fef3c7; font-weight: bold;">
-                                        <td style="padding: 12px; border-top: 2px solid #e2e8f0;" colspan="4">
-                                            Total Labor Cost
-                                        </td>
-                                        <td style="padding: 12px; text-align: right; border-top: 2px solid #e2e8f0; color: #F59E0B; font-size: 16px;">
-                                            ${this.formatCurrency(totalLaborCost)}
-                                        </td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    </div>
-                ` : ''}
-
-                ${(() => {
-                    console.log('🔍 PDF Generator - Equipment section check:');
-                    console.log('  - equipmentData exists:', !!equipmentData);
-                    console.log('  - equipmentData length:', equipmentData?.length || 0);
-                    console.log('  - Condition result:', equipmentData && equipmentData.length > 0);
-                    
-                    if (equipmentData && equipmentData.length > 0) {
-                        console.log('✅ Equipment section SHOULD be rendered');
-                        console.log('✅ First equipment item:', equipmentData[0]);
-                    } else {
-                        console.log('❌ Equipment section will NOT be rendered');
-                    }
-                    return '';
-                })()}
-
-                ${(equipmentData && equipmentData.length > 0) ? `
-                    <div style="page-break-inside: avoid; margin-top: 32px;">
-                        <h2 style="color: #1e293b; margin-bottom: 20px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
-                            Equipment Costs Summary (${equipmentData.length} entries)
-                        </h2>
-                        <div style="background-color: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0;">
-                            <table style="width: 100%; border-collapse: collapse;">
-                                <thead>
-                                    <tr style="background-color: #fef3c7;">
-                                        <th style="padding: 12px; text-align: left; font-size: 14px; color: #374151; border-bottom: 2px solid #e2e8f0;">Equipment Type</th>
-                                        <th style="padding: 12px; text-align: left; font-size: 14px; color: #374151; border-bottom: 2px solid #e2e8f0;">Category</th>
-                                        <th style="padding: 12px; text-align: center; font-size: 14px; color: #374151; border-bottom: 2px solid #e2e8f0;">Quantity</th>
-                                        <th style="padding: 12px; text-align: center; font-size: 14px; color: #374151; border-bottom: 2px solid #e2e8f0;">Cost Type</th>
-                                        <th style="padding: 12px; text-align: right; font-size: 14px; color: #374151; border-bottom: 2px solid #e2e8f0;">Per Unit Cost</th>
-                                        <th style="padding: 12px; text-align: right; font-size: 14px; color: #374151; border-bottom: 2px solid #e2e8f0;">Total Cost</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${equipmentData.map(equipment => `
-                                        <tr>
-                                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9;">
-                                                <div style="display: flex; align-items: center;">
-                                                    <div style="width: 8px; height: 8px; background-color: #F59E0B; border-radius: 50%; margin-right: 8px;"></div>
-                                                    <strong>${equipment.type || 'Unknown Equipment'}</strong>
-                                                </div>
-                                            </td>
-                                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9;">
-                                                ${equipment.category || 'Unknown Category'}
-                                            </td>
-                                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; text-align: center;">
-                                                ${equipment.quantity || 0}
-                                            </td>
-                                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; text-align: center;">
-                                                <span style="background-color: ${equipment.costType === 'rental' ? '#EFF6FF' : equipment.costType === 'purchase' ? '#F0FDF4' : '#FEF3C7'}; 
-                                                             color: ${equipment.costType === 'rental' ? '#3B82F6' : equipment.costType === 'purchase' ? '#10B981' : '#F59E0B'}; 
-                                                             padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">
-                                                    ${(equipment.costType || 'rental').toUpperCase()}
-                                                </span>
-                                            </td>
-                                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; text-align: right;">
-                                                ${this.formatCurrency(Number(equipment.perUnitCost) || 0)}
-                                            </td>
-                                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: bold;">
-                                                ${this.formatCurrency(Number(equipment.totalCost) || 0)}
-                                            </td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                                <tfoot>
-                                    <tr style="background-color: #fef3c7; font-weight: bold;">
-                                        <td style="padding: 12px; border-top: 2px solid #e2e8f0;" colspan="5">
-                                            Total Equipment Cost
-                                        </td>
-                                        <td style="padding: 12px; text-align: right; border-top: 2px solid #e2e8f0; color: #F59E0B; font-size: 16px;">
-                                            ${this.formatCurrency(totalEquipmentCost)}
-                                        </td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    </div>
-                ` : ''}
 
                 <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #9ca3af; font-size: 12px;">
                     <p>This complete cost report was automatically generated by Xsite Application</p>

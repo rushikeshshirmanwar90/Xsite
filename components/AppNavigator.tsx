@@ -70,9 +70,12 @@ const AppNavigator: React.FC = () => {
       const subscription = Notifications.addNotificationReceivedListener(notification => {
         console.log('🔔 Notification received in foreground:', notification);
         // Notification will be shown automatically with sound
-    });
+      });
 
-    return () => subscription.remove();
+      return () => subscription.remove();
+    } catch (error) {
+      console.log('⚠️ Foreground notification listener setup skipped');
+    }
   }, []);
 
   // Handle navigation based on auth status

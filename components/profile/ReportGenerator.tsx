@@ -311,25 +311,51 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                 const equipmentResponse = await axios.get<ApiResponse<any>>(`${domain}/api/equipment?projectId=${selectedProjectId}`);
                 console.log('🔍 Equipment API Response:', equipmentResponse.data);
                 
-                if (equipmentResponse.data.success && equipmentResponse.data.data && equipmentResponse.data.data.equipment) {
-                    equipmentData = equipmentResponse.data.data.equipment;
+                // ✅ FIXED: The API returns data directly in response.data.data (which is an array)
+                // Not in response.data.data.equipment
+                if (equipmentResponse.data.success && equipmentResponse.data.data) {
+                    // The data field contains the equipment array directly
+                    const rawEquipmentData = equipmentResponse.data.data;
+                    
+                    // Handle both array and object with equipment property
+                    if (Array.isArray(rawEquipmentData)) {
+                        equipmentData = rawEquipmentData;
+                    } else if (rawEquipmentData.equipment && Array.isArray(rawEquipmentData.equipment)) {
+                        equipmentData = rawEquipmentData.equipment;
+                    } else {
+                        console.warn('⚠️ Unexpected equipment data structure:', rawEquipmentData);
+                        equipmentData = [];
+                    }
+                    
+                    console.log('✅ Raw equipment data type:', Array.isArray(rawEquipmentData) ? 'array' : typeof rawEquipmentData);
+                    console.log('✅ Equipment data fetched:', equipmentData.length, 'entries');
                     
                     // Filter equipment data by selected sections only if there are multiple sections
                     if (projectSections.length > 1 && selectedSections.length > 0 && selectedSections.length < projectSections.length && equipmentData.length > 0) {
+                        const beforeFilterCount = equipmentData.length;
                         equipmentData = equipmentData.filter((equipment: any) => 
                             selectedSections.includes(equipment.sectionId) || 
-                            selectedSections.includes(equipment.miniSectionId)
+                            selectedSections.includes(equipment.miniSectionId) ||
+                            selectedSections.includes(equipment.projectSectionId)
                         );
+                        console.log(`✅ Equipment filtered by sections: ${beforeFilterCount} → ${equipmentData.length} entries`);
                     }
                     
-                    console.log('✅ Equipment data fetched:', equipmentData.length, 'entries');
-                    console.log('✅ Equipment data sample:', equipmentData.slice(0, 2));
+                    console.log('✅ Final equipment data count:', equipmentData.length);
+                    if (equipmentData.length > 0) {
+                        console.log('✅ Equipment data sample:', equipmentData.slice(0, 2));
+                    }
                 } else {
                     console.warn('⚠️ Could not fetch project equipment data');
-                    console.warn('⚠️ Response structure:', equipmentResponse.data);
+                    console.warn('⚠️ Response structure:', {
+                        success: equipmentResponse.data.success,
+                        hasData: !!equipmentResponse.data.data,
+                        dataType: typeof equipmentResponse.data.data
+                    });
                 }
-            } catch (equipmentError) {
+            } catch (equipmentError: any) {
                 console.error('❌ Error fetching equipment data:', equipmentError);
+                console.error('❌ Equipment error response:', equipmentError.response?.data);
                 // Continue without equipment data
             }
 
