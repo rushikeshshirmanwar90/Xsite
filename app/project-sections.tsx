@@ -177,7 +177,7 @@ const ProjectSections = () => {
       if (res && (res.status === 200 || res.status === 201)) {
         // Extract the new section data from response
         let newSectionData: any = null;
-        const responseData = res.data as any;
+        const responseData = res.data as Record<string, any>;
 
         // Try different response structures
         if (responseData._id || responseData.sectionId) {
@@ -254,8 +254,9 @@ const ProjectSections = () => {
 
         console.log(`📊 ${section.name} completion response:`, response.status, response.data);
 
-        if (response.data.success && response.data.data) {
-          const isCompleted = Boolean(response.data.data.isCompleted);
+        const responseData = response.data as { success?: boolean; data?: { isCompleted?: boolean } };
+        if (responseData.success && responseData.data) {
+          const isCompleted = Boolean(responseData.data.isCompleted);
           completionStates[sectionId] = isCompleted;
           console.log(`✅ ${section.name} completion status: ${isCompleted ? 'COMPLETED ✓' : 'INCOMPLETE ○'}`);
         } else {
@@ -313,19 +314,20 @@ const ProjectSections = () => {
       console.log('Response status:', response.status);
       console.log('Response data:', JSON.stringify(response.data, null, 2));
 
-      if (response.data.success) {
+      const responseData = response.data as { success?: boolean; data?: { isCompleted?: boolean }; message?: string };
+      if (responseData.success) {
         // Use the actual completion status from the API response instead of toggling
-        const newCompletionStatus = response.data.data?.isCompleted;
+        const newCompletionStatus = responseData.data?.isCompleted;
         if (typeof newCompletionStatus === 'boolean') {
           setProjectCompleted(newCompletionStatus);
-          toast.success(response.data.message || `Project ${newCompletionStatus ? 'completed' : 'reopened'} successfully`);
+          toast.success(responseData.message || `Project ${newCompletionStatus ? 'completed' : 'reopened'} successfully`);
         } else {
           // Fallback to toggle logic if API doesn't return the new status
           setProjectCompleted(!projectCompleted);
-          toast.success(response.data.message || `Project completion updated successfully`);
+          toast.success(responseData.message || `Project completion updated successfully`);
         }
       } else {
-        throw new Error(response.data.message || 'Failed to update project completion');
+        throw new Error(responseData.message || 'Failed to update project completion');
       }
     } catch (error: any) {
       console.error('❌ Error updating project completion:', error);
@@ -339,7 +341,7 @@ const ProjectSections = () => {
           method: error?.config?.method,
           data: error?.config?.data
         }
-      });
+      });x
       
       // Handle specific error cases
       const errorMessage = error?.response?.data?.message || error?.message || 'Unknown error';
@@ -388,8 +390,9 @@ const ProjectSections = () => {
       console.log('🔍 [DEBUG] Response status:', response.status);
       console.log('🔍 [DEBUG] Response data:', JSON.stringify(response.data, null, 2));
       
-      if (response.data.success && response.data.data) {
-        const completionStatus = response.data.data.isCompleted || false;
+      const responseData = response.data as { success?: boolean; data?: { isCompleted?: boolean } };
+      if (responseData.success && responseData.data) {
+        const completionStatus = responseData.data.isCompleted || false;
         console.log('🔍 [DEBUG] Extracted completion status:', completionStatus);
         console.log('🔍 [DEBUG] Setting projectCompleted to:', completionStatus);
         
@@ -400,9 +403,9 @@ const ProjectSections = () => {
       } else {
         console.log('⚠️ [DEBUG] Project completion status not found in response');
         console.log('⚠️ [DEBUG] Response structure:', {
-          success: response.data.success,
-          hasData: !!response.data.data,
-          dataKeys: response.data.data ? Object.keys(response.data.data) : 'no data'
+          success: responseData.success,
+          hasData: !!responseData.data,
+          dataKeys: responseData.data ? Object.keys(responseData.data) : 'no data'
         });
         setProjectCompleted(false);
       }

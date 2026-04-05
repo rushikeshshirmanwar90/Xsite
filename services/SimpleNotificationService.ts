@@ -2,22 +2,38 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-// import * as Notifications from 'expo-notifications'; // TEMPORARILY DISABLED - Requires development build
 import axios from 'axios';
 import { domain } from '@/lib/domain';
 
+// ✅ Check if we're running in Expo Go (which doesn't support push notifications in SDK 53+)
+const isExpoGo = Constants.appOwnership === 'expo';
+
+// Conditional import - only import Notifications if not in Expo Go
+let Notifications: any;
+
+if (!isExpoGo) {
+  try {
+    Notifications = require('expo-notifications');
+  } catch (error) {
+    console.log('⚠️ expo-notifications not available, using mock');
+    Notifications = null;
+  }
+}
+
 // Mock Notifications object for Expo Go compatibility
-const Notifications = {
-  setNotificationHandler: () => {},
-  getPermissionsAsync: async () => ({ status: 'denied' }),
-  requestPermissionsAsync: async () => ({ status: 'denied' }),
-  setNotificationChannelAsync: async () => {},
-  getExpoPushTokenAsync: async () => ({ data: 'mock-token' }),
-  scheduleNotificationAsync: async () => 'mock-id',
-  AndroidImportance: { MAX: 4 },
-  AndroidNotificationPriority: { HIGH: 1 },
-  SchedulableTriggerInputTypes: { TIME_INTERVAL: 'timeInterval' },
-};
+if (!Notifications || isExpoGo) {
+  Notifications = {
+    setNotificationHandler: () => {},
+    getPermissionsAsync: async () => ({ status: 'denied' }),
+    requestPermissionsAsync: async () => ({ status: 'denied' }),
+    setNotificationChannelAsync: async () => {},
+    getExpoPushTokenAsync: async () => ({ data: 'mock-token-expo-go' }),
+    scheduleNotificationAsync: async () => 'mock-id',
+    AndroidImportance: { MAX: 4 },
+    AndroidNotificationPriority: { HIGH: 1 },
+    SchedulableTriggerInputTypes: { TIME_INTERVAL: 'timeInterval' },
+  };
+}
 
 // Simple notification service for project activities
 export class SimpleNotificationService {
@@ -55,6 +71,14 @@ export class SimpleNotificationService {
   async initialize(): Promise<boolean> {
     try {
       console.log('🔔 Initializing simple notification service...');
+
+      // ✅ Skip initialization in Expo Go
+      if (isExpoGo) {
+        console.log('⚠️ Running in Expo Go - push notifications not available');
+        console.log('   Use a development build for full notification support');
+        console.log('   Run: eas build --profile development --platform android');
+        return false;
+      }
 
       // Check device support
       if (!Device.isDevice) {
@@ -112,6 +136,7 @@ export class SimpleNotificationService {
       return false;
     } catch (error) {
       console.error('❌ Error initializing notifications:', error);
+      console.log('⚠️ Simple push token initialization failed - user may not receive notifications');
       return false;
     }
   }

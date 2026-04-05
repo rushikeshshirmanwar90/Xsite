@@ -5,17 +5,27 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Toaster } from "sonner-native";
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 
-// ✅ Configure notification behavior
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true, // Enable default sound
-    shouldSetBadge: true,
-    shouldShowBanner: true, // Show banner notification
-    shouldShowList: true,   // Show in notification list
-  }),
-});
+// ✅ Check if we're running in Expo Go (which doesn't support push notifications in SDK 53+)
+const isExpoGo = Constants.appOwnership === 'expo';
+
+// ✅ Configure notification behavior (only if not in Expo Go)
+if (!isExpoGo) {
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true, // Enable default sound
+        shouldSetBadge: true,
+        shouldShowBanner: true, // Show banner notification
+        shouldShowList: true,   // Show in notification list
+      }),
+    });
+  } catch (error) {
+    console.log('⚠️ Notification handler setup skipped (Expo Go limitation)');
+  }
+}
 
 // Define protected routes that require authentication
 const PROTECTED_ROUTES = ['(tabs)', 'details'];
@@ -25,29 +35,41 @@ const AppNavigator: React.FC = () => {
   const router = useRouter();
   const segments = useSegments();
 
-  // ✅ Handle notification tap - Navigate to notification page
+  // ✅ Handle notification tap - Navigate to notification page (skip in Expo Go)
   useEffect(() => {
-    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('🔔 Notification tapped:', response);
-      
-      // Navigate to notification page when user taps notification
-      try {
-        router.push('/notification');
-      } catch (error) {
-        console.error('❌ Navigation error from notification:', error);
-        // Fallback navigation
-        router.replace('/(tabs)');
-      }
-    });
+    if (isExpoGo) {
+      console.log('⚠️ Push notifications not available in Expo Go - use development build for full functionality');
+      return;
+    }
 
-    return () => subscription.remove();
+    try {
+      const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+        console.log('🔔 Notification tapped:', response);
+        
+        // Navigate to notification page when user taps notification
+        try {
+          router.push('/notification');
+        } catch (error) {
+          console.error('❌ Navigation error from notification:', error);
+          // Fallback navigation
+          router.replace('/(tabs)');
+        }
+      });
+
+      return () => subscription.remove();
+    } catch (error) {
+      console.log('⚠️ Notification listener setup skipped');
+    }
   }, [router]);
 
-  // ✅ Handle notification received while app is in foreground
+  // ✅ Handle notification received while app is in foreground (skip in Expo Go)
   useEffect(() => {
-    const subscription = Notifications.addNotificationReceivedListener(notification => {
-      console.log('🔔 Notification received in foreground:', notification);
-      // Notification will be shown automatically with sound
+    if (isExpoGo) return;
+
+    try {
+      const subscription = Notifications.addNotificationReceivedListener(notification => {
+        console.log('🔔 Notification received in foreground:', notification);
+        // Notification will be shown automatically with sound
     });
 
     return () => subscription.remove();

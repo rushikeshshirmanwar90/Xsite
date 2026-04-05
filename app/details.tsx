@@ -270,8 +270,10 @@ const Details = () => {
             const availableParams = { ...baseParams };
             const usedParams = {
                 ...baseParams,
-                ...(activeTab === 'used' && selectedMiniSection ? {
-                    sectionId: selectedMiniSection,
+                // ✅ CRITICAL FIX: Always filter used materials by the current section
+                sectionId: sectionId, // Filter by the main section being viewed
+                // ✅ OPTIONAL: Add mini-section filter if one is selected
+                ...(selectedMiniSection ? {
                     miniSectionId: selectedMiniSection
                 } : {})
             };

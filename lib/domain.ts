@@ -5,7 +5,7 @@
 // Uncomment the appropriate domain for your environment:
 
 // LOCAL DEVELOPMENT OPTIONS:
-export const domain = "http://192.168.31.159:8080"; // Current local IP
+export const domain = "http://192.168.128.10:8080"; // Current local IP
 // export const domain = "http://localhost:8080";
 
 // PRODUCTION OPTIONS:
