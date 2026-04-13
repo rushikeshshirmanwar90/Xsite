@@ -15,6 +15,7 @@
     },
     "android": {
       "package": "com.codewithrushi.xsite",
+      "versionCode": 21,
       "adaptiveIcon": {
         "backgroundColor": "#ffffff",
         "foregroundImage": "./assets/images/icon.png",

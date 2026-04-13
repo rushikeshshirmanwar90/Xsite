@@ -30,7 +30,9 @@ const ProjectSectionsAnalytics: React.FC = () => {
   const projectName = params.projectName as string;
   const sectionsData = params.sections as string;
   const materialAvailable = params.materialAvailable as string;
-  const materialUsed = params.materialUsed as string; // Keep for future use
+  const materialUsed = params.materialUsed as string;
+  const laborsData = params.labors as string;
+  const equipmentsData = params.equipments as string; // Add equipment data
 
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const colors = PieChartColors20;
@@ -39,14 +41,23 @@ const ProjectSectionsAnalytics: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [totalAvailable, setTotalAvailable] = useState(0);
   const [totalUsed, setTotalUsed] = useState(0);
+  const [totalLabor, setTotalLabor] = useState(0);
+  const [totalEquipment, setTotalEquipment] = useState(0); // Add total equipment state
 
   useEffect(() => {
     loadSectionExpenses();
-  }, [sectionsData, materialUsed, materialAvailable]);
+  }, [sectionsData, materialUsed, materialAvailable, laborsData, equipmentsData]);
 
   const loadSectionExpenses = () => {
     try {
       setLoading(true);
+
+      console.log('🔍 Project Sections Analytics - Loading expenses');
+      console.log('   - Sections data:', sectionsData ? 'Present' : 'Missing');
+      console.log('   - Material used:', materialUsed ? 'Present' : 'Missing');
+      console.log('   - Material available:', materialAvailable ? 'Present' : 'Missing');
+      console.log('   - Labors data:', laborsData ? 'Present' : 'Missing');
+      console.log('   - Equipments data:', equipmentsData ? 'Present' : 'Missing');
 
       const parsedSections = JSON.parse(
         Array.isArray(sectionsData) ? sectionsData[0] : sectionsData
@@ -60,7 +71,21 @@ const ProjectSectionsAnalytics: React.FC = () => {
         ? JSON.parse(Array.isArray(materialAvailable) ? materialAvailable[0] : materialAvailable)
         : [];
 
-      // Calculate totals for available and used
+      const parsedLabors = laborsData
+        ? JSON.parse(Array.isArray(laborsData) ? laborsData[0] : laborsData)
+        : [];
+
+      const parsedEquipments = equipmentsData
+        ? JSON.parse(Array.isArray(equipmentsData) ? equipmentsData[0] : equipmentsData)
+        : [];
+
+      console.log('   - Parsed sections:', parsedSections.length);
+      console.log('   - Parsed material used:', parsedMaterialUsed.length);
+      console.log('   - Parsed material available:', parsedMaterialAvailable.length);
+      console.log('   - Parsed labors:', parsedLabors.length);
+      console.log('   - Parsed equipments:', parsedEquipments.length);
+
+      // Calculate totals for available, used, labor, and equipment
       const availableTotal = parsedMaterialAvailable.reduce(
         (sum: number, material: any) => sum + (material.totalCost || material.cost || 0),
         0
@@ -69,21 +94,61 @@ const ProjectSectionsAnalytics: React.FC = () => {
         (sum: number, material: any) => sum + (material.totalCost || material.cost || 0),
         0
       );
+      const laborTotal = parsedLabors.reduce(
+        (sum: number, labor: any) => sum + (labor.totalCost || 0),
+        0
+      );
+      const equipmentTotal = parsedEquipments.reduce(
+        (sum: number, equipment: any) => sum + (equipment.totalCost || equipment.cost || 0),
+        0
+      );
 
       setTotalAvailable(availableTotal);
       setTotalUsed(usedTotal);
+      setTotalLabor(laborTotal);
+      setTotalEquipment(equipmentTotal);
 
-      // Calculate expenses per section from MaterialUsed (allocated materials)
+      console.log('   - Total available:', availableTotal);
+      console.log('   - Total used:', usedTotal);
+      console.log('   - Total labor:', laborTotal);
+      console.log('   - Total equipment:', equipmentTotal);
+      console.log('   - Grand total expenses:', usedTotal + laborTotal + equipmentTotal);
+
+      // Calculate expenses per section from MaterialUsed + Labor + Equipment
       const sectionExpenses: SectionExpense[] = parsedSections.map((section: any) => {
         const sectionMaterials = parsedMaterialUsed.filter(
           (material: any) =>
             material.sectionId === section._id || material.sectionId === section.sectionId
         );
 
-        const totalExpense = sectionMaterials.reduce(
+        const materialExpense = sectionMaterials.reduce(
           (sum: number, material: any) => sum + (material.totalCost || material.cost || 0),
           0
         );
+
+        // Calculate labor costs for this section
+        const sectionLabors = parsedLabors.filter(
+          (labor: any) =>
+            labor.sectionId === section._id || labor.sectionId === section.sectionId
+        );
+
+        const laborExpense = sectionLabors.reduce(
+          (sum: number, labor: any) => sum + (labor.totalCost || 0),
+          0
+        );
+
+        // Calculate equipment costs for this section
+        const sectionEquipments = parsedEquipments.filter(
+          (equipment: any) =>
+            equipment.sectionId === section._id || equipment.sectionId === section.sectionId
+        );
+
+        const equipmentExpense = sectionEquipments.reduce(
+          (sum: number, equipment: any) => sum + (equipment.totalCost || equipment.cost || 0),
+          0
+        );
+
+        const totalExpense = materialExpense + laborExpense + equipmentExpense;
 
         return {
           _id: section._id || section.sectionId,
@@ -93,8 +158,26 @@ const ProjectSectionsAnalytics: React.FC = () => {
         };
       });
 
+      console.log('   - Section expenses calculated:');
+      sectionExpenses.forEach(section => {
+        console.log(`     * ${section.name}: ₹${section.totalExpense}`);
+      });
+
       // Show all sections (even with 0 expense) to indicate available vs used
       setSections(sectionExpenses);
+
+      // If we have expenses but no sections have them, it means sectionId doesn't match
+      const totalSectionExpenses = sectionExpenses.reduce((sum, s) => sum + s.totalExpense, 0);
+      const totalActualExpenses = usedTotal + laborTotal + equipmentTotal;
+      
+      if (totalActualExpenses > 0 && totalSectionExpenses === 0) {
+        console.warn('⚠️ WARNING: Expenses exist but not assigned to any sections!');
+        console.warn('   This means sectionId in materials/labor/equipment does not match section IDs');
+        console.warn('   Section IDs:', parsedSections.map((s: any) => s._id || s.sectionId));
+        console.warn('   Material sectionIds:', [...new Set(parsedMaterialUsed.map((m: any) => m.sectionId))]);
+        console.warn('   Labor sectionIds:', [...new Set(parsedLabors.map((l: any) => l.sectionId))]);
+        console.warn('   Equipment sectionIds:', [...new Set(parsedEquipments.map((e: any) => e.sectionId))]);
+      }
 
       // Animate
       Animated.timing(fadeAnim, {
@@ -137,6 +220,14 @@ const ProjectSectionsAnalytics: React.FC = () => {
   const handleSectionPress = (sectionId: string, sectionName: string) => {
     const section = sections.find((s) => s._id === sectionId);
     if (section) {
+      console.log('🔍 Project Sections - Navigating to mini-sections with data:', {
+        sectionId: section._id,
+        sectionName: section.name,
+        materialAvailable: materialAvailable ? 'Present' : 'Missing',
+        materialUsed: materialUsed ? 'Present' : 'Missing',
+        labors: laborsData ? 'Present' : 'Missing',
+        equipments: equipmentsData ? 'Present' : 'Missing',
+      });
       router.push({
         pathname: '/analytics/mini-sections-analytics',
         params: {
@@ -144,7 +235,10 @@ const ProjectSectionsAnalytics: React.FC = () => {
           projectName,
           sectionId: section._id,
           sectionName: section.name,
+          materialAvailable, // Pass materialAvailable to next level
           materialUsed,
+          labors: laborsData,
+          equipments: equipmentsData, // Pass equipment data to next level
         },
       });
     }
@@ -161,31 +255,45 @@ const ProjectSectionsAnalytics: React.FC = () => {
             </TouchableOpacity>
             <View style={styles.projectInfo}>
               <Text style={styles.projectName}>{projectName}</Text>
-              <Text style={styles.projectSubtitle}>Material Allocation by Section</Text>
+              <Text style={styles.projectSubtitle}>Expenses by Section (Materials + Labor + Equipment)</Text>
             </View>
           </View>
         </View>
 
-        {/* Material Status Summary */}
+        {/* Material, Labor & Equipment Status Summary */}
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Material Status</Text>
+          <Text style={styles.summaryTitle}>Expenses Breakdown</Text>
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
               <View style={[styles.summaryDot, { backgroundColor: '#10B981' }]} />
-              <Text style={styles.summaryLabel}>Available (Not Allocated)</Text>
+              <Text style={styles.summaryLabel}>Materials Available</Text>
             </View>
             <Text style={styles.summaryValue}>{formatCurrency(totalAvailable)}</Text>
           </View>
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
-              <View style={[styles.summaryDot, { backgroundColor: '#EF4444' }]} />
-              <Text style={styles.summaryLabel}>Used (Allocated)</Text>
+              <View style={[styles.summaryDot, { backgroundColor: '#3B82F6' }]} />
+              <Text style={styles.summaryLabel}>Materials Used</Text>
             </View>
             <Text style={styles.summaryValue}>{formatCurrency(totalUsed)}</Text>
           </View>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryItem}>
+              <View style={[styles.summaryDot, { backgroundColor: '#F59E0B' }]} />
+              <Text style={styles.summaryLabel}>Labor Costs</Text>
+            </View>
+            <Text style={styles.summaryValue}>{formatCurrency(totalLabor)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryItem}>
+              <View style={[styles.summaryDot, { backgroundColor: '#8B5CF6' }]} />
+              <Text style={styles.summaryLabel}>Equipment Costs</Text>
+            </View>
+            <Text style={styles.summaryValue}>{formatCurrency(totalEquipment)}</Text>
+          </View>
           <View style={[styles.summaryRow, styles.summaryTotal]}>
-            <Text style={styles.summaryTotalLabel}>Total Material Value</Text>
-            <Text style={styles.summaryTotalValue}>{formatCurrency(totalAvailable + totalUsed)}</Text>
+            <Text style={styles.summaryTotalLabel}>Total Expenses</Text>
+            <Text style={styles.summaryTotalValue}>{formatCurrency(totalUsed + totalLabor + totalEquipment)}</Text>
           </View>
         </View>
 
@@ -193,11 +301,11 @@ const ProjectSectionsAnalytics: React.FC = () => {
         <View style={styles.statsSection}>
           <View style={[styles.statBox, styles.statBoxPrimary]}>
             <Text style={styles.statValue}>{sections.filter(s => s.totalExpense > 0).length}</Text>
-            <Text style={styles.statLabel}>Sections with Materials</Text>
+            <Text style={styles.statLabel}>Active Sections</Text>
           </View>
           <View style={[styles.statBox, styles.statBoxSecondary]}>
             <Text style={styles.statValue}>{formatCurrency(totalExpense)}</Text>
-            <Text style={styles.statLabel}>Total Allocated</Text>
+            <Text style={styles.statLabel}>Total Expenses</Text>
           </View>
         </View>
 
@@ -214,20 +322,31 @@ const ProjectSectionsAnalytics: React.FC = () => {
               This project doesn't have any sections yet
             </Text>
           </View>
-        ) : sections.filter(s => s.totalExpense > 0).length === 0 ? (
+        ) : (totalUsed + totalLabor + totalEquipment) === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="cube-outline" size={64} color="#CBD5E1" />
-            <Text style={styles.emptyTitle}>No Materials Allocated</Text>
+            <Text style={styles.emptyTitle}>No Expenses Recorded</Text>
             <Text style={styles.emptySubtitle}>
-              Materials have been imported but not yet allocated to any sections.
-              Use the "Add Usage" feature to allocate materials to sections.
+              No materials have been allocated, no labor has been added, and no equipment has been assigned yet.
+              Start by importing materials, adding labor, or assigning equipment to see the breakdown.
             </Text>
+            <View style={{ marginTop: 20, padding: 15, backgroundColor: '#FEF3C7', borderRadius: 10 }}>
+              <Text style={{ fontSize: 12, color: '#92400E', textAlign: 'center' }}>
+                Debug Info:{'\n'}
+                Sections: {sections.length}{'\n'}
+                Materials Used: ₹{totalUsed}{'\n'}
+                Labor: ₹{totalLabor}{'\n'}
+                Equipment: ₹{totalEquipment}{'\n'}
+                Total: ₹{totalUsed + totalLabor + totalEquipment}{'\n'}
+                Sections with expenses: {sections.filter(s => s.totalExpense > 0).length}
+              </Text>
+            </View>
           </View>
         ) : (
           <Animated.View style={[styles.card, { opacity: fadeAnim }]}>
             <View style={styles.heading}>
-              <Text style={styles.title}>Section Material Usage</Text>
-              <Text style={styles.subtitle}>Allocated Materials by Section</Text>
+              <Text style={styles.title}>Section Expenses</Text>
+              <Text style={styles.subtitle}>Materials + Labor + Equipment by Section</Text>
             </View>
 
             <View style={styles.chartContainer}>
@@ -240,7 +359,7 @@ const ProjectSectionsAnalytics: React.FC = () => {
                 labelType="amount"
                 onSlicePress={handleSectionPress}
                 centerContent={{
-                  label: 'TOTAL USED',
+                  label: 'TOTAL EXPENSES',
                   value: formatCurrency(totalExpense),
                   subtitle: `${sections.filter(s => s.totalExpense > 0).length} Section${sections.filter(s => s.totalExpense > 0).length > 1 ? 's' : ''}`,
                 }}

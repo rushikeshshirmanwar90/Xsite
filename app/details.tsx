@@ -100,6 +100,7 @@ const Details = () => {
     const [miniSectionCompletions, setMiniSectionCompletions] = useState<{[key: string]: boolean}>({});
     const [isUpdatingCompletion, setIsUpdatingCompletion] = useState(false);
     const [currentUserType, setCurrentUserType] = useState<string>('staff'); // Track current user type
+    const [showCompletionConfirmModal, setShowCompletionConfirmModal] = useState(false);
 
     // Low stock alert system
     const [lowStockThreshold, setLowStockThreshold] = useState(10); // Default 10% threshold
@@ -663,9 +664,17 @@ const Details = () => {
         return /^[0-9a-fA-F]{24}$/.test(id);
     };
 
-    // Function to toggle section completion
+    // Function to show confirmation modal before toggling
+    const handleCompletionButtonPress = () => {
+        setShowCompletionConfirmModal(true);
+    };
+
+    // Function to toggle section completion (actual API call)
     const toggleSectionCompletion = async () => {
         if (isUpdatingCompletion) return;
+        
+        // Close the confirmation modal
+        setShowCompletionConfirmModal(false);
         
         // Validate IDs first
         if (!sectionId || !isValidMongoId(sectionId)) {
@@ -3435,7 +3444,7 @@ const Details = () => {
                 onShowSectionPrompt={() => { }}
                 hideSection={true}
                 sectionCompleted={sectionCompleted}
-                onToggleSectionCompletion={toggleSectionCompletion}
+                onToggleSectionCompletion={handleCompletionButtonPress}
                 isUpdatingCompletion={isUpdatingCompletion}
             />
 
@@ -3543,6 +3552,59 @@ const Details = () => {
                             {isAddingMaterialUsage ? 'Adding...' : sectionCompleted ? 'Section Completed' : 'Add Usage'}
                         </Text>
                     </TouchableOpacity>
+                    </View>
+                </View>
+            )}
+
+            {/* Action Buttons for "used" tab - Show completion status and undo option */}
+            {activeTab === 'used' && (
+                <View style={{ marginHorizontal: 16, marginTop: 8, marginBottom: 8 }}>
+                    {/* Section Completion Status Card */}
+                    <View style={[
+                        actionStyles.completionStatusCard,
+                        sectionCompleted && actionStyles.completionStatusCardCompleted
+                    ]}>
+                        <View style={actionStyles.completionStatusLeft}>
+                            <Ionicons 
+                                name={sectionCompleted ? "checkmark-circle" : "ellipse-outline"} 
+                                size={24} 
+                                color={sectionCompleted ? "#059669" : "#94A3B8"} 
+                            />
+                            <View style={actionStyles.completionStatusTextContainer}>
+                                <Text style={actionStyles.completionStatusTitle}>
+                                    {sectionCompleted ? 'Section Completed' : 'Section In Progress'}
+                                </Text>
+                                <Text style={actionStyles.completionStatusSubtitle}>
+                                    {sectionCompleted 
+                                        ? 'Material operations are disabled' 
+                                        : 'You can mark this section as complete'}
+                                </Text>
+                            </View>
+                        </View>
+                        <TouchableOpacity
+                            style={[
+                                actionStyles.completionToggleButton,
+                                sectionCompleted && actionStyles.completionToggleButtonUndo
+                            ]}
+                            onPress={handleCompletionButtonPress}
+                            activeOpacity={0.7}
+                            disabled={isUpdatingCompletion}
+                        >
+                            {isUpdatingCompletion ? (
+                                <Ionicons name="sync" size={18} color="#FFFFFF" />
+                            ) : (
+                                <>
+                                    <Ionicons 
+                                        name={sectionCompleted ? "refresh" : "checkmark"} 
+                                        size={18} 
+                                        color="#FFFFFF" 
+                                    />
+                                    <Text style={actionStyles.completionToggleButtonText}>
+                                        {sectionCompleted ? 'Undo' : 'Complete'}
+                                    </Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
                     </View>
                 </View>
             )}
@@ -4661,6 +4723,68 @@ const Details = () => {
                     </View>
                 </View>
             )}
+
+            {/* Section Completion Confirmation Modal */}
+            <Modal
+                visible={showCompletionConfirmModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowCompletionConfirmModal(false)}
+            >
+                <View style={confirmModalStyles.modalOverlay}>
+                    <View style={confirmModalStyles.modalContainer}>
+                        <View style={confirmModalStyles.modalHeader}>
+                            <Ionicons 
+                                name={sectionCompleted ? "refresh-circle" : "checkmark-circle"} 
+                                size={48} 
+                                color={sectionCompleted ? "#F59E0B" : "#059669"} 
+                            />
+                            <Text style={confirmModalStyles.modalTitle}>
+                                {sectionCompleted ? 'Reopen Section?' : 'Complete Section?'}
+                            </Text>
+                            <Text style={confirmModalStyles.modalMessage}>
+                                {sectionCompleted 
+                                    ? `Are you sure you want to reopen "${sectionName}"? This will allow material operations again.`
+                                    : `Are you sure you want to mark "${sectionName}" as completed? This will disable material operations.`
+                                }
+                            </Text>
+                        </View>
+
+                        <View style={confirmModalStyles.modalActions}>
+                            <TouchableOpacity
+                                style={confirmModalStyles.cancelButton}
+                                onPress={() => setShowCompletionConfirmModal(false)}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={confirmModalStyles.cancelButtonText}>Cancel</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[
+                                    confirmModalStyles.confirmButton,
+                                    sectionCompleted && confirmModalStyles.confirmButtonReopen
+                                ]}
+                                onPress={toggleSectionCompletion}
+                                activeOpacity={0.7}
+                                disabled={isUpdatingCompletion}
+                            >
+                                {isUpdatingCompletion ? (
+                                    <View style={confirmModalStyles.loadingContainer}>
+                                        <Ionicons name="sync" size={16} color="#FFFFFF" />
+                                        <Text style={confirmModalStyles.confirmButtonText}>
+                                            {sectionCompleted ? 'Reopening...' : 'Completing...'}
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    <Text style={confirmModalStyles.confirmButtonText}>
+                                        {sectionCompleted ? 'Reopen' : 'Complete'}
+                                    </Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -4747,6 +4871,62 @@ const actionStyles = StyleSheet.create({
         fontWeight: '500',
         color: '#059669',
         flex: 1,
+    },
+    // Completion Status Card for "used" tab
+    completionStatusCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        padding: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    completionStatusCardCompleted: {
+        backgroundColor: '#F0FDF4',
+        borderColor: '#BBF7D0',
+    },
+    completionStatusLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        flex: 1,
+    },
+    completionStatusTextContainer: {
+        flex: 1,
+    },
+    completionStatusTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#1E293B',
+        marginBottom: 2,
+    },
+    completionStatusSubtitle: {
+        fontSize: 12,
+        color: '#64748B',
+    },
+    completionToggleButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#059669',
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        gap: 6,
+    },
+    completionToggleButtonUndo: {
+        backgroundColor: '#F59E0B',
+    },
+    completionToggleButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#FFFFFF',
     },
 });
 
@@ -5218,6 +5398,87 @@ const completionStyles = StyleSheet.create({
     },
     miniSectionCompletionButtonTextCompleted: {
         color: '#059669',
+    },
+});
+
+// Confirmation Modal Styles
+const confirmModalStyles = StyleSheet.create({
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    modalContainer: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 20,
+        width: '100%',
+        maxWidth: 400,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    modalHeader: {
+        alignItems: 'center',
+        padding: 24,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    modalTitle: {
+        fontSize: 22,
+        fontWeight: '700',
+        color: '#1E293B',
+        marginTop: 16,
+        marginBottom: 12,
+        textAlign: 'center',
+    },
+    modalMessage: {
+        fontSize: 15,
+        color: '#64748B',
+        textAlign: 'center',
+        lineHeight: 22,
+    },
+    modalActions: {
+        flexDirection: 'row',
+        padding: 16,
+        gap: 12,
+    },
+    cancelButton: {
+        flex: 1,
+        backgroundColor: '#F1F5F9',
+        paddingVertical: 14,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    cancelButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#475569',
+    },
+    confirmButton: {
+        flex: 1,
+        backgroundColor: '#059669',
+        paddingVertical: 14,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    confirmButtonReopen: {
+        backgroundColor: '#F59E0B',
+    },
+    confirmButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#FFFFFF',
+    },
+    loadingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
     },
 });
 

@@ -45,10 +45,21 @@ export const LicenseGuard: React.FC<LicenseGuardProps> = ({ children }) => {
                 <Ionicons name="alert-circle" size={64} color="#F59E0B" />
                 <Text style={styles.errorTitle}>Unable to Verify License</Text>
                 <Text style={styles.errorMessage}>{error}</Text>
-                <TouchableOpacity style={styles.retryButton} onPress={recheckLicense}>
-                    <Ionicons name="refresh" size={20} color="#FFFFFF" />
-                    <Text style={styles.retryButtonText}>Retry</Text>
-                </TouchableOpacity>
+                <View style={styles.errorButtonsContainer}>
+                    <TouchableOpacity style={styles.retryButton} onPress={recheckLicense}>
+                        <Ionicons name="refresh" size={20} color="#FFFFFF" />
+                        <Text style={styles.retryButtonText}>Retry</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                        style={styles.errorLogoutButton} 
+                        onPress={async () => {
+                            await logout();
+                        }}
+                    >
+                        <Ionicons name="log-out-outline" size={20} color="#64748B" />
+                        <Text style={styles.errorLogoutButtonText}>Logout</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
         );
     }
@@ -182,6 +193,11 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginBottom: 24,
     },
+    errorButtonsContainer: {
+        width: '100%',
+        gap: 12,
+        alignItems: 'center',
+    },
     retryButton: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -195,6 +211,22 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#FFFFFF',
+    },
+    errorLogoutButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 12,
+        gap: 8,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    errorLogoutButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#64748B',
     },
     blockedContainer: {
         flex: 1,

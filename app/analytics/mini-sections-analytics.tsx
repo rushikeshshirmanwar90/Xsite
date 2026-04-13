@@ -1,9 +1,7 @@
 // Level 3: Mini-Sections Analytics
 import PieChart, { PieChartColors20 } from '@/components/PieChart';
 import PieChartLegend, { LegendItem } from '@/components/PieChartLegend';
-import { getClientId } from '@/functions/clientId';
 import { getSection } from '@/functions/details';
-import { getProject } from '@/functions/project';
 import { formatCurrency } from '@/utils/analytics';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -11,7 +9,6 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Animated,
-    Modal,
     ScrollView,
     StyleSheet,
     Text,
@@ -37,6 +34,12 @@ interface EquipmentExpense {
   totalCost: number;
 }
 
+interface BuildingLaborExpense {
+  _id: string;
+  type: string;
+  totalCost: number;
+}
+
 const MiniSectionsAnalytics: React.FC = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -45,41 +48,117 @@ const MiniSectionsAnalytics: React.FC = () => {
   const sectionId = params.sectionId as string;
   const sectionName = params.sectionName as string;
   const materialUsed = params.materialUsed as string;
+  const materialAvailable = params.materialAvailable as string;
+  const laborsData = params.labors as string;
+  const equipmentsData = params.equipments as string;
 
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const colors = PieChartColors20;
 
   const [miniSections, setMiniSections] = useState<MiniSectionExpense[]>([]);
   const [equipmentExpenses, setEquipmentExpenses] = useState<EquipmentExpense[]>([]);
+  const [buildingLaborExpenses, setBuildingLaborExpenses] = useState<BuildingLaborExpense[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showEquipmentModal, setShowEquipmentModal] = useState(false);
 
   useEffect(() => {
     loadMiniSectionExpenses();
-  }, [sectionId, materialUsed, projectId]);
+  }, [sectionId, materialUsed, materialAvailable, laborsData, equipmentsData, projectId]);
 
   const loadMiniSectionExpenses = async () => {
     try {
       setLoading(true);
 
+      console.log('\n🔍 ========== MINI-SECTIONS ANALYTICS DEBUG ==========');
+      console.log('🔍 Mini-Sections Analytics - Loading expenses');
+      console.log('   - SectionId:', sectionId);
+      console.log('   - SectionName:', sectionName);
+      console.log('   - ProjectId:', projectId);
+      console.log('   - Material used param:', materialUsed ? 'Present' : 'Missing');
+      console.log('   - Material available param:', materialAvailable ? 'Present' : 'Missing');
+      console.log('   - Labors param:', laborsData ? 'Present' : 'Missing');
+      console.log('   - Equipments param:', equipmentsData ? 'Present' : 'Missing');
+
       // Fetch mini-sections for this section
       const miniSectionsData = await getSection(sectionId);
+      console.log('   - Mini-sections from API:', miniSectionsData.length);
+      if (miniSectionsData.length > 0) {
+        console.log('   - Mini-section IDs:', miniSectionsData.map((ms: any) => ms._id));
+        console.log('   - Mini-section names:', miniSectionsData.map((ms: any) => ms.name));
+      }
       
       const parsedMaterialUsed = materialUsed
         ? JSON.parse(Array.isArray(materialUsed) ? materialUsed[0] : materialUsed)
         : [];
 
-      // Get clientId and fetch project data to get MaterialAvailable and Labor data
-      const clientId = await getClientId();
-      let projectMaterialsAvailable: any[] = [];
-      let projectLaborData: any[] = [];
+      // Parse materialAvailable from params
+      const parsedMaterialAvailable = materialAvailable
+        ? JSON.parse(Array.isArray(materialAvailable) ? materialAvailable[0] : materialAvailable)
+        : [];
+
+      // Parse labors from params
+      const parsedLabors = laborsData
+        ? JSON.parse(Array.isArray(laborsData) ? laborsData[0] : laborsData)
+        : [];
+
+      console.log('\n📊 PARSED DATA:');
+      console.log('   - Parsed material used:', parsedMaterialUsed.length);
+      if (parsedMaterialUsed.length > 0) {
+        console.log('   - Sample MaterialUsed:', JSON.stringify(parsedMaterialUsed[0], null, 2));
+        console.log('   - ALL MaterialUsed items:');
+        parsedMaterialUsed.forEach((m: any, idx: number) => {
+          console.log(`     ${idx + 1}. ${m.name}: sectionId=${m.sectionId}, miniSectionId=${m.miniSectionId}, cost=₹${m.cost || 0}, totalCost=₹${m.totalCost || 0}`);
+        });
+      }
       
-      if (clientId && projectId) {
-        try {
-          const projectData = await getProject(projectId, clientId);
-          projectMaterialsAvailable = projectData?.MaterialAvailable || [];
-          projectLaborData = projectData?.Labors || []; // Get labor data from project
-          
+      console.log('   - Parsed material available:', parsedMaterialAvailable.length);
+      if (parsedMaterialAvailable.length > 0) {
+        console.log('   - Sample MaterialAvailable:', JSON.stringify(parsedMaterialAvailable[0], null, 2));
+        console.log('   - ALL MaterialAvailable items:');
+        parsedMaterialAvailable.forEach((m: any, idx: number) => {
+          console.log(`     ${idx + 1}. ${m.name}: sectionId=${m.sectionId}, miniSectionId=${m.miniSectionId}, cost=₹${m.cost || 0}, totalCost=₹${m.totalCost || 0}`);
+        });
+      }
+      
+      console.log('   - Parsed labors:', parsedLabors.length);
+      if (parsedLabors.length > 0) {
+        console.log('   - Sample Labor:', JSON.stringify(parsedLabors[0], null, 2));
+        console.log('   - ALL Labor items:');
+        parsedLabors.forEach((l: any, idx: number) => {
+          console.log(`     ${idx + 1}. ${l.type}: sectionId=${l.sectionId}, miniSectionId=${l.miniSectionId}, status=${l.status}, totalCost=₹${l.totalCost || 0}`);
+        });
+      }
+      
+      // Calculate RAW totals (no filtering) for debugging
+      const rawUsedTotal = parsedMaterialUsed.reduce((sum: number, m: any) => sum + (m.totalCost || m.cost || 0), 0);
+      const rawAvailableTotal = parsedMaterialAvailable.reduce((sum: number, m: any) => sum + (m.totalCost || m.cost || 0), 0);
+      const rawLaborTotal = parsedLabors.reduce((sum: number, l: any) => sum + (l.totalCost || 0), 0);
+      
+      console.log('\n💰 RAW TOTALS (before filtering):');
+      console.log(`   - Total MaterialUsed: ₹${rawUsedTotal}`);
+      console.log(`   - Total MaterialAvailable: ₹${rawAvailableTotal}`);
+      console.log(`   - Total Labor: ₹${rawLaborTotal}`);
+
+      // CRITICAL FIX: If no mini-sections exist, create a virtual one for the section itself
+      // This handles cases where materials/labor are assigned to section but not mini-sections
+      let effectiveMiniSections = miniSectionsData;
+      if (miniSectionsData.length === 0) {
+        console.log('\n⚠️ ========== NO MINI-SECTIONS FOUND ==========');
+        console.log('⚠️ Creating virtual mini-section for section-level data');
+        console.log('⚠️ Virtual mini-section will use sectionId:', sectionId);
+        effectiveMiniSections = [{
+          _id: sectionId,
+          name: sectionName || 'Section',
+          // This virtual mini-section will capture all section-level expenses
+        }] as any[];
+      }
+      console.log('   - Effective mini-sections to process:', effectiveMiniSections.length);
+      console.log('   - Effective mini-section IDs:', effectiveMiniSections.map((ms: any) => ms._id));
+      console.log('   - Effective mini-section names:', effectiveMiniSections.map((ms: any) => ms.name));
+
+      // Use parsed data directly instead of fetching from API
+      const projectMaterialsAvailable = parsedMaterialAvailable;
+      const projectLaborData = parsedLabors;
+      
       // Debug logging
       console.log('🔍 Project MaterialAvailable:', projectMaterialsAvailable.length, 'items');
       console.log('👷 Project Labor data:', projectLaborData.length, 'entries');
@@ -93,40 +172,95 @@ const MiniSectionsAnalytics: React.FC = () => {
       }
       console.log('🎯 Looking for sectionId:', sectionId);
       console.log('📍 Mini-sections:', miniSectionsData.map(ms => ({ id: ms._id, name: ms.name })));
-        } catch (error) {
-          console.error('Error fetching project data:', error);
-        }
-      }
 
-      // Fetch equipment costs separately (not linked to mini-sections)
+      // Fetch equipment costs - ALWAYS try to fetch, even if it fails
+      console.log('\n🔧 ========== EQUIPMENT PROCESSING ==========');
+      console.log('   - Starting equipment fetch...');
+      console.log('   - ProjectId:', projectId);
+      console.log('   - SectionId:', sectionId);
+      
       let sectionEquipmentCosts: EquipmentExpense[] = [];
+      
+      // Try to parse equipment from params first
+      const parsedEquipments = equipmentsData
+        ? JSON.parse(Array.isArray(equipmentsData) ? equipmentsData[0] : equipmentsData)
+        : [];
+      
+      console.log('   - Parsed equipments from params:', parsedEquipments.length);
+      
+      // CRITICAL: Equipment data is usually NOT in Project object, so always try API first
       try {
-        console.log('🔧 Fetching equipment costs for section:', sectionId);
+        console.log('🔧 Fetching equipment costs from API');
+        console.log('   - ProjectId:', projectId);
+        console.log('   - SectionId:', sectionId);
+        
+        // Try fetching by projectId only first (more permissive)
+        // CRITICAL FIX: Don't filter by status - get ALL equipment
         const equipmentResponse = await axios.get<{
           success: boolean;
-          data: {
-            equipment: any[];
-          };
+          data: any[];
         }>(`${domain}/api/equipment`, {
           params: {
             projectId: projectId,
-            projectSectionId: sectionId
+            projectSectionId: sectionId,
+            // Don't filter by status - we want all equipment including active
           }
         });
 
+        console.log('   - API Response received');
+        console.log('   - Response success:', equipmentResponse.data?.success);
+        console.log('   - Response data:', equipmentResponse.data?.data ? 'Present' : 'Missing');
+
         if (equipmentResponse.data && equipmentResponse.data.success) {
-          const equipment = equipmentResponse.data.data.equipment || [];
-          console.log('✅ Equipment data loaded:', equipment.length, 'items');
+          const allEquipment = equipmentResponse.data.data || [];
+          console.log('✅ Equipment data loaded from API:', allEquipment.length, 'items');
+          
+          // Calculate RAW total (before filtering)
+          const rawEquipmentTotal = allEquipment.reduce((sum: number, e: any) => sum + (e.totalCost || 0), 0);
+          console.log('💰 RAW Equipment Total (before filtering): ₹' + rawEquipmentTotal);
+          
+          if (allEquipment.length > 0) {
+            console.log('   - Sample equipment from API:', JSON.stringify(allEquipment[0], null, 2));
+            console.log('   - Equipment fields:', Object.keys(allEquipment[0]));
+            console.log('   - All equipment sectionIds:', [...new Set(allEquipment.map((e: any) => e.sectionId || e.projectSectionId || 'undefined'))]);
+            console.log('   - All equipment items:');
+            allEquipment.forEach((e: any, idx: number) => {
+              console.log(`     ${idx + 1}. ${e.name || e.type}: sectionId="${e.sectionId}", projectSectionId="${e.projectSectionId}", status="${e.status}", totalCost=₹${e.totalCost || 0}`);
+            });
+          } else {
+            console.warn('   ⚠️ NO EQUIPMENT FOUND for projectId:', projectId);
+            console.warn('   - This means no equipment exists in the database for this project');
+            console.warn('   - Please add equipment from the Equipment page first');
+          }
+          
+          // Filter equipment for this section (or unassigned equipment)
+          const sectionEquipment = allEquipment.filter((equipment: any) => {
+            const isActive = equipment.status === 'active' || !equipment.status;
+            if (!isActive) {
+              console.log(`   - Equipment "${equipment.name || equipment.type}" skipped (status: ${equipment.status})`);
+              return false;
+            }
+            
+            // Match if: has matching sectionId/projectSectionId, OR has no section assignment
+            const hasSectionId = equipment.sectionId === sectionId || equipment.projectSectionId === sectionId;
+            const hasNoSectionId = !equipment.sectionId && !equipment.projectSectionId;
+            const matches = hasSectionId || hasNoSectionId;
+            
+            console.log(`   - Equipment "${equipment.name || equipment.type}": sectionId="${equipment.sectionId}", projectSectionId="${equipment.projectSectionId}", matches=${matches}, totalCost=₹${equipment.totalCost || 0}`);
+            return matches;
+          });
+          
+          console.log('   - Filtered equipment for this section:', sectionEquipment.length);
           
           // Group equipment by type/name and calculate total costs
           const equipmentGroups: { [key: string]: number } = {};
           
-          equipment.forEach((item: any) => {
-            if (item.status === 'active' || !item.status) {
-              const equipmentName = item.name || item.type || 'Unknown Equipment';
-              equipmentGroups[equipmentName] = (equipmentGroups[equipmentName] || 0) + (item.totalCost || 0);
-            }
+          sectionEquipment.forEach((item: any) => {
+            const equipmentName = item.name || item.type || 'Unknown Equipment';
+            equipmentGroups[equipmentName] = (equipmentGroups[equipmentName] || 0) + (item.totalCost || 0);
           });
+          
+          console.log('   - Equipment groups:', equipmentGroups);
           
           // Convert to array format
           sectionEquipmentCosts = Object.entries(equipmentGroups).map(([name, cost]) => ({
@@ -135,17 +269,125 @@ const MiniSectionsAnalytics: React.FC = () => {
             totalCost: cost
           }));
           
-          console.log('🔧 Equipment expenses:', sectionEquipmentCosts);
+          console.log('🔧 Equipment expenses from API:', sectionEquipmentCosts);
         }
       } catch (error) {
-        console.error('Error fetching equipment costs:', error);
+        console.error('❌ Error fetching equipment costs from API:', error);
+        
+        // Fallback to params if API fails
+        if (parsedEquipments.length > 0) {
+          console.log('🔧 Falling back to equipment data from params');
+          
+          // Filter equipment for this section and group by type/name
+          const sectionEquipment = parsedEquipments.filter(
+            (equipment: any) => {
+              const matches = equipment.sectionId === sectionId || equipment.projectSectionId === sectionId || (!equipment.sectionId && !equipment.projectSectionId);
+              console.log(`   - Equipment "${equipment.name || equipment.type}": sectionId=${equipment.sectionId}, projectSectionId=${equipment.projectSectionId}, matches=${matches}`);
+              return matches;
+            }
+          );
+          
+          console.log('   - Filtered equipment for this section:', sectionEquipment.length);
+          
+          const equipmentGroups: { [key: string]: number } = {};
+          
+          sectionEquipment.forEach((item: any) => {
+            const isActive = item.status === 'active' || !item.status;
+            console.log(`   - Processing equipment "${item.name || item.type}": status=${item.status}, isActive=${isActive}, cost=${item.totalCost || item.cost || 0}`);
+            if (isActive) {
+              const equipmentName = item.name || item.type || 'Unknown Equipment';
+              equipmentGroups[equipmentName] = (equipmentGroups[equipmentName] || 0) + (item.totalCost || item.cost || 0);
+            }
+          });
+          
+          console.log('   - Equipment groups:', equipmentGroups);
+          
+          sectionEquipmentCosts = Object.entries(equipmentGroups).map(([name, cost]) => ({
+            _id: `equipment_${name.replace(/\s+/g, '_')}`,
+            name: name,
+            totalCost: cost
+          }));
+          
+          console.log('🔧 Equipment expenses from params:', sectionEquipmentCosts);
+        }
+      }
+
+      // ========== BUILDING-LEVEL LABOR PROCESSING ==========
+      console.log('\n👷 ========== BUILDING-LEVEL LABOR PROCESSING ==========');
+      console.log('   - Starting building-level labor separation...');
+      console.log('   - Total labor entries:', parsedLabors.length);
+      
+      // Separate building-level labor (no sectionId) from section-specific labor
+      const buildingLevelLabor = parsedLabors.filter((labor: any) => {
+        const isActive = labor.status === 'active' || !labor.status;
+        if (!isActive) {
+          console.log(`   - Labor "${labor.type}" skipped (status: ${labor.status})`);
+          return false;
+        }
+        
+        // Building-level labor has miniSectionId="no-mini-section" (General Building Labor)
+        // This means it's assigned to the section but not to any specific mini-section
+        const isBuildingLevel = labor.miniSectionId === 'no-mini-section' && labor.sectionId === sectionId;
+        console.log(`   - Labor "${labor.type}": sectionId="${labor.sectionId}", miniSectionId="${labor.miniSectionId}", isBuilding-level=${isBuildingLevel}, totalCost=₹${labor.totalCost || 0}`);
+        return isBuildingLevel;
+      });
+      
+      console.log('   - Building-level labor entries found:', buildingLevelLabor.length);
+      
+      // Group building-level labor by type and calculate total costs
+      const buildingLaborGroups: { [key: string]: number } = {};
+      
+      buildingLevelLabor.forEach((item: any) => {
+        const laborType = item.type || 'Unknown Labor';
+        buildingLaborGroups[laborType] = (buildingLaborGroups[laborType] || 0) + (item.totalCost || 0);
+        console.log(`   - Adding building labor "${laborType}": ₹${item.totalCost || 0}`);
+      });
+      
+      console.log('   - Building labor groups:', buildingLaborGroups);
+      
+      // Convert to array format
+      const buildingLaborCosts: BuildingLaborExpense[] = Object.entries(buildingLaborGroups).map(([type, cost]) => ({
+        _id: `building_labor_${type.replace(/\s+/g, '_')}`,
+        type: type,
+        totalCost: cost
+      }));
+      
+      const totalBuildingLaborCost = buildingLaborCosts.reduce((sum, labor) => sum + labor.totalCost, 0);
+      console.log('👷 Building-level labor expenses:', buildingLaborCosts.length, 'types');
+      console.log('💰 Total Building-level Labor Cost: ₹' + totalBuildingLaborCost);
+      
+      if (totalBuildingLaborCost === 0) {
+        console.log('   ℹ️ No building-level labor found (all labor is section-specific)');
       }
 
       // Calculate expenses per mini-section
-      const miniSectionExpenses: MiniSectionExpense[] = miniSectionsData.map((miniSection: any) => {
+      console.log('\n💰 ========== CALCULATING EXPENSES ==========');
+      const miniSectionExpenses: MiniSectionExpense[] = effectiveMiniSections.map((miniSection: any) => {
+        console.log(`\n📍 Processing mini-section: ${miniSection.name} (ID: ${miniSection._id})`);
+        console.log(`   - Is virtual mini-section: ${miniSection._id === sectionId}`);
+        console.log(`   - Section ID to match: ${sectionId}`);
+        
+        // SIMPLIFIED LOGIC: If this is a virtual mini-section (no real mini-sections exist),
+        // just include ALL materials/labor regardless of sectionId
+        const isVirtualMiniSection = miniSection._id === sectionId;
+        
         // Calculate used materials cost
         const miniSectionUsedMaterials = parsedMaterialUsed.filter(
-          (material: any) => material.miniSectionId === miniSection._id
+          (material: any) => {
+            if (isVirtualMiniSection) {
+              // For virtual mini-section, be very forgiving:
+              // Include if: has matching sectionId, OR has no sectionId, OR if there's only one section (include everything)
+              const hasSectionId = material.sectionId === sectionId;
+              const hasNoSectionId = !material.sectionId;
+              const matches = hasSectionId || hasNoSectionId;
+              console.log(`     - Material "${material.name}": sectionId="${material.sectionId}", matches=${matches}, cost=₹${material.totalCost || material.cost || 0}`);
+              return matches;
+            }
+            // For real mini-sections, match by miniSectionId
+            const matches = material.miniSectionId === miniSection._id;
+            console.log(`     - Material "${material.name}": miniSectionId="${material.miniSectionId}", matches=${matches}`);
+            return matches;
+          }
         );
 
         const usedMaterialsCost = miniSectionUsedMaterials.reduce(
@@ -153,59 +395,92 @@ const MiniSectionsAnalytics: React.FC = () => {
           0
         );
 
-        // Calculate available materials cost for this mini-section
-        // Include materials that are explicitly assigned to this mini-section OR section-level materials
-        let miniSectionAvailableMaterials = projectMaterialsAvailable.filter(
-          (material: any) => material.miniSectionId === miniSection._id
+        console.log(`   ✅ Used materials: ${miniSectionUsedMaterials.length} items, cost: ₹${usedMaterialsCost}`);
+
+        // Calculate available materials cost for this section/mini-section
+        // MaterialAvailable = Materials imported but not yet allocated/used
+        
+        let miniSectionAvailableMaterials = parsedMaterialAvailable.filter(
+          (material: any) => {
+            if (isVirtualMiniSection) {
+              // For virtual mini-section, be very forgiving
+              const hasSectionId = material.sectionId === sectionId;
+              const hasNoSectionId = !material.sectionId;
+              const matches = hasSectionId || hasNoSectionId;
+              console.log(`     - Available material "${material.name}": sectionId="${material.sectionId}", matches=${matches}, cost=₹${material.totalCost || material.cost || 0}`);
+              return matches;
+            }
+            // For real mini-sections, match by miniSectionId
+            // CRITICAL FIX: MaterialAvailable often doesn't have miniSectionId OR sectionId set
+            // If both are missing, include the material (it's unassigned and available to all)
+            const hasMiniSectionId = material.miniSectionId === miniSection._id;
+            const hasNoMiniSectionId = !material.miniSectionId || material.miniSectionId === 'undefined';
+            const hasSectionId = material.sectionId === sectionId;
+            const hasNoSectionId = !material.sectionId;
+            
+            // Match if: 
+            // 1. Has matching miniSectionId, OR
+            // 2. (No miniSectionId AND has matching sectionId), OR
+            // 3. (No miniSectionId AND no sectionId - unassigned material)
+            const matches = hasMiniSectionId || (hasNoMiniSectionId && (hasSectionId || hasNoSectionId));
+            console.log(`     - Available material "${material.name}": miniSectionId="${material.miniSectionId}", sectionId="${material.sectionId}", matches=${matches}, cost=₹${material.totalCost || material.cost || 0}`);
+            return matches;
+          }
         );
 
-        // If no materials found by miniSectionId, include section-level materials
-        if (miniSectionAvailableMaterials.length === 0) {
-          // Get materials assigned to this section but not to specific mini-sections
-          const sectionLevelMaterials = projectMaterialsAvailable.filter(
-            (material: any) => material.sectionId === sectionId && !material.miniSectionId
-          );
-          
-          // If there are section-level materials, distribute them among mini-sections
-          if (sectionLevelMaterials.length > 0 && miniSectionsData.length > 0) {
-            miniSectionAvailableMaterials = sectionLevelMaterials.map(material => ({
-              ...material,
-              // Divide cost equally among mini-sections for display purposes
-              cost: (material.cost || 0) / miniSectionsData.length,
-              totalCost: (material.totalCost || 0) / miniSectionsData.length,
-            }));
-          }
-        }
-
-        // If still no materials, check for unassigned materials at project level
-        if (miniSectionAvailableMaterials.length === 0) {
-          const unassignedMaterials = projectMaterialsAvailable.filter(
-            (material: any) => !material.miniSectionId && !material.sectionId
-          );
-          
-          if (unassignedMaterials.length > 0 && miniSectionsData.length > 0) {
-            // Distribute unassigned materials equally among mini-sections for display
-            miniSectionAvailableMaterials = unassignedMaterials.map(material => ({
-              ...material,
-              cost: (material.cost || 0) / miniSectionsData.length,
-              totalCost: (material.totalCost || 0) / miniSectionsData.length,
-            }));
-          }
-        }
-
-        // Calculate available materials cost (for display purposes only, not included in expenses)
-        const availableMaterialsCost = miniSectionAvailableMaterials.reduce(
-          (sum: number, material: any) => {
-            const cost = material.totalCost || material.cost || 0;
-            console.log(`💰 Available material (for display): ${material.name} = ${cost}`);
-            return sum + cost;
-          },
+        // Calculate available materials cost (materials not yet used)
+        // CRITICAL: Available should be the REMAINING after subtracting used
+        let totalImportedMaterialsCost = miniSectionAvailableMaterials.reduce(
+          (sum: number, material: any) => sum + (material.totalCost || material.cost || 0),
           0
         );
+        
+        // Available = Imported - Used
+        let availableMaterialsCost = Math.max(0, totalImportedMaterialsCost - usedMaterialsCost);
+
+        console.log(`   💰 Material costs breakdown:`);
+        console.log(`      - Total Imported: ₹${totalImportedMaterialsCost} (${miniSectionAvailableMaterials.length} items)`);
+        console.log(`      - Used (allocated): ₹${usedMaterialsCost} (${miniSectionUsedMaterials.length} items)`);
+        console.log(`      - Available (Imported - Used): ₹${availableMaterialsCost}`);
+        console.log(`      - Truly Available (Imported - Used): ₹${availableMaterialsCost}`);
 
         // Calculate labor cost for this mini-section
+        console.log(`   - Checking labor entries...`);
+        console.log(`   - Total labor entries available: ${projectLaborData.length}`);
+        
         const miniSectionLaborEntries = projectLaborData.filter(
-          (labor: any) => labor.miniSectionId === miniSection._id && (labor.status === 'active' || !labor.status)
+          (labor: any) => {
+            const isActive = labor.status === 'active' || !labor.status;
+            if (!isActive) {
+              console.log(`     - Labor "${labor.type}" skipped (status: ${labor.status})`);
+              return false;
+            }
+            
+            // CRITICAL: Exclude building-level labor (miniSectionId="no-mini-section")
+            const isBuildingLevel = labor.miniSectionId === 'no-mini-section';
+            if (isBuildingLevel) {
+              console.log(`     - Labor "${labor.type}" skipped (building-level labor, miniSectionId="no-mini-section")`);
+              return false;
+            }
+            
+            if (isVirtualMiniSection) {
+              // For virtual mini-section, match by sectionId only
+              const hasSectionId = labor.sectionId === sectionId;
+              console.log(`     - Labor "${labor.type}": sectionId="${labor.sectionId}", matches=${hasSectionId}, cost=₹${labor.totalCost || 0}`);
+              return hasSectionId;
+            }
+            // For real mini-sections, match by miniSectionId
+            const hasMiniSectionId = labor.miniSectionId === miniSection._id;
+            const hasNoMiniSectionId = !labor.miniSectionId || labor.miniSectionId === 'undefined';
+            const hasSectionId = labor.sectionId === sectionId;
+            
+            // Match if: 
+            // 1. Has matching miniSectionId, OR
+            // 2. (No miniSectionId AND has matching sectionId)
+            const matches = hasMiniSectionId || (hasNoMiniSectionId && hasSectionId);
+            console.log(`     - Labor "${labor.type}": miniSectionId="${labor.miniSectionId}", sectionId="${labor.sectionId}", matches=${matches}, cost=₹${labor.totalCost || 0}`);
+            return matches;
+          }
         );
 
         const laborCost = miniSectionLaborEntries.reduce(
@@ -213,25 +488,16 @@ const MiniSectionsAnalytics: React.FC = () => {
           0
         );
 
-        console.log(`👷 Mini-section ${miniSection.name} labor:`, {
-          laborEntries: miniSectionLaborEntries.length,
-          laborCost: laborCost,
-          laborDetails: miniSectionLaborEntries.map(l => ({ type: l.type, cost: l.totalCost }))
-        });
+        console.log(`   ✅ Labor: ${miniSectionLaborEntries.length} entries, cost: ₹${laborCost}`);
 
         // Calculate total expense - only include used materials and labor costs
         // Equipment costs are handled separately since they're not linked to mini-sections
         const totalExpense = usedMaterialsCost + laborCost;
 
-        console.log(`📊 Mini-section ${miniSection.name}:`, {
-          usedMaterialsCost,
-          availableMaterialsCost,
-          laborCost,
-          totalExpense: totalExpense, // Used materials + labor only
-          availableMaterialsCount: miniSectionAvailableMaterials.length,
-          laborEntriesCount: miniSectionLaborEntries.length,
-          note: 'Equipment costs handled separately'
-        });
+        console.log(`   � TOTAL EXPENSE for ${miniSection.name}: ₹${totalExpense}`);
+        console.log(`      - Used Materials: ₹${usedMaterialsCost}`);
+        console.log(`      - Labor: ₹${laborCost}`);
+        console.log(`      - Available Materials (display only): ₹${availableMaterialsCost}`);
 
         return {
           _id: miniSection._id,
@@ -243,12 +509,38 @@ const MiniSectionsAnalytics: React.FC = () => {
         };
       });
 
+      console.log('\n📊 ========== EXPENSE CALCULATION COMPLETE ==========');
+      console.log('Total mini-sections processed:', miniSectionExpenses.length);
+      miniSectionExpenses.forEach((ms, idx) => {
+        console.log(`  ${idx + 1}. ${ms.name}: ₹${ms.totalExpense} (Materials: ₹${ms.usedMaterialsCost}, Labor: ₹${ms.laborCost})`);
+      });
+      
+      console.log('\n🔧 ========== EQUIPMENT SUMMARY ==========');
+      console.log('Equipment expenses:', sectionEquipmentCosts.length, 'items');
+      sectionEquipmentCosts.forEach((eq, idx) => {
+        console.log(`  ${idx + 1}. ${eq.name}: ₹${eq.totalCost}`);
+      });
+      const totalEquipmentCost = sectionEquipmentCosts.reduce((sum, eq) => sum + eq.totalCost, 0);
+      console.log(`Total Equipment Cost: ₹${totalEquipmentCost}`);
+      
+      if (totalEquipmentCost === 0) {
+        console.warn(`\n⚠️ WARNING: Equipment cost is ₹0!`);
+        console.warn(`   - Check if equipment exists in database`);
+        console.warn(`   - Check equipment API response above`);
+      }
+
       // Filter mini-sections with actual expenses > 0 (only used materials + labor)
       const activeMiniSections = miniSectionExpenses.filter((ms) => ms.usedMaterialsCost > 0 || ms.laborCost > 0);
+      console.log('\n✅ Active mini-sections (with expenses > 0):', activeMiniSections.length);
+      console.log('🔍 ================================================\n');
+      
       setMiniSections(activeMiniSections);
       
       // Set equipment expenses separately
       setEquipmentExpenses(sectionEquipmentCosts);
+      
+      // Set building-level labor expenses separately
+      setBuildingLaborExpenses(buildingLaborCosts);
 
       // Animate
       Animated.timing(fadeAnim, {
@@ -265,11 +557,12 @@ const MiniSectionsAnalytics: React.FC = () => {
 
   const totalMiniSectionExpense = miniSections.reduce((sum, ms) => sum + ms.totalExpense, 0);
   const totalEquipmentExpense = equipmentExpenses.reduce((sum, eq) => sum + eq.totalCost, 0);
-  const totalExpense = totalMiniSectionExpense + totalEquipmentExpense;
+  const totalBuildingLaborExpense = buildingLaborExpenses.reduce((sum, labor) => sum + labor.totalCost, 0);
+  const totalExpense = totalMiniSectionExpense + totalEquipmentExpense + totalBuildingLaborExpense;
   
   const totalUsedMaterials = miniSections.reduce((sum, ms) => sum + ms.usedMaterialsCost, 0);
   const totalAvailableMaterials = miniSections.reduce((sum, ms) => sum + ms.availableMaterialsCost, 0);
-  const totalLaborCost = miniSections.reduce((sum, ms) => sum + ms.laborCost, 0);
+  const totalLaborCost = miniSections.reduce((sum, ms) => sum + ms.laborCost, 0) + totalBuildingLaborExpense;
 
   // Transform to pie data - combine mini-sections and single equipment slice
   const miniSectionPieData = miniSections.map((miniSection, index) => ({
@@ -299,7 +592,49 @@ const MiniSectionsAnalytics: React.FC = () => {
     description: `Total Equipment Costs`,
   }] : [];
 
-  const pieData = [...miniSectionPieData, ...equipmentPieData];
+  // Single building-level labor slice (merged all building labor)
+  const buildingLaborPieData = totalBuildingLaborExpense > 0 ? [{
+    key: 'building_labor_total',
+    value: totalBuildingLaborExpense,
+    svg: {
+      fill: colors[(miniSections.length + (totalEquipmentExpense > 0 ? 1 : 0)) % colors.length].primary,
+      gradientId: `gradient_building_labor_total`,
+    },
+    name: 'General Building Labor',
+    formattedBudget: formatCurrency(totalBuildingLaborExpense),
+    percentage: ((totalBuildingLaborExpense / totalExpense) * 100).toFixed(1),
+    description: `Building-Level Labor Costs`,
+  }] : [];
+
+  const pieData = [...miniSectionPieData, ...equipmentPieData, ...buildingLaborPieData];
+
+  // Create legend data with separators
+  const miniSectionLegendData: LegendItem[] = miniSectionPieData.map((item, index) => ({
+    key: item.key,
+    name: item.name,
+    value: item.formattedBudget,
+    percentage: item.percentage,
+    color: colors[index % colors.length].primary,
+    description: item.description,
+  }));
+
+  const equipmentLegendData: LegendItem[] = equipmentPieData.map((item) => ({
+    key: item.key,
+    name: item.name,
+    value: item.formattedBudget,
+    percentage: item.percentage,
+    color: colors[miniSections.length % colors.length].primary,
+    description: item.description,
+  }));
+
+  const buildingLaborLegendData: LegendItem[] = buildingLaborPieData.map((item) => ({
+    key: item.key,
+    name: item.name,
+    value: item.formattedBudget,
+    percentage: item.percentage,
+    color: colors[(miniSections.length + (totalEquipmentExpense > 0 ? 1 : 0)) % colors.length].primary,
+    description: item.description,
+  }));
 
   const legendData: LegendItem[] = pieData.map((item, index) => ({
     key: item.key,
@@ -311,9 +646,33 @@ const MiniSectionsAnalytics: React.FC = () => {
   }));
 
   const handleMiniSectionPress = (miniSectionId: string, miniSectionName: string) => {
-    // Handle equipment click separately
+    // Handle equipment click - navigate to dedicated page
     if (miniSectionId === 'equipment_total') {
-      setShowEquipmentModal(true);
+      router.push({
+        pathname: '/analytics/equipment-analytics',
+        params: {
+          projectId,
+          projectName,
+          sectionId,
+          sectionName,
+          equipments: equipmentsData,
+        },
+      });
+      return;
+    }
+    
+    // Handle building-level labor click - navigate to dedicated page
+    if (miniSectionId === 'building_labor_total') {
+      router.push({
+        pathname: '/analytics/building-labor-analytics',
+        params: {
+          projectId,
+          projectName,
+          sectionId,
+          sectionName,
+          labors: laborsData,
+        },
+      });
       return;
     }
     
@@ -447,56 +806,132 @@ const MiniSectionsAnalytics: React.FC = () => {
               />
             </View>
 
-            <PieChartLegend
-              items={legendData}
-              onItemClick={handleMiniSectionPress}
-              showPercentage={true}
-              showDescription={true}
-              layout="vertical"
-            />
+            {/* Custom Legend with Separators */}
+            <View style={styles.legendContainer}>
+              {/* Mini-Sections Legend */}
+              {miniSectionLegendData.length > 0 && (
+                <View style={styles.legendSection}>
+                  <Text style={styles.legendSectionTitle}>Mini-Sections</Text>
+                  {miniSectionLegendData.map((item) => (
+                    <TouchableOpacity
+                      key={item.key}
+                      style={styles.legendItem}
+                      onPress={() => handleMiniSectionPress(item.key, item.name)}
+                    >
+                      <View style={[styles.legendColorIndicator, { backgroundColor: item.color }]} />
+                      <View style={styles.legendTextContainer}>
+                        <View style={styles.legendMainInfo}>
+                          <Text style={styles.legendItemName} numberOfLines={1}>
+                            {item.name}
+                          </Text>
+                          <Text style={styles.legendItemValue}>
+                            {item.value}
+                            {item.percentage && (
+                              <Text style={styles.legendPercentageText}>
+                                {' '}({item.percentage}%)
+                              </Text>
+                            )}
+                          </Text>
+                        </View>
+                        {item.description && (
+                          <View style={styles.legendDescriptionContainer}>
+                            <Text style={styles.legendItemDescription} numberOfLines={2}>
+                              {item.description}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {/* Separator for Equipment */}
+              {equipmentLegendData.length > 0 && miniSectionLegendData.length > 0 && (
+                <View style={styles.legendSeparator}>
+                  <View style={styles.legendSeparatorLine} />
+                  <Text style={styles.legendSeparatorText}>Other Costs</Text>
+                  <View style={styles.legendSeparatorLine} />
+                </View>
+              )}
+
+              {/* Equipment Legend */}
+              {equipmentLegendData.length > 0 && (
+                <View style={styles.legendSection}>
+                  {equipmentLegendData.map((item) => (
+                    <TouchableOpacity
+                      key={item.key}
+                      style={styles.legendItem}
+                      onPress={() => handleMiniSectionPress(item.key, item.name)}
+                    >
+                      <View style={[styles.legendColorIndicator, { backgroundColor: item.color }]} />
+                      <View style={styles.legendTextContainer}>
+                        <View style={styles.legendMainInfo}>
+                          <Text style={styles.legendItemName} numberOfLines={1}>
+                            {item.name}
+                          </Text>
+                          <Text style={styles.legendItemValue}>
+                            {item.value}
+                            {item.percentage && (
+                              <Text style={styles.legendPercentageText}>
+                                {' '}({item.percentage}%)
+                              </Text>
+                            )}
+                          </Text>
+                        </View>
+                        {item.description && (
+                          <View style={styles.legendDescriptionContainer}>
+                            <Text style={styles.legendItemDescription} numberOfLines={2}>
+                              {item.description}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {/* Building Labor Legend */}
+              {buildingLaborLegendData.length > 0 && (
+                <View style={styles.legendSection}>
+                  {buildingLaborLegendData.map((item) => (
+                    <TouchableOpacity
+                      key={item.key}
+                      style={styles.legendItem}
+                      onPress={() => handleMiniSectionPress(item.key, item.name)}
+                    >
+                      <View style={[styles.legendColorIndicator, { backgroundColor: item.color }]} />
+                      <View style={styles.legendTextContainer}>
+                        <View style={styles.legendMainInfo}>
+                          <Text style={styles.legendItemName} numberOfLines={1}>
+                            {item.name}
+                          </Text>
+                          <Text style={styles.legendItemValue}>
+                            {item.value}
+                            {item.percentage && (
+                              <Text style={styles.legendPercentageText}>
+                                {' '}({item.percentage}%)
+                              </Text>
+                            )}
+                          </Text>
+                        </View>
+                        {item.description && (
+                          <View style={styles.legendDescriptionContainer}>
+                            <Text style={styles.legendItemDescription} numberOfLines={2}>
+                              {item.description}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
           </Animated.View>
         )}
       </ScrollView>
-      
-      {/* Equipment Breakdown Modal */}
-      <Modal
-        visible={showEquipmentModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowEquipmentModal(false)}
-      >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Equipment Cost Breakdown</Text>
-            <TouchableOpacity 
-              onPress={() => setShowEquipmentModal(false)}
-              style={styles.closeButton}
-            >
-              <Ionicons name="close" size={24} color="#64748B" />
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView style={styles.modalContent}>
-            <View style={styles.modalStats}>
-              <Text style={styles.modalTotalLabel}>Total Equipment Cost</Text>
-              <Text style={styles.modalTotalValue}>{formatCurrency(totalEquipmentExpense)}</Text>
-            </View>
-            
-            {equipmentExpenses.map((equipment, index) => (
-              <View key={equipment._id} style={styles.modalEquipmentItem}>
-                <View style={styles.modalEquipmentHeader}>
-                  <Ionicons name="construct" size={20} color="#F59E0B" />
-                  <Text style={styles.modalEquipmentName}>{equipment.name}</Text>
-                </View>
-                <Text style={styles.modalEquipmentCost}>{formatCurrency(equipment.totalCost)}</Text>
-                <Text style={styles.modalEquipmentPercentage}>
-                  {((equipment.totalCost / totalEquipmentExpense) * 100).toFixed(1)}%
-                </Text>
-              </View>
-            ))}
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
     </SafeAreaView>
   );
 };
@@ -653,7 +1088,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     margin: 20,
     borderRadius: 16,
-    padding: 24,
+    padding: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#000',
@@ -664,7 +1099,7 @@ const styles = StyleSheet.create({
   },
   heading: {
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   title: {
     fontSize: 22,
@@ -679,7 +1114,7 @@ const styles = StyleSheet.create({
   },
   chartContainer: {
     alignItems: 'center',
-    marginVertical: 20,
+    marginVertical: 8,
   },
   loadingContainer: {
     flex: 1,
@@ -816,5 +1251,97 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748B',
     fontWeight: '500',
+  },
+  // Custom Legend Styles
+  legendContainer: {
+    marginHorizontal: 6,
+    marginTop: 4,
+    marginBottom: 20,
+  },
+  legendSection: {
+    marginBottom: 4,
+  },
+  legendSectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 8,
+    marginLeft: 4,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  legendColorIndicator: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginTop: 4,
+    marginRight: 12,
+  },
+  legendTextContainer: {
+    flex: 1,
+  },
+  legendMainInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  legendItemName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1E293B',
+    flex: 1,
+    marginRight: 8,
+  },
+  legendItemValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  legendPercentageText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  legendDescriptionContainer: {
+    marginTop: 2,
+  },
+  legendItemDescription: {
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 16,
+  },
+  legendSeparator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 12,
+    paddingHorizontal: 8,
+  },
+  legendSeparatorLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#CBD5E1',
+  },
+  legendSeparatorText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+    marginHorizontal: 12,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
 });

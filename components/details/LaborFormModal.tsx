@@ -220,6 +220,9 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
   const [editingEntry, setEditingEntry] = useState<any | null>(null);
   const laborEntriesRef = useRef<any[]>([]);
+  
+  // State for showing advanced options
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
 
   // Animation values for swipe to submit
   const swipeAnimation = useRef(new Animated.Value(0)).current;
@@ -384,6 +387,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
     setSwipeProgress(0);
     setProgressText('Swipe to Submit All');
     swipeAnimation.setValue(0);
+    setShowAdvancedOptions(false); // Reset advanced options
     
     // Reset types section animations
     typesSectionOpacity.setValue(0);
@@ -393,7 +397,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
   const handleCategorySelect = (category: LaborCategory) => {
     setSelectedCategory(category.id);
     
-    // Show types section
+    // Show types section with animation
     const showTypesAnimations = [
       Animated.timing(typesSectionOpacity, {
         toValue: 1,
@@ -417,6 +421,12 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
 
   const handleTypeSelect = (type: string) => {
     setSelectedType(type);
+    
+    // If category is not set (quick selection), set it to 'civil' for Mistri and Labor
+    if (!selectedCategory && (type === 'Mason (Raj Mistri)' || type === 'Helper / Unskilled Labour')) {
+      setSelectedCategory('civil');
+    }
+    
     // Auto scroll to mini-section selection
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
@@ -439,6 +449,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
     setSelectedMiniSection('');
     setSearchQuery('');
     setEditingEntry(null);
+    setShowAdvancedOptions(false); // Reset advanced options
     
     // Reset types section animations
     typesSectionOpacity.setValue(0);
@@ -812,40 +823,63 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                   </View>
                 )}
 
-                {/* Step 1: Category Selection */}
-                <View style={[styles.sectionContainer, styles.firstSectionContainer]}>
-                  {!selectedCategory ? (
-                    <View style={styles.searchContainer}>
-                      <View style={styles.searchInputWrapper}>
-                        <Ionicons name="search" size={20} color="#9CA3AF" />
-                        <TextInput
-                          style={styles.searchInput}
-                          value={searchQuery}
-                          onChangeText={setSearchQuery}
-                          placeholder="Search labor categories..."
-                          placeholderTextColor="#9CA3AF"
-                          returnKeyType="search"
-                        />
-                        {searchQuery.length > 0 && (
-                          <TouchableOpacity onPress={() => setSearchQuery('')}>
-                            <Ionicons name="close-circle" size={20} color="#9CA3AF" />
-                          </TouchableOpacity>
-                        )}
+                {/* Step 1: Category Selection - Only show if advanced options are enabled */}
+                {showAdvancedOptions && (
+                  <View style={[styles.sectionContainer, styles.firstSectionContainer]}>
+                    {!selectedCategory ? (
+                      <>
+                        <View style={styles.searchContainer}>
+                          <View style={styles.searchInputWrapper}>
+                            <Ionicons name="search" size={20} color="#9CA3AF" />
+                            <TextInput
+                              style={styles.searchInput}
+                              value={searchQuery}
+                              onChangeText={setSearchQuery}
+                              placeholder="Search labor categories..."
+                              placeholderTextColor="#9CA3AF"
+                              returnKeyType="search"
+                            />
+                            {searchQuery.length > 0 && (
+                              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                                <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        </View>
+                        
+                        {/* Hide Advanced Options Button */}
+                        <TouchableOpacity
+                          style={styles.hideAdvancedButton}
+                          onPress={() => {
+                            setShowAdvancedOptions(false);
+                            setSelectedCategory('');
+                            setSearchQuery('');
+                            // Scroll back to top
+                            setTimeout(() => {
+                              scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+                            }, 100);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <View style={styles.hideAdvancedButtonContent}>
+                            <Ionicons name="chevron-up" size={18} color="#64748B" />
+                            <Text style={styles.hideAdvancedButtonText}>Hide Advanced Options</Text>
+                          </View>
+                        </TouchableOpacity>
+                      </>
+                    ) : (
+                      <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Selected Category</Text>
+                        <TouchableOpacity 
+                          style={styles.undoButton}
+                          onPress={goBackToCategories}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="arrow-undo-outline" size={16} color="#EA580C" />
+                          <Text style={styles.undoButtonText}>Undo</Text>
+                        </TouchableOpacity>
                       </View>
-                    </View>
-                  ) : (
-                    <View style={styles.sectionHeader}>
-                      <Text style={styles.sectionTitle}>Selected Category</Text>
-                      <TouchableOpacity 
-                        style={styles.undoButton}
-                        onPress={goBackToCategories}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons name="arrow-undo-outline" size={16} color="#EA580C" />
-                        <Text style={styles.undoButtonText}>Undo</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
+                    )}
               
               <View style={styles.categoriesContainer}>
                 {!selectedCategory && (() => {
@@ -891,9 +925,122 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                 })()}
               </View>
             </View>
+                )}
 
-            {/* Step 2: Type Selection */}
-            {selectedCategory && (
+            {/* Quick Labor Selection - Show when advanced options are NOT enabled */}
+            {!showAdvancedOptions && (
+              <View style={[styles.sectionContainer, styles.firstSectionContainer]}>
+                <View style={styles.quickLaborHeader}>
+                  <Ionicons name="people-circle-outline" size={24} color="#3B82F6" />
+                  <Text style={styles.quickLaborTitle}>Select Labor Type</Text>
+                </View>
+                
+                {!selectedType ? (
+                  <View style={styles.quickLaborOptions}>
+                    {/* Mistri Option */}
+                    <TouchableOpacity
+                      style={styles.quickLaborCard}
+                      onPress={() => {
+                        setSelectedCategory('civil'); // Set to Civil category
+                        handleTypeSelect('Mason (Raj Mistri)');
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.quickLaborCardContent}>
+                        <View style={[styles.quickLaborIcon, { backgroundColor: '#EFF6FF' }]}>
+                          <Ionicons name="hammer-outline" size={32} color="#3B82F6" />
+                        </View>
+                        <View style={styles.quickLaborInfo}>
+                          <Text style={styles.quickLaborName}>Mistri</Text>
+                          <Text style={styles.quickLaborSubtext}>Skilled mason worker</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={24} color="#3B82F6" />
+                      </View>
+                    </TouchableOpacity>
+
+                    {/* Labor Option */}
+                    <TouchableOpacity
+                      style={styles.quickLaborCard}
+                      onPress={() => {
+                        setSelectedCategory('civil'); // Set to Civil category
+                        handleTypeSelect('Helper / Unskilled Labour');
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.quickLaborCardContent}>
+                        <View style={[styles.quickLaborIcon, { backgroundColor: '#F0FDF4' }]}>
+                          <Ionicons name="people-outline" size={32} color="#10B981" />
+                        </View>
+                        <View style={styles.quickLaborInfo}>
+                          <Text style={styles.quickLaborName}>Labor</Text>
+                          <Text style={styles.quickLaborSubtext}>General helper</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={24} color="#10B981" />
+                      </View>
+                    </TouchableOpacity>
+
+                    {/* Show Advanced Options Button */}
+                    <TouchableOpacity
+                      style={styles.showAdvancedButton}
+                      onPress={() => {
+                        setShowAdvancedOptions(true);
+                        // Scroll to show the advanced options
+                        setTimeout(() => {
+                          scrollViewRef.current?.scrollTo({ y: 100, animated: true });
+                        }, 100);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.showAdvancedButtonContent}>
+                        <Ionicons name="options-outline" size={20} color="#7C3AED" />
+                        <Text style={styles.showAdvancedButtonText}>Show Advanced Options</Text>
+                        <Ionicons name="chevron-down" size={18} color="#7C3AED" />
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.selectedQuickLaborWrapper}>
+                    <View style={styles.selectedQuickLaborCard}>
+                      <View style={styles.selectedQuickLaborContent}>
+                        <View style={[styles.quickLaborIcon, { 
+                          backgroundColor: selectedType === 'Mason (Raj Mistri)' ? '#EFF6FF' : '#F0FDF4' 
+                        }]}>
+                          <Ionicons 
+                            name={selectedType === 'Mason (Raj Mistri)' ? 'hammer' : 'people'} 
+                            size={28} 
+                            color={selectedType === 'Mason (Raj Mistri)' ? '#3B82F6' : '#10B981'} 
+                          />
+                        </View>
+                        <View style={styles.quickLaborInfo}>
+                          <Text style={styles.selectedQuickLaborName}>
+                            {selectedType === 'Mason (Raj Mistri)' ? 'Mistri' : 'Labor'}
+                          </Text>
+                          <Text style={styles.quickLaborSubtext}>
+                            {selectedType === 'Mason (Raj Mistri)' ? 'Skilled mason worker' : 'General helper'}
+                          </Text>
+                        </View>
+                        <View style={styles.selectedQuickLaborActions}>
+                          <TouchableOpacity 
+                            style={styles.undoButton}
+                            onPress={() => {
+                              setSelectedType('');
+                              setSelectedCategory('');
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <Ionicons name="arrow-undo-outline" size={16} color="#EA580C" />
+                            <Text style={styles.undoButtonText}>Change</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Step 2: Type Selection - Only show if advanced options are enabled */}
+            {showAdvancedOptions && selectedCategory && (
               <Animated.View 
                 style={[
                   styles.sectionContainer,
@@ -924,71 +1071,120 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                     const categoryTypes = laborCategories.find(cat => cat.id === selectedCategory)?.types || [];
                     const displayTypes = selectedType ? categoryTypes.filter(type => type === selectedType) : categoryTypes;
                     
+                    // Define basic labor types
+                    const basicLaborTypes = ['Mason (Raj Mistri)', 'Helper / Unskilled Labour'];
+                    
+                    // Filter types based on showAdvancedOptions
+                    const filteredTypes = showAdvancedOptions 
+                      ? displayTypes 
+                      : displayTypes.filter(type => basicLaborTypes.includes(type));
+                    
                     return (
                       <>
                         {!selectedType && displayTypes.length > 0 && (
                           <View style={styles.laborTypesContainer}>
-                            {/* Multitask Labor Option */}
-                            <TouchableOpacity
-                              style={styles.multitaskLaborCard}
-                              onPress={() => handleTypeSelect('Multitask Labor')}
-                              activeOpacity={0.7}
-                            >
-                              <View style={styles.multitaskLaborContent}>
-                                <View style={styles.multitaskLaborIconContainer}>
-                                  <View style={styles.multitaskLaborIconBadge}>
-                                    <Ionicons name="people" size={20} color="#7C3AED" />
-                                  </View>
-                                  <View style={styles.multitaskLaborIconOverlay}>
-                                    <Ionicons name="star" size={14} color="#7C3AED" />
-                                  </View>
-                                </View>
-                                <View style={styles.multitaskLaborInfo}>
-                                  <Text style={styles.multitaskLaborTitle}>Multitask Labor</Text>
-                                  <Text style={styles.multitaskLaborSubtitle}>
-                                    Workers who can handle multiple tasks in this category
-                                  </Text>
-                                  <View style={styles.multitaskLaborBadge}>
-                                    <Ionicons name="flash" size={12} color="#7C3AED" />
-                                    <Text style={styles.multitaskLaborBadgeText}>Versatile</Text>
-                                  </View>
-                                </View>
-                                <View style={styles.multitaskLaborArrow}>
-                                  <Ionicons name="chevron-forward" size={20} color="#7C3AED" />
-                                </View>
-                              </View>
-                            </TouchableOpacity>
-
-                            {/* Specific Labor Types */}
-                            <View style={styles.specificTypesGroup}>
-                              <View style={styles.specificTypesHeader}>
-                                <View style={styles.specificTypesHeaderLine} />
-                                <Text style={styles.specificTypesHeaderText}>Specific Labor Types</Text>
-                                <View style={styles.specificTypesHeaderLine} />
+                            {/* Basic Labor Types - Mistri and Labor */}
+                            <View style={styles.basicTypesGroup}>
+                              <View style={styles.basicTypesHeader}>
+                                <Ionicons name="people-circle-outline" size={20} color="#3B82F6" />
+                                <Text style={styles.basicTypesHeaderText}>Quick Add</Text>
                               </View>
                               
                               <View style={styles.typesList}>
-                                {displayTypes.map((type, index) => (
+                                {filteredTypes.map((type, index) => (
                                   <TouchableOpacity
                                     key={index}
                                     style={[
                                       styles.typeCard,
-                                      index === displayTypes.length - 1 && styles.typeCardLast
+                                      styles.basicTypeCard,
+                                      index === filteredTypes.length - 1 && !showAdvancedOptions && styles.typeCardLast
                                     ]}
                                     onPress={() => handleTypeSelect(type)}
                                     activeOpacity={0.7}
                                   >
                                     <View style={styles.typeCardLeft}>
-                                      <View style={styles.typeIconBadge}>
+                                      <View style={[styles.typeIconBadge, styles.basicTypeIconBadge]}>
                                         <Ionicons name="person-outline" size={18} color="#3B82F6" />
                                       </View>
-                                      <Text style={styles.typeCardName}>{type}</Text>
+                                      <View style={styles.basicTypeInfo}>
+                                        <Text style={styles.typeCardName}>{type}</Text>
+                                        <Text style={styles.basicTypeSubtext}>
+                                          {type === 'Mason (Raj Mistri)' ? 'Skilled mason worker' : 'General helper'}
+                                        </Text>
+                                      </View>
                                     </View>
-                                    <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                                    <Ionicons name="chevron-forward" size={20} color="#3B82F6" />
                                   </TouchableOpacity>
                                 ))}
                               </View>
                             </View>
+
+                            {/* Advanced Options - Show when toggled */}
+                            {showAdvancedOptions && (
+                              <>
+                                {/* Multitask Labor Option */}
+                                <TouchableOpacity
+                                  style={styles.multitaskLaborCard}
+                                  onPress={() => handleTypeSelect('Multitask Labor')}
+                                  activeOpacity={0.7}
+                                >
+                                  <View style={styles.multitaskLaborContent}>
+                                    <View style={styles.multitaskLaborIconContainer}>
+                                      <View style={styles.multitaskLaborIconBadge}>
+                                        <Ionicons name="people" size={20} color="#7C3AED" />
+                                      </View>
+                                      <View style={styles.multitaskLaborIconOverlay}>
+                                        <Ionicons name="star" size={14} color="#7C3AED" />
+                                      </View>
+                                    </View>
+                                    <View style={styles.multitaskLaborInfo}>
+                                      <Text style={styles.multitaskLaborTitle}>Multitask Labor</Text>
+                                      <Text style={styles.multitaskLaborSubtitle}>
+                                        Workers who can handle multiple tasks in this category
+                                      </Text>
+                                      <View style={styles.multitaskLaborBadge}>
+                                        <Ionicons name="flash" size={12} color="#7C3AED" />
+                                        <Text style={styles.multitaskLaborBadgeText}>Versatile</Text>
+                                      </View>
+                                    </View>
+                                    <View style={styles.multitaskLaborArrow}>
+                                      <Ionicons name="chevron-forward" size={20} color="#7C3AED" />
+                                    </View>
+                                  </View>
+                                </TouchableOpacity>
+
+                                {/* Specific Labor Types */}
+                                <View style={styles.specificTypesGroup}>
+                                  <View style={styles.specificTypesHeader}>
+                                    <View style={styles.specificTypesHeaderLine} />
+                                    <Text style={styles.specificTypesHeaderText}>All Labor Types</Text>
+                                    <View style={styles.specificTypesHeaderLine} />
+                                  </View>
+                                  
+                                  <View style={styles.typesList}>
+                                    {displayTypes.map((type, index) => (
+                                      <TouchableOpacity
+                                        key={index}
+                                        style={[
+                                          styles.typeCard,
+                                          index === displayTypes.length - 1 && styles.typeCardLast
+                                        ]}
+                                        onPress={() => handleTypeSelect(type)}
+                                        activeOpacity={0.7}
+                                      >
+                                        <View style={styles.typeCardLeft}>
+                                          <View style={styles.typeIconBadge}>
+                                            <Ionicons name="person-outline" size={18} color="#3B82F6" />
+                                          </View>
+                                          <Text style={styles.typeCardName}>{type}</Text>
+                                        </View>
+                                        <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                                      </TouchableOpacity>
+                                    ))}
+                                  </View>
+                                </View>
+                              </>
+                            )}
                           </View>
                         )}
 
@@ -1948,6 +2144,179 @@ const styles = StyleSheet.create({
   },
   multitaskLaborArrow: {
     marginLeft: 12,
+  },
+  // Basic Types Group Styles
+  basicTypesGroup: {
+    gap: 12,
+    marginBottom: 16,
+  },
+  basicTypesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  basicTypesHeaderText: {
+    fontSize: 15,
+    color: '#1E293B',
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  basicTypeCard: {
+    backgroundColor: '#F8FAFC',
+    borderLeftWidth: 3,
+    borderLeftColor: '#3B82F6',
+  },
+  basicTypeIconBadge: {
+    backgroundColor: '#DBEAFE',
+  },
+  basicTypeInfo: {
+    flex: 1,
+  },
+  basicTypeSubtext: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  // Quick Labor Selection Styles
+  quickLaborHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 20,
+    paddingHorizontal: 4,
+  },
+  quickLaborTitle: {
+    fontSize: 18,
+    color: '#1E293B',
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  quickLaborOptions: {
+    gap: 16,
+  },
+  quickLaborCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  quickLaborCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  quickLaborIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  quickLaborInfo: {
+    flex: 1,
+  },
+  quickLaborName: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 4,
+    letterSpacing: 0.3,
+  },
+  quickLaborSubtext: {
+    fontSize: 14,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  selectedQuickLaborWrapper: {
+    backgroundColor: '#FFF7ED',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+    shadowColor: '#F97316',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  selectedQuickLaborCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#3B82F6',
+  },
+  selectedQuickLaborContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  selectedQuickLaborName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 4,
+    letterSpacing: 0.3,
+  },
+  selectedQuickLaborActions: {
+    marginLeft: 12,
+  },
+  // Show Advanced Options Button Styles
+  showAdvancedButton: {
+    backgroundColor: '#FAFAF9',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: '#E7E5E4',
+    borderStyle: 'dashed',
+    marginTop: 8,
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  showAdvancedButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  showAdvancedButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#7C3AED',
+    letterSpacing: 0.2,
+  },
+  // Hide Advanced Options Button Styles
+  hideAdvancedButton: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  hideAdvancedButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  hideAdvancedButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+    letterSpacing: 0.2,
   },
   // Specific Types Group Styles
   specificTypesGroup: {

@@ -125,13 +125,13 @@ const AnalyticsDashboard: React.FC = () => {
     console.log(`     - MaterialUsed: ${project.MaterialUsed?.length || 0} items`);
     console.log(`     - Labors: ${project.Labors?.length || 0} entries`);
     if (project.MaterialAvailable && project.MaterialAvailable.length > 0) {
-      console.log(`     - Available items:`, project.MaterialAvailable.map(m => `${m.name}: ₹${m.cost || 0}`));
+      console.log(`     - Available items:`, project.MaterialAvailable.map(m => `${m.name}: cost=₹${m.cost || 0}, totalCost=₹${m.totalCost || 0}`));
     }
     if (project.MaterialUsed && project.MaterialUsed.length > 0) {
-      console.log(`     - Used items:`, project.MaterialUsed.map(m => `${m.name}: ₹${m.cost || 0}`));
+      console.log(`     - Used items:`, project.MaterialUsed.map(m => `${m.name}: cost=₹${m.cost || 0}, totalCost=₹${m.totalCost || 0}`));
     }
     if (project.Labors && project.Labors.length > 0) {
-      console.log(`     - Labor entries:`, project.Labors.map((l: any) => `${l.type}: ₹${l.totalCost || 0}`));
+      console.log(`     - Labor entries:`, project.Labors.map((l: any) => `${l.type}: totalCost=₹${l.totalCost || 0}`));
     }
   });
   
@@ -216,7 +216,7 @@ const AnalyticsDashboard: React.FC = () => {
         willFilter: !!staffId
       });
 
-      const projectData = await getProjectData(clientId, staffId, true, userRole); // Get all projects with staff filtering and license status
+      const projectData = await getProjectData(clientId, staffId, false, userRole); // ✅ CRITICAL FIX: Set excludeMaterials to FALSE to get material data for analytics
       
       // Handle the response structure from getProjectData
       const projectsArray: Project[] = Array.isArray(projectData) ? projectData : [];
@@ -278,12 +278,51 @@ const AnalyticsDashboard: React.FC = () => {
   const handlePress = (projectId: string, projectName: string) => {
     const project = projects.find(p => p._id === projectId);
     if (project) {
+      console.log('\n🔍 ========== DASHBOARD NAVIGATION DEBUG ==========');
+      console.log('🔍 Dashboard - Navigating to analytics for project:', projectName);
+      console.log('   - Project data:', {
+        _id: project._id,
+        name: project.name,
+        spent: project.spent,
+        MaterialAvailable: project.MaterialAvailable?.length || 0,
+        MaterialUsed: project.MaterialUsed?.length || 0,
+        Labors: project.Labors?.length || 0,
+        Equipments: (project as any).Equipments?.length || 0,
+      });
+      
+      // Log actual data samples
+      if (project.MaterialUsed && project.MaterialUsed.length > 0) {
+        console.log('   - Sample MaterialUsed:', project.MaterialUsed[0]);
+        console.log('   - MaterialUsed sectionIds:', [...new Set(project.MaterialUsed.map((m: any) => m.sectionId))]);
+        console.log('   - MaterialUsed miniSectionIds:', [...new Set(project.MaterialUsed.map((m: any) => m.miniSectionId).filter(Boolean))]);
+      }
+      if (project.Labors && project.Labors.length > 0) {
+        console.log('   - Sample Labor:', project.Labors[0]);
+        console.log('   - Labor sectionIds:', [...new Set(project.Labors.map((l: any) => l.sectionId))]);
+        console.log('   - Labor miniSectionIds:', [...new Set(project.Labors.map((l: any) => l.miniSectionId).filter(Boolean))]);
+      }
+      
       // Check if project has only one section
       const sections = project.section || [];
+      console.log('   - Sections:', sections.length);
+      if (sections.length > 0) {
+        console.log('   - Section IDs:', sections.map(s => s._id || s.sectionId));
+        console.log('   - Section names:', sections.map(s => s.name));
+      }
       
       if (sections.length === 1) {
         // Navigate directly to mini-sections (Level 3) if only one section
         const singleSection = sections[0];
+        console.log('🔍 Dashboard - Single section detected, navigating to mini-sections');
+        console.log('   - Section ID:', singleSection._id || singleSection.sectionId);
+        console.log('   - Section Name:', singleSection.name);
+        console.log('   - Passing data:', {
+          materialAvailable: project.MaterialAvailable?.length || 0,
+          materialUsed: project.MaterialUsed?.length || 0,
+          labors: project.Labors?.length || 0,
+          equipments: (project as any).Equipments?.length || 0,
+        });
+        console.log('🔍 ================================================\n');
         router.push({
           pathname: '/analytics/mini-sections-analytics',
           params: {
@@ -292,11 +331,22 @@ const AnalyticsDashboard: React.FC = () => {
             sectionId: singleSection._id || singleSection.sectionId || '',
             sectionName: singleSection.name || 'Section',
             materialAvailable: JSON.stringify(project.MaterialAvailable || []),
-            materialUsed: JSON.stringify(project.MaterialUsed || [])
+            materialUsed: JSON.stringify(project.MaterialUsed || []),
+            labors: JSON.stringify(project.Labors || []),
+            equipments: JSON.stringify((project as any).Equipments || []) // Equipment might not exist
           }
         });
       } else {
         // Navigate to project sections analytics (Level 2) if multiple sections
+        console.log('🔍 Dashboard - Multiple sections, navigating to project-sections');
+        console.log('   - Passing data:', {
+          sections: sections.length,
+          materialAvailable: project.MaterialAvailable?.length || 0,
+          materialUsed: project.MaterialUsed?.length || 0,
+          labors: project.Labors?.length || 0,
+          equipments: (project as any).Equipments?.length || 0,
+        });
+        console.log('🔍 ================================================\n');
         router.push({
           pathname: '/analytics/project-sections-analytics',
           params: {
@@ -304,7 +354,9 @@ const AnalyticsDashboard: React.FC = () => {
             projectName: project.name,
             sections: JSON.stringify(sections),
             materialAvailable: JSON.stringify(project.MaterialAvailable || []),
-            materialUsed: JSON.stringify(project.MaterialUsed || [])
+            materialUsed: JSON.stringify(project.MaterialUsed || []),
+            labors: JSON.stringify(project.Labors || []),
+            equipments: JSON.stringify((project as any).Equipments || []) // Equipment might not exist
           }
         });
       }

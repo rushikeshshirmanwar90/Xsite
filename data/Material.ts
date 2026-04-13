@@ -108,12 +108,13 @@ export const CATEGORIES = [
 
 export const UNITS = [
   "kg",
+  "brass",
+  "bags",
   "meter",
   "sqmm",
   "pieces",
   "sheets",
   "cubic_meter",
-  "bags",
 ];
 
 export const STATUSES = ["received", "in_use", "stored", "damaged"] as const;

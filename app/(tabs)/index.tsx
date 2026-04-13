@@ -37,6 +37,7 @@ const Index: React.FC = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [companyName, setCompanyName] = useState<string>('Company Name');
     const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+    const [logoError, setLogoError] = useState<boolean>(false);
     const [isSharing, setIsSharing] = useState(false);
 
     // Refs for capturing QR code views
@@ -188,27 +189,60 @@ const Index: React.FC = () => {
                 }
                 
                 console.log('📝 Fetching client data for:', clientId);
-                const response = await axios.get(`${domain}/api/client?id=${clientId}`);
+                // Add cache-busting parameter to ensure fresh data
+                const response = await axios.get(`${domain}/api/clients?id=${clientId}&_t=${Date.now()}`);
                 const responseData = response.data as any;
+
+                console.log('📦 Client API Response:', responseData);
 
                 // Handle new response structure: { success, message, data }
                 if (responseData.success && responseData.data) {
                     const client = responseData.data;
+                    console.log('✅ Client data loaded:', {
+                        name: client.companyName || client.name,
+                        hasLogo: !!client.logo,
+                        logoUrl: client.logo
+                    });
+                    
                     setCompanyName(client.companyName || client.name || 'Company Name');
-                    setCompanyLogo(client.logo || null);
-                    console.log('✅ Client data loaded:', client.companyName || client.name);
+                    
+                    if (client.logo) {
+                        console.log('🖼️ Setting company logo:', client.logo);
+                        setCompanyLogo(client.logo);
+                        setLogoError(false); // Reset error state
+                    } else {
+                        console.log('⚠️ No logo found in client data');
+                        setCompanyLogo(null);
+                    }
                 }
                 // Fallback for old response structure: { clientData }
                 else if (responseData.clientData) {
                     const client = responseData.clientData;
+                    console.log('✅ Client data loaded (legacy):', {
+                        name: client.companyName || client.name,
+                        hasLogo: !!client.logo,
+                        logoUrl: client.logo
+                    });
+                    
                     setCompanyName(client.companyName || client.name || 'Company Name');
-                    setCompanyLogo(client.logo || null);
-                    console.log('✅ Client data loaded (legacy):', client.companyName || client.name);
+                    
+                    if (client.logo) {
+                        console.log('🖼️ Setting company logo:', client.logo);
+                        setCompanyLogo(client.logo);
+                        setLogoError(false); // Reset error state
+                    } else {
+                        console.log('⚠️ No logo found in client data');
+                        setCompanyLogo(null);
+                    }
                 } else {
                     console.warn('⚠️ Unexpected client response structure:', responseData);
                 }
             } catch (error: unknown) {
                 console.error('❌ Error fetching client data:', error);
+                if (axios.isAxiosError(error)) {
+                    console.error('Response data:', error.response?.data);
+                    console.error('Response status:', error.response?.status);
+                }
             }
         };
 
@@ -396,11 +430,19 @@ const Index: React.FC = () => {
             {userIsAdmin && (
                 <View style={styles.fixedHeader}>
                     <View style={styles.userInfo}>
-                        {companyLogo ? (
+                        {companyLogo && !logoError ? (
                             <Image
                                 source={{ uri: companyLogo }}
                                 style={styles.companyLogo}
                                 resizeMode="contain"
+                                onError={(error) => {
+                                    console.error('❌ Error loading company logo:', error.nativeEvent.error);
+                                    console.log('Logo URL that failed:', companyLogo);
+                                    setLogoError(true);
+                                }}
+                                onLoad={() => {
+                                    console.log('✅ Company logo loaded successfully');
+                                }}
                             />
                         ) : (
                             <View style={styles.avatarContainer}>

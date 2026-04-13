@@ -709,6 +709,10 @@ const NotificationPage: React.FC = () => {
             ? activity.user
             : currentUser || { userId: 'unknown', fullName: 'Unknown User' };
 
+        // Check if this is a labor or equipment activity
+        const isLaborActivity = activity.category === 'labor';
+        const isEquipmentActivity = activity.category === 'equipment';
+
         // Enhanced message for project updates with change details
         let enhancedMessage = activity.message;
         if (activity.activityType === 'project_updated' && activity.metadata?.changedData) {
@@ -733,6 +737,147 @@ const NotificationPage: React.FC = () => {
             }
         }
 
+        // Render labor/equipment activities with enhanced card design
+        if (isLaborActivity || isEquipmentActivity) {
+            const metadata = (activity as any).metadata || {};
+            const laborEntries = metadata.laborEntries || [];
+            const equipmentEntries = metadata.equipmentEntries || [];
+            const entries = isLaborActivity ? laborEntries : equipmentEntries;
+            const totalCost = metadata.totalCost || 0;
+
+            return (
+                <View key={activity._id} style={styles.materialActivityCard}>
+                    <View style={styles.materialActivityGradient}>
+                        {/* Header with activity type badge */}
+                        <View style={styles.materialActivityHeader}>
+                            <View style={[
+                                styles.activityBadge,
+                                {
+                                    backgroundColor: icon.color,
+                                    shadowColor: icon.color,
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.3,
+                                    shadowRadius: 4,
+                                    elevation: 3,
+                                }
+                            ]}>
+                                <Ionicons
+                                    name={icon.name as any}
+                                    size={16}
+                                    color="#FFFFFF"
+                                />
+                                <Text style={[
+                                    styles.activityBadgeText,
+                                    { color: '#FFFFFF' }
+                                ]}>
+                                    {isLaborActivity ? 'LABOR ADDED' : 'EQUIPMENT ADDED'}
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* Project/Section Info */}
+                        {(activity.projectName || activity.sectionName) && (
+                            <View style={styles.projectInfo}>
+                                {activity.projectName && (
+                                    <View style={styles.projectInfoItem}>
+                                        <Ionicons name="folder-outline" size={14} color="#64748B" />
+                                        <Text style={styles.projectInfoText}>{activity.projectName}</Text>
+                                    </View>
+                                )}
+                                {activity.sectionName && (
+                                    <View style={styles.projectInfoItem}>
+                                        <Ionicons name="layers-outline" size={14} color="#64748B" />
+                                        <Text style={styles.projectInfoText}>{activity.sectionName}</Text>
+                                    </View>
+                                )}
+                                {activity.miniSectionName && (
+                                    <View style={styles.projectInfoItem}>
+                                        <Ionicons name="grid-outline" size={14} color="#64748B" />
+                                        <Text style={styles.projectInfoText}>{activity.miniSectionName}</Text>
+                                    </View>
+                                )}
+                            </View>
+                        )}
+
+                        {/* Labor/Equipment Entries List */}
+                        {entries.length > 0 && (
+                            <View style={styles.materialsList}>
+                                {entries.map((entry: any, index: number) => (
+                                    <View key={index} style={styles.materialItem}>
+                                        <View style={[
+                                            styles.materialIconSmall,
+                                            { backgroundColor: `${icon.color}15` }
+                                        ]}>
+                                            <Ionicons
+                                                name={isLaborActivity ? 'person-outline' : 'construct-outline'}
+                                                size={18}
+                                                color={icon.color}
+                                            />
+                                        </View>
+                                        <View style={styles.materialDetails}>
+                                            <Text style={styles.materialName}>
+                                                {entry.type || entry.name}
+                                            </Text>
+                                            <Text style={styles.materialQuantity}>
+                                                {isLaborActivity 
+                                                    ? `${entry.count} laborers • ₹${entry.perLaborCost?.toLocaleString('en-IN')}/laborer`
+                                                    : `${entry.quantity || 1} ${entry.unit || 'unit'}`
+                                                }
+                                                {entry.totalCost > 0 && (
+                                                    <Text style={styles.materialCost}>
+                                                        {' '}• ₹{entry.totalCost.toLocaleString('en-IN')}
+                                                    </Text>
+                                                )}
+                                            </Text>
+                                            {entry.category && (
+                                                <Text style={styles.laborCategory}>
+                                                    {entry.category}
+                                                </Text>
+                                            )}
+                                        </View>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+
+                        {/* Total Cost */}
+                        {totalCost > 0 && (
+                            <View style={styles.totalCostContainer}>
+                                <Text style={styles.totalCostLabel}>Total Cost</Text>
+                                <Text style={styles.totalCostValue}>
+                                    ₹{totalCost.toLocaleString('en-IN')}
+                                </Text>
+                            </View>
+                        )}
+
+                        {/* Message */}
+                        {enhancedMessage && (
+                            <View style={styles.messageContainer}>
+                                <Ionicons name="chatbox-outline" size={14} color="#64748B" />
+                                <Text style={styles.messageText}>{enhancedMessage}</Text>
+                            </View>
+                        )}
+
+                        {/* Footer with user info and time ago */}
+                        <View style={styles.materialActivityFooter}>
+                            <View style={styles.userInfo}>
+                                <View style={[styles.userAvatar, { backgroundColor: icon.color }]}>
+                                    <Text style={styles.userAvatarText}>
+                                        {displayUser.fullName.charAt(0).toUpperCase()}
+                                    </Text>
+                                </View>
+                                <Text style={styles.userName}>{displayUser.fullName}</Text>
+                            </View>
+                            <Text style={styles.activityTimeNew}>
+                                {formatTimeAgo(activity.createdAt)}
+                            </Text>
+                        </View>
+                    </View>
+                </View>
+            );
+        }
+
+        // Regular activity card for other types
         return (
             <View key={activity._id} style={styles.activityItemNew}>
                 <View style={[styles.iconContainerNew, { backgroundColor: icon.color }]}>
@@ -2020,6 +2165,12 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: '#10B981',
         fontWeight: '600',
+    },
+    laborCategory: {
+        fontSize: 11,
+        color: '#64748B',
+        marginTop: 2,
+        fontStyle: 'italic',
     },
     totalCostContainer: {
         flexDirection: 'row',
