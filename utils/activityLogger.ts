@@ -115,39 +115,15 @@ interface ActivityLogParams {
 
 // Main activity logging function
 export const logActivity = async (params: ActivityLogParams) => {
-  console.log("\n========================================");
-  console.log("🚀 ACTIVITY LOGGING STARTED");
-  console.log("========================================");
-  console.log("Activity Type:", params.activityType);
-  console.log("Category:", params.category);
-  console.log("Action:", params.action);
-  console.log("Description:", params.description);
-  console.log("Project ID:", params.projectId);
-  console.log("Project Name:", params.projectName);
-
   try {
-    console.log("\n🔍 Step 1: Getting user data from AsyncStorage...");
     const user = await getUserData();
-    console.log("✅ User data retrieved:");
-    console.log("   - User ID:", user.userId);
-    console.log("   - Full Name:", user.fullName);
-    console.log("   - Email:", user.email || "(not provided)");
-
-    console.log("\n🔍 Step 2: Getting client ID from AsyncStorage...");
     const clientId = await getClientId();
-    console.log("✅ Client ID retrieved:", clientId || "(EMPTY!)");
 
     if (!clientId) {
-      console.error("\n❌ CRITICAL: Client ID is empty!");
-      console.error("Activity logging cannot proceed without clientId");
-      console.error(
-        "Please ensure user is logged in and clientId is stored in AsyncStorage"
-      );
-      console.warn("⚠️ Skipping activity log due to missing clientId");
+      console.error("Activity logging skipped: Client ID is empty");
       return;
     }
 
-    console.log("\n🔨 Step 3: Building activity payload...");
     const activityPayload = {
       user,
       clientId,
@@ -167,54 +143,9 @@ export const logActivity = async (params: ActivityLogParams) => {
       date: new Date().toISOString(),
     };
 
-    console.log("✅ Activity payload built successfully");
-    console.log("\n📝 Payload details:");
-    console.log(JSON.stringify(activityPayload, null, 2));
-
-    console.log("\n🌐 Step 4: Sending POST request to Activity API...");
-    console.log("API Endpoint:", `${domain}/api/activity`);
-
-    const response = await axios.post(
-      `${domain}/api/activity`,
-      activityPayload
-    );
-
-    console.log("\n✅ SUCCESS! Activity logged to API");
-    console.log("Response Status:", response.status);
-    console.log("Response Data:", JSON.stringify(response.data, null, 2));
-    console.log("========================================");
-    console.log("🏁 ACTIVITY LOGGING COMPLETED");
-    console.log("========================================\n");
+    await axios.post(`${domain}/api/activity`, activityPayload);
   } catch (error: any) {
-    console.error("\n========================================");
-    console.error("❌ ACTIVITY LOGGING FAILED");
-    console.error("========================================");
-    console.error("Error Type:", error?.name);
-    console.error("Error Message:", error?.message);
-
-    if (error?.response) {
-      console.error("\n📡 API Response Error:");
-      console.error("   Status:", error.response.status);
-      console.error("   Status Text:", error.response.statusText);
-      console.error(
-        "   Error Data:",
-        JSON.stringify(error.response.data, null, 2)
-      );
-    } else if (error?.request) {
-      console.error("\n📡 Network Error:");
-      console.error("   No response received from server");
-      console.error("   Request was made but no response");
-    } else {
-      console.error("\n⚠️ Unknown Error:", error);
-    }
-
-    console.error("\n💡 Troubleshooting Tips:");
-    console.error("   1. Check if Activity API endpoint exists");
-    console.error("   2. Verify MongoDB connection");
-    console.error("   3. Check Activity model schema");
-    console.error("   4. Verify network connectivity");
-    console.error("========================================\n");
-
+    console.error("Activity logging failed:", error?.message);
     // Don't throw error - activity logging is not critical
   }
 };
@@ -228,12 +159,6 @@ export const logProjectCreated = async (
   projectName: string,
   metadata?: any
 ) => {
-  console.log("🎯 logProjectCreated called with:", {
-    projectId,
-    projectName,
-    metadata,
-  });
-
   try {
     await logActivity({
       activityType: "project_created",
@@ -244,9 +169,8 @@ export const logProjectCreated = async (
       projectName,
       metadata,
     });
-    console.log("🎯 logProjectCreated completed");
   } catch (error) {
-    console.error("🎯 logProjectCreated error:", error);
+    console.error("logProjectCreated error:", error);
     // Don't throw - activity logging should not break the main flow
   }
 };

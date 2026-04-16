@@ -3,9 +3,11 @@ import PieChartLegend, { LegendItem } from '@/components/PieChartLegend';
 import { getClientId } from '@/functions/clientId';
 import { getProjectData } from '@/functions/project';
 import { useUser } from '@/hooks/useUser';
+import { domain } from '@/lib/domain';
 import { Project } from '@/types/project';
 import { formatCurrency, transformProjectDataToPieSlices } from '@/utils/analytics';
 import { Ionicons } from '@expo/vector-icons';
+import axios from 'axios';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -30,6 +32,7 @@ const AnalyticsDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showCompletedProjects, setShowCompletedProjects] = useState(false); // Toggle between ongoing and completed
 
   // Performance optimization
   const isLoadingRef = React.useRef(false);
@@ -105,22 +108,33 @@ const AnalyticsDashboard: React.FC = () => {
       totalProjectCost, // Total project spending
       description: `Total Expenses: ${formatCurrency(actualSpent)}`,
       status: 'active' as const,
+      isCompleted: project.isCompleted || false, // ✅ Add completion status from project
     };
   });
 
-  // Filter only projects with budget used > 0 (either materials or labor)
-  const activeProjects = transformedProjectData.filter(p => p.budgetUsed > 0 || p.laborCosts > 0);
+  // ✅ FIXED: Filter projects based on completion status, not budget
+  // Ongoing projects = not completed (explicitly false)
+  const ongoingProjects = transformedProjectData.filter(p => p.isCompleted === false);
+  
+  // Completed projects = marked as completed (explicitly true)
+  const completedProjectsList = transformedProjectData.filter(p => p.isCompleted === true);
+  
+  // For pie chart, show either ongoing or completed projects based on toggle
+  const activeProjects = showCompletedProjects ? completedProjectsList : ongoingProjects;
   
   // Debug logging
   console.log('Dashboard - Raw projects state:', projects.length);
   console.log('Dashboard - Transformed project data:', transformedProjectData.length);
-  console.log('Dashboard - Active projects (with budget > 0):', activeProjects.length);
+  console.log('Dashboard - Ongoing projects (not completed with budget > 0):', ongoingProjects.length);
+  console.log('Dashboard - Completed projects:', completedProjectsList.length);
+  console.log('Dashboard - Active projects for pie chart:', activeProjects.length);
   
   console.log('\n🔍 DASHBOARD DEBUG - Raw Projects:');
   projects.forEach((project, index) => {
     console.log(`  ${index + 1}. ${project.name || 'Unnamed'}`);
     console.log(`     - _id: ${project._id}`);
     console.log(`     - spent: ${project.spent || 0}`);
+    console.log(`     - isCompleted: ${project.isCompleted || false}`);
     console.log(`     - MaterialAvailable: ${project.MaterialAvailable?.length || 0} items`);
     console.log(`     - MaterialUsed: ${project.MaterialUsed?.length || 0} items`);
     console.log(`     - Labors: ${project.Labors?.length || 0} entries`);
@@ -139,22 +153,30 @@ const AnalyticsDashboard: React.FC = () => {
   transformedProjectData.forEach((project, index) => {
     console.log(`  ${index + 1}. ${project.name}`);
     console.log(`     - Budget Used: ₹${project.budgetUsed}`);
+    console.log(`     - Is Completed: ${project.isCompleted}`);
     console.log(`     - Materials Available: ₹${project.available}`);
     console.log(`     - Materials Used: ₹${project.used}`);
     console.log(`     - Labor Costs: ₹${project.laborCosts}`);
     console.log(`     - Active Labor: ₹${project.activeLaborCosts}`);
   });
   
-  console.log('\n🔍 DASHBOARD DEBUG - Active Projects:');
-  activeProjects.forEach((project, index) => {
+  console.log('\n🔍 DASHBOARD DEBUG - Ongoing Projects:');
+  ongoingProjects.forEach((project, index) => {
     console.log(`  ${index + 1}. ${project.name} - Total: ₹${project.budgetUsed}, Labor: ₹${project.laborCosts}`);
+  });
+  
+  console.log('\n🔍 DASHBOARD DEBUG - Completed Projects:');
+  completedProjectsList.forEach((project, index) => {
+    console.log(`  ${index + 1}. ${project.name} - Total: ₹${project.budgetUsed}, Completed: ${project.isCompleted}`);
   });
   
   console.log(`\n🔍 DASHBOARD DEBUG - Render Decision:`);
   console.log(`  - Loading: ${loading}`);
   console.log(`  - Error: ${error}`);
   console.log(`  - Projects length: ${projects.length}`);
-  console.log(`  - Active projects length: ${activeProjects.length}`);
+  console.log(`  - Ongoing projects length: ${ongoingProjects.length}`);
+  console.log(`  - Completed projects length: ${completedProjectsList.length}`);
+  console.log(`  - Active projects for chart: ${activeProjects.length}`);
   console.log(`  - Will show: ${loading ? 'LOADING' : error ? 'ERROR' : activeProjects.length === 0 ? 'NO DATA' : 'PIE CHART'}`);
 
   // Transform project data using utility function
@@ -165,8 +187,8 @@ const AnalyticsDashboard: React.FC = () => {
 
   // Calculate statistics
   const totalProjects = projects.length;
-  const projectsWithExpenses = activeProjects.length;
-  const projectsWithoutExpenses = totalProjects - projectsWithExpenses;
+  const projectsWithExpenses = ongoingProjects.length; // ✅ Ongoing projects (not completed)
+  const projectsWithoutExpenses = completedProjectsList.length; // ✅ Completed projects
 
   // Calculate totals for all projects
   const totalAvailable = transformedProjectData.reduce((sum, p) => sum + p.available, 0);
@@ -225,9 +247,36 @@ const AnalyticsDashboard: React.FC = () => {
       console.log('Dashboard - Project data structure:', typeof projectData);
       console.log('Dashboard - First project sample:', projectsArray[0] ? Object.keys(projectsArray[0]) : 'No projects');
       
+      // ✅ Load completion status for all projects
+      const projectsWithCompletion = await Promise.all(
+        projectsArray.map(async (project) => {
+          try {
+            if (project._id) {
+              const response = await axios.get(`${domain}/api/completion?updateType=project&id=${project._id}`);
+              const responseData = response.data as any;
+              if (responseData.success && responseData.data) {
+                const completionStatus = Boolean(responseData.data.isCompleted);
+                console.log(`📊 Dashboard - Project ${project.name}: isCompleted = ${completionStatus}`);
+                return {
+                  ...project,
+                  isCompleted: completionStatus
+                };
+              }
+            }
+          } catch (error) {
+            console.warn(`Could not load completion status for project ${project._id}:`, error);
+          }
+          console.log(`📊 Dashboard - Project ${project.name}: isCompleted = false (default)`);
+          return { ...project, isCompleted: false };
+        })
+      );
+      
+      console.log('✅ Dashboard - Projects with completion status loaded:', projectsWithCompletion.length);
+      console.log('📊 Dashboard - Completion status summary:', projectsWithCompletion.map(p => `${p.name}: ${p.isCompleted}`).join(', '));
+      
       // Debug material data
-      if (projectsArray.length > 0) {
-        projectsArray.forEach((project, index) => {
+      if (projectsWithCompletion.length > 0) {
+        projectsWithCompletion.forEach((project, index) => {
           const availableCost = (project.MaterialAvailable || []).reduce((sum, m) => sum + (m.cost || 0), 0);
           const usedCost = (project.MaterialUsed || []).reduce((sum, m) => sum + (m.cost || 0), 0);
           const totalCost = availableCost + usedCost;
@@ -236,10 +285,11 @@ const AnalyticsDashboard: React.FC = () => {
           console.log(`  - Available materials: ${project.MaterialAvailable?.length || 0} items, cost: ${availableCost}`);
           console.log(`  - Used materials: ${project.MaterialUsed?.length || 0} items, cost: ${usedCost}`);
           console.log(`  - Total cost: ${totalCost}`);
+          console.log(`  - Is Completed: ${project.isCompleted}`);
         });
       }
       
-      setProjects(projectsArray);
+      setProjects(projectsWithCompletion);
     } catch (err: any) {
       console.error('Failed to fetch projects:', err);
       setError(err?.message || 'Failed to load projects');
@@ -442,14 +492,36 @@ const AnalyticsDashboard: React.FC = () => {
 
         {/* Stats Section - Simplified */}
         <View style={styles.statsSection}>
-          <View style={[styles.statBox, styles.statBoxPrimary]}>
+          <TouchableOpacity 
+            style={[
+              styles.statBox, 
+              styles.statBoxPrimary,
+              !showCompletedProjects && styles.statBoxActive
+            ]}
+            onPress={() => setShowCompletedProjects(false)}
+            activeOpacity={0.7}
+          >
             <Text style={styles.statValue}>{projectsWithExpenses}</Text>
             <Text style={styles.statLabel}>Ongoing Projects</Text>
-          </View>
-          <View style={[styles.statBox, styles.statBoxSecondary]}>
+            {!showCompletedProjects && (
+              <View style={styles.activeIndicator} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[
+              styles.statBox, 
+              styles.statBoxSecondary,
+              showCompletedProjects && styles.statBoxActive
+            ]}
+            onPress={() => setShowCompletedProjects(true)}
+            activeOpacity={0.7}
+          >
             <Text style={styles.statValue}>{projectsWithoutExpenses}</Text>
             <Text style={styles.statLabel}>Completed Projects</Text>
-          </View>
+            {showCompletedProjects && (
+              <View style={styles.activeIndicator} />
+            )}
+          </TouchableOpacity>
           <View style={[styles.statBox, styles.statBoxTertiary]}>
             <Text style={styles.statValue}>{totalProjects}</Text>
             <Text style={styles.statLabel}>Total Projects</Text>
@@ -489,16 +561,23 @@ const AnalyticsDashboard: React.FC = () => {
         ) : activeProjects.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="pie-chart-outline" size={64} color="#CBD5E1" />
-            <Text style={styles.emptyTitle}>No Expense Data</Text>
+            <Text style={styles.emptyTitle}>
+              {showCompletedProjects ? 'No Completed Projects' : 'No Ongoing Projects'}
+            </Text>
             <Text style={styles.emptySubtitle}>
-              Add materials and labor to your projects to see budget analytics
+              {showCompletedProjects 
+                ? 'Mark projects as complete to see their analytics here'
+                : 'Add materials and labor to your projects to see budget analytics'}
             </Text>
             <View style={{ marginTop: 20, padding: 15, backgroundColor: '#FEF3C7', borderRadius: 10 }}>
               <Text style={{ fontSize: 12, color: '#92400E', textAlign: 'center' }}>
                 Debug Info:{'\n'}
                 Projects: {projects.length}{'\n'}
                 Transformed: {transformedProjectData.length}{'\n'}
-                Active: {activeProjects.length}{'\n'}
+                Ongoing: {ongoingProjects.length}{'\n'}
+                Completed: {completedProjectsList.length}{'\n'}
+                Showing: {showCompletedProjects ? 'Completed' : 'Ongoing'}{'\n'}
+                Active for chart: {activeProjects.length}{'\n'}
                 Total Materials: {formatCurrency(totalMaterialCosts)}{'\n'}
                 Total Labor: {formatCurrency(totalLaborCosts)}{'\n'}
                 Grand Total: {formatCurrency(grandTotal)}{'\n'}
@@ -534,8 +613,12 @@ const AnalyticsDashboard: React.FC = () => {
         ) : (
           <Animated.View style={[styles.card, { opacity: fadeAnim }]}>
             <View style={styles.heading}>
-              <Text style={styles.title}>Project Expenses</Text>
-              <Text style={styles.subtitle}>Total Project Costs</Text>
+              <Text style={styles.title}>
+                {showCompletedProjects ? 'Completed Projects' : 'Ongoing Projects'}
+              </Text>
+              <Text style={styles.subtitle}>
+                {showCompletedProjects ? 'Completed Project Costs' : 'Active Project Costs'}
+              </Text>
             </View>
 
             <View style={styles.chartContainer}>
@@ -548,7 +631,7 @@ const AnalyticsDashboard: React.FC = () => {
                 labelType="amount"
                 onSlicePress={handlePress}
                 centerContent={{
-                  label: 'TOTAL EXPENSES',
+                  label: showCompletedProjects ? 'COMPLETED EXPENSES' : 'ONGOING EXPENSES',
                   value: formatCurrency(totalBudget),
                   subtitle: `${activeProjects.length} Project${activeProjects.length > 1 ? 's' : ''}`
                 }}
@@ -727,6 +810,20 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 15,
     elevation: 6,
+    position: 'relative',
+  },
+  statBoxActive: {
+    transform: [{ scale: 1.05 }],
+    shadowOpacity: 0.15,
+    elevation: 10,
+  },
+  activeIndicator: {
+    position: 'absolute',
+    bottom: 8,
+    width: 30,
+    height: 3,
+    backgroundColor: '#3B82F6',
+    borderRadius: 2,
   },
   statBoxPrimary: {
     borderWidth: 3,

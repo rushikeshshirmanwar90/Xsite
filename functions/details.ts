@@ -13,15 +13,12 @@ interface SectionResponse {
 
 export const getSection = async (sectionId: string): Promise<Section[]> => {
     try {
-        console.log("sectionId :", sectionId)
         const res = await axios.get<SectionResponse>(`${domain}/api/mini-section?sectionId=${sectionId}`);
         // The API returns { success, message, data }
         // We need to return the data array
         return res.data.data;
     } catch (error) {
-        console.log("sectionId :", sectionId)
-        console.log("somthing went wrong")
-        console.error('Error', error);
+        console.error('Error fetching section:', error);
         return [];
     }
 }
@@ -34,8 +31,6 @@ export const addSection = async (data: any, notificationCallback?: (data: any) =
             // 🔔 Send section creation notification using callback
             if (notificationCallback) {
                 try {
-                    console.log('🔔 Sending section creation notification...');
-                    
                     // Get user data for notification
                     const userString = await AsyncStorage.getItem('user');
                     let userInfo = null;
@@ -47,7 +42,7 @@ export const addSection = async (data: any, notificationCallback?: (data: any) =
                         };
                     }
 
-                    const notificationSent = await notificationCallback({
+                    await notificationCallback({
                         projectId: data.projectId,
                         activityType: 'section_created',
                         staffName: userInfo?.fullName || 'User',
@@ -56,10 +51,8 @@ export const addSection = async (data: any, notificationCallback?: (data: any) =
                         details: `Created section "${data.name || 'Section'}"`,
                         category: 'section',
                     });
-
-                    console.log('🔔 Section creation notification result:', notificationSent);
                 } catch (notificationError: any) {
-                    console.error('❌ Error sending section creation notification:', notificationError);
+                    console.error('Error sending section creation notification:', notificationError);
                     // Don't fail the whole operation if notification fails
                 }
             }
@@ -69,7 +62,7 @@ export const addSection = async (data: any, notificationCallback?: (data: any) =
             return null;
         }
     } catch (error) {
-        console.log('Error', error);
+        console.error('Error adding section:', error);
         return null;
     }
 }
@@ -82,8 +75,6 @@ export const updateSection = async (sectionId: string, data: any, notificationCa
             // 🔔 Send section update notification using callback
             if (notificationCallback) {
                 try {
-                    console.log('🔔 Sending section update notification...');
-                    
                     // Get user data for notification
                     const userString = await AsyncStorage.getItem('user');
                     let userInfo = null;
@@ -95,7 +86,7 @@ export const updateSection = async (sectionId: string, data: any, notificationCa
                         };
                     }
 
-                    const notificationSent = await notificationCallback({
+                    await notificationCallback({
                         projectId: data.projectId,
                         activityType: 'section_updated',
                         staffName: userInfo?.fullName || 'User',
@@ -104,10 +95,8 @@ export const updateSection = async (sectionId: string, data: any, notificationCa
                         details: `Updated section "${data.name || 'Section'}"`,
                         category: 'section',
                     });
-
-                    console.log('🔔 Section update notification result:', notificationSent);
                 } catch (notificationError: any) {
-                    console.error('❌ Error sending section update notification:', notificationError);
+                    console.error('Error sending section update notification:', notificationError);
                     // Don't fail the whole operation if notification fails
                 }
             }
@@ -130,8 +119,6 @@ export const deleteSection = async (sectionId: string, sectionData?: { name?: st
             // 🔔 Send section deletion notification using callback
             if (notificationCallback && sectionData?.projectId) {
                 try {
-                    console.log('🔔 Sending section deletion notification...');
-                    
                     // Get user data for notification
                     const userString = await AsyncStorage.getItem('user');
                     let userInfo = null;
@@ -143,7 +130,7 @@ export const deleteSection = async (sectionId: string, sectionData?: { name?: st
                         };
                     }
 
-                    const notificationSent = await notificationCallback({
+                    await notificationCallback({
                         projectId: sectionData.projectId,
                         activityType: 'section_deleted',
                         staffName: userInfo?.fullName || 'User',
@@ -152,10 +139,8 @@ export const deleteSection = async (sectionId: string, sectionData?: { name?: st
                         details: `Deleted section "${sectionData.name || 'Section'}"`,
                         category: 'section',
                     });
-
-                    console.log('🔔 Section deletion notification result:', notificationSent);
                 } catch (notificationError: any) {
-                    console.error('❌ Error sending section deletion notification:', notificationError);
+                    console.error('Error sending section deletion notification:', notificationError);
                     // Don't fail the whole operation if notification fails
                 }
             }
@@ -179,8 +164,6 @@ export const addMiniSection = async (data: any, notificationCallback?: (data: an
             // 🔔 Send mini-section creation notification using callback
             if (notificationCallback) {
                 try {
-                    console.log('🔔 Sending mini-section creation notification...');
-                    
                     // Get user data for notification
                     const userString = await AsyncStorage.getItem('user');
                     let userInfo = null;
@@ -192,7 +175,7 @@ export const addMiniSection = async (data: any, notificationCallback?: (data: an
                         };
                     }
 
-                    const notificationSent = await notificationCallback({
+                    await notificationCallback({
                         projectId: data.projectId,
                         activityType: 'mini_section_created',
                         staffName: userInfo?.fullName || 'User',
@@ -202,10 +185,8 @@ export const addMiniSection = async (data: any, notificationCallback?: (data: an
                         details: `Created mini-section "${data.name || 'Mini-Section'}" in ${data.sectionName || 'Section'}`,
                         category: 'mini_section',
                     });
-
-                    console.log('🔔 Mini-section creation notification result:', notificationSent);
                 } catch (notificationError: any) {
-                    console.error('❌ Error sending mini-section creation notification:', notificationError);
+                    console.error('Error sending mini-section creation notification:', notificationError);
                     // Don't fail the whole operation if notification fails
                 }
             }
@@ -215,7 +196,7 @@ export const addMiniSection = async (data: any, notificationCallback?: (data: an
             return null;
         }
     } catch (error) {
-        console.log('Error adding mini-section:', error);
+        console.error('Error adding mini-section:', error);
         return null;
     }
 }
@@ -228,8 +209,6 @@ export const updateMiniSection = async (miniSectionId: string, data: any, notifi
             // 🔔 Send mini-section update notification using callback
             if (notificationCallback) {
                 try {
-                    console.log('🔔 Sending mini-section update notification...');
-                    
                     // Get user data for notification
                     const userString = await AsyncStorage.getItem('user');
                     let userInfo = null;
@@ -241,7 +220,7 @@ export const updateMiniSection = async (miniSectionId: string, data: any, notifi
                         };
                     }
 
-                    const notificationSent = await notificationCallback({
+                    await notificationCallback({
                         projectId: data.projectId,
                         activityType: 'mini_section_updated',
                         staffName: userInfo?.fullName || 'User',
@@ -251,10 +230,8 @@ export const updateMiniSection = async (miniSectionId: string, data: any, notifi
                         details: `Updated mini-section "${data.name || 'Mini-Section'}" in ${data.sectionName || 'Section'}`,
                         category: 'mini_section',
                     });
-
-                    console.log('🔔 Mini-section update notification result:', notificationSent);
                 } catch (notificationError: any) {
-                    console.error('❌ Error sending mini-section update notification:', notificationError);
+                    console.error('Error sending mini-section update notification:', notificationError);
                     // Don't fail the whole operation if notification fails
                 }
             }
@@ -264,7 +241,7 @@ export const updateMiniSection = async (miniSectionId: string, data: any, notifi
             return null;
         }
     } catch (error) {
-        console.log('Error updating mini-section:', error);
+        console.error('Error updating mini-section:', error);
         return null;
     }
 }
@@ -277,8 +254,6 @@ export const deleteMiniSection = async (miniSectionId: string, miniSectionData?:
             // 🔔 Send mini-section deletion notification using callback
             if (notificationCallback && miniSectionData?.projectId) {
                 try {
-                    console.log('🔔 Sending mini-section deletion notification...');
-                    
                     // Get user data for notification
                     const userString = await AsyncStorage.getItem('user');
                     let userInfo = null;
@@ -290,7 +265,7 @@ export const deleteMiniSection = async (miniSectionId: string, miniSectionData?:
                         };
                     }
 
-                    const notificationSent = await notificationCallback({
+                    await notificationCallback({
                         projectId: miniSectionData.projectId,
                         activityType: 'mini_section_deleted',
                         staffName: userInfo?.fullName || 'User',
@@ -300,10 +275,8 @@ export const deleteMiniSection = async (miniSectionId: string, miniSectionData?:
                         details: `Deleted mini-section "${miniSectionData.name || 'Mini-Section'}" from ${miniSectionData.sectionName || 'Section'}`,
                         category: 'mini_section',
                     });
-
-                    console.log('🔔 Mini-section deletion notification result:', notificationSent);
                 } catch (notificationError: any) {
-                    console.error('❌ Error sending mini-section deletion notification:', notificationError);
+                    console.error('Error sending mini-section deletion notification:', notificationError);
                     // Don't fail the whole operation if notification fails
                 }
             }
@@ -313,7 +286,7 @@ export const deleteMiniSection = async (miniSectionId: string, miniSectionData?:
             return null;
         }
     } catch (error) {
-        console.log('Error deleting mini-section:', error);
+        console.error('Error deleting mini-section:', error);
         return null;
     }
 }

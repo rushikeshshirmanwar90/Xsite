@@ -689,6 +689,29 @@ export const styles = StyleSheet.create({
         backgroundColor: '#0EA5E9',
         borderRadius: 2,
     },
+    toggleButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        gap: 6,
+    },
+    toggleButtonActive: {
+        backgroundColor: '#F0FDF4',
+        borderColor: '#86EFAC',
+    },
+    toggleButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#6B7280',
+    },
+    toggleButtonTextActive: {
+        color: '#10B981',
+    },
     clientNameContainer: {
         flexDirection: 'row',
         alignItems: 'center',

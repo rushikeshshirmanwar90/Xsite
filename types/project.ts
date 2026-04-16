@@ -20,6 +20,7 @@ export interface Project {
   isAccessible?: boolean; // Added for license control - indicates if staff can access this project
   licenseStatus?: string; // Added for license control - 'active', 'expired', 'lifetime', 'unknown'
   blockReason?: string; // Added for license control - reason why project is blocked
+  isCompleted?: boolean; // Added for project completion tracking
 }
 
 export interface MaterialItem {

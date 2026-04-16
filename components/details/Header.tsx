@@ -145,45 +145,34 @@ const Header: React.FC<HeaderProps> = ({
                 <View style={styles.headerActions}>
                     {/* Section Completion Button */}
                     {onToggleSectionCompletion && (
-                        <>
-                            {sectionCompleted ? (
-                                <View style={[
-                                    styles.completionButton,
-                                    { backgroundColor: '#ECFDF5', borderColor: '#10B981' }
-                                ]}>
-                                    <Ionicons 
-                                        name="checkmark-circle" 
-                                        size={16} 
-                                        color="#10B981" 
-                                    />
-                                    <Text style={[
-                                        styles.completionButtonText,
-                                        { color: '#059669' }
-                                    ]}>
-                                        Complete
-                                    </Text>
-                                </View>
-                            ) : (
-                                <TouchableOpacity
-                                    style={[
-                                        styles.completionButton,
-                                        isUpdatingCompletion && { opacity: 0.6 }
-                                    ]}
-                                    onPress={onToggleSectionCompletion}
-                                    disabled={isUpdatingCompletion}
-                                    activeOpacity={0.7}
-                                >
-                                    <Ionicons 
-                                        name="ellipse-outline" 
-                                        size={16} 
-                                        color="#6B7280" 
-                                    />
-                                    <Text style={styles.completionButtonText}>
-                                        {isUpdatingCompletion ? 'Updating...' : 'Mark Complete'}
-                                    </Text>
-                                </TouchableOpacity>
-                            )}
-                        </>
+                        <TouchableOpacity
+                            style={[
+                                styles.completionButton,
+                                sectionCompleted 
+                                    ? { backgroundColor: '#ECFDF5', borderColor: '#10B981' }
+                                    : { backgroundColor: '#F3F4F6', borderColor: '#D1D5DB' },
+                                isUpdatingCompletion && { opacity: 0.6 }
+                            ]}
+                            onPress={onToggleSectionCompletion}
+                            disabled={isUpdatingCompletion}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons 
+                                name={sectionCompleted ? "checkmark-circle" : "ellipse-outline"}
+                                size={16} 
+                                color={sectionCompleted ? "#10B981" : "#6B7280"}
+                            />
+                            <Text style={[
+                                styles.completionButtonText,
+                                sectionCompleted && { color: '#059669' }
+                            ]}>
+                                {isUpdatingCompletion 
+                                    ? 'Updating...' 
+                                    : sectionCompleted 
+                                        ? 'Reopen' 
+                                        : 'Mark Complete'}
+                            </Text>
+                        </TouchableOpacity>
                     )}
                 </View>
             </View>

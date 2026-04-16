@@ -39,6 +39,7 @@ const Index: React.FC = () => {
     const [companyLogo, setCompanyLogo] = useState<string | null>(null);
     const [logoError, setLogoError] = useState<boolean>(false);
     const [isSharing, setIsSharing] = useState(false);
+    const [showCompletedProjects, setShowCompletedProjects] = useState(false); // Toggle for completed projects
 
     // Refs for capturing QR code views
     const embeddedQRRef = useRef<ViewShot | null>(null);
@@ -127,19 +128,34 @@ const Index: React.FC = () => {
                                 .filter((project: any) => project !== null);
                             
                             console.log(`📊 Found ${populatedProjects.length} populated projects for staff user`);
-                            console.log('🔍 Sample project with license status:', populatedProjects[0]);
                             
-                            // Debug: Log all projects with their license status
-                            populatedProjects.forEach((proj: any, idx: number) => {
-                                console.log(`Project ${idx + 1}: ${proj.name}`, {
-                                    isAccessible: proj.isAccessible,
-                                    licenseStatus: proj.licenseStatus,
-                                    blockReason: proj.blockReason,
-                                    clientName: proj.clientName
-                                });
-                            });
+                            // ✅ Load completion status for all staff projects
+                            const projectsWithCompletion = await Promise.all(
+                                populatedProjects.map(async (project: any) => {
+                                    try {
+                                        if (project._id) {
+                                            const response = await axios.get(`${domain}/api/completion?updateType=project&id=${project._id}`);
+                                            const responseData = response.data as any;
+                                            if (responseData.success && responseData.data) {
+                                                const completionStatus = Boolean(responseData.data.isCompleted);
+                                                console.log(`📊 Project ${project.name}: isCompleted = ${completionStatus}`);
+                                                return {
+                                                    ...project,
+                                                    isCompleted: completionStatus
+                                                };
+                                            }
+                                        }
+                                    } catch (error) {
+                                        console.warn(`Could not load completion status for project ${project._id}:`, error);
+                                    }
+                                    console.log(`📊 Project ${project.name}: isCompleted = false (default)`);
+                                    return { ...project, isCompleted: false };
+                                })
+                            );
                             
-                            setProjects(populatedProjects);
+                            console.log('✅ Staff projects with completion status loaded:', projectsWithCompletion.length);
+                            console.log('📊 Completion status summary:', projectsWithCompletion.map(p => `${p.name}: ${p.isCompleted}`).join(', '));
+                            setProjects(projectsWithCompletion);
                             return;
                         } else {
                             console.log('⚠️ Staff has no assigned projects');
@@ -162,7 +178,34 @@ const Index: React.FC = () => {
                 const userRole = user && 'role' in user ? 'staff' : 'admin';
                 const projectData = await getProjectData(clientId, undefined, true, userRole);
                 const projectsArray = Array.isArray(projectData) ? projectData : [];
-                setProjects(projectsArray);
+                
+                // ✅ Load completion status for all projects
+                const projectsWithCompletion = await Promise.all(
+                    projectsArray.map(async (project) => {
+                        try {
+                            if (project._id) {
+                                const response = await axios.get(`${domain}/api/completion?updateType=project&id=${project._id}`);
+                                const responseData = response.data as any;
+                                if (responseData.success && responseData.data) {
+                                    const completionStatus = Boolean(responseData.data.isCompleted);
+                                    console.log(`📊 Project ${project.name}: isCompleted = ${completionStatus}`);
+                                    return {
+                                        ...project,
+                                        isCompleted: completionStatus
+                                    };
+                                }
+                            }
+                        } catch (error) {
+                            console.warn(`Could not load completion status for project ${project._id}:`, error);
+                        }
+                        console.log(`📊 Project ${project.name}: isCompleted = false (default)`);
+                        return { ...project, isCompleted: false };
+                    })
+                );
+                
+                console.log('✅ Projects with completion status loaded:', projectsWithCompletion.length);
+                console.log('📊 Completion status summary:', projectsWithCompletion.map(p => `${p.name}: ${p.isCompleted}`).join(', '));
+                setProjects(projectsWithCompletion);
             } else {
                 // No clientId - staff without clients
                 console.log('⚠️ No clientId - skipping project fetch');
@@ -539,9 +582,33 @@ const Index: React.FC = () => {
             {/* Section Header */}
             <View style={styles.sectionHeader}>
                 <View>
-                    <Text style={styles.sectionTitle}>My Projects</Text>
+                    <Text style={styles.sectionTitle}>
+                        {showCompletedProjects ? 'Completed Projects' : 'My Projects'}
+                    </Text>
                     {userIsAdmin && <View style={styles.sectionDivider} />}
                 </View>
+                
+                {/* Toggle Button */}
+                <TouchableOpacity
+                    style={[
+                        styles.toggleButton,
+                        showCompletedProjects && styles.toggleButtonActive
+                    ]}
+                    onPress={() => setShowCompletedProjects(!showCompletedProjects)}
+                    activeOpacity={0.7}
+                >
+                    <Ionicons 
+                        name={showCompletedProjects ? "list" : "checkmark-done"} 
+                        size={18} 
+                        color={showCompletedProjects ? "#0EA5E9" : "#6B7280"} 
+                    />
+                    <Text style={[
+                        styles.toggleButtonText,
+                        showCompletedProjects && styles.toggleButtonTextActive
+                    ]}>
+                        {showCompletedProjects ? 'View Ongoing' : 'View Completed'}
+                    </Text>
+                </TouchableOpacity>
             </View>
 
             <ScrollView
@@ -582,16 +649,58 @@ const Index: React.FC = () => {
                     <View style={{ marginBottom: 24 }}>
                         {projects && projects.length > 0 ? (
                             <>
-                                {projects.map((project, index) => (
-                                    <View key={index} style={{ marginBottom: 10 }}>
-                                        <ProjectCard
-                                            key={project._id}
-                                            project={project}
-                                            onViewDetails={handleViewDetails}
-                                            userType={userIsAdmin ? 'admin' : (isStaff ? 'staff' : 'client')}
-                                        />
-                                    </View>
-                                ))}
+                                {/* Filter projects based on completion status */}
+                                {(() => {
+                                    console.log('🔍 Filtering projects:', {
+                                        totalProjects: projects.length,
+                                        showCompletedProjects,
+                                        projectsWithStatus: projects.map(p => ({
+                                            name: p.name,
+                                            isCompleted: p.isCompleted
+                                        }))
+                                    });
+                                    
+                                    const filteredProjects = showCompletedProjects
+                                        ? projects.filter(p => p.isCompleted === true)
+                                        : projects.filter(p => p.isCompleted === false);
+                                    
+                                    console.log('✅ Filtered result:', {
+                                        filteredCount: filteredProjects.length,
+                                        filteredProjects: filteredProjects.map(p => ({
+                                            name: p.name,
+                                            isCompleted: p.isCompleted
+                                        }))
+                                    });
+                                    
+                                    return filteredProjects.length > 0 ? (
+                                        filteredProjects.map((project, index) => (
+                                            <View key={index} style={{ marginBottom: 10 }}>
+                                                <ProjectCard
+                                                    key={project._id}
+                                                    project={project}
+                                                    onViewDetails={handleViewDetails}
+                                                    userType={userIsAdmin ? 'admin' : (isStaff ? 'staff' : 'client')}
+                                                />
+                                            </View>
+                                        ))
+                                    ) : (
+                                        <View style={styles.centerContainer}>
+                                            <Ionicons 
+                                                name={showCompletedProjects ? "checkmark-done-circle-outline" : "folder-open-outline"} 
+                                                size={64} 
+                                                color="#CBD5E1" 
+                                            />
+                                            <Text style={styles.emptyText}>
+                                                {showCompletedProjects ? 'No completed projects' : 'No ongoing projects'}
+                                            </Text>
+                                            <Text style={styles.emptySubText}>
+                                                {showCompletedProjects
+                                                    ? 'Mark projects as complete to see them here'
+                                                    : 'All your projects are completed'}
+                                            </Text>
+                                        </View>
+                                    );
+                                })()}
                             </>
                         ) : (
                             <View style={styles.centerContainer}>
