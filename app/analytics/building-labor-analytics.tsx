@@ -1,4 +1,6 @@
 // Building-Level Labor Analytics Page
+import PieChart, { PieChartColors20 } from '@/components/PieChart';
+import PieChartLegend, { LegendItem } from '@/components/PieChartLegend';
 import { formatCurrency } from '@/utils/analytics';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -35,6 +37,7 @@ const BuildingLaborAnalytics: React.FC = () => {
   const laborsData = params.labors as string;
 
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const colors = PieChartColors20;
 
   const [laborDetails, setLaborDetails] = useState<LaborDetail[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,6 +104,33 @@ const BuildingLaborAnalytics: React.FC = () => {
 
   const totalExpense = laborDetails.reduce((sum, labor) => sum + labor.totalCost, 0);
   const totalWorkers = laborDetails.reduce((sum, labor) => sum + labor.count, 0);
+
+  // Sort labors by cost (highest first) for pie chart
+  const sortedLabors = [...laborDetails].sort((a, b) => b.totalCost - a.totalCost);
+  
+  // Transform labors to pie data
+  const laborPieData = sortedLabors.map((labor, index) => ({
+    key: labor._id,
+    value: labor.totalCost,
+    svg: {
+      fill: colors[index % colors.length].primary,
+      gradientId: `gradient_${labor._id}`,
+    },
+    name: `${labor.category} - ${labor.type}`,
+    formattedBudget: formatCurrency(labor.totalCost),
+    percentage: (labor.totalCost / totalExpense * 100).toFixed(1),
+    description: `${labor.count} worker${labor.count !== 1 ? 's' : ''}`,
+  }));
+
+  // Create legend data for labors
+  const laborLegendData: LegendItem[] = laborPieData.map((item, index) => ({
+    key: item.key,
+    name: item.name,
+    value: item.formattedBudget,
+    percentage: item.percentage,
+    color: colors[index % colors.length].primary,
+    description: item.description,
+  }));
 
   // Get labor icon and color based on category
   const getLaborIconAndColor = (category: string) => {
@@ -199,11 +229,42 @@ const BuildingLaborAnalytics: React.FC = () => {
 
             {/* Labor Breakdown Section */}
             <View style={styles.section}>
+              {/* Pie Chart for Labor */}
+              <View style={styles.chartCard}>
+                <View style={styles.chartHeading}>
+                  <Text style={styles.chartTitle}>Labor Cost Distribution</Text>
+                  <Text style={styles.chartSubtitle}>Sorted by highest cost</Text>
+                </View>
+                
+                <View style={styles.chartContainer}>
+                  <PieChart
+                    data={laborPieData}
+                    colors={colors}
+                    size={260}
+                    enableAnimation={true}
+                    enableHover={true}
+                    labelType="amount"
+                    centerContent={{
+                      label: 'TOTAL LABOR',
+                      value: formatCurrency(totalExpense),
+                      subtitle: `${laborDetails.length} Labor Type${laborDetails.length > 1 ? 's' : ''}`
+                    }}
+                  />
+                </View>
+
+                <PieChartLegend
+                  items={laborLegendData}
+                  showPercentage={true}
+                  showDescription={true}
+                  layout="vertical"
+                />
+              </View>
+
               <Text style={styles.sectionTitle}>Labor Breakdown</Text>
             </View>
 
             {/* Labor Cards */}
-            {laborDetails.map((labor, index) => {
+            {sortedLabors.map((labor, index) => {
               const { icon, color } = getLaborIconAndColor(labor.category);
               
               return (
@@ -405,6 +466,38 @@ const styles = StyleSheet.create({
   section: {
     paddingHorizontal: 20,
     marginBottom: 16,
+  },
+  chartCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  chartHeading: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  chartTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 4,
+  },
+  chartSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  chartContainer: {
+    alignItems: 'center',
+    marginVertical: 16,
   },
   sectionTitle: {
     fontSize: 18,

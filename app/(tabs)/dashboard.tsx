@@ -569,46 +569,6 @@ const AnalyticsDashboard: React.FC = () => {
                 ? 'Mark projects as complete to see their analytics here'
                 : 'Add materials and labor to your projects to see budget analytics'}
             </Text>
-            <View style={{ marginTop: 20, padding: 15, backgroundColor: '#FEF3C7', borderRadius: 10 }}>
-              <Text style={{ fontSize: 12, color: '#92400E', textAlign: 'center' }}>
-                Debug Info:{'\n'}
-                Projects: {projects.length}{'\n'}
-                Transformed: {transformedProjectData.length}{'\n'}
-                Ongoing: {ongoingProjects.length}{'\n'}
-                Completed: {completedProjectsList.length}{'\n'}
-                Showing: {showCompletedProjects ? 'Completed' : 'Ongoing'}{'\n'}
-                Active for chart: {activeProjects.length}{'\n'}
-                Total Materials: {formatCurrency(totalMaterialCosts)}{'\n'}
-                Total Labor: {formatCurrency(totalLaborCosts)}{'\n'}
-                Grand Total: {formatCurrency(grandTotal)}{'\n'}
-                Loading: {loading ? 'Yes' : 'No'}{'\n'}
-                Error: {error || 'None'}{'\n'}
-                Tap the bug icon (🐛) to force refresh
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={{
-                marginTop: 15,
-                backgroundColor: '#3B82F6',
-                paddingHorizontal: 20,
-                paddingVertical: 10,
-                borderRadius: 8,
-              }}
-              onPress={async () => {
-                console.log('🔧 FORCE REFRESH TRIGGERED');
-                setError(null);
-                setLoading(true);
-                try {
-                  await fetchProjects(true);
-                } catch (err) {
-                  console.log('🔧 Force refresh error:', err);
-                }
-              }}
-            >
-              <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '600' }}>
-                Force Refresh
-              </Text>
-            </TouchableOpacity>
           </View>
         ) : (
           <Animated.View style={[styles.card, { opacity: fadeAnim }]}>

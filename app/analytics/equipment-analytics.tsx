@@ -1,4 +1,6 @@
 // Equipment Cost Analytics Page
+import PieChart, { PieChartColors20 } from '@/components/PieChart';
+import PieChartLegend, { LegendItem } from '@/components/PieChartLegend';
 import { formatCurrency } from '@/utils/analytics';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -46,6 +48,7 @@ const EquipmentAnalytics: React.FC = () => {
   const equipmentsData = params.equipments as string;
 
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const colors = PieChartColors20;
 
   const [equipmentDetails, setEquipmentDetails] = useState<EquipmentDetail[]>([]);
   const [loading, setLoading] = useState(true);
@@ -147,6 +150,33 @@ const EquipmentAnalytics: React.FC = () => {
   const totalExpense = equipmentDetails.reduce((sum, equipment) => sum + equipment.totalCost, 0);
   const totalQuantity = equipmentDetails.reduce((sum, equipment) => sum + equipment.quantity, 0);
 
+  // Sort equipment by cost (highest first) for pie chart
+  const sortedEquipment = [...equipmentDetails].sort((a, b) => b.totalCost - a.totalCost);
+  
+  // Transform equipment to pie data
+  const equipmentPieData = sortedEquipment.map((equipment, index) => ({
+    key: equipment._id,
+    value: equipment.totalCost,
+    svg: {
+      fill: colors[index % colors.length].primary,
+      gradientId: `gradient_${equipment._id}`,
+    },
+    name: equipment.name || equipment.type,
+    formattedBudget: formatCurrency(equipment.totalCost),
+    percentage: (equipment.totalCost / totalExpense * 100).toFixed(1),
+    description: `${equipment.quantity} unit${equipment.quantity !== 1 ? 's' : ''}`,
+  }));
+
+  // Create legend data for equipment
+  const equipmentLegendData: LegendItem[] = equipmentPieData.map((item, index) => ({
+    key: item.key,
+    name: item.name,
+    value: item.formattedBudget,
+    percentage: item.percentage,
+    color: colors[index % colors.length].primary,
+    description: item.description,
+  }));
+
   // Get equipment icon and color based on category
   const getEquipmentIconAndColor = (category: string) => {
     const categoryMap: { [key: string]: { icon: keyof typeof Ionicons.glyphMap, color: string } } = {
@@ -245,11 +275,42 @@ const EquipmentAnalytics: React.FC = () => {
 
             {/* Equipment Breakdown Section */}
             <View style={styles.section}>
+              {/* Pie Chart for Equipment */}
+              <View style={styles.chartCard}>
+                <View style={styles.chartHeading}>
+                  <Text style={styles.chartTitle}>Equipment Cost Distribution</Text>
+                  <Text style={styles.chartSubtitle}>Sorted by highest cost</Text>
+                </View>
+                
+                <View style={styles.chartContainer}>
+                  <PieChart
+                    data={equipmentPieData}
+                    colors={colors}
+                    size={260}
+                    enableAnimation={true}
+                    enableHover={true}
+                    labelType="amount"
+                    centerContent={{
+                      label: 'TOTAL EQUIPMENT',
+                      value: formatCurrency(totalExpense),
+                      subtitle: `${equipmentDetails.length} Item${equipmentDetails.length > 1 ? 's' : ''}`
+                    }}
+                  />
+                </View>
+
+                <PieChartLegend
+                  items={equipmentLegendData}
+                  showPercentage={true}
+                  showDescription={true}
+                  layout="vertical"
+                />
+              </View>
+
               <Text style={styles.sectionTitle}>Equipment Breakdown</Text>
             </View>
 
             {/* Equipment Cards */}
-            {equipmentDetails.map((equipment, index) => {
+            {sortedEquipment.map((equipment, index) => {
               const { icon, color } = getEquipmentIconAndColor(equipment.category);
               
               return (
@@ -478,6 +539,38 @@ const styles = StyleSheet.create({
   section: {
     paddingHorizontal: 20,
     marginBottom: 16,
+  },
+  chartCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  chartHeading: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  chartTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 4,
+  },
+  chartSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  chartContainer: {
+    alignItems: 'center',
+    marginVertical: 16,
   },
   sectionTitle: {
     fontSize: 18,

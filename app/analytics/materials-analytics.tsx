@@ -1,4 +1,6 @@
 // Level 4: Materials List for Mini-Section
+import PieChart, { PieChartColors20 } from '@/components/PieChart';
+import PieChartLegend, { LegendItem } from '@/components/PieChartLegend';
 import { getClientId } from '@/functions/clientId';
 import { getProject } from '@/functions/project';
 import { formatCurrency } from '@/utils/analytics';
@@ -55,6 +57,7 @@ const MaterialsAnalytics: React.FC = () => {
   const materialUsed = params.materialUsed as string;
 
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const colors = PieChartColors20;
 
   const [materials, setMaterials] = useState<MaterialUsed[]>([]);
   const [labors, setLabors] = useState<LaborUsed[]>([]);
@@ -208,6 +211,60 @@ const MaterialsAnalytics: React.FC = () => {
   const totalExpense = materials.reduce((sum, material) => sum + (material.totalCost || 0), 0);
   const totalLaborExpense = labors.reduce((sum, labor) => sum + (labor.totalCost || 0), 0);
   const grandTotal = totalExpense + totalLaborExpense;
+
+  // Sort materials by cost (highest first) for pie chart
+  const sortedMaterials = [...materials].sort((a, b) => (b.totalCost || 0) - (a.totalCost || 0));
+  
+  // Transform materials to pie data
+  const materialPieData = sortedMaterials.map((material, index) => ({
+    key: material._id || `material_${index}`,
+    value: material.totalCost || 0,
+    svg: {
+      fill: colors[index % colors.length].primary,
+      gradientId: `gradient_${material._id || index}`,
+    },
+    name: material.name,
+    formattedBudget: formatCurrency(material.totalCost || 0),
+    percentage: ((material.totalCost || 0) / totalExpense * 100).toFixed(1),
+    description: `${material.qnt} ${material.unit}`,
+  }));
+
+  // Create legend data for materials
+  const materialLegendData: LegendItem[] = materialPieData.map((item, index) => ({
+    key: item.key,
+    name: item.name,
+    value: item.formattedBudget,
+    percentage: item.percentage,
+    color: colors[index % colors.length].primary,
+    description: item.description,
+  }));
+
+  // Sort labors by cost (highest first) for pie chart
+  const sortedLabors = [...labors].sort((a, b) => b.totalCost - a.totalCost);
+  
+  // Transform labors to pie data
+  const laborPieData = sortedLabors.map((labor, index) => ({
+    key: labor._id || `labor_${index}`,
+    value: labor.totalCost,
+    svg: {
+      fill: colors[index % colors.length].primary,
+      gradientId: `gradient_${labor._id || index}`,
+    },
+    name: `${labor.category} - ${labor.type}`,
+    formattedBudget: formatCurrency(labor.totalCost),
+    percentage: (labor.totalCost / totalLaborExpense * 100).toFixed(1),
+    description: `${labor.count} laborer${labor.count !== 1 ? 's' : ''}`,
+  }));
+
+  // Create legend data for labors
+  const laborLegendData: LegendItem[] = laborPieData.map((item, index) => ({
+    key: item.key,
+    name: item.name,
+    value: item.formattedBudget,
+    percentage: item.percentage,
+    color: colors[index % colors.length].primary,
+    description: item.description,
+  }));
 
   const getMaterialIcon = (materialName: string) => {
     const name = materialName.toLowerCase();
@@ -364,8 +421,40 @@ const MaterialsAnalytics: React.FC = () => {
             {/* Materials Section */}
             {activeTab === 'materials' && materials.length > 0 && (
               <View style={styles.sectionContainer}>
+                {/* Pie Chart for Materials */}
+                <View style={styles.chartCard}>
+                  <View style={styles.chartHeading}>
+                    <Text style={styles.chartTitle}>Material Cost Distribution</Text>
+                    <Text style={styles.chartSubtitle}>Sorted by highest usage</Text>
+                  </View>
+                  
+                  <View style={styles.chartContainer}>
+                    <PieChart
+                      data={materialPieData}
+                      colors={colors}
+                      size={260}
+                      enableAnimation={true}
+                      enableHover={true}
+                      labelType="amount"
+                      centerContent={{
+                        label: 'TOTAL MATERIALS',
+                        value: formatCurrency(totalExpense),
+                        subtitle: `${materials.length} Material${materials.length > 1 ? 's' : ''}`
+                      }}
+                    />
+                  </View>
+
+                  <PieChartLegend
+                    items={materialLegendData}
+                    showPercentage={true}
+                    showDescription={true}
+                    layout="vertical"
+                  />
+                </View>
+
+                {/* Material Cards */}
                 <Text style={styles.sectionTitle}>Materials Breakdown</Text>
-                {materials.map((material, index) => (
+                {sortedMaterials.map((material, index) => (
                   <View key={material._id || index} style={styles.materialCard}>
                     <View style={styles.materialHeader}>
                       <View
@@ -422,8 +511,40 @@ const MaterialsAnalytics: React.FC = () => {
             {/* Labor Section */}
             {activeTab === 'labor' && labors.length > 0 && (
               <View style={styles.sectionContainer}>
+                {/* Pie Chart for Labor */}
+                <View style={styles.chartCard}>
+                  <View style={styles.chartHeading}>
+                    <Text style={styles.chartTitle}>Labor Cost Distribution</Text>
+                    <Text style={styles.chartSubtitle}>Sorted by highest cost</Text>
+                  </View>
+                  
+                  <View style={styles.chartContainer}>
+                    <PieChart
+                      data={laborPieData}
+                      colors={colors}
+                      size={260}
+                      enableAnimation={true}
+                      enableHover={true}
+                      labelType="amount"
+                      centerContent={{
+                        label: 'TOTAL LABOR',
+                        value: formatCurrency(totalLaborExpense),
+                        subtitle: `${labors.length} Labor Type${labors.length > 1 ? 's' : ''}`
+                      }}
+                    />
+                  </View>
+
+                  <PieChartLegend
+                    items={laborLegendData}
+                    showPercentage={true}
+                    showDescription={true}
+                    layout="vertical"
+                  />
+                </View>
+
+                {/* Labor Cards */}
                 <Text style={styles.sectionTitle}>Labor Breakdown</Text>
-                {labors.map((labor, index) => {
+                {sortedLabors.map((labor, index) => {
                   const { icon, color } = getLaborIconAndColor(labor.category);
                   return (
                     <View key={labor._id || index} style={styles.laborCard}>
@@ -673,6 +794,38 @@ const styles = StyleSheet.create({
   },
   sectionContainer: {
     marginBottom: 24,
+  },
+  chartCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  chartHeading: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  chartTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 4,
+  },
+  chartSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  chartContainer: {
+    alignItems: 'center',
+    marginVertical: 16,
   },
   materialsContainer: {
     paddingHorizontal: 20,
