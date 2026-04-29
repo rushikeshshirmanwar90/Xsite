@@ -18,11 +18,185 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Animated, FlatList, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
+import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 import { useSimpleNotifications } from '@/hooks/useSimpleNotifications';
 import { useAuth } from '@/contexts/AuthContext';
+
+// Simple Swipeable Mini-Section Component
+const SwipeableMiniSection = ({ 
+    section, 
+    selectedMiniSection, 
+    miniSectionCompletions, 
+    miniSectionLoadingStates, 
+    onSectionSelect, 
+    onToggleCompletion, 
+    onDelete 
+}: {
+    section: Section;
+    selectedMiniSection: string | null;
+    miniSectionCompletions: {[key: string]: boolean};
+    miniSectionLoadingStates: {[key: string]: boolean};
+    onSectionSelect: (sectionId: string) => void;
+    onToggleCompletion: (sectionId: string, sectionName: string) => void;
+    onDelete: (sectionId: string, sectionName: string) => void;
+}) => {
+    const translateX = useRef(new Animated.Value(0)).current;
+
+    const handleGestureEvent = Animated.event(
+        [{ nativeEvent: { translationX: translateX } }],
+        { useNativeDriver: false }
+    );
+
+    const handleStateChange = (event: any) => {
+        const { state, translationX } = event.nativeEvent;
+        
+        if (state === State.END) {
+            if (translationX < -100) {
+                // Swipe threshold reached - trigger delete
+                onDelete(section._id, section.name);
+                // Reset position
+                Animated.spring(translateX, {
+                    toValue: 0,
+                    useNativeDriver: false,
+                }).start();
+            } else {
+                // Reset position
+                Animated.spring(translateX, {
+                    toValue: 0,
+                    useNativeDriver: false,
+                }).start();
+            }
+        }
+    };
+
+    return (
+        <View style={{ marginBottom: 12, position: 'relative' }}>
+            {/* Delete Background */}
+            <View
+                style={{
+                    position: 'absolute',
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 100,
+                    backgroundColor: '#EF4444',
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }}
+            >
+                <Ionicons name="trash-outline" size={24} color="#FFFFFF" />
+                <Text style={{
+                    color: '#FFFFFF',
+                    fontSize: 12,
+                    fontWeight: '600',
+                    marginTop: 4,
+                }}>
+                    Delete
+                </Text>
+            </View>
+
+            {/* Swipeable Content */}
+            <PanGestureHandler
+                onGestureEvent={handleGestureEvent}
+                onHandlerStateChange={handleStateChange}
+                activeOffsetX={[-10, 10]}
+            >
+                <Animated.View
+                    style={{
+                        transform: [{ translateX }],
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: 12,
+                    }}
+                >
+                    <TouchableOpacity
+                        style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            paddingHorizontal: 20,
+                            paddingVertical: 18,
+                            backgroundColor: selectedMiniSection === section._id ? '#EFF6FF' : '#FFFFFF',
+                            borderRadius: 12,
+                            borderWidth: selectedMiniSection === section._id ? 2 : 1,
+                            borderColor: selectedMiniSection === section._id ? '#3B82F6' : '#E2E8F0',
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.05,
+                            shadowRadius: 3,
+                            elevation: 2,
+                        }}
+                        onPress={() => onSectionSelect(section._id)}
+                        activeOpacity={0.7}
+                    >
+                        {/* Completion Status Icon */}
+                        <TouchableOpacity
+                            onPress={(e) => {
+                                e.stopPropagation();
+                                onToggleCompletion(section._id, section.name);
+                            }}
+                            disabled={miniSectionLoadingStates[section._id]}
+                            activeOpacity={0.7}
+                            style={{
+                                width: 40,
+                                height: 40,
+                                borderRadius: 20,
+                                backgroundColor: miniSectionCompletions[section._id] ? '#10B981' : '#F3F4F6',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                marginRight: 16,
+                            }}
+                        >
+                            <Ionicons 
+                                name={
+                                    miniSectionCompletions[section._id] 
+                                        ? "checkmark" 
+                                        : "ellipse-outline"
+                                } 
+                                size={20}
+                                color={
+                                    miniSectionLoadingStates[section._id]
+                                        ? "#94A3B8"
+                                        : miniSectionCompletions[section._id]
+                                            ? "#FFFFFF"
+                                            : "#6B7280"
+                                } 
+                            />
+                        </TouchableOpacity>
+                        
+                        {/* Section Info */}
+                        <View style={{ flex: 1 }}>
+                            <Text 
+                                style={{
+                                    fontSize: 16,
+                                    fontWeight: '600',
+                                    color: selectedMiniSection === section._id ? '#3B82F6' : '#374151',
+                                    marginBottom: 4,
+                                }}
+                                numberOfLines={1}
+                            >
+                                {section.name}
+                            </Text>
+                            <Text style={{
+                                fontSize: 14,
+                                color: '#6B7280',
+                            }}>
+                                {miniSectionCompletions[section._id] ? 'Completed' : 'In Progress'}
+                            </Text>
+                        </View>
+                        
+                        {/* Selection Indicator */}
+                        {selectedMiniSection === section._id && (
+                            <Ionicons name="checkmark-circle" size={24} color="#3B82F6" />
+                        )}
+                    </TouchableOpacity>
+                </Animated.View>
+            </PanGestureHandler>
+        </View>
+    );
+};
 
 const Details = () => {
     const params = useLocalSearchParams();
@@ -45,6 +219,9 @@ const Details = () => {
     const [customEndDate, setCustomEndDate] = useState<Date>(new Date());
     const [showStartPicker, setShowStartPicker] = useState(false);
     const [showEndPicker, setShowEndPicker] = useState(false);
+    
+    // Simple dropdown state - now using modal instead of dropdown
+    const [showSectionModal, setShowSectionModal] = useState(false);
 
     const [materials, setMaterials] = useState<{
         available: Material[];
@@ -595,6 +772,28 @@ const Details = () => {
         return /^[0-9a-fA-F]{24}$/.test(id);
     };
 
+    // Function to get selected section name for dropdown display
+    const getSelectedSectionName = () => {
+        if (!selectedMiniSection) {
+            return 'All Sections';
+        }
+        const selectedSection = miniSections.find(s => s._id === selectedMiniSection);
+        return selectedSection?.name || 'Unknown Section';
+    };
+
+    // Function to handle section selection from modal
+    const handleSectionSelect = (sectionId: string) => {
+        if (sectionId === 'all-sections') {
+            setSelectedMiniSection(null);
+        } else {
+            setSelectedMiniSection(sectionId);
+        }
+        setShowSectionModal(false); // Close modal after selection
+        
+        // Reload materials with new filter
+        reloadMaterials(1, true);
+    };
+
     // Function to show confirmation modal before toggling
     const handleCompletionButtonPress = () => {
         setShowCompletionConfirmModal(true);
@@ -707,30 +906,75 @@ const Details = () => {
             if (!isMountedRef.current) return;
             setMiniSectionLoadingStates(prev => ({ ...prev, [miniSectionId]: true }));
             
-            // Make API call (no optimistic update, no verification)
-            const response = await axios.patch(
-                `${domain}/api/completion`,
-                { updateType: 'minisection', id: miniSectionId },
-                { headers: { 'Content-Type': 'application/json' }, timeout: 15000 }
-            );
+            // Show loading toast
+            toast.loading('Updating completion status...');
             
-            // Check mounted after API
-            if (!isMountedRef.current) return;
+            // Enhanced API call with retry logic and increased timeout
+            let lastError: any = null;
+            const maxRetries = 2;
             
-            // Update state with API response
-            if (response.data?.success && typeof response.data.data?.isCompleted === 'boolean') {
-                const newStatus = response.data.data.isCompleted;
-                setMiniSectionCompletions(prev => ({ ...prev, [miniSectionId]: newStatus }));
-                
-                const statusText = newStatus ? 'completed' : 'reopened';
-                toast.success(`${miniSectionName} ${statusText}`);
+            for (let attempt = 0; attempt <= maxRetries; attempt++) {
+                try {
+                    const response = await axios.patch(
+                        `${domain}/api/completion`,
+                        { updateType: 'minisection', id: miniSectionId },
+                        { 
+                            headers: { 'Content-Type': 'application/json' }, 
+                            timeout: 30000 // Increased to 30 seconds
+                        }
+                    );
+                    
+                    // Check mounted after API
+                    if (!isMountedRef.current) return;
+                    
+                    // Update state with API response
+                    if (response.data?.success && typeof response.data.data?.isCompleted === 'boolean') {
+                        const newStatus = response.data.data.isCompleted;
+                        setMiniSectionCompletions(prev => ({ ...prev, [miniSectionId]: newStatus }));
+                        
+                        const statusText = newStatus ? 'completed' : 'reopened';
+                        toast.success(`${miniSectionName} ${statusText}`);
+                        return; // Success, exit retry loop
+                    }
+                    
+                } catch (error: any) {
+                    lastError = error;
+                    
+                    // If it's a timeout and we have retries left, wait and retry
+                    if (attempt < maxRetries && (
+                        error.code === 'ECONNABORTED' || 
+                        error.message?.includes('timeout') ||
+                        error.response?.status >= 500
+                    )) {
+                        const delay = Math.pow(2, attempt) * 1000; // Exponential backoff: 1s, 2s, 4s
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        continue;
+                    }
+                    
+                    // If it's not retryable or we're out of retries, throw
+                    throw error;
+                }
             }
             
         } catch (error: any) {
             if (error.name === 'CanceledError' || error.code === 'ERR_CANCELED') return;
+            
             console.error('Toggle error:', error.message);
+            
             if (isMountedRef.current) {
-                toast.error('Failed to update');
+                let errorMessage = 'Failed to update completion status';
+                
+                if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+                    errorMessage = 'Request timed out. Please check your connection and try again.';
+                } else if (error.response?.status === 404) {
+                    errorMessage = 'Mini-section not found. Please refresh the page.';
+                } else if (error.response?.status >= 500) {
+                    errorMessage = 'Server error. Please try again later.';
+                } else if (error.response?.data?.message) {
+                    errorMessage = error.response.data.message;
+                }
+                
+                toast.error(errorMessage);
             }
         } finally {
             if (isMountedRef.current) {
@@ -2112,6 +2356,117 @@ const Details = () => {
         }
     };
 
+    // Function to handle deleting a mini-section
+    const handleDeleteSection = async (miniSectionId: string, miniSectionName: string) => {
+        try {
+            // Show confirmation alert
+            Alert.alert(
+                'Delete Mini-Section',
+                `Are you sure you want to delete "${miniSectionName}"? This action cannot be undone.`,
+                [
+                    {
+                        text: 'Cancel',
+                        style: 'cancel',
+                    },
+                    {
+                        text: 'Delete',
+                        style: 'destructive',
+                        onPress: async () => {
+                            let loadingToast: any = null;
+                            try {
+                                loadingToast = toast.loading('Deleting section...');
+
+                                // ✅ OPTIMISTIC UPDATE: Immediately remove from UI
+                                const originalMiniSections = [...miniSections];
+                                setMiniSections(prev => prev.filter(section => section._id !== miniSectionId));
+
+                                // If the deleted mini-section was selected, reset the filter immediately
+                                if (selectedMiniSection === miniSectionId) {
+                                    setSelectedMiniSection(null);
+                                }
+
+                                // Use the correct delete function from details.ts
+                                const { deleteMiniSection } = require('@/functions/details');
+                                
+                                // Prepare section data for notification
+                                const sectionData = {
+                                    name: miniSectionName,
+                                    sectionName: sectionName, // Parent section name
+                                    projectId: projectId,
+                                    projectName: projectName
+                                };
+
+                                // Call the delete function with notification callback
+                                const result = await deleteMiniSection(miniSectionId, sectionData, sendProjectNotification);
+
+                                toast.dismiss(loadingToast);
+
+                                if (result && result.success) {
+                                    toast.success(`"${miniSectionName}" deleted successfully`);
+
+                                    // ✅ DOUBLE-CHECK: Refetch from server to ensure consistency
+                                    try {
+                                        const sections = await getSection(sectionId);
+                                        if (sections && Array.isArray(sections)) {
+                                            setMiniSections(sections);
+                                        }
+                                    } catch (refetchError) {
+                                        console.warn('Failed to refetch sections after delete:', refetchError);
+                                        // Keep the optimistic update if refetch fails
+                                    }
+
+                                    // Reload materials to reflect the changes
+                                    await reloadMaterials(1, true);
+
+                                    // Log activity (optional)
+                                    try {
+                                        const user = await getUserData();
+                                        console.log(`Mini-section "${miniSectionName}" deleted by ${user.fullName}`);
+                                    } catch (logError) {
+                                        // Silent error for logging
+                                    }
+                                } else {
+                                    // ✅ ROLLBACK: Restore original state if API call failed
+                                    setMiniSections(originalMiniSections);
+                                    throw new Error(result?.error || result?.message || 'Failed to delete section');
+                                }
+                            } catch (error: any) {
+                                if (loadingToast) {
+                                    toast.dismiss(loadingToast);
+                                }
+                                
+                                // ✅ ROLLBACK: Restore original state on error
+                                const originalMiniSections = miniSections.filter(section => section._id !== miniSectionId);
+                                if (originalMiniSections.length < miniSections.length) {
+                                    // Only restore if we actually removed something
+                                    try {
+                                        const sections = await getSection(sectionId);
+                                        if (sections && Array.isArray(sections)) {
+                                            setMiniSections(sections);
+                                        }
+                                    } catch (restoreError) {
+                                        console.error('Failed to restore sections after error:', restoreError);
+                                    }
+                                }
+                                
+                                console.error('Delete section error:', error);
+                                
+                                const errorMessage = error?.response?.data?.error ||
+                                    error?.response?.data?.message ||
+                                    error?.message ||
+                                    'Failed to delete section';
+                                toast.error(errorMessage);
+                            }
+                        },
+                    },
+                ]
+            );
+        } catch (error: any) {
+            console.error('Error showing delete confirmation:', error);
+            toast.error('Failed to show delete confirmation');
+        }
+    };
+
     // ✅ FIXED: Simplified getCurrentData with safety checks and proper typing
     const getCurrentData = (): Material[] => {
         
@@ -2773,42 +3128,110 @@ const Details = () => {
                     <View style={sectionStyles.filtersContainer}>
                         {/* Section Filter - Compact Dropdown */}
                         <View style={sectionStyles.filterRow}>
-                            <Ionicons name="layers-outline" size={16} color="#64748B" style={sectionStyles.filterIcon} />
+                            {/* Check icon for mini-section completion status - Clickable to toggle */}
+                            <TouchableOpacity
+                                onPress={() => {
+                                    if (selectedMiniSection) {
+                                        // Find the selected mini-section name
+                                        const selectedSection = miniSections.find(s => s._id === selectedMiniSection);
+                                        const sectionName = selectedSection?.name || 'Unknown Section';
+                                        
+                                        // Toggle completion status
+                                        toggleMiniSectionCompletionDirect(selectedMiniSection, sectionName);
+                                    }
+                                }}
+                                disabled={!selectedMiniSection || miniSectionLoadingStates[selectedMiniSection || '']}
+                                activeOpacity={0.7}
+                                style={{
+                                    padding: 4, // Add padding for better touch target
+                                    marginRight: 4,
+                                }}
+                            >
+                                <Ionicons 
+                                    name={
+                                        selectedMiniSection && miniSectionCompletions[selectedMiniSection] 
+                                            ? "checkmark-circle" 
+                                            : "checkmark-circle-outline"
+                                    } 
+                                    size={16} 
+                                    color={
+                                        !selectedMiniSection 
+                                            ? "#CBD5E1" // Very light gray when no selection (disabled)
+                                            : miniSectionLoadingStates[selectedMiniSection || '']
+                                                ? "#94A3B8" // Medium gray when loading
+                                                : miniSectionCompletions[selectedMiniSection]
+                                                    ? "#10B981" // Green for completed
+                                                    : "#64748B" // Gray for not completed
+                                    } 
+                                />
+                            </TouchableOpacity>
+                            
                             {miniSections.length > 0 ? (
                                 <View style={sectionStyles.compactSectionSelector}>
-                                    <SectionManager
-                                        onSectionSelect={(sectionId) => {
-                                            setSelectedMiniSection(sectionId === 'all-sections' ? null : sectionId);
-                                        }}
-                                        onAddSection={async (newSection) => {
-                                            // Refetch sections after adding a new one
-                                            const sections = await getSection(sectionId);
-                                            if (sections && Array.isArray(sections)) {
-                                                setMiniSections(sections);
-                                            }
-                                        }}
-                                        selectedSection={selectedMiniSection || 'all-sections'}
-                                        sections={[
-                                            { id: 'all-sections', name: 'All Sections', createdAt: new Date().toISOString() },
-                                            ...miniSections.map(s => ({
-                                                id: s._id,
-                                                name: s.name,
-                                                createdAt: s.createdAt
-                                            }))
-                                        ]}
-                                        compact={true}
-                                        projectDetails={{
-                                            projectName: projectName,
-                                            projectId: projectId
-                                        }}
-                                        mainSectionDetails={{
-                                            sectionName: sectionName,
-                                            sectionId: sectionId
-                                        }}
-                                        miniSectionCompletions={miniSectionCompletions}
-                                        onToggleMiniSectionCompletion={toggleMiniSectionCompletionDirect}
-                                        miniSectionLoadingStates={miniSectionLoadingStates}
-                                    />
+                                    {/* Simple Inline Dropdown */}
+                                    <View style={{ 
+                                        flex: 1, 
+                                        position: 'relative'
+                                    }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                            {/* Main Button */}
+                                            <TouchableOpacity
+                                                style={{
+                                                    flex: 1,
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    paddingHorizontal: 12,
+                                                    paddingVertical: Platform.OS === 'ios' ? 12 : 10,
+                                                    backgroundColor: '#FFFFFF', // Always white background
+                                                    borderRadius: Platform.OS === 'ios' ? 8 : 6,
+                                                    borderWidth: 1,
+                                                    borderColor: '#E2E8F0', // Always show border
+                                                    minHeight: Platform.OS === 'ios' ? 44 : 40,
+                                                    shadowColor: '#000',
+                                                    shadowOffset: { width: 0, height: 1 },
+                                                    shadowOpacity: 0.05,
+                                                    shadowRadius: 2,
+                                                    elevation: 1,
+                                                }}
+                                                onPress={() => setShowSectionModal(true)}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Text style={{
+                                                    flex: 1,
+                                                    fontSize: 14,
+                                                    color: '#1F2937',
+                                                    fontWeight: '500',
+                                                    marginRight: 8,
+                                                }} numberOfLines={1}>
+                                                    {getSelectedSectionName()}
+                                                </Text>
+                                                <Ionicons 
+                                                    name="chevron-down" 
+                                                    size={16} 
+                                                    color="#64748B" 
+                                                />
+                                            </TouchableOpacity>
+
+                                            {/* Add Button */}
+                                            <TouchableOpacity
+                                                style={{
+                                                    backgroundColor: '#3B82F6',
+                                                    width: Platform.OS === 'ios' ? 36 : 32,
+                                                    height: Platform.OS === 'ios' ? 36 : 32,
+                                                    borderRadius: Platform.OS === 'ios' ? 8 : 6,
+                                                    justifyContent: 'center',
+                                                    alignItems: 'center',
+                                                }}
+                                                onPress={() => setShowAddSectionModal(true)}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Ionicons name="add" size={20} color="#fff" />
+                                            </TouchableOpacity>
+                                        </View>
+
+
+                                    </View>
                                 </View>
                             ) : (
                                 <View style={sectionStyles.noSectionsWrapper}>
@@ -3834,6 +4257,198 @@ const Details = () => {
                         </View>
                     </View>
                 </View>
+            </Modal>
+
+            {/* Mini-Section Selection Modal */}
+            <Modal
+                visible={showSectionModal}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setShowSectionModal(false)}
+            >
+                <GestureHandlerRootView style={{ flex: 1 }}>
+                    <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+                    {/* Header */}
+                    <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        paddingHorizontal: 20,
+                        paddingVertical: 16,
+                        backgroundColor: '#FFFFFF',
+                        borderBottomWidth: 1,
+                        borderBottomColor: '#E2E8F0',
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 3,
+                        elevation: 3,
+                    }}>
+                        <View style={{ flex: 1 }}>
+                            <Text style={{
+                                fontSize: 18,
+                                fontWeight: '600',
+                                color: '#1F2937',
+                            }}>
+                                Select Mini-Section
+                            </Text>
+                            <Text style={{
+                                fontSize: 14,
+                                color: '#6B7280',
+                                marginTop: 2,
+                            }}>
+                                Swipe left to delete
+                            </Text>
+                        </View>
+                        <TouchableOpacity
+                            onPress={() => setShowSectionModal(false)}
+                            style={{
+                                padding: 8,
+                                borderRadius: 8,
+                                backgroundColor: '#F3F4F6',
+                            }}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons name="close" size={20} color="#6B7280" />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Content */}
+                    <ScrollView 
+                        style={{ flex: 1 }}
+                        contentContainerStyle={{ 
+                            padding: 20,
+                            paddingBottom: 40,
+                        }}
+                        showsVerticalScrollIndicator={false}
+                    >
+                        {/* All Sections Option */}
+                        <TouchableOpacity
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                paddingHorizontal: 20,
+                                paddingVertical: 18,
+                                backgroundColor: !selectedMiniSection ? '#EFF6FF' : '#FFFFFF',
+                                borderRadius: 12,
+                                borderWidth: !selectedMiniSection ? 2 : 1,
+                                borderColor: !selectedMiniSection ? '#3B82F6' : '#E2E8F0',
+                                marginBottom: 16,
+                                shadowColor: '#000',
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.05,
+                                shadowRadius: 3,
+                                elevation: 2,
+                            }}
+                            onPress={() => {
+                                handleSectionSelect('all-sections');
+                            }}
+                            activeOpacity={0.7}
+                        >
+                            <View style={{
+                                width: 40,
+                                height: 40,
+                                borderRadius: 20,
+                                backgroundColor: !selectedMiniSection ? '#3B82F6' : '#F3F4F6',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                marginRight: 16,
+                            }}>
+                                <Ionicons 
+                                    name="apps-outline" 
+                                    size={20} 
+                                    color={!selectedMiniSection ? '#FFFFFF' : '#6B7280'} 
+                                />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{
+                                    fontSize: 16,
+                                    fontWeight: '600',
+                                    color: !selectedMiniSection ? '#3B82F6' : '#374151',
+                                    marginBottom: 2,
+                                }}>
+                                    All Sections
+                                </Text>
+                                <Text style={{
+                                    fontSize: 14,
+                                    color: '#6B7280',
+                                }}>
+                                    Show materials from all mini-sections
+                                </Text>
+                            </View>
+                            {!selectedMiniSection && (
+                                <Ionicons name="checkmark-circle" size={24} color="#3B82F6" />
+                            )}
+                        </TouchableOpacity>
+
+                        {/* Mini Sections List */}
+                        {miniSections.length > 0 && (
+                            <View>
+                                <Text style={{
+                                    fontSize: 16,
+                                    fontWeight: '600',
+                                    color: '#374151',
+                                    marginBottom: 16,
+                                    marginTop: 8,
+                                }}>
+                                    Mini-Sections ({miniSections.length})
+                                </Text>
+
+                                {miniSections.map((section, index) => (
+                                    <SwipeableMiniSection
+                                        key={section._id}
+                                        section={section}
+                                        selectedMiniSection={selectedMiniSection}
+                                        miniSectionCompletions={miniSectionCompletions}
+                                        miniSectionLoadingStates={miniSectionLoadingStates}
+                                        onSectionSelect={(sectionId) => {
+                                            handleSectionSelect(sectionId);
+                                        }}
+                                        onToggleCompletion={toggleMiniSectionCompletionDirect}
+                                        onDelete={handleDeleteSection}
+                                    />
+                                ))}
+                            </View>
+                        )}
+
+                        {/* Empty State */}
+                        {miniSections.length === 0 && (
+                            <View style={{
+                                alignItems: 'center',
+                                paddingVertical: 40,
+                            }}>
+                                <View style={{
+                                    width: 80,
+                                    height: 80,
+                                    borderRadius: 40,
+                                    backgroundColor: '#F3F4F6',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    marginBottom: 16,
+                                }}>
+                                    <Ionicons name="folder-outline" size={32} color="#9CA3AF" />
+                                </View>
+                                <Text style={{
+                                    fontSize: 18,
+                                    fontWeight: '600',
+                                    color: '#374151',
+                                    marginBottom: 8,
+                                }}>
+                                    No Mini-Sections
+                                </Text>
+                                <Text style={{
+                                    fontSize: 14,
+                                    color: '#6B7280',
+                                    textAlign: 'center',
+                                    lineHeight: 20,
+                                }}>
+                                    Create mini-sections to organize{'\n'}your materials better
+                                </Text>
+                            </View>
+                        )}
+                    </ScrollView>
+                </SafeAreaView>
+                </GestureHandlerRootView>
             </Modal>
         </SafeAreaView>
     );

@@ -13,12 +13,14 @@ interface SectionResponse {
 
 export const getSection = async (sectionId: string): Promise<Section[]> => {
     try {
+        console.log('🔍 Fetching mini-sections for parent sectionId:', sectionId);
         const res = await axios.get<SectionResponse>(`${domain}/api/mini-section?sectionId=${sectionId}`);
+        console.log('✅ Mini-sections fetched successfully:', res.data.data?.length || 0, 'sections');
         // The API returns { success, message, data }
         // We need to return the data array
-        return res.data.data;
+        return res.data.data || [];
     } catch (error) {
-        console.error('Error fetching section:', error);
+        console.error('❌ Error fetching mini-sections:', error);
         return [];
     }
 }
@@ -203,7 +205,7 @@ export const addMiniSection = async (data: any, notificationCallback?: (data: an
 
 export const updateMiniSection = async (miniSectionId: string, data: any, notificationCallback?: (data: any) => Promise<boolean>) => {
     try {
-        const res = await axios.put(`${domain}/api/mini-section/${miniSectionId}`, data);
+        const res = await axios.put(`${domain}/api/mini-section?id=${miniSectionId}`, data);
 
         if (res && res.data) {
             // 🔔 Send mini-section update notification using callback
@@ -248,7 +250,7 @@ export const updateMiniSection = async (miniSectionId: string, data: any, notifi
 
 export const deleteMiniSection = async (miniSectionId: string, miniSectionData?: { name?: string; sectionName?: string; projectId?: string; projectName?: string }, notificationCallback?: (data: any) => Promise<boolean>) => {
     try {
-        const res = await axios.delete(`${domain}/api/mini-section/${miniSectionId}`);
+        const res = await axios.delete(`${domain}/api/mini-section?id=${miniSectionId}`);
 
         if (res && res.data) {
             // 🔔 Send mini-section deletion notification using callback
