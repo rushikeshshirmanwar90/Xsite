@@ -71,14 +71,15 @@ const LaborPage = () => {
                 throw new Error('Client ID not found');
             }
 
-            // Import domain
+            // Import domain and auth headers
             const { domain } = await import('@/lib/domain');
+            const { getAuthHeaders } = await import('@/utils/axiosConfig');
 
             // Use the labor API to get entries for this project
             const response = await fetch(`${domain}/api/labor?entityType=project&entityId=${projectId}&sectionId=${sectionId}${selectedMiniSection ? `&miniSectionId=${selectedMiniSection}` : ''}`, {
                 method: 'GET',
                 headers: {
-                    'Content-Type': 'application/json',
+                    ...getAuthHeaders(),
                 },
             });
 
@@ -298,11 +299,15 @@ const LaborPage = () => {
 
             console.log('Sending labor data to API:', requestData);
 
+            // Import domain and auth headers
+            const { domain } = await import('@/lib/domain');
+            const { getAuthHeaders } = await import('@/utils/axiosConfig');
+
             // Call the labor API
             const response = await fetch(`${domain}/api/labor`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
+                    ...getAuthHeaders(),
                 },
                 body: JSON.stringify(requestData)
             });

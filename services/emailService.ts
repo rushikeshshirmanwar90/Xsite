@@ -1,5 +1,5 @@
 import { domain } from '@/lib/domain';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 
 export interface WelcomeEmailPayload {
     email: string;
@@ -58,10 +58,10 @@ export class EmailService {
             console.log('📋 Email payload:', JSON.stringify(payload, null, 2));
             console.log('🌐 Domain:', domain);
             
-            const url = `${domain}/api/send-mail`;
+            const url = `/api/send-mail`;
             console.log('📤 POST URL:', url);
             
-            const response = await axios.post<ApiResponse>(url, payload);
+            const response = await apiClient.post<ApiResponse>(url, payload);
             
             console.log('📥 Email response status:', response.status);
             console.log('📥 Email response data:', JSON.stringify(response.data, null, 2));
@@ -96,10 +96,10 @@ export class EmailService {
             console.log('📋 OTP Email payload:', JSON.stringify(payload, null, 2));
             console.log('🌐 Domain:', domain);
             
-            const url = `${domain}/api/send-otp`;
-            console.log('� POST UReL:', url);
+            const url = `/api/send-otp`;
+            console.log('📤 POST URL:', url);
             
-            const response = await axios.post<OTPResponse>(url, payload);
+            const response = await apiClient.post<OTPResponse>(url, payload);
             
             console.log('📥 OTP Email response status:', response.status);
             console.log('📥 OTP Email response data:', JSON.stringify(response.data, null, 2));
@@ -137,11 +137,11 @@ export class EmailService {
             console.log('🆔 Staff ID:', staffId);
             console.log('🌐 Domain:', domain);
             
-            const url = `${domain}/api/verify-otp`;
+            const url = `/api/verify-otp`;
             console.log('📤 POST URL:', url);
             
             const payload = { email, otp, staffId };
-            const response = await axios.post<VerifyOTPResponse>(url, payload);
+            const response = await apiClient.post<VerifyOTPResponse>(url, payload);
             
             console.log('📥 Verify OTP response status:', response.status);
             console.log('📥 Verify OTP response data:', JSON.stringify(response.data, null, 2));

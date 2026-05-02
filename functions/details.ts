@@ -1,6 +1,6 @@
 import { domain } from "@/lib/domain";
 import { Section } from "@/types/details";
-import axios from "axios";
+import apiClient from "@/utils/axiosConfig";
 // Remove direct service import - we'll use callback pattern
 // import SimpleNotificationService from '@/services/SimpleNotificationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -14,7 +14,7 @@ interface SectionResponse {
 export const getSection = async (sectionId: string): Promise<Section[]> => {
     try {
         console.log('🔍 Fetching mini-sections for parent sectionId:', sectionId);
-        const res = await axios.get<SectionResponse>(`${domain}/api/mini-section?sectionId=${sectionId}`);
+        const res = await apiClient.get<SectionResponse>(`/api/mini-section?sectionId=${sectionId}`);
         console.log('✅ Mini-sections fetched successfully:', res.data.data?.length || 0, 'sections');
         // The API returns { success, message, data }
         // We need to return the data array
@@ -27,7 +27,7 @@ export const getSection = async (sectionId: string): Promise<Section[]> => {
 
 export const addSection = async (data: any, notificationCallback?: (data: any) => Promise<boolean>) => {
     try {
-        const res = await axios.post(`${domain}/api/mini-section`, data);
+        const res = await apiClient.post(`/api/mini-section`, data);
 
         if (res && res.data) {
             // 🔔 Send section creation notification using callback
@@ -71,7 +71,7 @@ export const addSection = async (data: any, notificationCallback?: (data: any) =
 
 export const updateSection = async (sectionId: string, data: any, notificationCallback?: (data: any) => Promise<boolean>) => {
     try {
-        const res = await axios.put(`${domain}/api/mini-section?id=${sectionId}`, data);
+        const res = await apiClient.put(`/api/mini-section?id=${sectionId}`, data);
 
         if (res && res.data) {
             // 🔔 Send section update notification using callback
@@ -115,7 +115,7 @@ export const updateSection = async (sectionId: string, data: any, notificationCa
 
 export const deleteSection = async (sectionId: string, sectionData?: { name?: string; projectId?: string; projectName?: string }, notificationCallback?: (data: any) => Promise<boolean>) => {
     try {
-        const res = await axios.delete(`${domain}/api/mini-section?id=${sectionId}`);
+        const res = await apiClient.delete(`/api/mini-section?id=${sectionId}`);
 
         if (res && res.data) {
             // 🔔 Send section deletion notification using callback

@@ -1,16 +1,16 @@
 import { domain } from "@/lib/domain";
 import { Staff } from "@/types/staff";
-import axios from "axios";
+import apiClient from "@/utils/axiosConfig";
 // Remove direct service import - we'll use a different approach
 // import SimpleNotificationService from '@/services/SimpleNotificationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const addStaff = async (staff: Staff, notificationCallback?: (data: any) => Promise<boolean>): Promise<any | null> => {
   try {
-    console.log('📤 Adding staff via API:', `${domain}/api/users/staff`);
+    console.log('📤 Adding staff via API:', `/api/users/staff`);
     console.log('📋 Staff payload:', staff);
     
-    const res = await axios.post(`${domain}/api/users/staff`, staff);
+    const res = await apiClient.post(`/api/users/staff`, staff);
     console.log('✅ Staff API response:', res.data);
     
     const result = (res.data as any)?.data ?? null;
@@ -54,10 +54,10 @@ export const addStaff = async (staff: Staff, notificationCallback?: (data: any) 
 
 export const updateStaff = async (staffId: string, staffData: Partial<Staff>, notificationCallback?: (data: any) => Promise<boolean>): Promise<any | null> => {
   try {
-    console.log('📤 Updating staff via API:', `${domain}/api/users/staff/${staffId}`);
+    console.log('📤 Updating staff via API:', `/api/users/staff/${staffId}`);
     console.log('📋 Staff update payload:', staffData);
     
-    const res = await axios.put(`${domain}/api/users/staff/${staffId}`, staffData);
+    const res = await apiClient.put(`/api/users/staff/${staffId}`, staffData);
     console.log('✅ Staff update API response:', res.data);
     
     const result = (res.data as any)?.data ?? null;
@@ -101,9 +101,9 @@ export const updateStaff = async (staffId: string, staffData: Partial<Staff>, no
 
 export const removeStaff = async (staffId: string, staffName?: string, notificationCallback?: (data: any) => Promise<boolean>, clientId?: string): Promise<any | null> => {
   try {
-    console.log('📤 Removing staff via API:', `${domain}/api/users/staff/${staffId}`);
+    console.log('📤 Removing staff via API:', `/api/users/staff/${staffId}`);
     
-    const res = await axios.delete(`${domain}/api/users/staff/${staffId}`);
+    const res = await apiClient.delete(`/api/users/staff/${staffId}`);
     console.log('✅ Staff removal API response:', res.data);
     
     const result = (res.data as any)?.success ?? false;

@@ -2,8 +2,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import axios from 'axios';
-import { domain } from '@/lib/domain';
+import apiClient from '@/utils/axiosConfig';
 
 // ✅ Check if we're running in Expo Go (which doesn't support push notifications in SDK 53+)
 const isExpoGo = Constants.appOwnership === 'expo';
@@ -215,7 +214,7 @@ export class SimpleNotificationService {
         originalUserType: userData.userType,
       });
 
-      const response = await axios.post(`${domain}/api/simple-push-token`, payload, {
+      const response = await apiClient.post(`/api/simple-push-token`, payload, {
         headers: {
           'Content-Type': 'application/json',
         },
@@ -332,10 +331,9 @@ export class SimpleNotificationService {
       };
 
       console.log('� Notification payload:', notificationPayload);
-      console.log('� Sending to API:', `${domain}/api/send-project-notification`);
 
       // 5. Send to backend API with better error handling
-      const response = await axios.post(`${domain}/api/send-project-notification`, notificationPayload, {
+      const response = await apiClient.post(`/api/send-project-notification`, notificationPayload, {
         headers: {
           'Content-Type': 'application/json',
         },

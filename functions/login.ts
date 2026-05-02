@@ -1,4 +1,5 @@
 import axios from "axios";
+import apiClient from "@/utils/axiosConfig";
 import { domain } from "../lib/domain";
 
 // Type definitions for API responses
@@ -7,6 +8,8 @@ interface ApiResponse<T = any> {
   data?: T;
   message?: string;
   error?: string;
+  token?: string;
+  user?: any;
 }
 
 interface UserData {
@@ -34,12 +37,13 @@ export const getUser = async (email: string, userType: string): Promise<UserData
     // For clients, use /api/clients (plural) which supports email query
     const endpoint =
       userType === "clients"
-        ? `${domain}/api/clients?email=${email}`
-        : `${domain}/api/${userType}?email=${email}`;
+        ? `/api/clients?email=${email}`
+        : `/api/${userType}?email=${email}`;
 
     console.log("   URL:", endpoint);
 
-    const res = await axios.get<ApiResponse<UserData>>(endpoint);
+    // ✅ Use apiClient with Bearer token for user data fetching
+    const res = await apiClient.get<ApiResponse<UserData>>(endpoint);
 
     console.log("📦 API Response Status:", res.status);
     console.log("📦 API Response Data:", JSON.stringify(res.data, null, 2));

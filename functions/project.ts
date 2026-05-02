@@ -1,6 +1,6 @@
 import { domain } from "@/lib/domain";
 import { Project } from "@/types/project";
-import axios from "axios";
+import apiClient from "@/utils/axiosConfig";
 
 export const getProjectData = async (
   clientId: string,
@@ -25,7 +25,7 @@ export const getProjectData = async (
     );
 
     // Build URL with optional staffId parameter and material exclusion
-    let url = `${domain}/api/project?clientId=${clientId}`;
+    let url = `/api/project?clientId=${clientId}`;
     if (staffId) {
       url += `&staffId=${staffId}`;
       console.log("🔍 Adding staff filtering to project request");
@@ -39,7 +39,7 @@ export const getProjectData = async (
       console.log("🔐 Adding user role for license filtering");
     }
 
-    const res = await axios.get(url);
+    const res = await apiClient.get(url);
 
     console.log("📦 API Response:", JSON.stringify(res.data, null, 2));
 
@@ -76,7 +76,7 @@ export const getProject = async (projectId: string, clientId: string) => {
 
     console.log("📝 Fetching project for projectId:", projectId, "clientId:", clientId);
 
-    const res = await axios.get(`${domain}/api/project?id=${projectId}&clientId=${clientId}`);
+    const res = await apiClient.get(`/api/project?id=${projectId}&clientId=${clientId}`);
 
     console.log("📦 API Response:", JSON.stringify(res.data, null, 2));
 
@@ -107,7 +107,7 @@ export const addProject = async (data: Project, clientId: string) => {
       clientId,
     };
 
-    const res = await axios.post(`${domain}/api/project`, projectData);
+    const res = await apiClient.post(`/api/project`, projectData);
     const responseData = res.data as any;
 
     // ✅ FIXED: Handle new response structure

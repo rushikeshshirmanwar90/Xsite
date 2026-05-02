@@ -1,5 +1,5 @@
 import { domain } from "@/lib/domain";
-import axios from "axios";
+import apiClient from "@/utils/axiosConfig";
 // Remove direct service import - we'll use callback pattern
 // import SimpleNotificationService from '@/services/SimpleNotificationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -21,10 +21,10 @@ interface MaterialTransferData {
 
 export const transferMaterials = async (transferData: MaterialTransferData, notificationCallback?: (data: any) => Promise<boolean>): Promise<any | null> => {
   try {
-    console.log('📤 Transferring materials via API:', `${domain}/api/material-transfer`);
+    console.log('📤 Transferring materials via API:', `/api/material-transfer`);
     console.log('📋 Transfer payload:', transferData);
     
-    const res = await axios.post(`${domain}/api/material-transfer`, transferData);
+    const res = await apiClient.post(`/api/material-transfer`, transferData);
     console.log('✅ Material transfer API response:', res.data);
     
     const result = (res.data as any)?.data ?? null;

@@ -80,13 +80,21 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
                     setIsFocused(false);
                     props.onBlur?.(e);
                 }}
+                // Enhanced keyboard handling for production builds
+                returnKeyType={props.returnKeyType || 'next'}
+                blurOnSubmit={props.blurOnSubmit !== undefined ? props.blurOnSubmit : false}
+                editable={props.editable !== undefined ? props.editable : true}
                 // Platform-specific optimizations
                 {...(Platform.OS === 'android' && {
                     underlineColorAndroid: 'transparent',
                     importantForAutofill: 'yes',
+                    // Ensure keyboard stays responsive in production
+                    keyboardType: props.keyboardType || 'default',
                 })}
                 {...(Platform.OS === 'ios' && {
                     clearButtonMode: 'while-editing',
+                    // iOS-specific keyboard handling
+                    enablesReturnKeyAutomatically: true,
                 })}
                 {...props}
             />

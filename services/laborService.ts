@@ -1,5 +1,4 @@
-import axios from 'axios';
-import { domain } from '@/lib/domain';
+import apiClient from '@/utils/axiosConfig';
 import { LaborEntry } from '@/types/labor';
 
 export interface LaborApiResponse {
@@ -82,7 +81,7 @@ export interface LaborStatisticsResponse {
 
 export class LaborService {
   private static getApiUrl(endpoint: string): string {
-    return `${domain}/api/${endpoint}`;
+    return `/api/${endpoint}`;
   }
 
   // Get labor entries with pagination and filtering
@@ -106,7 +105,7 @@ export class LaborService {
       if (params.page) queryParams.append('page', params.page.toString());
       if (params.limit) queryParams.append('limit', params.limit.toString());
 
-      const response = await axios.get<LaborApiResponse>(
+      const response = await apiClient.get<LaborApiResponse>(
         `${this.getApiUrl('labor')}?${queryParams.toString()}`,
         { timeout: 10000 }
       );
@@ -132,7 +131,7 @@ export class LaborService {
     message?: string;
   }): Promise<LaborApiResponse> {
     try {
-      const response = await axios.post<LaborApiResponse>(
+      const response = await apiClient.post<LaborApiResponse>(
         this.getApiUrl('labor'),
         data,
         {
@@ -160,7 +159,7 @@ export class LaborService {
     message?: string;
   }): Promise<LaborApiResponse> {
     try {
-      const response = await axios.put<LaborApiResponse>(
+      const response = await apiClient.put<LaborApiResponse>(
         this.getApiUrl('labor'),
         data,
         {
@@ -190,7 +189,7 @@ export class LaborService {
       queryParams.append('projectId', params.projectId);
       queryParams.append('clientId', params.clientId);
 
-      const response = await axios.delete<LaborApiResponse>(
+      const response = await apiClient.delete<LaborApiResponse>(
         `${this.getApiUrl('labor')}?${queryParams.toString()}`,
         { timeout: 10000 }
       );
@@ -225,7 +224,7 @@ export class LaborService {
       if (params.page) queryParams.append('page', params.page.toString());
       if (params.limit) queryParams.append('limit', params.limit.toString());
 
-      const response = await axios.get<LaborActivityResponse>(
+      const response = await apiClient.get<LaborActivityResponse>(
         `${this.getApiUrl('labor-activity')}?${queryParams.toString()}`,
         { timeout: 10000 }
       );
@@ -256,7 +255,7 @@ export class LaborService {
       if (params.endDate) queryParams.append('endDate', params.endDate);
       if (params.groupBy) queryParams.append('groupBy', params.groupBy);
 
-      const response = await axios.get<LaborStatisticsResponse>(
+      const response = await apiClient.get<LaborStatisticsResponse>(
         `${this.getApiUrl('labor-statistics')}?${queryParams.toString()}`,
         { timeout: 10000 }
       );
@@ -287,7 +286,7 @@ export class LaborService {
     groupBy?: string;
   }): Promise<any> {
     try {
-      const response = await axios.post(
+      const response = await apiClient.post(
         this.getApiUrl('labor-statistics'),
         data,
         {

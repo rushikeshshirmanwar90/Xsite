@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   StyleSheet,
   Alert,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useSimpleNotifications } from '@/hooks/useSimpleNotifications';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,6 +29,11 @@ const MaterialAddForm: React.FC<MaterialAddFormProps> = ({
   const [unit, setUnit] = useState('');
   const [cost, setCost] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Refs for keyboard navigation
+  const quantityRef = useRef<TextInput>(null);
+  const unitRef = useRef<TextInput>(null);
+  const costRef = useRef<TextInput>(null);
   
   const { user } = useAuth();
   const { sendProjectNotification } = useSimpleNotifications();
@@ -119,65 +126,93 @@ const MaterialAddForm: React.FC<MaterialAddFormProps> = ({
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>📦 Add Material</Text>
-      
-      <View style={styles.form}>
-        <Text style={styles.label}>Material Name *</Text>
-        <TextInput
-          style={styles.input}
-          value={materialName}
-          onChangeText={setMaterialName}
-          placeholder="e.g., Cement, Steel, Bricks"
-          placeholderTextColor="#9CA3AF"
-        />
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}
+    >
+      <ScrollView 
+        style={styles.container}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.title}>📦 Add Material</Text>
+        
+        <View style={styles.form}>
+          <Text style={styles.label}>Material Name *</Text>
+          <TextInput
+            style={styles.input}
+            value={materialName}
+            onChangeText={setMaterialName}
+            placeholder="e.g., Cement, Steel, Bricks"
+            placeholderTextColor="#9CA3AF"
+            returnKeyType="next"
+            onSubmitEditing={() => quantityRef.current?.focus()}
+            blurOnSubmit={false}
+            editable={!isLoading}
+          />
 
-        <Text style={styles.label}>Quantity *</Text>
-        <TextInput
-          style={styles.input}
-          value={quantity}
-          onChangeText={setQuantity}
-          placeholder="e.g., 50"
-          keyboardType="numeric"
-          placeholderTextColor="#9CA3AF"
-        />
+          <Text style={styles.label}>Quantity *</Text>
+          <TextInput
+            ref={quantityRef}
+            style={styles.input}
+            value={quantity}
+            onChangeText={setQuantity}
+            placeholder="e.g., 50"
+            keyboardType="numeric"
+            placeholderTextColor="#9CA3AF"
+            returnKeyType="next"
+            onSubmitEditing={() => unitRef.current?.focus()}
+            blurOnSubmit={false}
+            editable={!isLoading}
+          />
 
-        <Text style={styles.label}>Unit *</Text>
-        <TextInput
-          style={styles.input}
-          value={unit}
-          onChangeText={setUnit}
-          placeholder="e.g., bags, tons, pieces"
-          placeholderTextColor="#9CA3AF"
-        />
+          <Text style={styles.label}>Unit *</Text>
+          <TextInput
+            ref={unitRef}
+            style={styles.input}
+            value={unit}
+            onChangeText={setUnit}
+            placeholder="e.g., bags, tons, pieces"
+            placeholderTextColor="#9CA3AF"
+            returnKeyType="next"
+            onSubmitEditing={() => costRef.current?.focus()}
+            blurOnSubmit={false}
+            editable={!isLoading}
+          />
 
-        <Text style={styles.label}>Cost (Optional)</Text>
-        <TextInput
-          style={styles.input}
-          value={cost}
-          onChangeText={setCost}
-          placeholder="e.g., 5000"
-          keyboardType="numeric"
-          placeholderTextColor="#9CA3AF"
-        />
+          <Text style={styles.label}>Cost (Optional)</Text>
+          <TextInput
+            ref={costRef}
+            style={styles.input}
+            value={cost}
+            onChangeText={setCost}
+            placeholder="e.g., 5000"
+            keyboardType="numeric"
+            placeholderTextColor="#9CA3AF"
+            returnKeyType="done"
+            onSubmitEditing={handleAddMaterial}
+            blurOnSubmit={true}
+            editable={!isLoading}
+          />
 
-        <TouchableOpacity
-          style={[styles.button, isLoading && styles.buttonDisabled]}
-          onPress={handleAddMaterial}
-          disabled={isLoading}
-        >
-          <Text style={styles.buttonText}>
-            {isLoading ? 'Adding Material...' : '📦 Add Material & Notify Admins'}
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, isLoading && styles.buttonDisabled]}
+            onPress={handleAddMaterial}
+            disabled={isLoading}
+          >
+            <Text style={styles.buttonText}>
+              {isLoading ? 'Adding Material...' : '📦 Add Material & Notify Admins'}
+            </Text>
+          </TouchableOpacity>
 
-        <View style={styles.info}>
-          <Text style={styles.infoText}>
-            ℹ️ When you add material, all project admins will be automatically notified.
-          </Text>
+          <View style={styles.info}>
+            <Text style={styles.infoText}>
+              ℹ️ When you add material, all project admins will be automatically notified.
+            </Text>
+          </View>
         </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
