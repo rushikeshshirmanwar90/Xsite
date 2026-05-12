@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-nati
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getClientId } from '@/functions/clientId';
 import { domain } from '@/lib/domain';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 
 const ProfileDebugger = () => {
   const [debugResults, setDebugResults] = useState<string>('');
@@ -55,7 +55,7 @@ const ProfileDebugger = () => {
         if (clientId) {
           addLog('\n📋 Test 3: Client API Test...');
           try {
-            const clientResponse = await axios.get(`${domain}/api/clients?id=${clientId}`);
+            const clientResponse = await apiClient.get(`/api/clients?id=${clientId}`);
             addLog(`✅ Client API Status: ${clientResponse.status}`);
             addLog(`✅ Client API Success: ${clientResponse.data.success}`);
             addLog(`✅ Client API Message: ${clientResponse.data.message}`);

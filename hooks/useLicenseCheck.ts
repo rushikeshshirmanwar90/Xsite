@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { domain } from '@/lib/domain';
 import { getClientId } from '@/functions/clientId';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -74,8 +74,8 @@ export const useLicenseCheck = () => {
 
             console.log('🔍 Fetching license for admin client:', clientId);
 
-            // Fetch client license data with skipCache
-            const response = await axios.get(`${domain}/api/clients?id=${clientId}&skipCache=true`);
+            // Fetch client license data with skipCache using apiClient (includes bearer token)
+            const response = await apiClient.get(`/api/clients?id=${clientId}&skipCache=true`);
             
             if (response.data.success && response.data.data) {
                 const client = response.data.data;
@@ -91,11 +91,14 @@ export const useLicenseCheck = () => {
                 // Determine access for admin
                 // -1 = Lifetime (always access)
                 // 0 = Expired (no access)
-                // >0 = Active (has access)
-                const hasAccess = license === -1 || (license > 0 && isLicenseActive);
+                // >0 or -1 = Active (has access)
+                // Simple logic: if license is not 0, grant access
+                const hasAccess = license !== 0;
 
                 if (!hasAccess) {
                     console.error('❌ Admin license expired - access denied');
+                } else {
+                    console.log('✅ Admin license valid - access granted');
                 }
 
                 setLicenseStatus({

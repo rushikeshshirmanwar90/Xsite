@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { domain } from '@/lib/domain';
 import { toast } from 'sonner-native';
 
@@ -34,7 +34,7 @@ const TestCompletion = () => {
       addResult(`Payload: ${JSON.stringify(payload)}`);
       addResult(`URL: ${domain}/api/completion`);
       
-      const response = await axios.patch(`${domain}/api/completion`, payload, {
+      const response = await apiClient.patch(`/api/completion`, payload, {
         headers: {
           'Content-Type': 'application/json'
         },
@@ -75,7 +75,7 @@ const TestCompletion = () => {
       addResult(`Payload: ${JSON.stringify(payload)}`);
       addResult(`URL: ${domain}/api/completion`);
       
-      const response = await axios.patch(`${domain}/api/completion`, payload, {
+      const response = await apiClient.patch(`/api/completion`, payload, {
         headers: {
           'Content-Type': 'application/json'
         },
@@ -115,7 +115,7 @@ const TestCompletion = () => {
       addResult(`Payload: ${JSON.stringify(payload)}`);
       addResult(`URL: ${domain}/api/completion`);
       
-      const response = await axios.patch(`${domain}/api/completion`, payload, {
+      const response = await apiClient.patch(`/api/completion`, payload, {
         headers: {
           'Content-Type': 'application/json'
         },
@@ -143,7 +143,7 @@ const TestCompletion = () => {
       addResult('🔍 Testing API health...');
       addResult(`Domain: ${domain}`);
       
-      const response = await axios.get(`${domain}/api/health`, {
+      const response = await apiClient.get(`/api/health`, {
         timeout: 5000
       });
 

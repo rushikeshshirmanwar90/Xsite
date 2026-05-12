@@ -7,15 +7,12 @@ import TabSelector from '@/components/details/TabSelector';
 import { predefinedSections } from '@/data/details';
 import { getSection } from '@/functions/details';
 import { getClientId } from '@/functions/clientId';
-import { API_BASE_URL as domain } from '@/lib/domain';
 import { styles } from '@/style/details';
 import { Material, MaterialEntry, Section } from '@/types/details';
-import { logMaterialImported } from '@/utils/activityLogger';
-import { logSectionCompleted, logSectionReopened, logMiniSectionCompleted, logMiniSectionReopened } from '@/utils/activityLogger';
+import { logSectionCompleted, logSectionReopened } from '@/utils/activityLogger';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import axios from 'axios';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, FlatList, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
@@ -24,8 +21,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 import { useSimpleNotifications } from '@/hooks/useSimpleNotifications';
 import { useAuth } from '@/contexts/AuthContext';
+import apiClient from '@/utils/axiosConfig';
 
-// Simple Swipeable Mini-Section Component
 const SwipeableMiniSection = ({ 
     section, 
     selectedMiniSection, 
@@ -74,7 +71,6 @@ const SwipeableMiniSection = ({
 
     return (
         <View style={{ marginBottom: 12, position: 'relative' }}>
-            {/* Delete Background */}
             <View
                 style={{
                     position: 'absolute',
@@ -314,7 +310,7 @@ const Details = () => {
                 }
             }, 200);
         }
-        
+
         // Cleanup function for this effect
         return () => {
             if (completionLoadTimeoutRef.current) {
@@ -330,7 +326,7 @@ const Details = () => {
     const isLoadingRef = useRef(false);
     
     // Ref to track completion load timeout for cleanup
-    const completionLoadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const completionLoadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     
     // Loading animations for material operations
     const materialLoadingAnimation = useRef(new Animated.Value(0)).current;
@@ -422,11 +418,10 @@ const Details = () => {
                 throw new Error('Client ID not available');
             }
 
+            console.log('🔄 Fetching materials - Page:', page, 'Force Refresh:', forceRefresh);
 
             setMaterials(prev => ({ ...prev, loading: true, error: null }));
 
-            // Build API parameters based on active tab and filters
-            // ✅ SORT BY NEWEST FIRST: Sort by createdAt/addedAt in descending order
             const baseParams = {
                 projectId,
                 clientId,
@@ -438,38 +433,89 @@ const Details = () => {
                 ...(forceRefresh ? { _t: Date.now() } : {})
             };
 
+            console.log('📋 Base params:', baseParams);
 
             // Add section filter only for used materials tab
             const availableParams = { ...baseParams };
+            
+            // ✅ CRITICAL FIX: Validate miniSectionId before adding to params
+            // Filter out special IDs like 'all-sections', 'default-section', etc.
+            const isValidMiniSectionId = selectedMiniSection && 
+                                        selectedMiniSection !== 'all-sections' && 
+                                        selectedMiniSection !== 'default-section' &&
+                                        isValidMongoId(selectedMiniSection);
+            
+            console.log('🔍 Mini-section validation:', {
+                selectedMiniSection,
+                isValidMiniSectionId,
+                isMongoId: selectedMiniSection ? isValidMongoId(selectedMiniSection) : false
+            });
+            
             const usedParams = {
                 ...baseParams,
                 // ✅ CRITICAL FIX: Always filter used materials by the current section
                 sectionId: sectionId, // Filter by the main section being viewed
-                // ✅ OPTIONAL: Add mini-section filter if one is selected
-                ...(selectedMiniSection ? {
+                // ✅ OPTIONAL: Add mini-section filter ONLY if it's a valid MongoDB ObjectId
+                ...(isValidMiniSectionId ? {
                     miniSectionId: selectedMiniSection
                 } : {})
             };
 
-            if (forceRefresh) {
-            }
+            console.log('📦 Available params:', availableParams);
+            console.log('🔧 Used params:', usedParams);
 
-            // Fetch both available and used materials in parallel
+            // Import domain for fetch API calls
+            const { domain } = await import('@/lib/domain');
+            const { getAuthHeaders } = await import('@/utils/axiosConfig');
+
+            // Build query strings manually for better control
+            const buildQueryString = (params: any) => {
+                return Object.entries(params)
+                    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+                    .join('&');
+            };
+
+            const availableQueryString = buildQueryString(availableParams);
+            const usedQueryString = buildQueryString(usedParams);
+
+            console.log('🌐 Available URL:', `${domain}/api/material?${availableQueryString}`);
+            console.log('🌐 Used URL:', `${domain}/api/material-usage?${usedQueryString}`);
+
+            // Fetch both available and used materials in parallel using fetch API
             const [availableResponse, usedResponse] = await Promise.all([
-                axios.get(`${domain}/api/material`, {
-                    params: availableParams,
-                    timeout: 10000
+                fetch(`${domain}/api/material?${availableQueryString}`, {
+                    method: 'GET',
+                    headers: {
+                        ...getAuthHeaders(),
+                    },
                 }),
-                axios.get(`${domain}/api/material-usage`, {
-                    params: usedParams,
-                    timeout: 10000
+                fetch(`${domain}/api/material-usage?${usedQueryString}`, {
+                    method: 'GET',
+                    headers: {
+                        ...getAuthHeaders(),
+                    },
                 })
             ]);
 
-            const availableData = availableResponse.data as any;
-            const usedData = usedResponse.data as any;
+            console.log('✅ Available response status:', availableResponse.status);
+            console.log('✅ Used response status:', usedResponse.status);
 
+            // Check if responses are OK
+            if (!availableResponse.ok) {
+                throw new Error(`Available materials API failed: ${availableResponse.status}`);
+            }
+            if (!usedResponse.ok) {
+                throw new Error(`Used materials API failed: ${usedResponse.status}`);
+            }
 
+            // Parse JSON responses
+            const availableData = await availableResponse.json();
+            const usedData = await usedResponse.json();
+
+            console.log('📊 Available data:', availableData);
+            console.log('📊 Used data:', usedData);
+            console.log('📦 Available materials count:', availableData.MaterialAvailable?.length || 0);
+            console.log('🔧 Used materials count:', usedData.MaterialUsed?.length || 0);
             // Extract materials arrays from API response
             const availableMaterialsArray = availableData.MaterialAvailable || availableData.materials || [];
             const usedMaterialsArray = usedData.MaterialUsed || usedData.materials || [];
@@ -664,10 +710,8 @@ const Details = () => {
         } catch (error: any) {
             console.error(`\n❌ ERROR FETCHING MATERIALS:`);
             console.error(`   Message: ${error?.message}`);
-            console.error(`   Status: ${error?.response?.status}`);
-            console.error(`   Data:`, error?.response?.data);
             
-            const errorMessage = error?.response?.data?.message || error?.message || 'Failed to load materials';
+            const errorMessage = error?.message || 'Failed to load materials';
             
             setMaterials(prev => ({ 
                 ...prev, 
@@ -783,10 +827,16 @@ const Details = () => {
 
     // Function to handle section selection from modal
     const handleSectionSelect = (sectionId: string) => {
-        if (sectionId === 'all-sections') {
+        // ✅ CRITICAL FIX: Filter out special/invalid section IDs
+        if (sectionId === 'all-sections' || sectionId === 'default-section') {
             setSelectedMiniSection(null);
-        } else {
+        } else if (isValidMongoId(sectionId)) {
+            // Only set if it's a valid MongoDB ObjectId
             setSelectedMiniSection(sectionId);
+        } else {
+            // Invalid ID format - treat as "all sections"
+            console.warn(`⚠️ Invalid miniSectionId format: ${sectionId}, treating as "all sections"`);
+            setSelectedMiniSection(null);
         }
         setShowSectionModal(false); // Close modal after selection
         
@@ -827,7 +877,7 @@ const Details = () => {
                 projectId: projectId
             };
             
-            const response = await axios.patch(`${domain}/api/completion`, payload, {
+            const response = await apiClient.patch(`/api/completion`, payload, {
                 headers: { 'Content-Type': 'application/json' },
                 timeout: 15000
             });
@@ -915,21 +965,22 @@ const Details = () => {
             
             for (let attempt = 0; attempt <= maxRetries; attempt++) {
                 try {
-                    const response = await axios.patch(
-                        `${domain}/api/completion`,
+                    const response = await apiClient.patch(
+                        `/api/completion`,
                         { updateType: 'minisection', id: miniSectionId },
                         { 
                             headers: { 'Content-Type': 'application/json' }, 
                             timeout: 30000 // Increased to 30 seconds
                         }
                     );
-                    
+
                     // Check mounted after API
                     if (!isMountedRef.current) return;
-                    
+
                     // Update state with API response
-                    if (response.data?.success && typeof response.data.data?.isCompleted === 'boolean') {
-                        const newStatus = response.data.data.isCompleted;
+                    const responseData = response.data as any;
+                    if (responseData?.success && typeof responseData.data?.isCompleted === 'boolean') {
+                        const newStatus = responseData.data.isCompleted;
                         setMiniSectionCompletions(prev => ({ ...prev, [miniSectionId]: newStatus }));
                         
                         const statusText = newStatus ? 'completed' : 'reopened';
@@ -939,7 +990,7 @@ const Details = () => {
                     
                 } catch (error: any) {
                     lastError = error;
-                    
+
                     // If it's a timeout and we have retries left, wait and retry
                     if (attempt < maxRetries && (
                         error.code === 'ECONNABORTED' || 
@@ -955,7 +1006,7 @@ const Details = () => {
                     throw error;
                 }
             }
-            
+
         } catch (error: any) {
             if (error.name === 'CanceledError' || error.code === 'ERR_CANCELED') return;
             
@@ -995,10 +1046,10 @@ const Details = () => {
             // Load completion status for each mini-section in parallel
             const loadPromises = miniSections.map(async (section) => {
                 try {
-                    const url = `${domain}/api/completion?updateType=minisection&id=${section._id}`;
-                    const response = await axios.get(url, { timeout: 10000 });
+                    const url = `/api/completion?updateType=minisection&id=${section._id}`;
+                    const response = await apiClient.get(url, { timeout: 10000 });
                     
-                    const data = response.data;
+                    const data = response.data as any;
                     if (data?.success && data?.data) {
                         completionStates[section._id] = Boolean(data.data.isCompleted);
                     } else {
@@ -1061,9 +1112,9 @@ const Details = () => {
             }
             
             // Make the API call with clientId parameter
-            const apiUrl = `${domain}/api/project/${projectId}?clientId=${queryClientId}`;
+            const apiUrl = `/api/project/${projectId}?clientId=${queryClientId}`;
             
-            const response = await axios.get(apiUrl);
+            const response = await apiClient.get(apiUrl);
             const projectData = response.data as any;
             
             
@@ -1185,7 +1236,7 @@ const Details = () => {
                 date: new Date().toISOString(),
             };
 
-            const response = await axios.post(`${domain}/api/materialActivity`, activityPayload);
+            const response = await apiClient.post(`/api/materialActivity`, activityPayload);
             
 
             const responseData = response.data as any;
@@ -1195,7 +1246,6 @@ const Details = () => {
             }
 
             // Step 2: Enhanced notification logic
-            
             try {
                 // Get notification recipients (admins and staff for this client)
                 const recipients = await getNotificationRecipients(clientId, projectId, user.userId, materials, activity, user);
@@ -1251,7 +1301,7 @@ const Details = () => {
         try {
 
             // Try to get recipients from backend
-            const response = await axios.get(`${domain}/api/notifications/recipients?clientId=${clientId}&projectId=${projectId}`);
+            const response = await apiClient.get(`/api/notifications/recipients?clientId=${clientId}&projectId=${projectId}`);
             
             const responseData = response.data as any;
             if (responseData.success) {
@@ -1378,7 +1428,7 @@ const Details = () => {
         try {
             
             // Try to send via backend notification service
-            const response = await axios.post(`${domain}/api/notifications/send`, payload);
+            const response = await apiClient.post(`/api/notifications/send`, payload);
             
             const responseData = response.data as any;
             if (responseData.success) {
@@ -1546,7 +1596,7 @@ const Details = () => {
             // Load section completion status
             if (sectionId && isValidMongoId(sectionId) && projectId && isValidMongoId(projectId)) {
                 try {
-                    const sectionResponse = await axios.get(`${domain}/api/completion?updateType=project-section&id=${sectionId}&projectId=${projectId}`);
+                    const sectionResponse = await apiClient.get(`/api/completion?updateType=project-section&id=${sectionId}&projectId=${projectId}`);
                     const sectionData = sectionResponse.data as any;
                     if (sectionData.success && sectionData.data) {
                         const isSectionCompleted = Boolean(sectionData.data.isCompleted);
@@ -1587,7 +1637,7 @@ const Details = () => {
 
     // Fetch mini-sections for the section selector
     useEffect(() => {
-        let timeoutId: NodeJS.Timeout | null = null;
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
         
         const fetchMiniSections = async () => {
             if (!sectionId) return;
@@ -1949,7 +1999,7 @@ const Details = () => {
             };
 
 
-            const response = await axios.post(`${domain}/api/material-usage-batch`, apiPayload, requestConfig);
+            const response = await apiClient.post(`/api/material-usage-batch`, apiPayload, requestConfig);
             const responseData = response.data as any;
 
             
@@ -2034,7 +2084,6 @@ const Details = () => {
                         }
                     } catch (notificationError) {
                         console.error('❌ Usage notification error:', notificationError);
-                        // Don't fail the whole operation if notification fails
                     }
                 }
             } else {
@@ -2076,7 +2125,7 @@ const Details = () => {
                                 clientId: clientId // Add clientId to single API payload
                             };
                             
-                            const singleResponse = await axios.post(`${domain}/api/material-usage`, singleApiPayload, {
+                            const singleResponse = await apiClient.post(`/api/material-usage`, singleApiPayload, {
                                 headers: {
                                     'Content-Type': 'application/json',
                                 },
@@ -2093,7 +2142,7 @@ const Details = () => {
                             failCount++;
                         }
                     }
-                    
+
                     toast.dismiss(loadingToast);
                     
                     if (successCount > 0) {
@@ -2178,7 +2227,7 @@ const Details = () => {
             // Get target project name for logging
             let targetProjectName = 'Unknown Project';
             try {
-                const targetProjectResponse = await axios.get(`${domain}/api/project/${targetProjectId}?clientId=${clientId}`);
+                const targetProjectResponse = await apiClient.get(`/api/project/${targetProjectId}?clientId=${clientId}`);
                 const targetProjectData = targetProjectResponse.data as any;
                 if (targetProjectData?.success) {
                     targetProjectName = targetProjectData.project?.name || 
@@ -2209,15 +2258,13 @@ const Details = () => {
             };
 
 
-            const response = await axios.post(`${domain}/api/material/transfer`, transferPayload);
+            const response = await apiClient.post(`/api/material/transfer`, transferPayload);
             const responseData = response.data as any;
-
 
             toast.dismiss(loadingToast);
 
             if (responseData.success) {
-                // Log material transfer activity
-                
+
                 try {
                     const transferActivityPayload = {
                         clientId,
@@ -2249,16 +2296,13 @@ const Details = () => {
                         date: new Date().toISOString(),
                     };
 
-
-                    const activityResponse = await axios.post(`${domain}/api/materialActivity`, transferActivityPayload);
+                    const activityResponse = await apiClient.post(`/api/materialActivity`, transferActivityPayload);
                 } catch (activityError) {
                     console.error('❌ Failed to log transfer activity:', activityError);
-                    // Don't fail the transfer if activity logging fails
                 }
 
                 toast.success(`Successfully transferred ${quantity} ${unit} of ${materialName} to ${targetProjectName}`);
                 
-                // Reload materials to reflect the transfer
                 await reloadMaterials(1);
                 
             } else {
@@ -2497,8 +2541,6 @@ const Details = () => {
         return getGroupedMaterialsWithCompleteData(currentMaterials, isUsedTab);
     };
 
-    // ✅ FIXED: Proper pagination calculations using API data with safety checks
-    // ✅ PAGINATION FIX: Account for material grouping when determining if pagination is needed
     const itemsPerPage = 10; // Items per page for pagination (API level)
     const currentPage = activeTab === 'imported' 
         ? (materials?.pagination?.available?.currentPage || 1)
@@ -2538,16 +2580,13 @@ const Details = () => {
             return;
         }
 
-        // Prevent duplicate requests
         if (materials.loading) {
             return;
         }
 
         try {
-            // Scroll to top when page changes
             scrollViewRef.current?.scrollTo({ y: 0, animated: true });
             
-            // Fetch new page data from API (LIMIT: 10 items per page)
             await fetchMaterials(page, 10, true);
             
         } catch (error) {
@@ -2556,14 +2595,10 @@ const Details = () => {
         }
     };
 
-    // Reset pagination when tab changes or filters change and reload data (LIMIT: 7 items per page)
     useEffect(() => {
-        
-        // Always reload from page 1 when tab or filter changes
         fetchMaterials(1, 10, true);
     }, [activeTab, selectedMiniSection]);
 
-    // Group materials by date for "Used Materials" tab
     const getGroupedByDate = () => {
         if (activeTab !== 'used') {
             return null;
@@ -2574,11 +2609,9 @@ const Details = () => {
 
         materials.forEach(material => {
             try {
-                // Use createdAt or addedAt for grouping
                 const dateStr = material.createdAt || material.addedAt || material.date;
                 const date = new Date(dateStr);
 
-                // Check if date is valid
                 if (isNaN(date.getTime())) {
                     console.warn('Invalid date for material:', material.name, dateStr);
                     // Use a fallback date key
@@ -2602,7 +2635,6 @@ const Details = () => {
             }
         });
 
-        // Sort dates in descending order (newest first)
         const sortedDates = Object.keys(groupedByDate).sort((a, b) => {
             return b.localeCompare(a); // ISO dates can be sorted alphabetically
         });
@@ -2615,13 +2647,11 @@ const Details = () => {
 
     const formatDateHeader = (dateString: string) => {
         try {
-            // Handle unknown date
             if (dateString === 'unknown-date') {
                 return 'Unknown Date';
             }
 
-            // dateString is in ISO format: "2025-12-07"
-            const date = new Date(dateString + 'T00:00:00'); // Add time to avoid timezone issues
+            const date = new Date(dateString + 'T00:00:00');
 
             // Check if date is valid
             if (isNaN(date.getTime())) {
@@ -2641,7 +2671,6 @@ const Details = () => {
             if (dateOnly.getTime() === todayOnly.getTime()) return 'Today';
             if (dateOnly.getTime() === yesterdayOnly.getTime()) return 'Yesterday';
 
-            // Format as "December 7, 2025"
             return date.toLocaleDateString('en-US', {
                 year: 'numeric',
                 month: 'long',
@@ -2706,10 +2735,26 @@ const Details = () => {
 
 
         try {
-            const res = await axios.post(`${domain}/api/material`, formattedMaterials);
+            // Get user details from AsyncStorage to send in headers
+            const userDetailsString = await AsyncStorage.getItem("user");
+            let userDetails = null;
+            
+            if (userDetailsString) {
+                try {
+                    userDetails = JSON.parse(userDetailsString);
+                } catch (parseError) {
+                    console.error('Failed to parse user details:', parseError);
+                }
+            }
+            
+            // Make API call with user details in headers
+            const res = await apiClient.post(`/api/material`, formattedMaterials, {
+                headers: {
+                    ...(userDetails && { 'x-user-details': JSON.stringify(userDetails) })
+                }
+            });
 
             const responseData = res.data as any;
-
 
             // Check response
             if (responseData.success && responseData.results && Array.isArray(responseData.results)) {
@@ -2718,20 +2763,13 @@ const Details = () => {
                 const successCount = responseData.results.filter((r: any) => r.success).length || 0;
                 const failCount = responseData.results.filter((r: any) => !r.success).length || 0;
 
-                
-                // Log each result for debugging
                 responseData.results.forEach((result: any, index: number) => {
                 });
 
                 if (successCount > 0) {
-                    // Log material activity ONLY for successful materials (no toast)
                     const successfulResults = responseData.results.filter((r: any) => r.success) || [];
 
                     const successfulMaterials = successfulResults.map((result: any) => {
-                        // ✅ CRITICAL FIX: Always use INPUT data for activity logging
-                        // This ensures we show what was actually added, not the merged database result
-                        
-                        // Get original input values (what user actually added)
                         const inputQnt = result.input?.qnt || 0;
                         const inputPerUnitCost = result.input?.perUnitCost || 0;
                         const inputTotalCost = result.input?.totalCost || (inputQnt * inputPerUnitCost);
@@ -2746,8 +2784,7 @@ const Details = () => {
                             cost: inputTotalCost, // ✅ For notification compatibility
                             addedAt: new Date(),
                         };
-                        
-                        
+
                         return materialData;
                     });
 
@@ -2757,30 +2794,18 @@ const Details = () => {
                     // Only log activity if we have successful materials
                     if (successfulMaterials.length > 0) {
                         
-                        // Log general activity (shows "imported materials to project" message)
-                        const totalCost = successfulMaterials.reduce((sum: number, m: any) => sum + (m.totalCost || 0), 0);
-                        try {
-                            await logMaterialImported(
-                                projectId,
-                                projectName,
-                                successCount,
-                                totalCost,
-                                message
-                            );
-                        } catch (generalActivityError) {
-                            console.error('❌ Failed to log general activity:', generalActivityError);
-                            // Don't fail the whole operation if general activity logging fails
-                        }
-                        // 🔔 NEW: Send simple notification for material addition
+                        // ✅ REMOVED: logMaterialImported() call
+                        // The backend API (/api/material/add-stock) already creates MaterialActivity entries
+                        // with detailed information (activity: "imported"). Creating a duplicate regular Activity
+                        // here was causing simple text notifications instead of detailed material cards.
+                        // Now only the MaterialActivity from the backend will be shown in notifications.
                         try {
                             
                             const staffName = user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Staff Member';
                             const materialCount = successfulMaterials.length;
                             const totalValue = successfulMaterials.reduce((sum: number, m: any) => sum + (m.totalCost || 0), 0);
                             
-                            // Create a clean, professional notification message
                             const notificationDetails = `Added ${materialCount} material${materialCount > 1 ? 's' : ''} worth ₹${totalValue.toLocaleString()}`;
-                            
                             
                             const notificationSent = await sendProjectNotification({
                                 projectId: projectId,
@@ -2812,8 +2837,6 @@ const Details = () => {
                 // Short delay for state update
                 await new Promise(resolve => setTimeout(resolve, 300));
                 
-
-                // Stop loading animation (show success toast after completion)
                 stopMaterialLoadingAnimation();
 
                 // Show appropriate toast messages
@@ -2825,13 +2848,11 @@ const Details = () => {
                     toast.success(`✅ Added ${successCount} material${successCount === 1 ? '' : 's'}`);
                     toast.error(`❌ Failed to add ${failCount} material${failCount === 1 ? '' : 's'}`);
                 } else if (failCount > 0) {
-                    // All failed
                     toast.error(`❌ Failed to add ${failCount} material${failCount > 1 ? 's' : ''}`);
                 }
             } else if (responseData.success) {
                 console.warn('⚠️ API returned success but no results array');
                 
-                // Still refresh materials since backend says success
                 await new Promise(resolve => setTimeout(resolve, 500));
                 await reloadMaterials(1);
                 await new Promise(resolve => setTimeout(resolve, 300));
@@ -2839,9 +2860,8 @@ const Details = () => {
                 stopMaterialLoadingAnimation();
                 toast.success('✅ Material added successfully');
             } else {
-                // API returned success: false
+
                 console.error('❌ API returned success: false');
-                
                 const errorMsg = typeof responseData.error === 'string' 
                     ? responseData.error 
                     : (responseData.message || 'Failed to add materials');

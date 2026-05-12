@@ -5,7 +5,7 @@ import { useUser, isStaff } from '@/hooks/useUser';
 import { domain } from '@/lib/domain';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState, useRef } from 'react';
@@ -239,7 +239,7 @@ const CompanyProfile: React.FC = () => {
             console.log('🔍 Fetching client data for ID:', clientId);
             
             // Add skipCache parameter to force fresh data from database
-            const response = await axios.get(`${domain}/api/clients?id=${clientId}&skipCache=true`, {
+            const response = await apiClient.get(`/api/clients?id=${clientId}&skipCache=true`, {
                 headers: {
                     'Cache-Control': 'no-cache',
                     'Pragma': 'no-cache'
@@ -371,7 +371,7 @@ const CompanyProfile: React.FC = () => {
                 
                 try {
                     // Fetch staff data with populated assignedProjects from ALL clients
-                    const response = await axios.get(`${domain}/api/users/staff?id=${user._id}&getAllProjects=true`);
+                    const response = await apiClient.get(`/api/users/staff?id=${user._id}&getAllProjects=true`);
                     const responseData = response.data as any;
                     
                     console.log('📥 Staff API response for stats:', {

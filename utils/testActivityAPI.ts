@@ -5,7 +5,7 @@
 
 import { domain } from "@/lib/domain";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import axios from "axios";
+import apiClient from '@/utils/axiosConfig';
 
 export const testActivityAPICall = async () => {
   console.log("\n========================================");
@@ -68,7 +68,7 @@ export const testActivityAPICall = async () => {
     console.log("URL:", `${domain}/api/activity`);
     console.log("Method: POST");
 
-    const response = await axios.post(`${domain}/api/activity`, testPayload);
+    const response = await apiClient.post(`/api/activity`, testPayload);
 
     console.log("\n✅ SUCCESS! Activity API is working!");
     console.log("Response Status:", response.status);

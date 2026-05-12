@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'rea
 import { getClientId } from '@/functions/clientId';
 import { getProjectData } from '@/functions/project';
 import { domain } from '@/lib/domain';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 
 const DebugApiTest = () => {
   const [testResults, setTestResults] = useState<string>('');
@@ -33,7 +33,7 @@ const DebugApiTest = () => {
       // Test 2: Direct API call
       addLog('\n📋 Test 2: Direct API call...');
       try {
-        const directResponse = await axios.get(`${domain}/api/project?clientId=${clientId}`);
+        const directResponse = await apiClient.get(`/api/project?clientId=${clientId}`);
         addLog(`✅ Direct API Status: ${directResponse.status}`);
         addLog(`✅ Direct API Success: ${directResponse.data.success}`);
         addLog(`✅ Direct API Data Type: ${Array.isArray(directResponse.data.data) ? 'Array' : typeof directResponse.data.data}`);

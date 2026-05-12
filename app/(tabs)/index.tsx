@@ -8,7 +8,7 @@ import { styles } from "@/style/adminHome";
 import { Project } from '@/types/project';
 import { StaffMembers } from '@/types/staff';
 import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState, useRef } from 'react';
 import QRCode from 'react-native-qrcode-svg';
@@ -99,7 +99,7 @@ const Index: React.FC = () => {
                 try {
                     // Fetch staff data with populated projects in one API call
                     // Use skipCache=true to ensure fresh data with license status
-                    const response = await axios.get(`${domain}/api/users/staff?id=${user._id}&getAllProjects=true&skipCache=true`);
+                    const response = await apiClient.get(`/api/users/staff?id=${user._id}&getAllProjects=true&skipCache=true`);
                     const responseData = response.data as any;
                     
                     if (responseData.success && responseData.data) {
@@ -134,7 +134,7 @@ const Index: React.FC = () => {
                                 populatedProjects.map(async (project: any) => {
                                     try {
                                         if (project._id) {
-                                            const response = await axios.get(`${domain}/api/completion?updateType=project&id=${project._id}`);
+                                            const response = await apiClient.get(`/api/completion?updateType=project&id=${project._id}`);
                                             const responseData = response.data as any;
                                             if (responseData.success && responseData.data) {
                                                 const completionStatus = Boolean(responseData.data.isCompleted);
@@ -184,7 +184,7 @@ const Index: React.FC = () => {
                     projectsArray.map(async (project) => {
                         try {
                             if (project._id) {
-                                const response = await axios.get(`${domain}/api/completion?updateType=project&id=${project._id}`);
+                                const response = await apiClient.get(`/api/completion?updateType=project&id=${project._id}`);
                                 const responseData = response.data as any;
                                 if (responseData.success && responseData.data) {
                                     const completionStatus = Boolean(responseData.data.isCompleted);
@@ -233,7 +233,7 @@ const Index: React.FC = () => {
                 
                 console.log('📝 Fetching client data for:', clientId);
                 // Add cache-busting parameter to ensure fresh data
-                const response = await axios.get(`${domain}/api/clients?id=${clientId}&_t=${Date.now()}`);
+                const response = await apiClient.get(`/api/clients?id=${clientId}&_t=${Date.now()}`);
                 const responseData = response.data as any;
 
                 console.log('📦 Client API Response:', responseData);
@@ -354,7 +354,7 @@ const Index: React.FC = () => {
             }
             
             try {
-                const res = await axios.get(`${domain}/api/staff?clientId=${clientId}`);
+                const res = await apiClient.get(`/api/staff?clientId=${clientId}`);
                 const data = (res.data as any)?.data || [];
                 const filterData = data.map((item: any) => {
                     return {

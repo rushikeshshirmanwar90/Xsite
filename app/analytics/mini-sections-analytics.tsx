@@ -16,7 +16,7 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { domain } from '@/lib/domain';
 
 interface MiniSectionExpense {
@@ -196,10 +196,10 @@ const MiniSectionsAnalytics: React.FC = () => {
         
         // Try fetching by projectId only first (more permissive)
         // CRITICAL FIX: Don't filter by status - get ALL equipment
-        const equipmentResponse = await axios.get<{
+        const equipmentResponse = await apiClient.get<{
           success: boolean;
           data: any[];
-        }>(`${domain}/api/equipment`, {
+        }>(`/api/equipment`, {
           params: {
             projectId: projectId,
             projectSectionId: sectionId,
@@ -738,7 +738,7 @@ const MiniSectionsAnalytics: React.FC = () => {
                   <Text style={styles.breakdownStatValue}>{formatCurrency(totalUsedMaterials)}</Text>
                 </View>
               </View>
-              <View style={styles.breakdownStatItem}>
+              {/* <View style={styles.breakdownStatItem}>
                 <View style={styles.breakdownStatIconContainer}>
                   <Ionicons name="layers-outline" size={18} color="#10B981" />
                 </View>
@@ -746,7 +746,7 @@ const MiniSectionsAnalytics: React.FC = () => {
                   <Text style={styles.breakdownStatLabel}>Available Materials</Text>
                   <Text style={styles.breakdownStatValue}>{formatCurrency(totalAvailableMaterials)}</Text>
                 </View>
-              </View>
+              </View> */}
               <View style={styles.breakdownStatItem}>
                 <View style={styles.breakdownStatIconContainer}>
                   <Ionicons name="construct-outline" size={18} color="#F59E0B" />
@@ -799,9 +799,9 @@ const MiniSectionsAnalytics: React.FC = () => {
                 labelType="amount"
                 onSlicePress={handleMiniSectionPress}
                 centerContent={{
-                  label: 'TOTAL EXPENSES',
+                  label: '',
                   value: formatCurrency(totalExpense),
-                  subtitle: `${miniSections.length} Mini-Section${miniSections.length > 1 ? 's' : ''} (Materials + Equipment + Labor)`,
+                  subtitle: `${miniSections.length} Mini-Section${miniSections.length > 1 ? 's' : ''}`,
                 }}
               />
             </View>

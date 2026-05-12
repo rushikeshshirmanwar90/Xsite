@@ -13,7 +13,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { X } from 'lucide-react-native';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { domain } from '@/lib/domain';
 import { toast } from 'sonner-native';
 
@@ -333,7 +333,7 @@ const StaffQRScannerModal: React.FC<StaffQRScannerModalProps> = ({
 
       // Call the assign-client API
       // Note: (users) is a route group in Next.js and doesn't appear in the URL
-      const response = await axios.post(
+      const response = await apiClient.post(
         `${domain}/api/users/staff/assign-client`,
         {
           staffId: staffData.staffId,

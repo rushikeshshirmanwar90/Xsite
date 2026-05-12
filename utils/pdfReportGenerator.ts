@@ -105,42 +105,70 @@ export class PDFReportGenerator {
 
         const totalLaborCost = laborEntries.reduce((sum, labor) => sum + (Number(labor.totalCost) || 0), 0);
 
-        return `
-            <div style="margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-                <div style="background-color: #fef3c7; padding: 12px; border-bottom: 1px solid #e2e8f0;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <span style="background-color: #F59E0B; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
-                                👷 LABOR COSTS
-                            </span>
-                            <span style="margin-left: 10px; font-weight: 600; color: #374151;">
-                                ${laborEntries.length} ${laborEntries.length === 1 ? 'entry' : 'entries'}
-                            </span>
+        return laborEntries.map(labor => {
+            // Try multiple possible fields for admin name
+            // addedBy can be either a populated object or an ObjectId string
+            // Admin model has firstName and lastName, not fullName
+            let adminName = 'Admin';
+            
+            if (labor.addedBy?.firstName && labor.addedBy?.lastName) {
+                adminName = `${labor.addedBy.firstName} ${labor.addedBy.lastName}`;
+            } else if (labor.addedBy?.fullName) {
+                adminName = labor.addedBy.fullName;
+            } else if (labor.addedBy?.name) {
+                adminName = labor.addedBy.name;
+            } else if (labor.user?.firstName && labor.user?.lastName) {
+                adminName = `${labor.user.firstName} ${labor.user.lastName}`;
+            } else if (labor.user?.fullName) {
+                adminName = labor.user.fullName;
+            } else if (labor.user?.name) {
+                adminName = labor.user.name;
+            } else if (labor.addedByName) {
+                adminName = labor.addedByName;
+            } else if (labor.adminName) {
+                adminName = labor.adminName;
+            } else if (labor.createdBy?.fullName) {
+                adminName = labor.createdBy.fullName;
+            } else if (labor.createdBy?.name) {
+                adminName = labor.createdBy.name;
+            }
+            
+            return `
+                <div style="margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                    <div style="background-color: #fef3c7; padding: 12px; border-bottom: 1px solid #e2e8f0;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <span style="background-color: #F59E0B; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
+                                    👷 LABOR ENTRY
+                                </span>
+                                <span style="margin-left: 10px; font-weight: 600; color: #374151;">
+                                    ${adminName}
+                                </span>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 12px; color: #6b7280;">
+                                    ${labor.category || 'Unknown Category'}
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-                
-                <table style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr style="background-color: #f8fafc;">
-                            <th style="padding: 10px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Category</th>
-                            <th style="padding: 10px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Type</th>
-                            <th style="padding: 10px; text-align: center; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Count</th>
-                            <th style="padding: 10px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Per Labor Cost</th>
-                            <th style="padding: 10px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Total Cost</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${laborEntries.map(labor => `
+                    
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background-color: #f8fafc;">
+                                <th style="padding: 10px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Type</th>
+                                <th style="padding: 10px; text-align: center; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Count</th>
+                                <th style="padding: 10px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Per Labor Cost</th>
+                                <th style="padding: 10px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Total Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody>
                             <tr>
                                 <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">
                                     <div style="display: flex; align-items: center;">
                                         <div style="width: 8px; height: 8px; background-color: #F59E0B; border-radius: 50%; margin-right: 8px;"></div>
-                                        <strong>${labor.category || 'Unknown Category'}</strong>
+                                        <strong>${labor.type || 'Unknown Type'}</strong>
                                     </div>
-                                </td>
-                                <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">
-                                    ${labor.type || 'Unknown Type'}
                                 </td>
                                 <td style="padding: 8px; border-bottom: 1px solid #f1f5f9; text-align: center;">
                                     ${labor.count || 0}
@@ -152,66 +180,92 @@ export class PDFReportGenerator {
                                     ${this.formatCurrency(Number(labor.totalCost) || 0)}
                                 </td>
                             </tr>
-                        `).join('')}
-                    </tbody>
-                    <tfoot>
-                        <tr style="background-color: #fef3c7; font-weight: bold;">
-                            <td style="padding: 10px; border-top: 2px solid #e2e8f0;" colspan="4">
-                                Day Labor Total
-                            </td>
-                            <td style="padding: 10px; text-align: right; border-top: 2px solid #e2e8f0; color: #F59E0B;">
-                                ${this.formatCurrency(totalLaborCost)}
-                            </td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-        `;
+                        </tbody>
+                        <tfoot>
+                            <tr style="background-color: #fef3c7; font-weight: bold;">
+                                <td style="padding: 10px; border-top: 2px solid #e2e8f0;" colspan="3">
+                                    Entry Total
+                                </td>
+                                <td style="padding: 10px; text-align: right; border-top: 2px solid #e2e8f0; color: #F59E0B;">
+                                    ${this.formatCurrency(Number(labor.totalCost) || 0)}
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            `;
+        }).join('');
     }
 
     // ✅ NEW: Generate equipment entry HTML
     private generateEquipmentHTML(equipmentEntries: any[]): string {
         if (!equipmentEntries || equipmentEntries.length === 0) return '';
 
-        const totalEquipmentCost = equipmentEntries.reduce((sum, equipment) => sum + (Number(equipment.totalCost) || 0), 0);
-
-        return `
-            <div style="margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-                <div style="background-color: #fef3c7; padding: 12px; border-bottom: 1px solid #e2e8f0;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <span style="background-color: #F59E0B; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
-                                🚜 EQUIPMENT COSTS
-                            </span>
-                            <span style="margin-left: 10px; font-weight: 600; color: #374151;">
-                                ${equipmentEntries.length} ${equipmentEntries.length === 1 ? 'entry' : 'entries'}
-                            </span>
+        return equipmentEntries.map(equipment => {
+            // Try multiple possible fields for admin name
+            // addedBy can be either a populated object or an ObjectId string
+            // Admin model has firstName and lastName, not fullName
+            let adminName = 'Admin';
+            
+            if (equipment.addedBy?.firstName && equipment.addedBy?.lastName) {
+                adminName = `${equipment.addedBy.firstName} ${equipment.addedBy.lastName}`;
+            } else if (equipment.addedBy?.fullName) {
+                adminName = equipment.addedBy.fullName;
+            } else if (equipment.addedBy?.name) {
+                adminName = equipment.addedBy.name;
+            } else if (equipment.user?.firstName && equipment.user?.lastName) {
+                adminName = `${equipment.user.firstName} ${equipment.user.lastName}`;
+            } else if (equipment.user?.fullName) {
+                adminName = equipment.user.fullName;
+            } else if (equipment.user?.name) {
+                adminName = equipment.user.name;
+            } else if (equipment.addedByName) {
+                adminName = equipment.addedByName;
+            } else if (equipment.adminName) {
+                adminName = equipment.adminName;
+            } else if (equipment.createdBy?.fullName) {
+                adminName = equipment.createdBy.fullName;
+            } else if (equipment.createdBy?.name) {
+                adminName = equipment.createdBy.name;
+            }
+            
+            return `
+                <div style="margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                    <div style="background-color: #eff6ff; padding: 12px; border-bottom: 1px solid #e2e8f0;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <span style="background-color: #3B82F6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
+                                    🚜 EQUIPMENT ENTRY
+                                </span>
+                                <span style="margin-left: 10px; font-weight: 600; color: #374151;">
+                                    ${adminName}
+                                </span>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 12px; color: #6b7280;">
+                                    ${equipment.category || 'Unknown Category'}
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-                
-                <table style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr style="background-color: #f8fafc;">
-                            <th style="padding: 10px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Equipment Type</th>
-                            <th style="padding: 10px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Category</th>
-                            <th style="padding: 10px; text-align: center; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Quantity</th>
-                            <th style="padding: 10px; text-align: center; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Cost Type</th>
-                            <th style="padding: 10px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Per Unit</th>
-                            <th style="padding: 10px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Total Cost</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${equipmentEntries.map(equipment => `
+                    
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background-color: #f8fafc;">
+                                <th style="padding: 10px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Equipment Type</th>
+                                <th style="padding: 10px; text-align: center; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Quantity</th>
+                                <th style="padding: 10px; text-align: center; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Cost Type</th>
+                                <th style="padding: 10px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Per Unit</th>
+                                <th style="padding: 10px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Total Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody>
                             <tr>
                                 <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">
                                     <div style="display: flex; align-items: center;">
-                                        <div style="width: 8px; height: 8px; background-color: #F59E0B; border-radius: 50%; margin-right: 8px;"></div>
+                                        <div style="width: 8px; height: 8px; background-color: #3B82F6; border-radius: 50%; margin-right: 8px;"></div>
                                         <strong>${equipment.type || 'Unknown Equipment'}</strong>
                                     </div>
-                                </td>
-                                <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">
-                                    ${equipment.category || 'Unknown Category'}
                                 </td>
                                 <td style="padding: 8px; border-bottom: 1px solid #f1f5f9; text-align: center;">
                                     ${equipment.quantity || 0}
@@ -230,21 +284,21 @@ export class PDFReportGenerator {
                                     ${this.formatCurrency(Number(equipment.totalCost) || 0)}
                                 </td>
                             </tr>
-                        `).join('')}
-                    </tbody>
-                    <tfoot>
-                        <tr style="background-color: #fef3c7; font-weight: bold;">
-                            <td style="padding: 10px; border-top: 2px solid #e2e8f0;" colspan="5">
-                                Day Equipment Total
-                            </td>
-                            <td style="padding: 10px; text-align: right; border-top: 2px solid #e2e8f0; color: #F59E0B;">
-                                ${this.formatCurrency(totalEquipmentCost)}
-                            </td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-        `;
+                        </tbody>
+                        <tfoot>
+                            <tr style="background-color: #eff6ff; font-weight: bold;">
+                                <td style="padding: 10px; border-top: 2px solid #e2e8f0;" colspan="4">
+                                    Entry Total
+                                </td>
+                                <td style="padding: 10px; text-align: right; border-top: 2px solid #e2e8f0; color: #3B82F6;">
+                                    ${this.formatCurrency(Number(equipment.totalCost) || 0)}
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            `;
+        }).join('');
     }
 
     // Format date for display
@@ -466,6 +520,351 @@ export class PDFReportGenerator {
                         </tfoot>
                     ` : ''}
                 </table>
+            </div>
+        `;
+    }
+
+    // ✅ NEW: Generate comprehensive summary page with aggregated costs
+    private generateSummaryPage(activities: MaterialActivity[], laborData: any[], equipmentData: any[]): string {
+        console.log('📊 ========================================');
+        console.log('📊 GENERATING COMPREHENSIVE SUMMARY PAGE');
+        console.log('📊 ========================================');
+        console.log('📊 Input data:');
+        console.log('  - Activities count:', activities.length);
+        console.log('  - Labor data count:', laborData.length);
+        console.log('  - Equipment data count:', equipmentData.length);
+        
+        // Log sample data for debugging
+        if (activities.length > 0) {
+            console.log('📊 Sample activity:', JSON.stringify(activities[0], null, 2));
+        }
+        if (laborData.length > 0) {
+            console.log('📊 Sample labor:', JSON.stringify(laborData[0], null, 2));
+        }
+        if (equipmentData.length > 0) {
+            console.log('📊 Sample equipment:', JSON.stringify(equipmentData[0], null, 2));
+        }
+        
+        // Aggregate materials by name
+        const materialMap = new Map<string, { quantity: number; unit: string; totalCost: number }>();
+        
+        console.log('📊 Processing materials...');
+        activities.forEach((activity, idx) => {
+            console.log(`  Activity ${idx + 1}: ${activity.activity} - ${activity.materials.length} materials`);
+            
+            // Include ALL materials (imported, used, transferred) for comprehensive summary
+            activity.materials.forEach(material => {
+                const key = material.name;
+                const existing = materialMap.get(key) || { quantity: 0, unit: material.unit, totalCost: 0 };
+                
+                let materialCost = 0;
+                if (material.totalCost !== undefined) {
+                    materialCost = Number(material.totalCost);
+                } else if (material.perUnitCost !== undefined) {
+                    materialCost = Number(material.perUnitCost) * Number(material.qnt);
+                } else if (material.cost !== undefined) {
+                    // For imported: cost is per-unit, multiply by quantity
+                    // For used: cost is total cost
+                    if (activity.activity === 'imported') {
+                        materialCost = Number(material.cost) * Number(material.qnt);
+                    } else {
+                        materialCost = Number(material.cost);
+                    }
+                }
+                
+                console.log(`    - ${material.name}: qty=${material.qnt}, cost=${materialCost}`);
+                
+                materialMap.set(key, {
+                    quantity: existing.quantity + Number(material.qnt),
+                    unit: material.unit,
+                    totalCost: existing.totalCost + materialCost
+                });
+            });
+        });
+        
+        console.log('📊 Material aggregation complete:', materialMap.size, 'unique materials');
+        materialMap.forEach((data, name) => {
+            console.log(`  - ${name}: ${data.quantity} ${data.unit} = ${this.formatCurrency(data.totalCost)}`);
+        });
+        
+        // Aggregate labor by category and type
+        const laborMap = new Map<string, { type: string; count: number; totalCost: number }>();
+        
+        console.log('📊 Processing labor...');
+        laborData.forEach((labor, idx) => {
+            const key = `${labor.category || 'Unknown'} - ${labor.type || 'Unknown'}`;
+            const existing = laborMap.get(key) || { type: labor.type || 'Unknown', count: 0, totalCost: 0 };
+            
+            const laborCost = Number(labor.totalCost) || 0;
+            const laborCount = Number(labor.count) || 0;
+            
+            console.log(`  Labor ${idx + 1}: ${key}, count=${laborCount}, cost=${laborCost}`);
+            
+            laborMap.set(key, {
+                type: labor.type || 'Unknown',
+                count: existing.count + laborCount,
+                totalCost: existing.totalCost + laborCost
+            });
+        });
+        
+        console.log('📊 Labor aggregation complete:', laborMap.size, 'unique labor categories');
+        laborMap.forEach((data, name) => {
+            console.log(`  - ${name}: ${data.count} workers = ${this.formatCurrency(data.totalCost)}`);
+        });
+        
+        // Aggregate equipment by type
+        const equipmentMap = new Map<string, { category: string; quantity: number; totalCost: number }>();
+        
+        console.log('📊 Processing equipment...');
+        equipmentData.forEach((equipment, idx) => {
+            const key = equipment.type || 'Unknown Equipment';
+            const existing = equipmentMap.get(key) || { category: equipment.category || 'Unknown', quantity: 0, totalCost: 0 };
+            
+            const equipmentCost = Number(equipment.totalCost) || 0;
+            const equipmentQty = Number(equipment.quantity) || 0;
+            
+            console.log(`  Equipment ${idx + 1}: ${key}, qty=${equipmentQty}, cost=${equipmentCost}`);
+            
+            equipmentMap.set(key, {
+                category: equipment.category || 'Unknown',
+                quantity: existing.quantity + equipmentQty,
+                totalCost: existing.totalCost + equipmentCost
+            });
+        });
+        
+        console.log('📊 Equipment aggregation complete:', equipmentMap.size, 'unique equipment types');
+        equipmentMap.forEach((data, name) => {
+            console.log(`  - ${name}: ${data.quantity} units = ${this.formatCurrency(data.totalCost)}`);
+        });
+        
+        // Sort by cost (highest first)
+        const sortedMaterials = Array.from(materialMap.entries()).sort((a, b) => b[1].totalCost - a[1].totalCost);
+        const sortedLabor = Array.from(laborMap.entries()).sort((a, b) => b[1].totalCost - a[1].totalCost);
+        const sortedEquipment = Array.from(equipmentMap.entries()).sort((a, b) => b[1].totalCost - a[1].totalCost);
+        
+        // Calculate totals
+        const totalMaterialCost = Array.from(materialMap.values()).reduce((sum, m) => sum + m.totalCost, 0);
+        const totalLaborCost = Array.from(laborMap.values()).reduce((sum, l) => sum + l.totalCost, 0);
+        const totalEquipmentCost = Array.from(equipmentMap.values()).reduce((sum, e) => sum + e.totalCost, 0);
+        const grandTotal = totalMaterialCost + totalLaborCost + totalEquipmentCost;
+        
+        console.log('📊 ========================================');
+        console.log('📊 SUMMARY TOTALS:');
+        console.log('  - Unique materials:', materialMap.size);
+        console.log('  - Unique labor categories:', laborMap.size);
+        console.log('  - Unique equipment types:', equipmentMap.size);
+        console.log('  - Total material cost:', this.formatCurrency(totalMaterialCost));
+        console.log('  - Total labor cost:', this.formatCurrency(totalLaborCost));
+        console.log('  - Total equipment cost:', this.formatCurrency(totalEquipmentCost));
+        console.log('  - GRAND TOTAL:', this.formatCurrency(grandTotal));
+        console.log('📊 ========================================');
+        
+        return `
+            <div style="margin-top: 20px;">
+                <div style="background: linear-gradient(135deg, #1e293b, #334155); color: white; padding: 24px; border-radius: 12px; margin-bottom: 32px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                    <h1 style="margin: 0 0 8px 0; font-size: 28px; font-weight: 800;">📊 Project Cost Summary</h1>
+                    <p style="margin: 0; opacity: 0.9; font-size: 14px;">Comprehensive breakdown of all project expenses</p>
+                </div>
+                
+                <!-- Grand Total Card -->
+                <div style="background: linear-gradient(135deg, #059669, #10B981); color: white; padding: 24px; border-radius: 12px; margin-bottom: 32px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                    <div style="font-size: 16px; opacity: 0.9; margin-bottom: 8px;">Total Project Cost</div>
+                    <div style="font-size: 42px; font-weight: 800; margin-bottom: 16px;">${this.formatCurrency(grandTotal)}</div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.2);">
+                        <div>
+                            <div style="font-size: 12px; opacity: 0.8;">Materials</div>
+                            <div style="font-size: 18px; font-weight: 700;">${this.formatCurrency(totalMaterialCost)}</div>
+                            <div style="font-size: 11px; opacity: 0.7;">${grandTotal > 0 ? ((totalMaterialCost / grandTotal) * 100).toFixed(1) : 0}% of total</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 12px; opacity: 0.8;">Labor</div>
+                            <div style="font-size: 18px; font-weight: 700;">${this.formatCurrency(totalLaborCost)}</div>
+                            <div style="font-size: 11px; opacity: 0.7;">${grandTotal > 0 ? ((totalLaborCost / grandTotal) * 100).toFixed(1) : 0}% of total</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 12px; opacity: 0.8;">Equipment</div>
+                            <div style="font-size: 18px; font-weight: 700;">${this.formatCurrency(totalEquipmentCost)}</div>
+                            <div style="font-size: 11px; opacity: 0.7;">${grandTotal > 0 ? ((totalEquipmentCost / grandTotal) * 100).toFixed(1) : 0}% of total</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Material Costs Summary -->
+                ${sortedMaterials.length > 0 ? `
+                    <div style="margin-bottom: 32px;">
+                        <div style="background-color: #f0fdf4; padding: 16px; border-radius: 8px 8px 0 0; border: 1px solid #10B981; border-bottom: none;">
+                            <h2 style="margin: 0; color: #059669; font-size: 20px; display: flex; align-items: center;">
+                                <span style="margin-right: 8px;">📦</span> Material Costs Summary
+                            </h2>
+                            <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">Total: ${this.formatCurrency(totalMaterialCost)} across ${sortedMaterials.length} material types</p>
+                        </div>
+                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #10B981; border-top: none;">
+                            <thead>
+                                <tr style="background-color: #f8fafc;">
+                                    <th style="padding: 12px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0; width: 50px;">#</th>
+                                    <th style="padding: 12px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Material Name</th>
+                                    <th style="padding: 12px; text-align: center; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Total Quantity</th>
+                                    <th style="padding: 12px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Total Cost</th>
+                                    <th style="padding: 12px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">% of Material Cost</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${sortedMaterials.map(([name, data], index) => `
+                                    <tr style="${index % 2 === 0 ? 'background-color: #ffffff;' : 'background-color: #f9fafb;'}">
+                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-weight: 600; color: #6b7280;">${index + 1}</td>
+                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">
+                                            <div style="display: flex; align-items: center;">
+                                                <div style="width: 8px; height: 8px; background-color: #10B981; border-radius: 50%; margin-right: 8px;"></div>
+                                                <strong style="color: #374151;">${name}</strong>
+                                            </div>
+                                        </td>
+                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: center; color: #6b7280;">
+                                            ${data.quantity.toLocaleString('en-IN')} ${data.unit}
+                                        </td>
+                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 700; color: #059669;">
+                                            ${this.formatCurrency(data.totalCost)}
+                                        </td>
+                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; color: #6b7280;">
+                                            ${totalMaterialCost > 0 ? ((data.totalCost / totalMaterialCost) * 100).toFixed(1) : 0}%
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                            <tfoot>
+                                <tr style="background-color: #f0fdf4; font-weight: bold;">
+                                    <td colspan="3" style="padding: 12px; border-top: 2px solid #10B981; color: #059669;">
+                                        Total Material Cost
+                                    </td>
+                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #10B981; color: #059669; font-size: 16px;">
+                                        ${this.formatCurrency(totalMaterialCost)}
+                                    </td>
+                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #10B981; color: #059669;">
+                                        100%
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                ` : ''}
+                
+                <!-- Labor Costs Summary -->
+                ${sortedLabor.length > 0 ? `
+                    <div style="margin-bottom: 32px;">
+                        <div style="background-color: #fef3c7; padding: 16px; border-radius: 8px 8px 0 0; border: 1px solid #F59E0B; border-bottom: none;">
+                            <h2 style="margin: 0; color: #D97706; font-size: 20px; display: flex; align-items: center;">
+                                <span style="margin-right: 8px;">👷</span> Labor Costs Summary
+                            </h2>
+                            <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">Total: ${this.formatCurrency(totalLaborCost)} across ${sortedLabor.length} labor categories</p>
+                        </div>
+                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #F59E0B; border-top: none;">
+                            <thead>
+                                <tr style="background-color: #f8fafc;">
+                                    <th style="padding: 12px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0; width: 50px;">#</th>
+                                    <th style="padding: 12px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Labor Category</th>
+                                    <th style="padding: 12px; text-align: center; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Total Count</th>
+                                    <th style="padding: 12px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Total Cost</th>
+                                    <th style="padding: 12px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">% of Labor Cost</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${sortedLabor.map(([name, data], index) => `
+                                    <tr style="${index % 2 === 0 ? 'background-color: #ffffff;' : 'background-color: #f9fafb;'}">
+                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-weight: 600; color: #6b7280;">${index + 1}</td>
+                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">
+                                            <div style="display: flex; align-items: center;">
+                                                <div style="width: 8px; height: 8px; background-color: #F59E0B; border-radius: 50%; margin-right: 8px;"></div>
+                                                <strong style="color: #374151;">${name}</strong>
+                                            </div>
+                                        </td>
+                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: center; color: #6b7280;">
+                                            ${data.count.toLocaleString('en-IN')} workers
+                                        </td>
+                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 700; color: #D97706;">
+                                            ${this.formatCurrency(data.totalCost)}
+                                        </td>
+                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; color: #6b7280;">
+                                            ${totalLaborCost > 0 ? ((data.totalCost / totalLaborCost) * 100).toFixed(1) : 0}%
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                            <tfoot>
+                                <tr style="background-color: #fef3c7; font-weight: bold;">
+                                    <td colspan="3" style="padding: 12px; border-top: 2px solid #F59E0B; color: #D97706;">
+                                        Total Labor Cost
+                                    </td>
+                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #F59E0B; color: #D97706; font-size: 16px;">
+                                        ${this.formatCurrency(totalLaborCost)}
+                                    </td>
+                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #F59E0B; color: #D97706;">
+                                        100%
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                ` : ''}
+                
+                <!-- Equipment Costs Summary -->
+                ${sortedEquipment.length > 0 ? `
+                    <div style="margin-bottom: 32px;">
+                        <div style="background-color: #eff6ff; padding: 16px; border-radius: 8px 8px 0 0; border: 1px solid #3B82F6; border-bottom: none;">
+                            <h2 style="margin: 0; color: #1E40AF; font-size: 20px; display: flex; align-items: center;">
+                                <span style="margin-right: 8px;">🚜</span> Equipment Costs Summary
+                            </h2>
+                            <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">Total: ${this.formatCurrency(totalEquipmentCost)} across ${sortedEquipment.length} equipment types</p>
+                        </div>
+                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #3B82F6; border-top: none;">
+                            <thead>
+                                <tr style="background-color: #f8fafc;">
+                                    <th style="padding: 12px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0; width: 50px;">#</th>
+                                    <th style="padding: 12px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Equipment Type</th>
+                                    <th style="padding: 12px; text-align: center; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Total Quantity</th>
+                                    <th style="padding: 12px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Total Cost</th>
+                                    <th style="padding: 12px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">% of Equipment Cost</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${sortedEquipment.map(([name, data], index) => `
+                                    <tr style="${index % 2 === 0 ? 'background-color: #ffffff;' : 'background-color: #f9fafb;'}">
+                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-weight: 600; color: #6b7280;">${index + 1}</td>
+                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">
+                                            <div style="display: flex; align-items: center;">
+                                                <div style="width: 8px; height: 8px; background-color: #3B82F6; border-radius: 50%; margin-right: 8px;"></div>
+                                                <div>
+                                                    <strong style="color: #374151;">${name}</strong>
+                                                    <div style="font-size: 11px; color: #9ca3af; margin-top: 2px;">${data.category}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: center; color: #6b7280;">
+                                            ${data.quantity.toLocaleString('en-IN')} units
+                                        </td>
+                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 700; color: #1E40AF;">
+                                            ${this.formatCurrency(data.totalCost)}
+                                        </td>
+                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; color: #6b7280;">
+                                            ${totalEquipmentCost > 0 ? ((data.totalCost / totalEquipmentCost) * 100).toFixed(1) : 0}%
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                            <tfoot>
+                                <tr style="background-color: #eff6ff; font-weight: bold;">
+                                    <td colspan="3" style="padding: 12px; border-top: 2px solid #3B82F6; color: #1E40AF;">
+                                        Total Equipment Cost
+                                    </td>
+                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #3B82F6; color: #1E40AF; font-size: 16px;">
+                                        ${this.formatCurrency(totalEquipmentCost)}
+                                    </td>
+                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #3B82F6; color: #1E40AF;">
+                                        100%
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                ` : ''}
             </div>
         `;
     }
@@ -777,8 +1176,14 @@ export class PDFReportGenerator {
                 ${dateRangeHTML}
                 ${summaryHTML}
 
+                <!-- Comprehensive Project Cost Summary - Start on new page only if there's content -->
+                ${activities.length > 0 || (laborData && laborData.length > 0) || (equipmentData && equipmentData.length > 0) ? `
+                    <div class="page-break"></div>
+                    ${this.generateSummaryPage(activities, laborData || [], equipmentData || [])}
+                ` : ''}
+
                 ${sortedDates.length > 0 ? `
-                    <h2 style="color: #1e293b; margin-bottom: 20px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
+                    <h2 style="color: #1e293b; margin-top: 32px; margin-bottom: 20px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
                         Daily Activity Details
                     </h2>
                     ${activitiesHTML}

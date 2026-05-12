@@ -7,7 +7,7 @@
  * Run: npx ts-node scripts/testActivityAPI.ts
  */
 
-import axios from "axios";
+import apiClient from '@/utils/axiosConfig';
 
 const domain = "https://real-estate-apis.vercel.app"; // Update with your domain
 
@@ -26,7 +26,7 @@ const testActivityAPI = async () => {
     // Test 1: Project Created Activity
     console.log("\n📝 Test 1: Project Created Activity");
     console.log("-".repeat(60));
-    await axios.post(`${domain}/api/activity`, {
+    await apiClient.post(`/api/activity`, {
       user: {
         userId: "test-user-123",
         fullName: "John Doe",
@@ -50,7 +50,7 @@ const testActivityAPI = async () => {
     // Test 2: Staff Assigned Activity
     console.log("\n👥 Test 2: Staff Assigned Activity");
     console.log("-".repeat(60));
-    await axios.post(`${domain}/api/activity`, {
+    await apiClient.post(`/api/activity`, {
       user: {
         userId: "test-user-123",
         fullName: "John Doe",
@@ -73,7 +73,7 @@ const testActivityAPI = async () => {
     // Test 3: Section Created Activity
     console.log("\n🏗️  Test 3: Section Created Activity");
     console.log("-".repeat(60));
-    await axios.post(`${domain}/api/activity`, {
+    await apiClient.post(`/api/activity`, {
       user: {
         userId: "test-user-123",
         fullName: "John Doe",
@@ -93,7 +93,7 @@ const testActivityAPI = async () => {
     // Test 4: Material Import Activity
     console.log("\n📦 Test 4: Material Import Activity");
     console.log("-".repeat(60));
-    await axios.post(`${domain}/api/activity`, {
+    await apiClient.post(`/api/activity`, {
       user: {
         userId: "test-user-123",
         fullName: "John Doe",
@@ -117,7 +117,7 @@ const testActivityAPI = async () => {
     // Test 5: Material Usage Activity
     console.log("\n🔨 Test 5: Material Usage Activity");
     console.log("-".repeat(60));
-    await axios.post(`${domain}/api/activity`, {
+    await apiClient.post(`/api/activity`, {
       user: {
         userId: "test-user-123",
         fullName: "John Doe",
@@ -145,7 +145,7 @@ const testActivityAPI = async () => {
     // Test 6: Fetch All Activities
     console.log("\n📋 Test 6: Fetching All Activities");
     console.log("-".repeat(60));
-    const fetchAllResponse = await axios.get(
+    const fetchAllResponse = await apiClient.get(
       `${domain}/api/activity?clientId=${testClientId}&limit=20`
     );
     console.log("✅ Activities fetched successfully");

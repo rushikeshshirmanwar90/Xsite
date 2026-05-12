@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useUnifiedActivities } from '../hooks/useUnifiedActivities';
 import { logSectionCompleted, logMiniSectionCompleted } from '../utils/activityLogger';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { domain } from '../lib/domain';
 import { getClientId } from '../functions/clientId';
 
@@ -107,7 +107,7 @@ const TestUnifiedActivitiesScreen: React.FC = () => {
       console.log('📤 Sending to Activity API:', `${domain}/api/activity`);
       console.log('📋 Payload:', JSON.stringify(testPayload, null, 2));
       
-      const response = await axios.post(`${domain}/api/activity`, testPayload);
+      const response = await apiClient.post(`/api/activity`, testPayload);
       
       console.log('✅ Activity API response:', response.data);
       

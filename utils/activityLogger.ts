@@ -1,6 +1,6 @@
 import { domain } from "@/lib/domain";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import axios from "axios";
+import apiClient from '@/utils/axiosConfig';
 import { getClientId as getClientIdFromFunction } from "@/functions/clientId";
 
 // Get user data from AsyncStorage
@@ -143,7 +143,7 @@ export const logActivity = async (params: ActivityLogParams) => {
       date: new Date().toISOString(),
     };
 
-    await axios.post(`${domain}/api/activity`, activityPayload);
+    await apiClient.post(`/api/activity`, activityPayload);
   } catch (error: any) {
     console.error("Activity logging failed:", error?.message);
     // Don't throw error - activity logging is not critical

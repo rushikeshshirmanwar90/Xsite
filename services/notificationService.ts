@@ -1,5 +1,5 @@
 import { domain } from '@/lib/domain';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { emailService, WelcomeEmailPayload } from './emailService';
 
 export interface NotificationPayload {
@@ -57,7 +57,7 @@ export class NotificationService {
                 const url = `${domain}/api/notifications/staff-welcome`;
                 console.log('📤 Logging notification: POST URL:', url);
                 
-                const response = await axios.post(url, payload);
+                const response = await apiClient.post(url, payload);
                 
                 console.log('📥 Notification log response status:', response.status);
                 console.log('📥 Notification log response data:', JSON.stringify(response.data, null, 2));
@@ -152,7 +152,7 @@ ${companyName} Team`;
             
             // Log notification (you can extend this to send actual emails/push notifications)
             const url = `${domain}/api/notifications/material-activity`;
-            const response = await axios.post(url, notificationPayload);
+            const response = await apiClient.post(url, notificationPayload);
             
             if (response.data.success) {
                 console.log('✅ Material added notification sent successfully');
@@ -200,7 +200,7 @@ ${companyName} Team`;
             
             // Log notification
             const url = `${domain}/api/notifications/material-activity`;
-            const response = await axios.post(url, notificationPayload);
+            const response = await apiClient.post(url, notificationPayload);
             
             if (response.data.success) {
                 console.log('✅ Material used notification sent successfully');

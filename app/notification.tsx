@@ -2,7 +2,7 @@ import { getClientId } from '@/functions/clientId';
 import { domain } from '@/lib/domain';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
@@ -73,14 +73,14 @@ interface MaterialActivity {
 }
 
 type TabType = 'all' | 'project' | 'material' | 'labor';
-type MaterialSubTab = 'imported' | 'used' | 'transferred';
+type MaterialSubTab = 'all' | 'imported' | 'used' | 'transferred';
 
 const NotificationPage: React.FC = () => {
     console.log('🏗️ NotificationPage component rendering/re-rendering');
 
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<TabType>('all');
-    const [materialSubTab, setMaterialSubTab] = useState<MaterialSubTab>('imported');
+    const [materialSubTab, setMaterialSubTab] = useState<MaterialSubTab>('all');
     const [activitiesRaw, setActivitiesRaw] = useState<Activity[]>(() => {
         console.log('🎬 Initializing activities state to empty array');
         return [];
@@ -265,7 +265,7 @@ const NotificationPage: React.FC = () => {
 
             // Fetch both activities in parallel with enhanced error handling
             const [activityRes, materialActivityRes] = await Promise.all([
-                axios.get(`${domain}/api/activity?${activityParams.toString()}`)
+                apiClient.get(`/api/activity?${activityParams.toString()}`)
                     .catch((err) => {
                         console.error('❌ Activity API Error Details:');
                         console.error('   - URL:', `${domain}/api/activity?${activityParams.toString()}`);
@@ -283,7 +283,7 @@ const NotificationPage: React.FC = () => {
                             } 
                         };
                     }),
-                axios.get(`${domain}/api/materialActivity?${materialParams.toString()}`)
+                apiClient.get(`/api/materialActivity?${materialParams.toString()}`)
                     .catch((err) => {
                         console.error('❌ Material Activity API Error Details:');
                         console.error('   - URL:', `${domain}/api/materialActivity?${materialParams.toString()}`);
@@ -1181,6 +1181,15 @@ const NotificationPage: React.FC = () => {
         } else if (activeTab === 'material') {
             // Filter materials based on sub-tab (ensure it's an array)
             if (Array.isArray(materialActivities)) {
+                // If 'all' sub-tab is selected, show all material activities
+                if (materialSubTab === 'all') {
+                    return materialActivities.map(m => ({
+                        type: 'material' as const,
+                        data: m,
+                        timestamp: m.date || m.createdAt || new Date().toISOString()
+                    }));
+                }
+                // Otherwise filter by specific activity type
                 return materialActivities
                     .filter(m => m.activity === materialSubTab)
                     .map(m => ({
@@ -1236,10 +1245,18 @@ const NotificationPage: React.FC = () => {
                     );
                 } else if (activeTab === 'material') {
                     // Only show material activities that match the sub-tab
-                    filteredGroupActivities = group.activities.filter(item => 
-                        item.type === 'material' && 
-                        (item.data as MaterialActivity).activity === materialSubTab
-                    );
+                    if (materialSubTab === 'all') {
+                        // Show all material activities
+                        filteredGroupActivities = group.activities.filter(item => 
+                            item.type === 'material'
+                        );
+                    } else {
+                        // Filter by specific activity type
+                        filteredGroupActivities = group.activities.filter(item => 
+                            item.type === 'material' && 
+                            (item.data as MaterialActivity).activity === materialSubTab
+                        );
+                    }
                 } else {
                     // 'all' tab - show everything
                     filteredGroupActivities = group.activities;
@@ -1471,7 +1488,26 @@ const NotificationPage: React.FC = () => {
 
             {/* Material Sub-Tabs - Only show when Materials tab is active */}
             {activeTab === 'material' && (
-                <View style={styles.subTabsContainer}>
+                <ScrollView 
+                    horizontal 
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.subTabsContainer}
+                    contentContainerStyle={styles.subTabsContentContainer}
+                >
+                    <TouchableOpacity
+                        style={[styles.subTab, materialSubTab === 'all' && styles.subTabActive]}
+                        onPress={() => setMaterialSubTab('all')}
+                    >
+                        <Ionicons
+                            name="apps-outline"
+                            size={16}
+                            color={materialSubTab === 'all' ? '#8B5CF6' : '#64748B'}
+                        />
+                        <Text style={[styles.subTabText, materialSubTab === 'all' && styles.subTabTextActive]}>
+                            All
+                        </Text>
+                    </TouchableOpacity>
+
                     <TouchableOpacity
                         style={[styles.subTab, materialSubTab === 'imported' && styles.subTabActive]}
                         onPress={() => setMaterialSubTab('imported')}
@@ -1513,7 +1549,7 @@ const NotificationPage: React.FC = () => {
                             Transferred
                         </Text>
                     </TouchableOpacity>
-                </View>
+                </ScrollView>
             )}
 
             {/* Content */}
@@ -1912,24 +1948,29 @@ const styles = StyleSheet.create({
         borderTopRightRadius: 3,
     },
     subTabsContainer: {
-        flexDirection: 'row',
         backgroundColor: '#F8FAFC',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        gap: 12,
         borderBottomWidth: 1,
         borderBottomColor: '#E2E8F0',
+        maxHeight: 56,
+    },
+    subTabsContentContainer: {
+        flexDirection: 'row',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        gap: 10,
+        alignItems: 'center',
     },
     subTab: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
+        paddingHorizontal: 14,
+        paddingVertical: 6,
         borderRadius: 8,
         gap: 6,
         backgroundColor: '#FFFFFF',
         borderWidth: 1,
         borderColor: '#E2E8F0',
+        height: 36,
     },
     subTabActive: {
         backgroundColor: '#FFFFFF',

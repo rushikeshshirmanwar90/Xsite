@@ -1,5 +1,4 @@
-import axios from "axios";
-import apiClient from "@/utils/axiosConfig";
+import apiClient from '@/utils/axiosConfig';
 import { domain } from "../lib/domain";
 
 // Type definitions for API responses
@@ -66,7 +65,7 @@ export const getUser = async (email: string, userType: string): Promise<UserData
 
 export const confirmMail = async (email: string): Promise<{ verified: boolean; isUser: boolean; userType: string }> => {
   try {
-    const res = await axios.post<FindUserResponse>(`${domain}/api/findUser`, {
+    const res = await apiClient.post<FindUserResponse>(`/api/findUser`, {
       email: email,
     });
 
@@ -102,7 +101,7 @@ export const sendOtp = async (email: string, OTP: number): Promise<boolean> => {
     console.log("   OTP:", OTP);
     console.log("   URL:", `${domain}/api/otp`);
 
-    const res = await axios.post<ApiResponse>(`${domain}/api/otp`, {
+    const res = await apiClient.post<ApiResponse>(`/api/otp`, {
       email: email,
       OTP: OTP,
     });
@@ -131,7 +130,7 @@ export const addPassword = async (
     console.log('👤 User Type:', userType);
     console.log('🔑 Password length:', password.length);
 
-    const res = await axios.post<ApiResponse>(`${domain}/api/password`, {
+    const res = await apiClient.post<ApiResponse>(`/api/password`, {
       email: email,
       password: password,
       userType: userType,
@@ -173,7 +172,7 @@ export const login = async (email: string, password: string): Promise<{ success:
     console.log('  - Email:', email);
     console.log('  - URL:', `${domain}/api/login`);
     
-    const res = await axios.post<ApiResponse>(`${domain}/api/login`, {
+    const res = await apiClient.post<ApiResponse>(`/api/login`, {
       email,
       password,
     });
@@ -218,7 +217,7 @@ export const login = async (email: string, password: string): Promise<{ success:
 
 export const findUserType = async (email: string): Promise<{ success: boolean; userType: string }> => {
   try {
-    const res = await axios.post<FindUserResponse>(`${domain}/api/findUser`, {
+    const res = await apiClient.post<FindUserResponse>(`/api/findUser`, {
       email: email,
     });
 
@@ -256,7 +255,7 @@ export const forgetPassword = async (email: string, userType: string): Promise<{
     console.log("UserType:", userType);
     console.log("========================================\n");
 
-    const res = await axios.post<ApiResponse>(`${domain}/api/forget-password`, payload);
+    const res = await apiClient.post<ApiResponse>(`/api/forget-password`, payload);
 
     console.log("Forget Password Response Status:", res.status);
     console.log(

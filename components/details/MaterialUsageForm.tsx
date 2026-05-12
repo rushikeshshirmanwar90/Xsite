@@ -14,7 +14,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { getClientId } from '@/functions/clientId';
 import { domain } from '@/lib/domain';
 
@@ -134,7 +134,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                 const apiUrl = `${domain}/api/material?${params.toString()}`;
                 console.log(`🌐 Fetching page ${currentPage}: ${apiUrl}`);
 
-                const response = await axios.get(apiUrl, {
+                const response = await apiClient.get(apiUrl, {
                     timeout: 15000, // 15 second timeout
                 });
 

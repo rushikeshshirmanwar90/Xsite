@@ -160,7 +160,7 @@ export const deleteSection = async (sectionId: string, sectionData?: { name?: st
 // Mini-section management functions with notifications
 export const addMiniSection = async (data: any, notificationCallback?: (data: any) => Promise<boolean>) => {
     try {
-        const res = await axios.post(`${domain}/api/mini-section`, data);
+        const res = await apiClient.post(`/api/mini-section`, data);
 
         if (res && res.data) {
             // 🔔 Send mini-section creation notification using callback
@@ -205,7 +205,7 @@ export const addMiniSection = async (data: any, notificationCallback?: (data: an
 
 export const updateMiniSection = async (miniSectionId: string, data: any, notificationCallback?: (data: any) => Promise<boolean>) => {
     try {
-        const res = await axios.put(`${domain}/api/mini-section?id=${miniSectionId}`, data);
+        const res = await apiClient.put(`/api/mini-section?id=${miniSectionId}`, data);
 
         if (res && res.data) {
             // 🔔 Send mini-section update notification using callback
@@ -250,7 +250,7 @@ export const updateMiniSection = async (miniSectionId: string, data: any, notifi
 
 export const deleteMiniSection = async (miniSectionId: string, miniSectionData?: { name?: string; sectionName?: string; projectId?: string; projectName?: string }, notificationCallback?: (data: any) => Promise<boolean>) => {
     try {
-        const res = await axios.delete(`${domain}/api/mini-section?id=${miniSectionId}`);
+        const res = await apiClient.delete(`/api/mini-section?id=${miniSectionId}`);
 
         if (res && res.data) {
             // 🔔 Send mini-section deletion notification using callback

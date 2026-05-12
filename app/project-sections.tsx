@@ -13,7 +13,7 @@
 import { domain } from '@/lib/domain';
 import { ProjectSection } from '@/types/project';
 import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -163,11 +163,11 @@ const ProjectSections = () => {
 
       // Use the correct API endpoint based on section type
       if (newSectionType === 'building') {
-        res = await axios.post(`${domain}/api/building`, payload);
+        res = await apiClient.post(`/api/building`, payload);
       } else if (newSectionType === 'rowhouse') {
-        res = await axios.post(`${domain}/api/rowHouse`, payload);
+        res = await apiClient.post(`/api/rowHouse`, payload);
       } else {
-        res = await axios.post(`${domain}/api/otherSection`, payload);
+        res = await apiClient.post(`/api/otherSection`, payload);
       }
 
       console.log('Section API response:', JSON.stringify(res?.data, null, 2));
@@ -248,7 +248,7 @@ const ProjectSections = () => {
         console.log(`📡 Checking completion for section: ${section.name} (${sectionId})`);
         
         const completionUrl = `${domain}/api/completion?updateType=project-section&id=${sectionId}&projectId=${id}`;
-        const response = await axios.get(completionUrl, {
+        const response = await apiClient.get(completionUrl, {
           timeout: 10000
         });
 
@@ -304,7 +304,7 @@ const ProjectSections = () => {
       
       console.log('Payload:', JSON.stringify(payload, null, 2));
       
-      const response = await axios.patch(`${domain}/api/completion`, payload, {
+      const response = await apiClient.patch(`/api/completion`, payload, {
         headers: {
           'Content-Type': 'application/json'
         },
@@ -383,7 +383,7 @@ const ProjectSections = () => {
       const projectUrl = `${domain}/api/completion?updateType=project&id=${id}`;
       console.log('🔍 [DEBUG] Fetching from:', projectUrl);
       
-      const response = await axios.get(projectUrl, {
+      const response = await apiClient.get(projectUrl, {
         timeout: 10000
       });
       

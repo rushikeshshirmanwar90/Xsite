@@ -7,7 +7,7 @@ import { domain } from '@/lib/domain';
 import { Project } from '@/types/project';
 import { formatCurrency, transformProjectDataToPieSlices } from '@/utils/analytics';
 import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -252,7 +252,7 @@ const AnalyticsDashboard: React.FC = () => {
         projectsArray.map(async (project) => {
           try {
             if (project._id) {
-              const response = await axios.get(`${domain}/api/completion?updateType=project&id=${project._id}`);
+              const response = await apiClient.get(`/api/completion?updateType=project&id=${project._id}`);
               const responseData = response.data as any;
               if (responseData.success && responseData.data) {
                 const completionStatus = Boolean(responseData.data.isCompleted);

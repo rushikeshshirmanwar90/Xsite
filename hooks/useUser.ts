@@ -1,6 +1,6 @@
 import { domain } from '@/lib/domain';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { useEffect, useState } from 'react';
 
 // User type definitions
@@ -128,7 +128,7 @@ export const useUser = (): UseUserReturn => {
       setLoading(true);
       setError(null);
 
-      const response = await axios.get(
+      const response = await apiClient.get(
         `${domain}/api/${userType}?email=${user.email}`
       );
 
@@ -160,7 +160,7 @@ export const useUser = (): UseUserReturn => {
       setLoading(true);
       setError(null);
 
-      const response = await axios.put(
+      const response = await apiClient.put(
         `${domain}/api/${userType}?id=${user._id}`,
         updates
       );

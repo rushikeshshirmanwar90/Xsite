@@ -6,7 +6,7 @@ import { domain } from '@/lib/domain';
 import { Project as BaseProject, ProjectSection } from '@/types/project';
 import { StaffMembers } from '@/types/staff';
 import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
@@ -127,7 +127,7 @@ const ProjectScreen: React.FC = () => {
             setClientId(clientId);
 
             console.log('📝 Fetching projects for clientId:', clientId);
-            const res = await axios.get(`${domain}/api/project?clientId=${clientId}`);
+            const res = await apiClient.get(`/api/project?clientId=${clientId}`);
 
             console.log('📦 API Response:', JSON.stringify(res.data, null, 2));
 
@@ -175,7 +175,7 @@ const ProjectScreen: React.FC = () => {
     useEffect(() => {
         const getStaffData = async () => {
             try {
-                const res = await axios.get(`${domain}/api/staff?clientId=${clientId}`);
+                const res = await apiClient.get(`/api/staff?clientId=${clientId}`);
                 const data = (res.data as any)?.data || [];
                 const filterData = data.map((item: any) => ({
                     fullName: `${item.firstName} ${item.lastName}`,
@@ -218,7 +218,7 @@ const ProjectScreen: React.FC = () => {
 
             console.log('📝 Creating project with payload:', payload);
 
-            const res = await axios.post(`${domain}/api/project`, payload);
+            const res = await apiClient.post(`/api/project`, payload);
 
             console.log('✅ Project created, response:', res.data);
             console.log('✅ Response status:', res.status);
@@ -324,7 +324,7 @@ const ProjectScreen: React.FC = () => {
 
                             // DIRECT AXIOS CALL TO ACTIVITY API
                             console.log('⏳ Making axios.post call...');
-                            const activityResponse = await axios.post(
+                            const activityResponse = await apiClient.post(
                                 `${domain}/api/activity`,
                                 activityPayload
                             );
@@ -358,7 +358,7 @@ const ProjectScreen: React.FC = () => {
 
                                         console.log(`\n📝 Logging staff: ${staff.fullName}`);
 
-                                        const staffResponse = await axios.post(
+                                        const staffResponse = await apiClient.post(
                                             `${domain}/api/activity`,
                                             staffPayload
                                         );
@@ -415,7 +415,7 @@ const ProjectScreen: React.FC = () => {
 
                         console.log('📤 Building payload:', buildingPayload);
 
-                        const buildingResponse = await axios.post(`${domain}/api/building`, buildingPayload);
+                        const buildingResponse = await apiClient.post(`/api/building`, buildingPayload);
                         
                         console.log('✅ Building created successfully:', buildingResponse.data);
 
@@ -444,7 +444,7 @@ const ProjectScreen: React.FC = () => {
                                         },
                                     };
 
-                                    await axios.post(`${domain}/api/activity`, buildingActivityPayload);
+                                    await apiClient.post(`/api/activity`, buildingActivityPayload);
                                     console.log('✅ Building creation activity logged');
                                 } catch (buildingActivityError: any) {
                                     console.error('❌ Error logging building creation activity:', buildingActivityError);
@@ -706,7 +706,7 @@ const ProjectScreen: React.FC = () => {
             console.log('📝 Updating project:', editingProject._id, updatePayload);
             console.log('📊 Detected changes:', changedData);
 
-            const response = await axios.put(
+            const response = await apiClient.put(
                 `${domain}/api/project/${editingProject._id}`,
                 updatePayload
             );
@@ -785,7 +785,7 @@ const ProjectScreen: React.FC = () => {
                                 },
                             };
 
-                            const response = await axios.post(`${domain}/api/activity`, staffPayload);
+                            const response = await apiClient.post(`/api/activity`, staffPayload);
                             console.log(`✅ Staff assignment logged successfully: ${staff.fullName}`, response.status);
                         } catch (error: any) {
                             console.error(`❌ Error logging staff assignment for ${staff.fullName}:`, error);
@@ -816,7 +816,7 @@ const ProjectScreen: React.FC = () => {
                                 },
                             };
 
-                            const response = await axios.post(`${domain}/api/activity`, staffPayload);
+                            const response = await apiClient.post(`/api/activity`, staffPayload);
                             console.log(`✅ Staff removal logged successfully: ${staff.fullName}`, response.status);
                         } catch (error: any) {
                             console.error(`❌ Error logging staff removal for ${staff.fullName}:`, error);
@@ -917,7 +917,7 @@ const ProjectScreen: React.FC = () => {
             // Start delete loading animation
             startDeleteLoadingAnimation(project._id!);
 
-            const response = await axios.delete(`${domain}/api/project/${project._id}`);
+            const response = await apiClient.delete(`/api/project/${project._id}`);
 
             console.log('✅ Project deleted:', response.data);
 

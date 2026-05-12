@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { domain } from '@/lib/domain';
 import { getClientId } from '@/functions/clientId';
 import { toast } from 'sonner-native';
@@ -272,7 +272,7 @@ const EquipmentManagement = () => {
                 return;
             }
 
-            const response = await axios.get<ApiResponse<Equipment[]>>(`${domain}/api/equipment`, {
+            const response = await apiClient.get<ApiResponse<Equipment[]>>(`/api/equipment`, {
                 params: {
                     projectId,
                     projectSectionId: sectionId,
@@ -317,7 +317,7 @@ const EquipmentManagement = () => {
     // Load equipment categories
     const loadCategories = async () => {
         try {
-            const response = await axios.get<ApiResponse<{[key: string]: EquipmentCategory}>>(`${domain}/api/equipment/categories`);
+            const response = await apiClient.get<ApiResponse<{[key: string]: EquipmentCategory}>>(`/api/equipment/categories`);
             if (response.data && response.data.success) {
                 setCategories(response.data.data);
             }
@@ -433,16 +433,10 @@ const EquipmentManagement = () => {
 
             console.log('Sending equipment data to bulk API:', requestData);
 
-            // Call the bulk equipment API
-            const response = await fetch(`${domain}/api/equipment/bulk`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(requestData)
-            });
+            // Call the bulk equipment API using apiClient (includes Bearer token)
+            const response = await apiClient.post(`/api/equipment/bulk`, requestData);
 
-            const result = await response.json();
+            const result = response.data;
             console.log('Equipment API response:', result);
 
             if (result.success) {
@@ -594,7 +588,7 @@ const EquipmentManagement = () => {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            const response = await axios.delete<ApiResponse<Equipment>>(`${domain}/api/equipment?id=${equipmentId}`);
+                            const response = await apiClient.delete<ApiResponse<Equipment>>(`/api/equipment?id=${equipmentId}`);
                             if (response.data.success) {
                                 toast.success('Equipment deleted successfully');
                                 loadEquipment();

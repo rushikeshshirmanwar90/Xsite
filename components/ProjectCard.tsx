@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, Alert, Modal } from 'react-native';
 import { domain } from '@/lib/domain';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { toast } from 'sonner-native';
 
 interface ProjectCardProps {
@@ -53,7 +53,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userT
         }
         
         try {
-            const response = await axios.get(`${domain}/api/completion?updateType=project&id=${project._id}`);
+            const response = await apiClient.get(`/api/completion?updateType=project&id=${project._id}`);
             const responseData = response.data as any;
             if (responseData.success && responseData.data) {
                 const isCompleted = Boolean(responseData.data.isCompleted);
@@ -78,7 +78,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userT
             console.log('Project ID:', project._id);
             console.log('Current status:', projectCompleted);
             
-            const response = await axios.patch(`${domain}/api/completion`, {
+            const response = await apiClient.patch(`/api/completion`, {
                 updateType: 'project',
                 id: project._id,
                 isCompleted: !projectCompleted

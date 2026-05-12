@@ -12,7 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { X, UserPlus, Hash } from 'lucide-react-native';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { domain } from '@/lib/domain';
 import { toast } from 'sonner-native';
 
@@ -52,7 +52,7 @@ const ManualStaffAssignModal: React.FC<ManualStaffAssignModalProps> = ({
       console.log('🔍 Fetching staff details for ID:', staffId);
       
       // Fetch staff details by ID (without clientId filter for lookup)
-      const response = await axios.get(
+      const response = await apiClient.get(
         `${domain}/api/(users)/staff?id=${staffId.trim()}`
       );
 
@@ -89,7 +89,7 @@ const ManualStaffAssignModal: React.FC<ManualStaffAssignModalProps> = ({
       console.log('Client ID:', clientId);
 
       // Note: (users) is a route group in Next.js and doesn't appear in the URL
-      const response = await axios.post(
+      const response = await apiClient.post(
         `${domain}/api/users/staff/assign-client`,
         {
           staffId: staffDetails._id,

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { getClientId } from '@/functions/clientId';
 import { domain } from '@/lib/domain';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 
 const StaffDebugger = () => {
   const [debugResults, setDebugResults] = useState<string>('');
@@ -35,7 +35,7 @@ const StaffDebugger = () => {
         const newStaffUrl = `${domain}/api/clients/staff?clientId=${clientId}`;
         addLog(`📤 URL: ${newStaffUrl}`);
         
-        const newStaffResponse = await axios.get(newStaffUrl);
+        const newStaffResponse = await apiClient.get(newStaffUrl);
         addLog(`✅ New Staff API Status: ${newStaffResponse.status}`);
         addLog(`✅ New Staff API Success: ${newStaffResponse.data.success}`);
         addLog(`✅ New Staff API Message: ${newStaffResponse.data.message}`);
@@ -63,7 +63,7 @@ const StaffDebugger = () => {
         const oldStaffUrl = `${domain}/api/users/staff?clientId=${clientId}`;
         addLog(`📤 URL: ${oldStaffUrl}`);
         
-        const oldStaffResponse = await axios.get(oldStaffUrl);
+        const oldStaffResponse = await apiClient.get(oldStaffUrl);
         addLog(`✅ Old Staff API Status: ${oldStaffResponse.status}`);
         addLog(`✅ Old Staff API Success: ${oldStaffResponse.data.success}`);
         addLog(`✅ Old Staff API Message: ${oldStaffResponse.data.message}`);
@@ -91,7 +91,7 @@ const StaffDebugger = () => {
         const adminUrl = `${domain}/api/users/admin?clientId=${clientId}`;
         addLog(`📤 URL: ${adminUrl}`);
         
-        const adminResponse = await axios.get(adminUrl);
+        const adminResponse = await apiClient.get(adminUrl);
         addLog(`✅ Admin API Status: ${adminResponse.status}`);
         addLog(`✅ Admin API Success: ${adminResponse.data.success}`);
         addLog(`✅ Admin API Message: ${adminResponse.data.message}`);
@@ -119,7 +119,7 @@ const StaffDebugger = () => {
         const clientUrl = `${domain}/api/clients?id=${clientId}`;
         addLog(`📤 URL: ${clientUrl}`);
         
-        const clientResponse = await axios.get(clientUrl);
+        const clientResponse = await apiClient.get(clientUrl);
         addLog(`✅ Client API Status: ${clientResponse.status}`);
         addLog(`✅ Client API Success: ${clientResponse.data.success}`);
         addLog(`✅ Client API Message: ${clientResponse.data.message}`);

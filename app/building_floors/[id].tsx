@@ -1,6 +1,6 @@
 import { domain } from '@/lib/domain';
 import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -123,7 +123,7 @@ const BuildingFloorsPage = () => {
             }
 
             console.log('🔍 Fetching floors for building:', buildingId);
-            const response = await axios.get(`${domain}/api/floors?buildingId=${buildingId}`);
+            const response = await apiClient.get(`/api/floors?buildingId=${buildingId}`);
             const responseData = response.data as any;
             
             console.log('📦 Floors API Response:', JSON.stringify(responseData, null, 2));
@@ -197,7 +197,7 @@ const BuildingFloorsPage = () => {
                 floorName: newFloor.floorName.trim()
             };
 
-            const response = await axios.post(`${domain}/api/floors`, payload);
+            const response = await apiClient.post(`/api/floors`, payload);
 
             toast.dismiss(loadingToast);
 
@@ -243,7 +243,7 @@ const BuildingFloorsPage = () => {
                         try {
                             loadingToast = toast.loading('Deleting floor...');
 
-                            await axios.delete(`${domain}/api/floors?id=${floor._id}`);
+                            await apiClient.delete(`/api/floors?id=${floor._id}`);
 
                             toast.dismiss(loadingToast);
                             toast.success('Floor deleted successfully!');
@@ -306,7 +306,7 @@ const BuildingFloorsPage = () => {
                 description: bulkUnit.description
             };
 
-            const response = await axios.post(`${domain}/api/building/units`, payload);
+            const response = await apiClient.post(`/api/building/units`, payload);
 
             toast.dismiss(loadingToast);
 
@@ -375,7 +375,7 @@ const BuildingFloorsPage = () => {
                 } : null
             };
 
-            const response = await axios.post(`${domain}/api/building/units`, payload);
+            const response = await apiClient.post(`/api/building/units`, payload);
 
             toast.dismiss(loadingToast);
 
@@ -429,7 +429,7 @@ const BuildingFloorsPage = () => {
                         try {
                             loadingToast = toast.loading('Deleting unit...');
 
-                            await axios.delete(`${domain}/api/building/units?buildingId=${buildingId}&floorId=${selectedFloor._id}&unitId=${unit._id}`);
+                            await apiClient.delete(`/api/building/units?buildingId=${buildingId}&floorId=${selectedFloor._id}&unitId=${unit._id}`);
 
                             toast.dismiss(loadingToast);
                             toast.success('Unit deleted successfully!');
@@ -511,7 +511,7 @@ const BuildingFloorsPage = () => {
                 } : null
             };
 
-            const response = await axios.put(
+            const response = await apiClient.put(
                 `${domain}/api/building/units?buildingId=${buildingId}&floorId=${selectedFloor._id}&unitId=${editingUnit._id}`,
                 payload
             );

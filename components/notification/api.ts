@@ -1,10 +1,10 @@
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { API_CONFIG, PROJECT_NAMES, SECTION_NAMES } from './config';
 import { MaterialRequest, MaterialRequestResponse, Notification } from './types';
 
 export const fetchMaterialRequests = async (clientId: string): Promise<MaterialRequest[]> => {
     try {
-        const response = await axios.get(`${API_CONFIG.baseUrl}/api/request-material?clientId=${clientId}`, {
+        const response = await apiClient.get(`${API_CONFIG.baseUrl}/api/request-material?clientId=${clientId}`, {
             headers: API_CONFIG.headers,
             timeout: API_CONFIG.timeout,
         });
@@ -29,7 +29,7 @@ export const fetchMaterialRequests = async (clientId: string): Promise<MaterialR
 
 export const approveMaterialRequest = async (requestId: string): Promise<boolean> => {
     try {
-        const response = await axios.post(`${API_CONFIG.baseUrl}/api/sanction`,
+        const response = await apiClient.post(`${API_CONFIG.baseUrl}/api/sanction`,
             {
                 isApproved: true,
                 id: requestId
@@ -54,7 +54,7 @@ export const approveMaterialRequest = async (requestId: string): Promise<boolean
 
 export const rejectMaterialRequest = async (requestId: string): Promise<boolean> => {
     try {
-        const response = await axios.post(`${API_CONFIG.baseUrl}/api/sanction`,
+        const response = await apiClient.post(`${API_CONFIG.baseUrl}/api/sanction`,
             {
                 isApproved: false,
                 id: requestId
@@ -144,7 +144,7 @@ export const getProjectName = (projectId: string): string => {
 // Generic function to handle both approve and reject
 export const sanctionMaterialRequest = async (requestId: string, isApproved: boolean): Promise<boolean> => {
     try {
-        const response = await axios.post(`${API_CONFIG.baseUrl}/api/sanction`,
+        const response = await apiClient.post(`${API_CONFIG.baseUrl}/api/sanction`,
             {
                 isApproved: isApproved,
                 id: requestId
@@ -170,7 +170,7 @@ export const sanctionMaterialRequest = async (requestId: string, isApproved: boo
 // Function to mark material as imported
 export const markMaterialAsImported = async (payload: any): Promise<boolean> => {
     try {
-        const response = await axios.post(`${API_CONFIG.baseUrl}/api/import`, payload
+        const response = await apiClient.post(`${API_CONFIG.baseUrl}/api/import`, payload
         );
 
         if (!response || response.status < 200 || response.status >= 300) {
@@ -231,7 +231,7 @@ export const importMaterialsWithCosts = async (requestId: string, materials: IMa
         });
         console.log('=====================================');
 
-        const response = await axios.post(`${API_CONFIG.baseUrl}/api/import-material`,
+        const response = await apiClient.post(`${API_CONFIG.baseUrl}/api/import-material`,
             payload,
             {
                 headers: API_CONFIG.headers,

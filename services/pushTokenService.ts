@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { domain } from '@/lib/domain';
 import NotificationPermissions from './notificationPermissions';
 
@@ -307,7 +307,7 @@ class PushTokenService {
       });
 
       // SECURITY FIX: Add authentication headers
-      const response = await axios.post(`${domain}/api/push-token`, payload, {
+      const response = await apiClient.post(`/api/push-token`, payload, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${await this.getAuthToken()}`,
@@ -407,7 +407,7 @@ class PushTokenService {
       }
 
       // Deactivate token on backend
-      const response = await axios.delete(`${domain}/api/push-token?userId=${userData._id}`, {
+      const response = await apiClient.delete(`/api/push-token?userId=${userData._id}`, {
         headers: {
           'Authorization': `Bearer ${await this.getAuthToken()}`,
           'Content-Type': 'application/json',

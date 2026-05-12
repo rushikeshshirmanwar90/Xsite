@@ -4,7 +4,7 @@ import { domain } from '@/lib/domain';
 import { generateOTP } from '@/lib/functions';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -92,7 +92,7 @@ export default function RegisterScreen() {
             setGeneratedOTP(OTP);
             
             // Send OTP via API
-            const response = await axios.post<OTPResponse>(`${domain}/api/otp`, {
+            const response = await apiClient.post<OTPResponse>(`/api/otp`, {
                 email: email.trim().toLowerCase(),
                 OTP: OTP,
             });
@@ -230,7 +230,7 @@ export default function RegisterScreen() {
 
             console.log('📦 Complete payload:', { ...payload, password: `[${payload.password.length} chars]` });
 
-            const response = await axios.post<StaffRegistrationResponse>(`${domain}/api/staff`, payload);
+            const response = await apiClient.post<StaffRegistrationResponse>(`/api/staff`, payload);
 
             console.log('✅ Registration response:', response.data);
 
@@ -258,8 +258,17 @@ export default function RegisterScreen() {
 
                 console.log('💾 Storing user data:', userData);
 
-                // Clear any existing data and store new user data
-                await AsyncStorage.clear();
+                // Clear any existing auth data and store new user data
+                try {
+                    // Remove specific keys instead of clearing everything
+                    await AsyncStorage.multiRemove(['user', 'userType', 'token', 'refreshToken']);
+                    console.log('✅ Cleared existing auth data');
+                } catch (clearError) {
+                    console.warn('⚠️ Error clearing storage (non-critical):', clearError);
+                    // Continue anyway - this is not critical
+                }
+                
+                // Store new user data
                 await AsyncStorage.setItem('user', JSON.stringify(userData));
                 await AsyncStorage.setItem('userType', 'staff');
 

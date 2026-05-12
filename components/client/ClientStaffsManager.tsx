@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { domain } from '@/lib/domain';
 
 interface StaffMember {
@@ -42,7 +42,7 @@ const ClientStaffsManager: React.FC<ClientStaffsManagerProps> = ({
       }
 
       console.log('🔍 Fetching staffs for client:', clientId);
-      const response = await axios.get(`${domain}/api/clients/staffs?clientId=${clientId}`);
+      const response = await apiClient.get(`/api/clients/staffs?clientId=${clientId}`);
       const responseData = response.data as any;
       
       if (responseData.success) {
@@ -80,7 +80,7 @@ const ClientStaffsManager: React.FC<ClientStaffsManagerProps> = ({
               setRemovingStaffId(staffId);
               console.log('🗑️ Removing staff:', staffId, 'from client:', clientId);
 
-              const response = await axios.delete(
+              const response = await apiClient.delete(
                 `${domain}/api/clients/staffs?clientId=${clientId}&staffId=${staffId}`
               );
               const responseData = response.data as any;

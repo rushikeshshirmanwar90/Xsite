@@ -216,7 +216,14 @@ export default function LoginScreen() {
 
                 // ✅ Clear any existing data before storing new data
                 console.log('🧹 Clearing existing data before login...');
-                await AsyncStorage.clear();
+                try {
+                    // Remove specific keys instead of clearing everything
+                    await AsyncStorage.multiRemove(['user', 'userType', 'token', 'refreshToken', 'loginTimestamp']);
+                    console.log('✅ Cleared existing auth data');
+                } catch (clearError) {
+                    console.warn('⚠️ Error clearing storage (non-critical):', clearError);
+                    // Continue anyway - this is not critical
+                }
                 
                 // PRODUCTION FIX: Add login timestamp for validation
                 await AsyncStorage.setItem('loginTimestamp', Date.now().toString());
@@ -339,7 +346,14 @@ export default function LoginScreen() {
 
                 // ✅ Clear any existing data before storing new data
                 console.log('🧹 Clearing existing data before login...');
-                await AsyncStorage.clear();
+                try {
+                    // Remove specific keys instead of clearing everything
+                    await AsyncStorage.multiRemove(['user', 'userType', 'token', 'refreshToken', 'loginTimestamp']);
+                    console.log('✅ Cleared existing auth data');
+                } catch (clearError) {
+                    console.warn('⚠️ Error clearing storage (non-critical):', clearError);
+                    // Continue anyway - this is not critical
+                }
                 
                 // PRODUCTION FIX: Add login timestamp for validation
                 await AsyncStorage.setItem('loginTimestamp', Date.now().toString());

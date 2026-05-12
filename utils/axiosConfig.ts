@@ -16,7 +16,7 @@ const apiClient = axios.create({
 
 // Request interceptor to add Bearer token to all requests
 apiClient.interceptors.request.use(
-  (config) => {
+  (config: any) => {
     // Always use the fixed Bearer token
     if (!config.headers) {
       config.headers = {};
@@ -33,7 +33,7 @@ apiClient.interceptors.request.use(
     
     return config;
   },
-  (error) => {
+  (error: any) => {
     console.error('❌ Request interceptor error:', error);
     return Promise.reject(error);
   }
@@ -41,11 +41,11 @@ apiClient.interceptors.request.use(
 
 // Response interceptor for error handling
 apiClient.interceptors.response.use(
-  (response) => {
+  (response: any) => {
     console.log(`✅ API Response: ${response.status} ${response.config.url}`);
     return response;
   },
-  (error) => {
+  (error: any) => {
     console.error(`❌ API Error: ${error.response?.status} ${error.config?.url}`, error.response?.data);
     
     // Handle 401 Unauthorized errors

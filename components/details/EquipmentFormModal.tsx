@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { domain } from '@/lib/domain';
+import apiClient from '@/utils/axiosConfig';
 
 interface EquipmentFormModalProps {
   visible: boolean;
@@ -45,6 +46,17 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
   // Get screen dimensions and calculate safe bottom padding
   const safeBottomPadding = Platform.OS === 'ios' ? 34 : 20;
   
+  // Helper function to convert rental period to plural noun form
+  const getPeriodNoun = (period: string): string => {
+    const periodMap: { [key: string]: string } = {
+      'hourly': 'hours',
+      'daily': 'days',
+      'weekly': 'weeks',
+      'monthly': 'months'
+    };
+    return periodMap[period] || period;
+  };
+  
   const [equipmentTypes, setEquipmentTypes] = useState<EquipmentType[]>([]);
   const [selectedType, setSelectedType] = useState<string>('');
   const [quantity, setQuantity] = useState<string>('');
@@ -71,13 +83,12 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
   const loadEquipmentTypes = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${domain}/api/equipment/types`);
-      const result = await response.json();
+      const response = await apiClient.get('/api/equipment/types');
       
-      if (result.success && result.data) {
-        setEquipmentTypes(result.data);
+      if (response.data.success && response.data.data) {
+        setEquipmentTypes(response.data.data);
       } else {
-        console.error('Failed to load equipment types:', result.message);
+        console.error('Failed to load equipment types:', response.data.message);
       }
     } catch (error) {
       console.error('Error loading equipment types:', error);
@@ -261,7 +272,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
       
       // For rental: Total Cost = Quantity × Duration × Per Unit Cost
       calculatedTotalCost = quantityNum * durationNum * costNum;
-      calculationDetails = `${quantityNum} units × ${durationNum} ${rentalPeriod} × ₹${costNum} = ₹${calculatedTotalCost.toLocaleString()}`;
+      calculationDetails = `${quantityNum} units × ${durationNum} ${getPeriodNoun(rentalPeriod)} × ₹${costNum} = ₹${calculatedTotalCost.toLocaleString()}`;
     } else {
       // For purchase: Total Cost = Quantity × Per Unit Cost
       calculatedTotalCost = quantityNum * costNum;
@@ -417,7 +428,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                               <Ionicons name={entry.costType === 'rental' ? 'time' : 'card'} size={12} color="#3B82F6" />
                               <Text style={styles.compactCostTypeText}>
                                 {entry.costType === 'rental' 
-                                  ? `${entry.rentalDuration} ${entry.rentalPeriod}` 
+                                  ? `${entry.rentalDuration} ${getPeriodNoun(entry.rentalPeriod)}` 
                                   : 'Purchase'
                                 }
                               </Text>
@@ -743,7 +754,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                                   returnKeyType="next"
                                   placeholderTextColor="#94A3B8"
                                 />
-                                <Text style={styles.equipmentUnitLarge}>{rentalPeriod}</Text>
+                                <Text style={styles.equipmentUnitLarge}>{getPeriodNoun(rentalPeriod)}</Text>
                               </View>
                               
                               {costType === 'rental' && rentalDuration && parseInt(rentalDuration) <= 0 && (
@@ -759,7 +770,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                                 <View style={styles.equipmentSuccess}>
                                   <Ionicons name="checkmark-circle" size={16} color="#10B981" />
                                   <Text style={styles.equipmentSuccessText}>
-                                    Duration: {rentalDuration} {rentalPeriod}
+                                    Duration: {rentalDuration} {getPeriodNoun(rentalPeriod)}
                                   </Text>
                                 </View>
                               )}
@@ -859,7 +870,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                                     Quantity: {quantity} units
                                   </Text>
                                   <Text style={styles.costPreviewStep}>
-                                    Duration: {rentalDuration} {rentalPeriod}
+                                    Duration: {rentalDuration} {getPeriodNoun(rentalPeriod)}
                                   </Text>
                                   <Text style={styles.costPreviewStep}>
                                     Cost per unit: ₹{perUnitCost}

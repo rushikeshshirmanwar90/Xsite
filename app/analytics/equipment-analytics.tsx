@@ -70,12 +70,12 @@ const EquipmentAnalytics: React.FC = () => {
       // Try to fetch from API first
       try {
         const { domain } = await import('@/lib/domain');
-        const axios = (await import('axios')).default;
+        const apiClient = (await import('@/utils/axiosConfig')).default;
 
-        const equipmentResponse = await axios.get<{
+        const equipmentResponse = await apiClient.get<{
           success: boolean;
           data: any[];
-        }>(`${domain}/api/equipment`, {
+        }>(`/api/equipment`, {
           params: {
             projectId: projectId,
             projectSectionId: sectionId,

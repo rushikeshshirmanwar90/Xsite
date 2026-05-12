@@ -14,7 +14,7 @@ import { domain } from '@/lib/domain';
 import { Staff } from '@/types/staff';
 import { notificationService } from '@/services/notificationService';
 import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -118,7 +118,7 @@ const StaffManagement: React.FC = () => {
             let staffUrl = `${domain}/api/clients/staff?clientId=${clientId}`;
             console.log('📤 Staff URL:', staffUrl);
             
-            let staffRes = await axios.get(staffUrl);
+            let staffRes = await apiClient.get(staffUrl);
             console.log('📥 Staff Response Status:', staffRes.status);
             console.log('📥 Staff Response Data:', JSON.stringify(staffRes.data, null, 2));
             
@@ -137,7 +137,7 @@ const StaffManagement: React.FC = () => {
                     staffUrl = `${domain}/api/users/staff?clientId=${clientId}`;
                     console.log('📤 Fallback Staff URL:', staffUrl);
                     
-                    staffRes = await axios.get(staffUrl);
+                    staffRes = await apiClient.get(staffUrl);
                     console.log('📥 Fallback Response Status:', staffRes.status);
                     console.log('📥 Fallback Response Data:', JSON.stringify(staffRes.data, null, 2));
                     
@@ -165,7 +165,7 @@ const StaffManagement: React.FC = () => {
                 const adminUrl = `${domain}/api/users/admin?clientId=${clientId}`;
                 console.log('📤 Admin URL:', adminUrl);
                 
-                const adminRes = await axios.get(adminUrl);
+                const adminRes = await apiClient.get(adminUrl);
                 console.log('📥 Admin Response Status:', adminRes.status);
                 console.log('📥 Admin Response Data:', JSON.stringify(adminRes.data, null, 2));
                 
@@ -207,7 +207,7 @@ const StaffManagement: React.FC = () => {
                 const clientUrl = `${domain}/api/clients?id=${clientId}`;
                 console.log('📤 Client URL:', clientUrl);
                 
-                const clientRes = await axios.get(clientUrl);
+                const clientRes = await apiClient.get(clientUrl);
                 console.log('📥 Client Response Status:', clientRes.status);
                 console.log('📥 Client Response Data:', JSON.stringify(clientRes.data, null, 2));
                 

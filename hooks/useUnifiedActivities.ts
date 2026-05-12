@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { domain } from '@/lib/domain';
 import { getClientId } from '@/functions/clientId';
 
@@ -43,8 +43,8 @@ export const useUnifiedActivities = () => {
 
       // Fetch both material activities and completion activities in parallel
       const [materialResponse, completionResponse] = await Promise.allSettled([
-        axios.get(`${domain}/api/(Xsite)/materialActivity?clientId=${clientId}`),
-        axios.get(`${domain}/api/activity?clientId=${clientId}`)
+        apiClient.get(`/api/(Xsite)/materialActivity?clientId=${clientId}`),
+        apiClient.get(`/api/activity?clientId=${clientId}`)
       ]);
 
       const unifiedActivities: UnifiedActivity[] = [];

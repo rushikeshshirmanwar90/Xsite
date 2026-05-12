@@ -1,7 +1,7 @@
 import { domain } from '@/lib/domain';
 import { getClientId } from '@/functions/clientId';
 import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import React, { useState, useEffect } from 'react';
 import {
     Alert,
@@ -69,9 +69,10 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
     userData
 }) => {
     const [startDate, setStartDate] = useState<Date>(() => {
-        // Default to 1 year ago to capture all activities
+        // ✅ FIXED: Start from 5 years ago to capture ALL historical data
+        // This ensures all material activities are included in the report
         const date = new Date();
-        date.setFullYear(date.getFullYear() - 1);
+        date.setFullYear(date.getFullYear() - 5);
         return date;
     });
     
@@ -108,7 +109,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
 
             console.log('📋 Fetching projects for client:', clientId);
             
-            const response = await axios.get<ApiResponse<ProjectsResponse>>(`${domain}/api/client-projects?clientId=${clientId}`);
+            const response = await apiClient.get<ApiResponse<ProjectsResponse>>(`/api/client-projects?clientId=${clientId}`);
             
             if (response.data.success && response.data.data) {
                 const projectsList = response.data.data.projects;
@@ -141,7 +142,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
 
             console.log('📋 Fetching sections for project:', projectId);
             
-            const response = await axios.get<ApiResponse<any>>(`${domain}/api/project?id=${projectId}&clientId=${clientId}`);
+            const response = await apiClient.get<ApiResponse<any>>(`/api/project?id=${projectId}&clientId=${clientId}`);
             
             if (response.data.success && response.data.data) {
                 const project = response.data.data;
@@ -263,7 +264,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
             console.log('🌐 API Request URL:', `${domain}/api/material-activity-report?${params.toString()}`);
 
             // Fetch material activity data
-            const response = await axios.get<ApiResponse<MaterialActivityResponse>>(`${domain}/api/material-activity-report?${params.toString()}`);
+            const response = await apiClient.get<ApiResponse<MaterialActivityResponse>>(`/api/material-activity-report?${params.toString()}`);
             
             console.log('✅ API Response received');
             console.log('  - Success:', response.data.success);
@@ -281,10 +282,23 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
             let laborData: any[] = [];
             
             try {
-                const projectResponse = await axios.get<ApiResponse<any>>(`${domain}/api/project?id=${selectedProjectId}&clientId=${clientId}`);
+                const projectResponse = await apiClient.get<ApiResponse<any>>(`/api/project?id=${selectedProjectId}&clientId=${clientId}`);
                 if (projectResponse.data.success && projectResponse.data.data) {
                     const project = projectResponse.data.data;
                     laborData = project.Labors || [];
+                    
+                    // ✅ Since addedBy contains clientId (not userId), we'll use the current user's name
+                    // This is more reliable than trying to fetch from database
+                    if (laborData.length > 0 && userData) {
+                        laborData = laborData.map((labor: any) => ({
+                            ...labor,
+                            user: {
+                                firstName: userData.firstName || userData.name?.split(' ')[0] || 'Admin',
+                                lastName: userData.lastName || userData.name?.split(' ')[1] || '',
+                                fullName: userData.name || `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || 'Admin'
+                            }
+                        }));
+                    }
                     
                     // Filter labor data by selected sections only if there are multiple sections
                     if (projectSections.length > 1 && selectedSections.length > 0 && selectedSections.length < projectSections.length && laborData.length > 0) {
@@ -294,7 +308,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                         );
                     }
                     
-                    console.log('✅ Labor data fetched:', laborData.length, 'entries');
+                    console.log('✅ Labor data fetched and enriched:', laborData.length, 'entries');
                 } else {
                     console.warn('⚠️ Could not fetch project labor data');
                 }
@@ -308,7 +322,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
             let equipmentData: any[] = [];
             
             try {
-                const equipmentResponse = await axios.get<ApiResponse<any>>(`${domain}/api/equipment?projectId=${selectedProjectId}`);
+                const equipmentResponse = await apiClient.get<ApiResponse<any>>(`/api/equipment?projectId=${selectedProjectId}`);
                 console.log('🔍 Equipment API Response:', equipmentResponse.data);
                 
                 // ✅ FIXED: The API returns data directly in response.data.data (which is an array)
@@ -329,6 +343,27 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                     
                     console.log('✅ Raw equipment data type:', Array.isArray(rawEquipmentData) ? 'array' : typeof rawEquipmentData);
                     console.log('✅ Equipment data fetched:', equipmentData.length, 'entries');
+                    
+                    // ✅ Equipment data is already populated by the API with addedBy
+                    // However, if addedBy contains clientId instead of userId, use current user's name
+                    if (equipmentData.length > 0) {
+                        // Check if first equipment has valid admin data
+                        const firstEquipment = equipmentData[0];
+                        const hasValidAdminData = firstEquipment.addedBy?.firstName || firstEquipment.addedBy?.email;
+                        
+                        if (!hasValidAdminData && userData) {
+                            console.log('⚠️ Equipment addedBy contains clientId, using current user data');
+                            equipmentData = equipmentData.map((equipment: any) => ({
+                                ...equipment,
+                                addedBy: {
+                                    firstName: userData.firstName || userData.name?.split(' ')[0] || 'Admin',
+                                    lastName: userData.lastName || userData.name?.split(' ')[1] || '',
+                                    fullName: userData.name || `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || 'Admin'
+                                }
+                            }));
+                            console.log('✅ Equipment data enriched with current user info');
+                        }
+                    }
                     
                     // Filter equipment data by selected sections only if there are multiple sections
                     if (projectSections.length > 1 && selectedSections.length > 0 && selectedSections.length < projectSections.length && equipmentData.length > 0) {
@@ -384,6 +419,18 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
 
             console.log('📄 Generating PDF with activities:', activities.length, ', labor entries:', laborData.length, ', and equipment entries:', equipmentData.length);
             console.log('📄 Equipment data being passed to PDF:', equipmentData.slice(0, 2));
+
+            // ✅ NEW: Show activity count summary before generating PDF
+            const importedCount = activities.filter(a => a.activity === 'imported').length;
+            const usedCount = activities.filter(a => a.activity === 'used').length;
+            const transferredCount = activities.filter(a => a.activity === 'transferred').length;
+            
+            console.log('📊 Activity Breakdown:');
+            console.log(`  - Imported: ${importedCount}`);
+            console.log(`  - Used: ${usedCount}`);
+            console.log(`  - Transferred: ${transferredCount}`);
+            console.log(`  - Labor Entries: ${laborData.length}`);
+            console.log(`  - Equipment Entries: ${equipmentData.length}`);
 
             // Get selected project name for PDF title
             const selectedProject = projects.find(p => p._id === selectedProjectId);

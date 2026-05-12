@@ -1,7 +1,7 @@
 import { getClientId } from '@/functions/clientId';
 import { domain } from '@/lib/domain';
 import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -99,7 +99,7 @@ const MyActivitiesScreen: React.FC = () => {
             console.log('🔍 Client ID:', clientId);
 
             // Fetch activities where user.userId matches user._id
-            const response = await axios.get(`${domain}/api/activity`, {
+            const response = await apiClient.get(`/api/activity`, {
                 params: {
                     clientId: clientId,
                     userId: user._id,

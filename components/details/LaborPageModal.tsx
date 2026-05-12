@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { toast } from 'sonner-native';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { domain } from '@/lib/domain';
 
 interface LaborEntry {
@@ -72,7 +72,7 @@ const LaborPageModal: React.FC<LaborPageModalProps> = ({
                 params.append('miniSectionId', miniSectionId);
             }
 
-            const response = await axios.get(`${domain}/api/labor?${params.toString()}`);
+            const response = await apiClient.get(`/api/labor?${params.toString()}`);
             const data = response.data;
 
             if (data.success) {
@@ -114,7 +114,7 @@ const LaborPageModal: React.FC<LaborPageModalProps> = ({
                 params.append('miniSectionId', miniSectionId);
             }
 
-            const response = await axios.delete(`${domain}/api/labor?${params.toString()}`);
+            const response = await apiClient.delete(`/api/labor?${params.toString()}`);
             const data = response.data;
 
             if (data.success) {

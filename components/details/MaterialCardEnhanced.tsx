@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { Animated, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
+import apiClient from '@/utils/axiosConfig';
 
 interface MaterialVariant {
     _id: string;
@@ -116,11 +117,14 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
     // Transfer functionality functions
     const fetchAvailableProjects = async () => {
         try {
+            console.log('🔍 Fetching available projects for transfer...');
             setLoadingProjects(true);
             
             // Get client ID
             const { getClientId } = await import('@/functions/clientId');
             const clientId = await getClientId();
+            
+            console.log('📋 Client ID:', clientId);
             
             if (!clientId) {
                 throw new Error('Client ID not found');
@@ -130,32 +134,71 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
             const { domain } = await import('@/lib/domain');
             
             // Fetch projects from API
-            const response = await fetch(`${domain}/api/project?clientId=${clientId}`, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+            console.log('🌐 Fetching projects from API...');
+            const response = await apiClient.get(`/api/project?clientId=${clientId}`);
+            
+            console.log('✅ API Response:', response.data);
+            console.log('📊 Response structure:', {
+                success: response.data.success,
+                hasData: !!response.data.data,
+                hasProjects: !!(response.data.data?.projects || response.data.projects),
+                dataKeys: Object.keys(response.data.data || {}),
+                rootKeys: Object.keys(response.data)
             });
 
-            const result = await response.json();
-            
-            if (result.success && result.data) {
+            if (response.data.success && response.data.data) {
+                // Try multiple possible response structures
+                let projectsList = response.data.data.projects || 
+                                  response.data.projects || 
+                                  response.data.data || 
+                                  [];
+                
+                console.log('📦 Raw projects list:', projectsList);
+                console.log('📦 Projects list length:', Array.isArray(projectsList) ? projectsList.length : 'Not an array');
+                
+                // If projectsList is not an array, try to extract it
+                if (!Array.isArray(projectsList)) {
+                    console.warn('⚠️ Projects list is not an array, trying to extract...');
+                    if (projectsList.projects && Array.isArray(projectsList.projects)) {
+                        projectsList = projectsList.projects;
+                    } else {
+                        projectsList = [];
+                    }
+                }
+                
                 // Filter out current project
-                const projects = (result.data.projects || result.projects || [])
-                    .filter((project: any) => project._id !== currentProjectId)
+                const projects = projectsList
+                    .filter((project: any) => {
+                        const isCurrentProject = project._id === currentProjectId;
+                        console.log(`  - Project: ${project.name} (${project._id}) - Current: ${isCurrentProject}`);
+                        return !isCurrentProject;
+                    })
                     .map((project: any) => ({
                         _id: project._id,
                         name: project.name,
                         description: project.description
                     }));
                 
+                console.log('✅ Filtered projects:', projects.length);
+                projects.forEach((p: any, i: number) => {
+                    console.log(`  ${i + 1}. ${p.name} (${p._id})`);
+                });
+                
                 setAvailableProjects(projects);
+                
+                if (projects.length === 0) {
+                    console.warn('⚠️ No projects available for transfer (all filtered out or empty list)');
+                    Alert.alert('No Projects', 'No other projects available for material transfer.');
+                }
             } else {
+                console.error('❌ API response not successful or missing data');
                 throw new Error('Failed to fetch projects');
             }
-        } catch (error) {
-            console.error('Error fetching projects:', error);
-            Alert.alert('Error', 'Failed to load available projects');
+        } catch (error: any) {
+            console.error('❌ Error fetching projects:', error);
+            console.error('   - Message:', error?.message);
+            console.error('   - Response:', error?.response?.data);
+            Alert.alert('Error', 'Failed to load available projects. Please try again.');
         } finally {
             setLoadingProjects(false);
         }
@@ -383,29 +426,17 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                             console.log('Client ID:', clientId);
 
                             // Call API to add stock
-                            const response = await fetch(`${domain}/api/material/add-stock`, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({
-                                    materialId: selectedStockVariant._id,
-                                    quantity: quantity,
-                                    perUnitCost: perUnitCost > 0 ? perUnitCost : undefined,
-                                    clientId: clientId,
-                                }),
+                            const response = await apiClient.post('/api/material/add-stock', {
+                                materialId: selectedStockVariant._id,
+                                quantity: quantity,
+                                perUnitCost: perUnitCost > 0 ? perUnitCost : undefined,
+                                clientId: clientId,
                             });
 
-                            const result = await response.json();
+                            console.log('📥 API Response:', response.data);
 
-                            console.log('📥 API Response:', result);
-
-                            if (!response.ok) {
-                                throw new Error(result.error || `API error: ${response.status}`);
-                            }
-
-                            if (result.success) {
-                                const message = result.action === 'created'
+                            if (response.data.success) {
+                                const message = response.data.action === 'created'
                                     ? `New material entry created!\n\nAdded ${quantity} ${material.unit} at ₹${perUnitCost}/${material.unit}\n\nNote: A separate entry was created because the cost is different from existing stock.`
                                     : `Successfully added ${quantity} ${material.unit} to stock`;
                                 

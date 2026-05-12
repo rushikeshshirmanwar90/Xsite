@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { domain } from '@/lib/domain';
 
 interface AuthContextType {
@@ -180,7 +180,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const clearCorruptedData = async () => {
     try {
       console.log('🧹 Clearing corrupted auth data...');
-      await AsyncStorage.clear();
+      // Remove specific auth keys instead of clearing everything
+      await AsyncStorage.multiRemove(['user', 'userType', 'token', 'refreshToken', 'loginTimestamp']);
       setIsAuthenticated(false);
       setUser(null);
       setClientId(null);
@@ -207,7 +208,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           userDetails === 'undefined' ||
           userDetails === '{}') {
         console.log('❌ Invalid user data found, clearing...');
-        await AsyncStorage.clear();
+        await AsyncStorage.multiRemove(['user', 'userType', 'token', 'refreshToken', 'loginTimestamp']);
         return false;
       }
       
@@ -222,7 +223,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             !data.email ||
             !data.email.includes('@')) {
           console.log('❌ Corrupted user data structure, clearing...');
-          await AsyncStorage.clear();
+          await AsyncStorage.multiRemove(['user', 'userType', 'token', 'refreshToken', 'loginTimestamp']);
           return false;
         }
         
@@ -234,7 +235,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           if (loginTime < thirtyDaysAgo) {
             console.log('❌ Authentication data expired, clearing...');
-            await AsyncStorage.clear();
+            await AsyncStorage.multiRemove(['user', 'userType', 'token', 'refreshToken', 'loginTimestamp']);
             return false;
           }
         }
@@ -244,13 +245,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
       } catch (parseError) {
         console.error('❌ Error parsing user data:', parseError);
-        await AsyncStorage.clear();
+        await AsyncStorage.multiRemove(['user', 'userType', 'token', 'refreshToken', 'loginTimestamp']);
         return false;
       }
       
     } catch (error) {
       console.error('❌ Error validating auth state:', error);
-      await AsyncStorage.clear();
+      await AsyncStorage.multiRemove(['user', 'userType', 'token', 'refreshToken', 'loginTimestamp']);
       return false;
     }
   };
@@ -295,30 +296,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const allKeys = await AsyncStorage.getAllKeys();
       console.log('📋 Found storage keys:', allKeys);
       
-      // Clear everything
-      await AsyncStorage.clear();
-      
-      // Double-check by explicitly removing known keys
+      // Remove specific auth keys instead of clearing everything
       const keysToRemove = [
         'user', 'userType', 'admin', 'staff', 'client',
         'pushToken', 'pushTokenRegistered', 'pushTokenRegistrationTime',
         'notificationSetupChecked', 'notificationSetupResult', 
         'notificationSetupTimestamp', 'local_notifications',
         'authToken', 'sessionId', 'lastLoginTime', 'clientId',
-        'isAuthenticated', 'loginTimestamp', 'deviceId',
+        'isAuthenticated', 'loginTimestamp', 'deviceId', 'token', 'refreshToken',
+        'registeredClientId',
         // Add any other keys your app might use
       ];
       
+      // Remove keys with error handling
       await Promise.all(keysToRemove.map(key => 
         AsyncStorage.removeItem(key).catch(err => 
           console.warn(`⚠️ Failed to remove ${key}:`, err)
-        )
-      ));
-      
-      // PRODUCTION FIX: Force clear by setting empty values as fallback
-      await Promise.all(keysToRemove.map(key => 
-        AsyncStorage.setItem(key, '').catch(err => 
-          console.warn(`⚠️ Failed to set empty ${key}:`, err)
         )
       ));
       
@@ -379,7 +372,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       console.log('   URL:', endpoint);
 
-      const response = await axios.get(endpoint);
+      const response = await apiClient.get(endpoint);
       console.log('📦 Fresh data response status:', response.status);
 
       if (response.status === 200) {

@@ -3,7 +3,7 @@ import { domain } from '@/lib/domain';
 import { ProjectSection } from '@/types/project';
 import { logSectionCreated, logSectionDeleted, logSectionUpdated } from '@/utils/activityLogger';
 import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -146,7 +146,7 @@ const ManageProject = () => {
             console.log('Client ID source:', passedClientId ? 'passed parameter' : 'from storage');
             console.log('API URL:', `${domain}/api/project/${projectId}?clientId=${clientId}`);
 
-            const res = await axios.get(`${domain}/api/project/${projectId}?clientId=${clientId}`);
+            const res = await apiClient.get(`/api/project/${projectId}?clientId=${clientId}`);
             const responseData = res.data as any;
 
             console.log('Project data received:', responseData);
@@ -266,7 +266,7 @@ const ManageProject = () => {
 
                             console.log('Delete endpoint:', endpoint);
 
-                            const res = await axios.delete(endpoint);
+                            const res = await apiClient.delete(endpoint);
 
                             console.log('Delete response:', res.data);
 
@@ -365,7 +365,7 @@ const ManageProject = () => {
                 console.log('🔍 DEBUG: Fetching building details for ID:', sectionId);
                 console.log('🌐 API URL:', `${domain}/api/building?id=${sectionId}`);
                 
-                const response = await axios.get(`${domain}/api/building?id=${sectionId}`);
+                const response = await apiClient.get(`/api/building?id=${sectionId}`);
                 const responseData = response.data as any;
                 
                 console.log('📥 Building details response:', JSON.stringify(responseData, null, 2));
@@ -534,11 +534,11 @@ const ManageProject = () => {
                 // For buildings, try updating through project API first
                 if (editingSection.type === 'Buildings' || editingSection.type === 'building') {
                     console.log('🔄 Trying project-based section update...');
-                    res = await axios.patch(endpoint, payload);
+                    res = await apiClient.patch(endpoint, payload);
                     console.log('✅ Project section update successful');
                 } else {
                     // For other section types, use PUT method
-                    res = await axios.put(endpoint, payload);
+                    res = await apiClient.put(endpoint, payload);
                     console.log('✅ Direct section update successful');
                 }
             } catch (firstError: any) {
@@ -558,7 +558,7 @@ const ManageProject = () => {
                         };
                         
                         console.log('� Trying building API as fallback...');
-                        res = await axios.put(buildingEndpoint, buildingPayload);
+                        res = await apiClient.put(buildingEndpoint, buildingPayload);
                         console.log('✅ Building API fallback successful');
                     } catch (secondError: any) {
                         if (secondError?.response?.status === 404) {
@@ -576,7 +576,7 @@ const ManageProject = () => {
                                 hasGroundFloor: true
                             };
                             
-                            res = await axios.post(`${domain}api/building`, createPayload);
+                            res = await apiClient.post(`${domain}api/building`, createPayload);
                             console.log('✅ Building created successfully');
                         } else {
                             // Try a simple section name update through a generic endpoint
@@ -589,7 +589,7 @@ const ManageProject = () => {
                             };
                             
                             try {
-                                res = await axios.put(`${domain}api/section/update`, genericPayload);
+                                res = await apiClient.put(`${domain}api/section/update`, genericPayload);
                                 console.log('✅ Generic section update successful');
                             } catch (thirdError: any) {
                                 console.log('❌ All API approaches failed, updating local state instead...');
@@ -778,7 +778,7 @@ const ManageProject = () => {
             let response;
             
             try {
-                response = await axios.put(`${domain}/api/building?id=${sectionId}`, payload);
+                response = await apiClient.put(`/api/building?id=${sectionId}`, payload);
                 console.log('✅ Building updated successfully');
             } catch (updateError: any) {
                 if (updateError?.response?.status === 404) {
@@ -793,7 +793,7 @@ const ManageProject = () => {
                     
                     console.log('📤 Create Payload:', JSON.stringify(createPayload, null, 2));
                     
-                    response = await axios.post(`${domain}/api/building`, createPayload);
+                    response = await apiClient.post(`/api/building`, createPayload);
                     console.log('✅ Building created successfully');
                 } else {
                     throw updateError;
@@ -845,7 +845,7 @@ const ManageProject = () => {
             if (floorsToCreate.length > 0) {
                 let existingFloors: any[] = [];
                 try {
-                    const existingFloorsResponse = await axios.get(`${domain}/api/floors?buildingId=${sectionId}`);
+                    const existingFloorsResponse = await apiClient.get(`/api/floors?buildingId=${sectionId}`);
                     existingFloors = (existingFloorsResponse.data as any)?.data || [];
                     console.log(`📋 Found ${existingFloors.length} existing floors`);
                 } catch (error) {
@@ -875,7 +875,7 @@ const ManageProject = () => {
                             floors: newFloorsToCreate
                         }, null, 2));
 
-                        const bulkResponse = await axios.post(`${domain}/api/floors`, {
+                        const bulkResponse = await apiClient.post(`/api/floors`, {
                             buildingId: sectionId,
                             floors: newFloorsToCreate
                         });
@@ -948,7 +948,7 @@ const ManageProject = () => {
             // Fetch current building details to check if floors exist
             let buildingData = null;
             try {
-                const response = await axios.get(`${domain}/api/building?id=${sectionId}`);
+                const response = await apiClient.get(`/api/building?id=${sectionId}`);
                 const responseData = response.data as any;
                 if (responseData && responseData.success && responseData.data) {
                     buildingData = responseData.data;
@@ -1062,7 +1062,7 @@ const ManageProject = () => {
                             floors: floorsToCreate
                         }, null, 2));
 
-                        const bulkResponse = await axios.post(`${domain}/api/floors`, {
+                        const bulkResponse = await apiClient.post(`/api/floors`, {
                             buildingId: sectionId,
                             floors: floorsToCreate
                         });
@@ -1131,7 +1131,7 @@ const ManageProject = () => {
             let res;
 
             if (type === "building") {
-                res = await axios.post(`${domain}/api/building`, payload);
+                res = await apiClient.post(`/api/building`, payload);
                 console.log('Building API response:', res.data);
 
                 if (res && res.status === 200) {
@@ -1145,7 +1145,7 @@ const ManageProject = () => {
                     totalHouses: totalHouses
                 };
 
-                res = await axios.post(`${domain}/api/rowHouse`, rowhousePayload);
+                res = await apiClient.post(`/api/rowHouse`, rowhousePayload);
                 console.log('Rowhouse API response:', res.data);
 
                 if (res && res.status === 200) {
@@ -1153,7 +1153,7 @@ const ManageProject = () => {
                     toast.success('Row house added successfully!');
                 }
             } else {
-                res = await axios.post(`${domain}/api/otherSection`, payload);
+                res = await apiClient.post(`/api/otherSection`, payload);
                 console.log('Other section API response:', res.data);
 
                 if (res && res.status === 200) {

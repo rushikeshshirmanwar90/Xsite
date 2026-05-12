@@ -1,7 +1,7 @@
 import { domain } from '@/lib/domain';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -90,7 +90,7 @@ const MaterialActivityNotifications: React.FC<MaterialActivityNotificationsProps
             if (projectId) params.append('projectId', projectId);
             if (filter !== 'all') params.append('activity', filter);
 
-            const response = await axios.get(`${domain}/api/materialActivity?${params.toString()}`);
+            const response = await apiClient.get(`/api/materialActivity?${params.toString()}`);
             const responseData = response.data as { success: boolean; data?: MaterialActivity[]; message?: string };
 
             if (responseData.success) {

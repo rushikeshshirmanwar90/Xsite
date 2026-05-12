@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import { domain } from '@/lib/domain';
 import ClientStaffsManager from '@/components/client/ClientStaffsManager';
 
@@ -45,7 +45,7 @@ const ClientDetailsPage: React.FC = () => {
       setLoading(true);
       console.log('🔍 Fetching client details for:', clientId);
       
-      const response = await axios.get(`${domain}/api/clients?id=${clientId}`);
+      const response = await apiClient.get(`/api/clients?id=${clientId}`);
       const responseData = response.data as any;
       
       if (responseData.success) {

@@ -32,6 +32,7 @@ type SectionManagerProps = {
   miniSectionCompletions?: {[key: string]: boolean};
   onToggleMiniSectionCompletion?: (miniSectionId: string, miniSectionName: string) => void;
   isUpdatingCompletion?: boolean;
+  miniSectionLoadingStates?: {[key: string]: boolean};
 };
 
 const SectionManager: React.FC<SectionManagerProps> = ({
@@ -45,7 +46,8 @@ const SectionManager: React.FC<SectionManagerProps> = ({
   mainSectionDetails,
   miniSectionCompletions = {},
   onToggleMiniSectionCompletion,
-  isUpdatingCompletion = false
+  isUpdatingCompletion = false,
+  miniSectionLoadingStates = {}
 }) => {
   const [sections, setSections] = useState<Section[]>(propSections || []);
   const [showAddSectionModal, setShowAddSectionModal] = useState(false);

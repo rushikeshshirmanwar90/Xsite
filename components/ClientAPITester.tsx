@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { domain } from '@/lib/domain';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 
 const ClientAPITester = () => {
   const [testResults, setTestResults] = useState<string>('');
@@ -26,7 +26,7 @@ const ClientAPITester = () => {
       const url = `${domain}/api/clients?id=${clientId}`;
       addLog(`📤 URL: ${url}`);
       
-      const response = await axios.get(url);
+      const response = await apiClient.get(url);
       
       addLog(`✅ Status: ${response.status}`);
       addLog(`✅ Success: ${response.data.success}`);

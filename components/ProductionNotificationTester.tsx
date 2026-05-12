@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
 import { domain } from '@/lib/domain';
-import axios from 'axios';
+import apiClient from '@/utils/axiosConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function ProductionNotificationTester() {
@@ -22,7 +22,7 @@ export default function ProductionNotificationTester() {
       // Test 1: Check backend connectivity
       addResult('📡 Testing backend connectivity...');
       try {
-        const healthResponse = await axios.get(`${domain}/api/health`, { timeout: 10000 });
+        const healthResponse = await apiClient.get(`/api/health`, { timeout: 10000 });
         addResult(`✅ Backend connected: ${healthResponse.status}`);
       } catch (error: any) {
         addResult(`❌ Backend connection failed: ${error.message}`);
@@ -59,7 +59,7 @@ export default function ProductionNotificationTester() {
             }
           };
 
-          const notificationResponse = await axios.post(
+          const notificationResponse = await apiClient.post(
             `${domain}/api/notifications/send-test`, 
             testNotification,
             {
@@ -95,7 +95,7 @@ export default function ProductionNotificationTester() {
             message: 'Test material activity from production app'
           };
 
-          const materialResponse = await axios.post(
+          const materialResponse = await apiClient.post(
             `${domain}/api/test-material-notification`,
             materialActivity,
             {
