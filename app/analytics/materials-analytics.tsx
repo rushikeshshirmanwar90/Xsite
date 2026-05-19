@@ -443,13 +443,6 @@ const MaterialsAnalytics: React.FC = () => {
                       }}
                     />
                   </View>
-
-                  <PieChartLegend
-                    items={materialLegendData}
-                    showPercentage={true}
-                    showDescription={true}
-                    layout="vertical"
-                  />
                 </View>
 
                 {/* Material Cards */}

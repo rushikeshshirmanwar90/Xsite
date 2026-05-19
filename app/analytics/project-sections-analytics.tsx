@@ -139,7 +139,9 @@ const ProjectSectionsAnalytics: React.FC = () => {
       console.log('   - Parsed equipments:', parsedEquipments.length);
 
       // Calculate totals for available, used, labor, and equipment
-      const totalImportedMaterials = parsedMaterialAvailable.reduce(
+      // FIXED: MaterialAvailable contains current stock, not total imported
+      // Total Imported = Current Stock (MaterialAvailable) + Already Used (MaterialUsed)
+      const currentStockValue = parsedMaterialAvailable.reduce(
         (sum: number, material: any) => sum + (material.totalCost || material.cost || 0),
         0
       );
@@ -147,8 +149,11 @@ const ProjectSectionsAnalytics: React.FC = () => {
         (sum: number, material: any) => sum + (material.totalCost || material.cost || 0),
         0
       );
-      // Available = Imported - Used (remaining materials)
-      const availableTotal = Math.max(0, totalImportedMaterials - usedTotal);
+      // Total imported = what's in stock now + what's already been used
+      const totalImportedMaterials = currentStockValue + usedTotal;
+      // Available = Current stock value (what's remaining)
+      const availableTotal = currentStockValue;
+      
       const laborTotal = parsedLabors.reduce(
         (sum: number, labor: any) => sum + (labor.totalCost || 0),
         0
@@ -172,19 +177,21 @@ const ProjectSectionsAnalytics: React.FC = () => {
       setTotalLabor(laborTotal);
       setTotalEquipment(equipmentTotal);
 
-      console.log('   - Total imported materials:', totalImportedMaterials);
-      console.log('   - Total used materials:', usedTotal);
-      console.log('   - Total available materials (Imported - Used):', availableTotal);
+      console.log('   - Current stock value (MaterialAvailable):', currentStockValue);
+      console.log('   - Total used materials (MaterialUsed):', usedTotal);
+      console.log('   - Total imported materials (Stock + Used):', totalImportedMaterials);
+      console.log('   - Materials available/remaining:', availableTotal);
       console.log('   - Total labor:', laborTotal);
       console.log('   - Total equipment:', equipmentTotal);
       console.log('   - Grand total expenses:', usedTotal + laborTotal + equipmentTotal);
 
       // Debug material calculation
       console.log('📊 MATERIAL CALCULATION BREAKDOWN:');
-      console.log(`   - Materials Imported: ₹${totalImportedMaterials} (${parsedMaterialAvailable.length} items)`);
+      console.log(`   - Current Stock (MaterialAvailable): ₹${currentStockValue} (${parsedMaterialAvailable.length} items)`);
       console.log(`   - Materials Used: ₹${usedTotal} (${parsedMaterialUsed.length} items)`);
+      console.log(`   - Total Imported (Stock + Used): ₹${totalImportedMaterials}`);
       console.log(`   - Materials Available (Remaining): ₹${availableTotal}`);
-      console.log(`   - Formula: Available = Imported - Used = ₹${totalImportedMaterials} - ₹${usedTotal} = ₹${availableTotal}`);
+      console.log(`   - Formula: Total Imported = Current Stock + Used = ₹${currentStockValue} + ₹${usedTotal} = ₹${totalImportedMaterials}`);
       if (parsedEquipments.length > 0) {
         console.log('   - Equipment items:');
         parsedEquipments.forEach((eq: any, idx: number) => {
@@ -208,9 +215,13 @@ const ProjectSectionsAnalytics: React.FC = () => {
 
       // Calculate expenses per section from MaterialUsed + Labor + Equipment
       const sectionExpenses: SectionExpense[] = parsedSections.map((section: any) => {
+        console.log(`\n🔍 Processing section: ${section.name}`);
+        console.log(`   - section._id: ${section._id}`);
+        console.log(`   - section.sectionId: ${section.sectionId}`);
+        
         const sectionMaterials = parsedMaterialUsed.filter(
           (material: any) =>
-            material.sectionId === section._id || material.sectionId === section.sectionId
+            material.sectionId === section.sectionId || material.sectionId === section._id
         );
 
         const materialExpense = sectionMaterials.reduce(
@@ -218,16 +229,20 @@ const ProjectSectionsAnalytics: React.FC = () => {
           0
         );
 
+        console.log(`   - Materials matched: ${sectionMaterials.length}, cost: ₹${materialExpense}`);
+
         // Calculate labor costs for this section
         const sectionLabors = parsedLabors.filter(
           (labor: any) =>
-            labor.sectionId === section._id || labor.sectionId === section.sectionId
+            labor.sectionId === section.sectionId || labor.sectionId === section._id
         );
 
         const laborExpense = sectionLabors.reduce(
           (sum: number, labor: any) => sum + (labor.totalCost || 0),
           0
         );
+
+        console.log(`   - Labor matched: ${sectionLabors.length}, cost: ₹${laborExpense}`);
 
         // Calculate equipment costs for this section
         const sectionEquipments = parsedEquipments.filter(
@@ -239,8 +254,8 @@ const ProjectSectionsAnalytics: React.FC = () => {
             }
             
             // Match if: has matching sectionId/projectSectionId, OR has no section assignment
-            const hasSectionId = equipment.sectionId === section._id || equipment.sectionId === section.sectionId || 
-                                equipment.projectSectionId === section._id || equipment.projectSectionId === section.sectionId;
+            const hasSectionId = equipment.sectionId === section.sectionId || equipment.sectionId === section._id || 
+                                equipment.projectSectionId === section.sectionId || equipment.projectSectionId === section._id;
             const hasNoSectionId = !equipment.sectionId && !equipment.projectSectionId;
             
             // For unassigned equipment, distribute it across all sections
@@ -262,7 +277,7 @@ const ProjectSectionsAnalytics: React.FC = () => {
         const totalExpense = materialExpense + laborExpense + equipmentExpense;
 
         return {
-          _id: section._id || section.sectionId,
+          _id: section.sectionId || section._id,
           name: section.name,
           type: section.type,
           totalExpense,
@@ -291,11 +306,29 @@ const ProjectSectionsAnalytics: React.FC = () => {
         const laborCost = sectionLabors.reduce((sum: number, l: any) => sum + (l.totalCost || 0), 0);
         const equipmentCost = sectionEquipments.reduce((sum: number, e: any) => sum + (e.totalCost || e.cost || 0), 0);
         
-        console.log(`     * ${section.name}: ₹${section.totalExpense} (Materials: ₹${materialCost}, Labor: ₹${laborCost}, Equipment: ₹${equipmentCost})`);
+        const icon = section.totalExpense > 0 ? '✅' : '⚠️';
+        console.log(`     ${icon} ${section.name} (ID: ${section._id}): ₹${section.totalExpense} (Materials: ₹${materialCost}, Labor: ₹${laborCost}, Equipment: ₹${equipmentCost})`);
       });
 
       // Show all sections (even with 0 expense) to indicate available vs used
-      setSections(sectionExpenses);
+      // CRITICAL FIX: Filter to only show sections with actual expenses to avoid confusion
+      const sectionsWithExpenses = sectionExpenses.filter(s => s.totalExpense > 0);
+      
+      console.log('\n📊 ========== SECTIONS SUMMARY ==========');
+      console.log(`   - Total sections: ${sectionExpenses.length}`);
+      console.log(`   - Sections with expenses: ${sectionsWithExpenses.length}`);
+      console.log(`   - Sections without expenses: ${sectionExpenses.length - sectionsWithExpenses.length}`);
+      
+      if (sectionsWithExpenses.length === 0 && sectionExpenses.length > 0) {
+        console.warn('\n⚠️ WARNING: All sections have ₹0 expenses!');
+        console.warn('   This means materials/labor sectionIds do not match any section IDs');
+        console.warn('   Section IDs in project:', sectionExpenses.map(s => s._id).join(', '));
+        console.warn('   Material sectionIds:', [...new Set(parsedMaterialUsed.map((m: any) => m.sectionId))].join(', '));
+        console.warn('   Labor sectionIds:', [...new Set(parsedLabors.map((l: any) => l.sectionId))].join(', '));
+      }
+      console.log('📊 ====================================\n');
+      
+      setSections(sectionsWithExpenses.length > 0 ? sectionsWithExpenses : sectionExpenses);
 
       // If we have expenses but no sections have them, it means sectionId doesn't match
       const totalSectionExpenses = sectionExpenses.reduce((sum, s) => sum + s.totalExpense, 0);
@@ -356,22 +389,34 @@ const ProjectSectionsAnalytics: React.FC = () => {
   }));
 
   const handleSectionPress = (sectionId: string, sectionName: string) => {
+    console.log('\n🎯 ========== SECTION CLICKED ==========');
+    console.log(`   - Clicked sectionId: ${sectionId}`);
+    console.log(`   - Clicked sectionName: ${sectionName}`);
+    console.log(`   - All sections in state:`, sections.map(s => ({ _id: s._id, name: s.name, expense: s.totalExpense })));
+    
     const section = sections.find((s) => s._id === sectionId);
     if (section) {
+      // CRITICAL: section._id already contains the correct sectionId 
+      // (set in line 265: _id: section.sectionId || section._id)
+      // So we just use section._id directly, no need to extract again
+      
       console.log('🔍 Project Sections - Navigating to mini-sections with data:', {
         sectionId: section._id,
         sectionName: section.name,
+        sectionExpense: section.totalExpense,
         materialAvailable: materialAvailable ? 'Present' : 'Missing',
         materialUsed: materialUsed ? 'Present' : 'Missing',
         labors: laborsData ? 'Present' : 'Missing',
         equipments: equipmentsData ? 'Present' : 'Missing',
       });
+      console.log('🎯 ======================================\n');
+      
       router.push({
         pathname: '/analytics/mini-sections-analytics',
         params: {
           projectId,
           projectName,
-          sectionId: section._id,
+          sectionId: section._id, // section._id already contains the correct sectionId
           sectionName: section.name,
           materialAvailable, // Pass materialAvailable to next level
           materialUsed,
@@ -379,6 +424,9 @@ const ProjectSectionsAnalytics: React.FC = () => {
           equipments: JSON.stringify(parsedEquipments), // Pass the fetched equipment data
         },
       });
+    } else {
+      console.error('❌ Section not found in sections array!');
+      console.log('🎯 ======================================\n');
     }
   };
 

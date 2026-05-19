@@ -1,8 +1,6 @@
 import Header from '@/components/details/Header';
 import LaborCardEnhanced from '@/components/details/LaborCardEnhanced';
 import LaborFormModal from '@/components/details/LaborFormModal';
-import SectionManager from '@/components/details/SectionManager';
-import { getSection, addSection } from '@/functions/details';
 import { getClientId } from '@/functions/clientId';
 import apiClient from '@/utils/axiosConfig';
 
@@ -30,10 +28,8 @@ const LaborPage = () => {
     const sectionName = params.sectionName as string;
 
     const [laborEntries, setLaborEntries] = useState<Labor[]>([]);
-    const [miniSections, setMiniSections] = useState<Section[]>([]);
     const [loading, setLoading] = useState(false);
     const [showLaborForm, setShowLaborForm] = useState(false);
-    const [selectedMiniSection, setSelectedMiniSection] = useState<string | null>(null);
     const [isAddingLabor, setIsAddingLabor] = useState(false);
     const cardAnimations = useRef<Animated.Value[]>([]).current;
     const scrollViewRef = useRef<ScrollView>(null);
@@ -41,48 +37,28 @@ const LaborPage = () => {
     // Loading animation for adding labor
     const loadingAnimation = useRef(new Animated.Value(0)).current;
 
-    // Pagination state
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage] = useState(10);
-    const [totalCount, setTotalCount] = useState(0);
-
-    // Function to fetch mini-sections from API
-    const fetchMiniSections = async () => {
-        try {
-            console.log('Fetching mini-sections for sectionId:', sectionId);
-            const sections = await getSection(sectionId);
-            console.log('Fetched mini-sections:', sections);
-            setMiniSections(sections);
-        } catch (error) {
-            console.error('Error fetching mini-sections:', error);
-            toast.error('Failed to load mini-sections');
-            setMiniSections([]);
-        }
-    };
-
-    // Function to fetch labor entries from API
+    // Function to fetch all labor entries from API
     const fetchLaborEntries = async () => {
         try {
             setLoading(true);
-            console.log('Fetching labor entries for project:', projectId);
+            console.log('📋 Fetching all labor entries - Project:', projectId);
             
             const clientId = await getClientId();
             if (!clientId) {
                 throw new Error('Client ID not found');
             }
 
-            // Use apiClient for authenticated requests
+            // Use apiClient for authenticated requests - fetch all entries
             const response = await apiClient.get(`/api/labor`, {
                 params: {
                     entityType: 'project',
                     entityId: projectId,
-                    sectionId: sectionId,
-                    ...(selectedMiniSection ? { miniSectionId: selectedMiniSection } : {})
+                    sectionId: sectionId
                 }
             });
 
             const result = response.data;
-            console.log('Labor API response:', result);
+            console.log('✅ Labor API response:', result);
 
             if (result.success && result.data) {
                 // Transform API response to match our Labor interface
@@ -104,15 +80,20 @@ const LaborPage = () => {
                     updatedAt: entry.updatedAt || new Date().toISOString()
                 }));
 
+                console.log('📋 Total entries fetched:', transformedEntries.length);
                 setLaborEntries(transformedEntries);
-                setTotalCount(transformedEntries.length);
 
-                // Initialize animations
-                cardAnimations.splice(0);
+                // Clear animations array completely before reinitializing
+                while (cardAnimations.length > 0) {
+                    cardAnimations.pop();
+                }
+                
+                // Initialize fresh animations for all items
                 for (let i = 0; i < transformedEntries.length; i++) {
                     cardAnimations.push(new Animated.Value(0));
                 }
 
+                // Start stagger animation
                 Animated.stagger(100,
                     cardAnimations.map((anim: Animated.Value) =>
                         Animated.timing(anim, {
@@ -124,73 +105,18 @@ const LaborPage = () => {
                 ).start();
             } else {
                 // No labor entries found
+                console.log('⚠️ No labor entries in response');
                 setLaborEntries([]);
-                setTotalCount(0);
             }
         } catch (error: any) {
-            console.error('Error fetching labor entries:', error);
+            console.error('❌ Error fetching labor entries:', error);
+            console.error('❌ Error details:', error.response?.data || error.message);
             toast.error('Failed to load labor entries');
-            // Fall back to mock data for now
-            setLaborEntries(mockLaborEntries);
-            setTotalCount(mockLaborEntries.length);
+            setLaborEntries([]);
         } finally {
             setLoading(false);
         }
     };
-
-    const mockLaborEntries: Labor[] = [
-        {
-            id: 1,
-            _id: 'labor1',
-            type: 'Mason',
-            category: 'skilled',
-            count: 5,
-            perLaborCost: 800,
-            totalCost: 4000,
-            date: new Date().toISOString(),
-            icon: 'hammer-outline',
-            color: '#EF4444',
-            sectionId: sectionId,
-            miniSectionId: '1',
-            addedAt: new Date().toISOString(),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        },
-        {
-            id: 2,
-            _id: 'labor2',
-            type: 'Electrician',
-            category: 'skilled',
-            count: 3,
-            perLaborCost: 1000,
-            totalCost: 3000,
-            date: new Date().toISOString(),
-            icon: 'flash-outline',
-            color: '#F59E0B',
-            sectionId: sectionId,
-            miniSectionId: '2',
-            addedAt: new Date().toISOString(),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        },
-        {
-            id: 3,
-            _id: 'labor3',
-            type: 'Helper',
-            category: 'unskilled',
-            count: 8,
-            perLaborCost: 500,
-            totalCost: 4000,
-            date: new Date().toISOString(),
-            icon: 'people-outline',
-            color: '#6B7280',
-            sectionId: sectionId,
-            miniSectionId: '1',
-            addedAt: new Date().toISOString(),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        }
-    ];
 
     // Function to get labor icon and color based on category
     const getLaborIconAndColor = (category: string) => {
@@ -216,11 +142,8 @@ const LaborPage = () => {
         setLoading(true);
         
         try {
-            // Load mini-sections from API
-            await fetchMiniSections();
-            
-            // Load labor entries from API
-            await fetchLaborEntries();
+            // Load labor entries from API with pagination
+            await fetchLaborEntries(1);
         } catch (error) {
             console.error('Error loading data:', error);
         } finally {
@@ -250,16 +173,6 @@ const LaborPage = () => {
     const handleAddLaborEntries = async (laborEntries: LaborEntry[], message: string) => {
         try {
             console.log('Adding labor entries:', laborEntries);
-            
-            // Group entries by mini-section
-            const entriesBySection = laborEntries.reduce((acc, entry) => {
-                const sectionId = entry.miniSectionId;
-                if (!acc[sectionId]) {
-                    acc[sectionId] = [];
-                }
-                acc[sectionId].push(entry);
-                return acc;
-            }, {} as Record<string, LaborEntry[]>);
 
             // Start loading animation
             startLoadingAnimation();
@@ -270,29 +183,22 @@ const LaborPage = () => {
                 throw new Error('Client ID not found');
             }
 
-            // Import domain
-            const { domain } = await import('@/lib/domain');
-
-            // Process each mini-section group
-            const results = [];
-            for (const [miniSectionId, sectionEntries] of Object.entries(entriesBySection)) {
-                // Prepare data for the labor API
-                const requestData = {
-                    laborEntries: sectionEntries.map(entry => ({
-                        type: entry.type,
-                        category: entry.category,
-                        count: entry.count,
-                        perLaborCost: entry.perLaborCost,
-                        totalCost: entry.count * entry.perLaborCost,
-                        notes: message || '',
+            // Prepare data for the labor API
+            const requestData = {
+                laborEntries: laborEntries.map(entry => ({
+                    type: entry.type,
+                    category: entry.category,
+                    count: entry.count,
+                    perLaborCost: entry.perLaborCost,
+                    totalCost: entry.count * entry.perLaborCost,
+                    notes: message || '',
                     workDate: new Date().toISOString(),
                     status: 'active'
                 })),
                 entityType: 'project',
                 entityId: projectId,
-                miniSectionId: miniSectionId,
                 sectionId: sectionId,
-                addedBy: clientId // Use clientId as the user who added the labor
+                addedBy: clientId
             };
 
             console.log('Sending labor data to API:', requestData);
@@ -304,38 +210,21 @@ const LaborPage = () => {
             console.log('Labor API response:', result);
 
             if (result.success) {
-                results.push(result);
-            } else {
-                throw new Error(result.message || 'Failed to add labor entries');
-            }
-        }
-
-        // All sections processed successfully
-        if (results.length > 0) {
-            // Log activity for labor addition (without loading toast)
-            try {
-                console.log('🚀 Starting labor activity logging...');
-                console.log('📋 Labor entries to log:', laborEntries);
-                console.log('📍 Project details:', { projectId, projectName, sectionId, sectionName });
-                
-                // Import the activity logger
-                const { logLaborAdded } = await import('@/utils/activityLogger');
-                
-                // For multiple mini-sections, log activity for each section
-                for (const [miniSectionId, sectionEntries] of Object.entries(entriesBySection)) {
-                    const miniSection = miniSections.find(s => s._id === miniSectionId);
-                    const miniSectionName = miniSection?.name || 'Unknown Section';
+                // Log activity for labor addition
+                try {
+                    console.log('🚀 Starting labor activity logging...');
                     
-                    console.log('🚀 Logging activity for mini-section:', miniSectionName);
+                    // Import the activity logger
+                    const { logLaborAdded } = await import('@/utils/activityLogger');
                     
                     await logLaborAdded(
                         projectId,
                         projectName,
                         sectionId,
                         sectionName,
-                        miniSectionId,
-                        miniSectionName,
-                        sectionEntries.map(entry => ({
+                        sectionId, // Use sectionId as miniSectionId since we removed mini-sections
+                        sectionName, // Use sectionName as miniSectionName
+                        laborEntries.map(entry => ({
                             type: entry.type,
                             category: entry.category,
                             count: entry.count,
@@ -344,29 +233,22 @@ const LaborPage = () => {
                         })),
                         message
                     );
-                }
                     
                     console.log('✅ Labor activity logged successfully');
                 } catch (activityError: any) {
                     console.error('❌ Failed to log labor activity:', activityError);
-                    console.error('❌ Activity error details:', {
-                        name: activityError?.name,
-                        message: activityError?.message,
-                        stack: activityError?.stack
-                    });
-                    
                     // Don't fail the main operation if activity logging fails
                 }
 
-                // Refresh the labor entries list (without loading toast)
+                // Refresh the labor entries list
                 await fetchLaborEntries();
 
                 // Stop loading animation and show success
                 stopLoadingAnimation();
-                toast.dismiss(); // Dismiss loading toast
+                toast.dismiss();
                 toast.success(`Labor added successfully`);
                 
-                // 🔔 NEW: Send simple notification for labor addition
+                // Send simple notification for labor addition
                 try {
                     console.log('\n🔔 Sending simple notification for labor addition...');
                     
@@ -374,14 +256,7 @@ const LaborPage = () => {
                     const laborCount = laborEntries.length;
                     const totalValue = laborEntries.reduce((sum, entry) => sum + (entry.count * entry.perLaborCost), 0);
                     
-                    // Create a clean, professional notification message
                     const notificationDetails = `Added ${laborCount} labor ${laborCount === 1 ? 'entry' : 'entries'} worth ₹${totalValue.toLocaleString()}`;
-                    
-                    console.log('📋 Labor notification details:');
-                    console.log('   - Staff Name:', staffName);
-                    console.log('   - Project ID:', projectId);
-                    console.log('   - Project Name:', projectName);
-                    console.log('   - Details:', notificationDetails);
                     
                     const notificationSent = await sendProjectNotification({
                         projectId: projectId,
@@ -402,16 +277,15 @@ const LaborPage = () => {
                     }
                 } catch (notificationError) {
                     console.error('❌ Labor notification error:', notificationError);
-                    // Don't fail the whole operation if notification fails
                 }
             } else {
-                throw new Error('Failed to add some labor entries');
+                throw new Error(result.message || 'Failed to add labor entries');
             }
             
         } catch (error: any) {
             console.error('Error adding labor entries:', error);
             stopLoadingAnimation();
-            toast.dismiss(); // Dismiss loading toast
+            toast.dismiss();
             toast.error(error.message || 'Failed to add labor entries');
         }
     };
@@ -471,22 +345,6 @@ const LaborPage = () => {
     useEffect(() => {
         loadData();
     }, [projectId, sectionId]);
-
-    // Filter entries when mini-section selection changes
-    useEffect(() => {
-        // Reload labor entries when mini-section selection changes
-        fetchLaborEntries();
-        setCurrentPage(1);
-    }, [selectedMiniSection]);
-
-    // Handle pagination (mock implementation)
-    const handlePageChange = (page: number) => {
-        setCurrentPage(page);
-        // In a real app, this would trigger an API call
-        console.log('Page changed to:', page);
-    };
-
-    const totalPages = Math.ceil(totalCount / itemsPerPage);
 
     return (
         <SafeAreaView style={styles.container}>
@@ -550,7 +408,7 @@ const LaborPage = () => {
                 projectName={projectName}
                 sectionId={sectionId}
                 sectionName={sectionName}
-                miniSections={miniSections}
+                miniSections={[]}
             />
 
             <ScrollView
@@ -559,68 +417,6 @@ const LaborPage = () => {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
             >
-                {/* Filters - Mini Section Selection */}
-                {miniSections.length > 0 && (
-                    <View style={sectionStyles.filtersContainer}>
-                        <View style={sectionStyles.filterRow}>
-                            <Ionicons name="layers-outline" size={16} color="#64748B" style={sectionStyles.filterIcon} />
-                            <View style={sectionStyles.compactSectionSelector}>
-                                <SectionManager
-                                    onSectionSelect={(sectionId) => {
-                                        setSelectedMiniSection(sectionId === 'all-sections' ? null : sectionId);
-                                    }}
-                                    onAddSection={async (newSection) => {
-                                        try {
-                                            console.log('Adding new mini-section:', newSection);
-                                            
-                                            // Prepare section data for API
-                                            const sectionData = {
-                                                name: newSection.name,
-                                                sectionId: sectionId, // Parent section ID
-                                                projectId: projectId,
-                                                projectName: projectName,
-                                                mainSectionName: sectionName
-                                            };
-                                            
-                                            // Call API to add section
-                                            const result = await addSection(sectionData);
-                                            
-                                            if (result && (result as any).success) {
-                                                // Refresh mini-sections list
-                                                await fetchMiniSections();
-                                                toast.success('Mini-section added successfully');
-                                            } else {
-                                                throw new Error((result as any)?.message || 'Failed to add section');
-                                            }
-                                        } catch (error: any) {
-                                            console.error('Error adding mini-section:', error);
-                                            toast.error(error.message || 'Failed to add mini-section');
-                                        }
-                                    }}
-                                    selectedSection={selectedMiniSection || 'all-sections'}
-                                    sections={[
-                                        { id: 'all-sections', name: 'All Sections', createdAt: new Date().toISOString() },
-                                        ...miniSections.map(s => ({
-                                            id: s._id,
-                                            name: s.name,
-                                            createdAt: s.createdAt
-                                        }))
-                                    ]}
-                                    compact={true}
-                                    projectDetails={{
-                                        projectName: projectName,
-                                        projectId: projectId
-                                    }}
-                                    mainSectionDetails={{
-                                        sectionName: sectionName,
-                                        sectionId: sectionId
-                                    }}
-                                />
-                            </View>
-                        </View>
-                    </View>
-                )}
-
                 {/* Labor Entries Display */}
                 {loading ? (
                     <View style={styles.noMaterialsContainer}>
@@ -668,8 +464,8 @@ const LaborPage = () => {
                                         key={`${dateGroup.date}-${labor._id}-${index}`}
                                         labor={labor}
                                         animation={cardAnimations[dateIndex * 10 + index] || new Animated.Value(1)}
-                                        showMiniSectionLabel={!selectedMiniSection}
-                                        miniSections={miniSections}
+                                        showMiniSectionLabel={false}
+                                        miniSections={[]}
                                     />
                                 ))}
                             </View>
@@ -685,59 +481,7 @@ const LaborPage = () => {
                     </View>
                 )}
 
-                {/* Pagination */}
-                {totalPages > 1 && (
-                    <View style={paginationStyles.paginationContainer}>
-                        <TouchableOpacity
-                            style={[paginationStyles.paginationButton, currentPage === 1 && paginationStyles.paginationButtonDisabled]}
-                            onPress={() => handlePageChange(currentPage - 1)}
-                            disabled={currentPage === 1}
-                        >
-                            <Ionicons name="chevron-back" size={16} color={currentPage === 1 ? "#CBD5E1" : "#3B82F6"} />
-                        </TouchableOpacity>
 
-                        <View style={paginationStyles.pageNumbers}>
-                            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                                let page;
-                                if (totalPages <= 5) {
-                                    page = i + 1;
-                                } else if (currentPage <= 3) {
-                                    page = i + 1;
-                                } else if (currentPage >= totalPages - 2) {
-                                    page = totalPages - 4 + i;
-                                } else {
-                                    page = currentPage - 2 + i;
-                                }
-
-                                return (
-                                    <TouchableOpacity
-                                        key={page}
-                                        style={[
-                                            paginationStyles.pageNumber,
-                                            currentPage === page && paginationStyles.pageNumberActive
-                                        ]}
-                                        onPress={() => handlePageChange(page)}
-                                    >
-                                        <Text style={[
-                                            paginationStyles.pageNumberText,
-                                            currentPage === page && paginationStyles.pageNumberTextActive
-                                        ]}>
-                                            {page}
-                                        </Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-
-                        <TouchableOpacity
-                            style={[paginationStyles.paginationButton, currentPage === totalPages && paginationStyles.paginationButtonDisabled]}
-                            onPress={() => handlePageChange(currentPage + 1)}
-                            disabled={currentPage === totalPages}
-                        >
-                            <Ionicons name="chevron-forward" size={16} color={currentPage === totalPages ? "#CBD5E1" : "#3B82F6"} />
-                        </TouchableOpacity>
-                    </View>
-                )}
             </ScrollView> 
 
             {/* Loading Overlay */}
@@ -817,8 +561,8 @@ const actionStyles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
         borderBottomWidth: 1,
         borderBottomColor: '#F1F5F9',
-        gap: 8, // Add gap between buttons
-        flexWrap: 'wrap', // Allow wrapping if needed
+        gap: 8,
+        flexWrap: 'wrap',
     },
     addLaborButton: {
         flexDirection: 'row',
@@ -831,8 +575,8 @@ const actionStyles = StyleSheet.create({
         borderColor: '#DBEAFE',
         gap: 8,
         justifyContent: 'center',
-        minWidth: 180, // Set minimum width for the button
-        flex: 0.8, // Take up more space in the container
+        minWidth: 180,
+        flex: 0.8,
     },
     addLaborButtonText: {
         fontSize: 16,
@@ -846,28 +590,6 @@ const actionStyles = StyleSheet.create({
     },
     addLaborButtonTextDisabled: {
         color: '#94A3B8',
-    },
-});
-
-const sectionStyles = StyleSheet.create({
-    filtersContainer: {
-        backgroundColor: '#FFFFFF',
-        marginHorizontal: 20,
-        marginVertical: 12,
-        borderRadius: 12,
-        padding: 16,
-        borderWidth: 1,
-        borderColor: '#F1F5F9',
-    },
-    filterRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    filterIcon: {
-        marginRight: 8,
-    },
-    compactSectionSelector: {
-        flex: 1,
     },
 });
 
@@ -907,56 +629,7 @@ const dateGroupStyles = StyleSheet.create({
     },
 });
 
-const paginationStyles = StyleSheet.create({
-    paginationContainer: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingVertical: 20,
-        paddingHorizontal: 20,
-        gap: 12,
-    },
-    paginationButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 8,
-        backgroundColor: '#F8FAFC',
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    paginationButtonDisabled: {
-        backgroundColor: '#F1F5F9',
-        borderColor: '#E2E8F0',
-    },
-    pageNumbers: {
-        flexDirection: 'row',
-        gap: 4,
-    },
-    pageNumber: {
-        width: 36,
-        height: 36,
-        borderRadius: 8,
-        backgroundColor: '#F8FAFC',
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    pageNumberActive: {
-        backgroundColor: '#3B82F6',
-        borderColor: '#3B82F6',
-    },
-    pageNumberText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#64748B',
-    },
-    pageNumberTextActive: {
-        color: '#FFFFFF',
-    },
-});
+
 
 const loadingStyles = StyleSheet.create({
     loadingOverlay: {

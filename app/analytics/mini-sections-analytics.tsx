@@ -128,6 +128,76 @@ const MiniSectionsAnalytics: React.FC = () => {
         });
       }
       
+      // CRITICAL FIX: Extract unique mini-section IDs from materials/labor data
+      // Materials/labor may have mini-section IDs in the sectionId field (legacy bug)
+      const materialMiniSectionIds = [...new Set([
+        ...parsedMaterialUsed.map((m: any) => m.miniSectionId).filter(Boolean),
+        ...parsedMaterialUsed.map((m: any) => m.sectionId).filter(Boolean), // Legacy: sectionId might contain mini-section ID
+      ])];
+      const laborMiniSectionIds = [...new Set([
+        ...parsedLabors.map((l: any) => l.miniSectionId).filter(Boolean),
+        ...parsedLabors.map((l: any) => l.sectionId).filter(Boolean), // Legacy: sectionId might contain mini-section ID
+      ])];
+      const allDataMiniSectionIds = [...new Set([...materialMiniSectionIds, ...laborMiniSectionIds])]
+        .filter(id => 
+          id !== 'no-mini-section' && // Exclude special string
+          id !== 'undefined' && // Exclude undefined string
+          id !== sectionId && // Exclude the section ID itself
+          id.length === 24 // MongoDB ObjectId is 24 characters
+        );
+      
+      console.log('\n🔍 ========== MINI-SECTION ID EXTRACTION ==========');
+      console.log('   - Mini-section IDs from materials:', materialMiniSectionIds);
+      console.log('   - Mini-section IDs from labor:', laborMiniSectionIds);
+      console.log('   - All unique mini-section IDs in data:', allDataMiniSectionIds);
+      console.log('   - Fetched mini-section IDs from API:', miniSectionsData.map((ms: any) => ms._id));
+      
+      // Find IDs that are NOT in the fetched mini-sections (these need to be fetched individually)
+      const fetchedIds = miniSectionsData.map((ms: any) => ms._id);
+      const missingIds = allDataMiniSectionIds.filter(id => !fetchedIds.includes(id));
+      
+      console.log('   - Missing mini-section IDs (need to fetch):', missingIds);
+      
+      // Fetch missing mini-sections individually
+      let additionalMiniSections: any[] = [];
+      if (missingIds.length > 0) {
+        console.log('   - Fetching missing mini-sections individually...');
+        for (const id of missingIds) {
+          try {
+            const miniSection = await apiClient.get<{
+              success: boolean;
+              message: string;
+              data: any[];
+            }>(`/api/mini-section?id=${id}`);
+            if (miniSection.data?.success && miniSection.data?.data) {
+              additionalMiniSections.push(...miniSection.data.data);
+              console.log(`   ✅ Fetched mini-section: ${id} - ${miniSection.data.data[0]?.name || 'Unknown'}`);
+            }
+          } catch (error: any) {
+            console.warn(`   ⚠️ Could not fetch mini-section ${id}:`, error?.response?.data?.message || error.message);
+            console.warn(`   → This mini-section was deleted or doesn't exist. Materials/labor still reference it.`);
+          }
+        }
+      }
+      
+      // Combine fetched and additional mini-sections
+      const allMiniSections = [...miniSectionsData, ...additionalMiniSections];
+      console.log('   - Total mini-sections (fetched + additional):', allMiniSections.length);
+      if (allMiniSections.length > 0) {
+        console.log('   - All mini-section IDs:', allMiniSections.map((ms: any) => ms._id));
+        console.log('   - All mini-section names:', allMiniSections.map((ms: any) => ms.name));
+      }
+      
+      // If no mini-sections were found, log the orphaned materials/labor
+      if (allMiniSections.length === 0 && (parsedMaterialUsed.length > 0 || parsedLabors.length > 0)) {
+        console.warn('\n⚠️ ========== ORPHANED DATA DETECTED ==========');
+        console.warn('⚠️ Materials and labor exist but reference non-existent mini-sections');
+        console.warn('⚠️ This means the mini-sections were deleted but materials/labor were not cleaned up');
+        console.warn('⚠️ Referenced mini-section IDs:', missingIds);
+        console.warn('⚠️ SOLUTION: Either restore the mini-sections or reassign the materials/labor');
+        console.warn('⚠️ ================================================\n');
+      }
+      
       // Calculate RAW totals (no filtering) for debugging
       const rawUsedTotal = parsedMaterialUsed.reduce((sum: number, m: any) => sum + (m.totalCost || m.cost || 0), 0);
       const rawAvailableTotal = parsedMaterialAvailable.reduce((sum: number, m: any) => sum + (m.totalCost || m.cost || 0), 0);
@@ -140,16 +210,37 @@ const MiniSectionsAnalytics: React.FC = () => {
 
       // CRITICAL FIX: If no mini-sections exist, create a virtual one for the section itself
       // This handles cases where materials/labor are assigned to section but not mini-sections
-      let effectiveMiniSections = miniSectionsData;
-      if (miniSectionsData.length === 0) {
+      let effectiveMiniSections = allMiniSections;
+      if (allMiniSections.length === 0) {
         console.log('\n⚠️ ========== NO MINI-SECTIONS FOUND ==========');
         console.log('⚠️ Creating virtual mini-section for section-level data');
         console.log('⚠️ Virtual mini-section will use sectionId:', sectionId);
-        effectiveMiniSections = [{
-          _id: sectionId,
-          name: sectionName || 'Section',
-          // This virtual mini-section will capture all section-level expenses
-        }] as any[];
+        
+        // Create virtual mini-sections for orphaned data
+        // Group materials/labor by their sectionId to create separate virtual mini-sections
+        const orphanedSectionIds = [...new Set([
+          ...parsedMaterialUsed.map((m: any) => m.sectionId).filter((id: string) => id && id !== sectionId),
+          ...parsedLabors.map((l: any) => l.sectionId).filter((id: string) => id && id !== sectionId && id !== 'no-mini-section'),
+        ])];
+        
+        if (orphanedSectionIds.length > 0) {
+          console.log('⚠️ Found orphaned data with sectionIds:', orphanedSectionIds);
+          console.log('⚠️ Creating virtual mini-sections for orphaned data...');
+          
+          effectiveMiniSections = orphanedSectionIds.map((id, index) => ({
+            _id: id,
+            name: `Deleted Mini-Section ${index + 1}`,
+            isVirtual: true,
+            isOrphaned: true,
+          })) as any[];
+        } else {
+          // No orphaned data, create a single virtual mini-section for the section
+          effectiveMiniSections = [{
+            _id: sectionId,
+            name: sectionName || 'Section',
+            isVirtual: true,
+          }] as any[];
+        }
       }
       console.log('   - Effective mini-sections to process:', effectiveMiniSections.length);
       console.log('   - Effective mini-section IDs:', effectiveMiniSections.map((ms: any) => ms._id));
@@ -171,7 +262,7 @@ const MiniSectionsAnalytics: React.FC = () => {
         console.log('🔑 Labor fields:', Object.keys(projectLaborData[0]));
       }
       console.log('🎯 Looking for sectionId:', sectionId);
-      console.log('📍 Mini-sections:', miniSectionsData.map(ms => ({ id: ms._id, name: ms.name })));
+      console.log('📍 Mini-sections:', allMiniSections.map(ms => ({ id: ms._id, name: ms.name })));
 
       // Fetch equipment costs - ALWAYS try to fetch, even if it fails
       console.log('\n🔧 ========== EQUIPMENT PROCESSING ==========');
@@ -364,28 +455,34 @@ const MiniSectionsAnalytics: React.FC = () => {
       console.log('\n💰 ========== CALCULATING EXPENSES ==========');
       const miniSectionExpenses: MiniSectionExpense[] = effectiveMiniSections.map((miniSection: any) => {
         console.log(`\n📍 Processing mini-section: ${miniSection.name} (ID: ${miniSection._id})`);
-        console.log(`   - Is virtual mini-section: ${miniSection._id === sectionId}`);
+        console.log(`   - Is virtual mini-section for section: ${miniSection._id === sectionId}`);
+        console.log(`   - Is orphaned virtual mini-section: ${miniSection.isOrphaned || false}`);
         console.log(`   - Section ID to match: ${sectionId}`);
         
-        // SIMPLIFIED LOGIC: If this is a virtual mini-section (no real mini-sections exist),
-        // just include ALL materials/labor regardless of sectionId
-        const isVirtualMiniSection = miniSection._id === sectionId;
+        // CRITICAL FIX: Distinguish between two types of virtual mini-sections:
+        // 1. Virtual mini-section for the section itself (miniSection._id === sectionId)
+        // 2. Orphaned virtual mini-sections (created for deleted mini-sections, miniSection.isOrphaned === true)
+        const isVirtualForSection = miniSection._id === sectionId;
+        const isOrphanedVirtual = miniSection.isOrphaned === true;
         
         // Calculate used materials cost
         const miniSectionUsedMaterials = parsedMaterialUsed.filter(
           (material: any) => {
-            if (isVirtualMiniSection) {
-              // For virtual mini-section, be very forgiving:
-              // Include if: has matching sectionId, OR has no sectionId, OR if there's only one section (include everything)
+            if (isVirtualForSection) {
+              // For virtual mini-section representing the section itself:
+              // Include if: has matching sectionId, OR has no sectionId
               const hasSectionId = material.sectionId === sectionId;
               const hasNoSectionId = !material.sectionId;
               const matches = hasSectionId || hasNoSectionId;
               console.log(`     - Material "${material.name}": sectionId="${material.sectionId}", matches=${matches}, cost=₹${material.totalCost || material.cost || 0}`);
               return matches;
             }
-            // For real mini-sections, match by miniSectionId
-            const matches = material.miniSectionId === miniSection._id;
-            console.log(`     - Material "${material.name}": miniSectionId="${material.miniSectionId}", matches=${matches}`);
+            // For orphaned virtual mini-sections OR real mini-sections:
+            // Match by miniSectionId OR sectionId (legacy data has mini-section IDs in sectionId field)
+            const matchesMiniSectionId = material.miniSectionId === miniSection._id;
+            const matchesSectionId = material.sectionId === miniSection._id;
+            const matches = matchesMiniSectionId || matchesSectionId;
+            console.log(`     - Material "${material.name}": miniSectionId="${material.miniSectionId}", sectionId="${material.sectionId}", miniSection._id="${miniSection._id}", matchesMiniSectionId=${matchesMiniSectionId}, matchesSectionId=${matchesSectionId}, FINAL_MATCH=${matches}`);
             return matches;
           }
         );
@@ -402,28 +499,21 @@ const MiniSectionsAnalytics: React.FC = () => {
         
         let miniSectionAvailableMaterials = parsedMaterialAvailable.filter(
           (material: any) => {
-            if (isVirtualMiniSection) {
-              // For virtual mini-section, be very forgiving
+            if (isVirtualForSection) {
+              // For virtual mini-section representing the section itself
               const hasSectionId = material.sectionId === sectionId;
               const hasNoSectionId = !material.sectionId;
               const matches = hasSectionId || hasNoSectionId;
               console.log(`     - Available material "${material.name}": sectionId="${material.sectionId}", matches=${matches}, cost=₹${material.totalCost || material.cost || 0}`);
               return matches;
             }
-            // For real mini-sections, match by miniSectionId
-            // CRITICAL FIX: MaterialAvailable often doesn't have miniSectionId OR sectionId set
-            // If both are missing, include the material (it's unassigned and available to all)
-            const hasMiniSectionId = material.miniSectionId === miniSection._id;
-            const hasNoMiniSectionId = !material.miniSectionId || material.miniSectionId === 'undefined';
-            const hasSectionId = material.sectionId === sectionId;
-            const hasNoSectionId = !material.sectionId;
-            
-            // Match if: 
-            // 1. Has matching miniSectionId, OR
-            // 2. (No miniSectionId AND has matching sectionId), OR
-            // 3. (No miniSectionId AND no sectionId - unassigned material)
-            const matches = hasMiniSectionId || (hasNoMiniSectionId && (hasSectionId || hasNoSectionId));
-            console.log(`     - Available material "${material.name}": miniSectionId="${material.miniSectionId}", sectionId="${material.sectionId}", matches=${matches}, cost=₹${material.totalCost || material.cost || 0}`);
+            // For orphaned virtual mini-sections OR real mini-sections:
+            // Match by miniSectionId OR sectionId (legacy data)
+            const matchesMiniSectionId = material.miniSectionId === miniSection._id;
+            const matchesSectionId = material.sectionId === miniSection._id;
+            const hasNoIds = !material.miniSectionId && !material.sectionId;
+            const matches = matchesMiniSectionId || matchesSectionId || hasNoIds;
+            console.log(`     - Available material "${material.name}": miniSectionId="${material.miniSectionId}", sectionId="${material.sectionId}", miniSection._id="${miniSection._id}", matches=${matches}, cost=₹${material.totalCost || material.cost || 0}`);
             return matches;
           }
         );
@@ -463,22 +553,19 @@ const MiniSectionsAnalytics: React.FC = () => {
               return false;
             }
             
-            if (isVirtualMiniSection) {
-              // For virtual mini-section, match by sectionId only
+            if (isVirtualForSection) {
+              // For virtual mini-section representing the section itself:
+              // Match by sectionId only
               const hasSectionId = labor.sectionId === sectionId;
               console.log(`     - Labor "${labor.type}": sectionId="${labor.sectionId}", matches=${hasSectionId}, cost=₹${labor.totalCost || 0}`);
               return hasSectionId;
             }
-            // For real mini-sections, match by miniSectionId
-            const hasMiniSectionId = labor.miniSectionId === miniSection._id;
-            const hasNoMiniSectionId = !labor.miniSectionId || labor.miniSectionId === 'undefined';
-            const hasSectionId = labor.sectionId === sectionId;
-            
-            // Match if: 
-            // 1. Has matching miniSectionId, OR
-            // 2. (No miniSectionId AND has matching sectionId)
-            const matches = hasMiniSectionId || (hasNoMiniSectionId && hasSectionId);
-            console.log(`     - Labor "${labor.type}": miniSectionId="${labor.miniSectionId}", sectionId="${labor.sectionId}", matches=${matches}, cost=₹${labor.totalCost || 0}`);
+            // For orphaned virtual mini-sections OR real mini-sections:
+            // Match by miniSectionId OR sectionId (legacy data has mini-section IDs in sectionId field)
+            const matchesMiniSectionId = labor.miniSectionId === miniSection._id;
+            const matchesSectionId = labor.sectionId === miniSection._id;
+            const matches = matchesMiniSectionId || matchesSectionId;
+            console.log(`     - Labor "${labor.type}": miniSectionId="${labor.miniSectionId}", sectionId="${labor.sectionId}", miniSection._id="${miniSection._id}", matchesMiniSectionId=${matchesMiniSectionId}, matchesSectionId=${matchesSectionId}, FINAL_MATCH=${matches}, cost=₹${labor.totalCost || 0}`);
             return matches;
           }
         );
@@ -565,7 +652,8 @@ const MiniSectionsAnalytics: React.FC = () => {
   const totalLaborCost = miniSections.reduce((sum, ms) => sum + ms.laborCost, 0) + totalBuildingLaborExpense;
 
   // Transform to pie data - combine mini-sections and single equipment slice
-  const miniSectionPieData = miniSections.map((miniSection, index) => ({
+  // CRITICAL: Only include mini-sections with expenses > 0 to avoid NaN in pie chart
+  const miniSectionPieData = miniSections.filter(ms => ms.totalExpense > 0).map((miniSection, index) => ({
     key: miniSection._id,
     value: miniSection.totalExpense,
     svg: {
@@ -749,15 +837,6 @@ const MiniSectionsAnalytics: React.FC = () => {
               </View> */}
               <View style={styles.breakdownStatItem}>
                 <View style={styles.breakdownStatIconContainer}>
-                  <Ionicons name="construct-outline" size={18} color="#F59E0B" />
-                </View>
-                <View style={styles.breakdownStatInfo}>
-                  <Text style={styles.breakdownStatLabel}>Equipment Costs</Text>
-                  <Text style={styles.breakdownStatValue}>{formatCurrency(totalEquipmentExpense)}</Text>
-                </View>
-              </View>
-              <View style={styles.breakdownStatItem}>
-                <View style={styles.breakdownStatIconContainer}>
                   <Ionicons name="people-outline" size={18} color="#EF4444" />
                 </View>
                 <View style={styles.breakdownStatInfo}>
@@ -774,19 +853,36 @@ const MiniSectionsAnalytics: React.FC = () => {
             <ActivityIndicator size="large" color="#3B82F6" />
             <Text style={styles.loadingText}>Loading mini-section expenses...</Text>
           </View>
-        ) : (miniSections.length === 0 && equipmentExpenses.length === 0) ? (
+        ) : (miniSections.length === 0 && equipmentExpenses.length === 0 && buildingLaborExpenses.length === 0) || totalExpense === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="grid-outline" size={64} color="#CBD5E1" />
-            <Text style={styles.emptyTitle}>No Actual Expenses</Text>
+            <Text style={styles.emptyTitle}>No Expenses Found</Text>
             <Text style={styles.emptySubtitle}>
-              No materials have been used, no equipment costs incurred, and no labor costs recorded in any mini-sections yet
+              No materials have been used, no equipment costs incurred, and no labor costs recorded in this section yet.
+              {'\n\n'}
+              Check the console logs for detailed debugging information about why expenses might not be showing.
             </Text>
+            <View style={{ marginTop: 20, padding: 15, backgroundColor: '#FEF3C7', borderRadius: 10, width: '100%' }}>
+              <Text style={{ fontSize: 12, color: '#92400E', textAlign: 'left', fontFamily: 'monospace' }}>
+                Debug Info:{'\n'}
+                Section ID: {sectionId}{'\n'}
+                Section Name: {sectionName}{'\n'}
+                Mini-Sections: {miniSections.length}{'\n'}
+                Equipment: {equipmentExpenses.length}{'\n'}
+                Building Labor: {buildingLaborExpenses.length}{'\n'}
+                Total Expense: ₹{totalExpense}{'\n'}
+                {'\n'}
+                ⚠️ This section has no expenses.{'\n'}
+                Materials/labor may be assigned to different sections.{'\n'}
+                Check console for section ID mismatch details.
+              </Text>
+            </View>
           </View>
         ) : (
           <Animated.View style={[styles.card, { opacity: fadeAnim }]}>
             <View style={styles.heading}>
               <Text style={styles.title}>Mini-Section Actual Expenses</Text>
-              <Text style={styles.subtitle}>Used Materials + Equipment + Labor Costs</Text>
+              <Text style={styles.subtitle}>Used Materials + Labor Costs</Text>
             </View>
 
             <View style={styles.chartContainer}>

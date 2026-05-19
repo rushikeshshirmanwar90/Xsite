@@ -128,7 +128,7 @@ const ProjectSections = () => {
 
   const handleViewDetails = (section: ProjectSection) => {
     console.log('Navigating to details with materials:', {
-      sectionId: section._id || section.sectionId,
+      sectionId: section.sectionId || section._id,
       passingMaterialsData: true
     });
 
@@ -137,7 +137,7 @@ const ProjectSections = () => {
       params: {
         projectId: id as string,
         projectName: name as string,
-        sectionId: section._id || section.sectionId,
+        sectionId: section.sectionId || section._id,
         sectionName: section.name,
         materialAvailable: materialAvailable as string,
         materialUsed: materialUsed as string
@@ -237,7 +237,7 @@ const ProjectSections = () => {
     const completionStates: {[key: string]: boolean} = {};
 
     for (const section of sections) {
-      const sectionId = section._id || section.sectionId;
+      const sectionId = section.sectionId || section._id;
       if (!sectionId || !isValidMongoId(sectionId)) {
         console.warn(`⚠️ Invalid section ID for ${section.name}:`, sectionId);
         completionStates[sectionId] = false;
@@ -503,7 +503,7 @@ const ProjectSections = () => {
       >
         {sections && sections.length > 0 ? (
           sections.map((section, index) => {
-            const sectionId = section._id || section.sectionId;
+            const sectionId = section.sectionId || section._id;
             const isCompleted = sectionCompletions[sectionId] || false;
             const isLoadingCompletion = isLoadingSectionCompletions && !sectionCompletions.hasOwnProperty(sectionId);
             
