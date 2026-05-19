@@ -16,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import { toast } from 'sonner-native';
+import apiClient from '@/utils/axiosConfig';
 
 export default function ProjectDetails() {
   const { id } = useLocalSearchParams();
@@ -110,21 +111,22 @@ export default function ProjectDetails() {
       return;
     }
 
-    setLoading(true);
-    try {
-      const response = await fetch(`${domain}/api/project/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: editProjectName.trim(),
-          totalBudget: Number(editProjectBudget),
-          status: editProjectStatus,
-        }),
-      });
+    // ✅ Validate project ID before making API call
+    if (!id || id === 'undefined' || id === 'null') {
+      console.error('❌ Project ID is invalid, cannot update project');
+      console.error('   Received id:', id);
+      toast.error('Invalid project ID. Cannot update project.');
+      return;
+    }
 
-      const data = await response.json();
+    try {
+      setLoading(true);
+      
+      const { data } = await apiClient.put(`/api/project/${id}`, {
+        name: editProjectName.trim(),
+        totalBudget: Number(editProjectBudget),
+        status: editProjectStatus,
+      });
 
       if (data.success) {
         toast.success('Project updated successfully');
@@ -132,11 +134,15 @@ export default function ProjectDetails() {
         // Refresh the page or update local state
         router.back();
       } else {
-        throw new Error(data.message || 'Failed to update project');
+        toast.error(data.message || 'Failed to update project');
       }
     } catch (error: any) {
-      console.error('Error updating project:', error);
-      toast.error(error.message || 'Failed to update project');
+      const message =
+        error?.response?.data?.message ??
+        error?.message ??
+        'Failed to update project. Please try again.';
+      toast.error(message);
+      console.error('[EditProject] Error:', error);
     } finally {
       setLoading(false);
     }
@@ -167,23 +173,32 @@ export default function ProjectDetails() {
   };
 
   const confirmDeleteProject = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`${domain}/api/project/${id}`, {
-        method: 'DELETE',
-      });
+    // ✅ Validate project ID before making API call
+    if (!id || id === 'undefined' || id === 'null') {
+      console.error('❌ Project ID is invalid, cannot delete project');
+      console.error('   Received id:', id);
+      toast.error('Invalid project ID. Cannot delete project.');
+      return;
+    }
 
-      const data = await response.json();
+    try {
+      setLoading(true);
+      
+      const { data } = await apiClient.delete(`/api/project/${id}`);
 
       if (data.success) {
         toast.success('Project deleted successfully');
         router.replace('/');
       } else {
-        throw new Error(data.message || 'Failed to delete project');
+        toast.error(data.message || 'Failed to delete project');
       }
     } catch (error: any) {
-      console.error('Error deleting project:', error);
-      toast.error(error.message || 'Failed to delete project');
+      const message =
+        error?.response?.data?.message ??
+        error?.message ??
+        'Failed to delete project. Please try again.';
+      toast.error(message);
+      console.error('[DeleteProject] Error:', error);
     } finally {
       setLoading(false);
     }

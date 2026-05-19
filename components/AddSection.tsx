@@ -28,12 +28,11 @@ const AddSectionModal = ({ visible, onClose, onAddSection, projectId, projectNam
 
     // Notification service
     const { sendProjectNotification } = useSimpleNotifications();
-    const { user } = useAuth();
+    const { user, clientId } = useAuth();
 
     // Section types
     const sectionTypes: SectionType[] = [
         { id: 'building', label: 'Building' },
-        { id: 'rowhouse', label: 'Row House' },
         { id: 'other', label: 'Other' }
     ];
 
@@ -62,11 +61,15 @@ const AddSectionModal = ({ visible, onClose, onAddSection, projectId, projectNam
                 
                 const notificationSent = await sendProjectNotification({
                     projectId: projectId,
+                    clientId: clientId || undefined,
                     activityType: 'section_created',
                     staffName: user?.firstName || user?.name || 'User',
                     projectName: projectName || 'Project',
                     sectionName: sectionTitle.trim(),
                     details: `Created ${selectedType} section "${sectionTitle.trim()}"${selectedType === 'rowhouse' ? ` with ${totalHouses} houses` : ''}`,
+                    performerId: user?._id,
+                    performerRole: user?.role,
+                    recipientType: 'admins',
                     category: 'section',
                     message: `Section type: ${selectedType}`,
                 });

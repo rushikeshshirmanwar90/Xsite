@@ -35,7 +35,7 @@ const MaterialAddForm: React.FC<MaterialAddFormProps> = ({
   const unitRef = useRef<TextInput>(null);
   const costRef = useRef<TextInput>(null);
   
-  const { user } = useAuth();
+  const { user, clientId } = useAuth();
   const { sendProjectNotification } = useSimpleNotifications();
 
   const handleAddMaterial = async () => {
@@ -79,13 +79,14 @@ const MaterialAddForm: React.FC<MaterialAddFormProps> = ({
 
       const notificationSent = await sendProjectNotification({
         projectId,
+        clientId: clientId || undefined,
         activityType: 'material_added',
         staffName: user?.firstName || user?.name || 'Staff Member',
         projectName,
         details: `Added ${quantity} ${unit} of ${materialName}${cost ? ` (₹${cost})` : ''}`,
+        performerId: user?._id,
+        performerRole: user?.role,
         recipientType: 'admins',
-        staffId: user?._id, // ✅ Pass staffId to prevent self-notification
-        // ✅ Remove clientId - let backend get it from project
       });
 
       console.log('📤 Notification send result:', notificationSent);

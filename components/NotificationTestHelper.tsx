@@ -8,7 +8,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import NotificationManager from '../services/notificationManager';
+import { SimpleNotificationService } from '@/services/SimpleNotificationService';
 
 interface TestNotificationHelperProps {
   onClose?: () => void;
@@ -16,7 +16,7 @@ interface TestNotificationHelperProps {
 
 const NotificationTestHelper: React.FC<TestNotificationHelperProps> = ({ onClose }) => {
   const [isAdding, setIsAdding] = useState(false);
-  const notificationManager = NotificationManager.getInstance();
+  const notificationService = SimpleNotificationService.getInstance();
 
   const testNotifications = [
     {
@@ -97,7 +97,11 @@ const NotificationTestHelper: React.FC<TestNotificationHelperProps> = ({ onClose
       console.log('📱 Adding test notifications...');
       
       for (const notification of testNotifications) {
-        await notificationManager.addNotification(notification);
+        await notificationService.scheduleLocalNotification(
+          notification.title,
+          notification.body,
+          notification.data
+        );
         // Small delay to ensure different timestamps
         await new Promise(resolve => setTimeout(resolve, 100));
       }
@@ -124,7 +128,11 @@ const NotificationTestHelper: React.FC<TestNotificationHelperProps> = ({ onClose
 
   const addSingleNotification = async (notification: typeof testNotifications[0]) => {
     try {
-      await notificationManager.addNotification(notification);
+      await notificationService.scheduleLocalNotification(
+        notification.title,
+        notification.body,
+        notification.data
+      );
       Alert.alert(
         'Added!',
         `Added notification: ${notification.title}`,
@@ -139,23 +147,8 @@ const NotificationTestHelper: React.FC<TestNotificationHelperProps> = ({ onClose
   const clearAllNotifications = async () => {
     Alert.alert(
       'Clear All Notifications',
-      'Are you sure you want to clear all notifications? This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear All',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await notificationManager.clearAll();
-              Alert.alert('Cleared!', 'All notifications have been cleared.', [{ text: 'OK' }]);
-            } catch (error) {
-              console.error('❌ Error clearing notifications:', error);
-              Alert.alert('Error', 'Failed to clear notifications', [{ text: 'OK' }]);
-            }
-          }
-        }
-      ]
+      'This feature is not available with SimpleNotificationService. Notifications are managed by the system.',
+      [{ text: 'OK' }]
     );
   };
 

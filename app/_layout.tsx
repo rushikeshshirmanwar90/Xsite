@@ -6,6 +6,7 @@ import 'react-native-reanimated';
 import { Toaster } from "sonner-native";
 import OnboardingWrapper from '@/components/onboarding/OnboardingWrapper';
 import AppNavigator from '@/components/AppNavigator';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 export const unstable_settings = {
   initialRouteName: 'index',
@@ -13,10 +14,12 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   return (
-    <OnboardingWrapper>
-      <AuthProvider>
-        <AppNavigator />
-      </AuthProvider>
-    </OnboardingWrapper>
+    <ErrorBoundary>
+      <OnboardingWrapper>
+        <AuthProvider>
+          <AppNavigator />
+        </AuthProvider>
+      </OnboardingWrapper>
+    </ErrorBoundary>
   );
 }

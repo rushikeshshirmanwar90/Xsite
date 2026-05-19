@@ -1,5 +1,4 @@
 import AddSectionModal from '@/components/AddSection';
-import { domain } from '@/lib/domain';
 import { ProjectSection } from '@/types/project';
 import { logSectionCreated, logSectionDeleted, logSectionUpdated } from '@/utils/activityLogger';
 import { Ionicons } from '@expo/vector-icons';
@@ -128,6 +127,16 @@ const ManageProject = () => {
             // Extract project ID if it's an array
             const projectId = Array.isArray(id) ? id[0] : id;
 
+            // ✅ Validate projectId before making API call
+            if (!projectId || projectId === 'undefined' || projectId === 'null') {
+                console.error('❌ Project ID is invalid, cannot fetch sections');
+                console.error('   Received id:', id);
+                console.error('   Extracted projectId:', projectId);
+                toast.error('Invalid project ID. Cannot load sections.');
+                setLoading(false);
+                return;
+            }
+
             // Get client ID - use passed parameter first, then get from storage
             let clientId = passedClientId;
             if (!clientId) {
@@ -144,7 +153,7 @@ const ManageProject = () => {
             console.log('Fetching sections for project:', projectId);
             console.log('Using client ID:', clientId);
             console.log('Client ID source:', passedClientId ? 'passed parameter' : 'from storage');
-            console.log('API URL:', `${domain}/api/project/${projectId}?clientId=${clientId}`);
+            console.log('API URL:', `/api/project/${projectId}?clientId=${clientId}`);
 
             const res = await apiClient.get(`/api/project/${projectId}?clientId=${clientId}`);
             const responseData = res.data as any;
@@ -238,7 +247,11 @@ const ManageProject = () => {
                     style: 'destructive',
                     onPress: async () => {
                         let loadingToast: any = null;
-                        const sectionId = section._id || section.sectionId;
+                        // ✅ Use sectionId first (the actual building/rowhouse/other ID), fallback to _id
+                        const sectionId = section.sectionId || section._id;
+                        
+                        // ✅ FIXED: Extract projectId from array if needed
+                        const projectId = Array.isArray(id) ? id[0] : id;
 
                         try {
                             loadingToast = toast.loading('Deleting section...');
@@ -252,16 +265,17 @@ const ManageProject = () => {
                             console.log('section.sectionId:', section.sectionId);
                             console.log('Extracted sectionId:', sectionId);
                             console.log('Section type:', section.type);
-                            console.log('Project ID:', id);
+                            console.log('Project ID (raw):', id);
+                            console.log('Project ID (extracted):', projectId);
                             console.log('========================================');
 
                             // Determine the correct API endpoint based on section type
-                            if (section.type === 'Buildings') {
-                                endpoint = `${domain}api/building?projectId=${id}&sectionId=${sectionId}`;
-                            } else if (section.type === 'rowhouse') {
-                                endpoint = `${domain}api/rowHouse?projectId=${id}&sectionId=${sectionId}`;
+                            if (section.type === 'Buildings' || section.type === 'building') {
+                                endpoint = `/api/building?projectId=${projectId}&sectionId=${sectionId}`;
+                            } else if (section.type === 'rowhouse' || section.type === 'row house' || section.type === 'Rowhouse') {
+                                endpoint = `/api/rowHouse?projectId=${projectId}&sectionId=${sectionId}`;
                             } else {
-                                endpoint = `${domain}api/otherSection?projectId=${id}&sectionId=${sectionId}`;
+                                endpoint = `/api/otherSection?projectId=${projectId}&sectionId=${sectionId}`;
                             }
 
                             console.log('Delete endpoint:', endpoint);
@@ -272,14 +286,14 @@ const ManageProject = () => {
 
                             toast.dismiss(loadingToast);
 
-                            // Check if response is successful
-                            const responseData = res.data as any;
-                            if (res.status === 200 || responseData?.message || responseData?.deletedRowHouse !== undefined || responseData?.deletedOtherSection !== undefined) {
+                            // Check if response is successful - all APIs return 200 on success
+                            if (res.status === 200) {
                                 toast.success('Section deleted successfully!');
 
-                                // Log activity
+                                // Log activity - extract projectId properly
+                                const projectIdForLog = Array.isArray(id) ? id[0] : id;
                                 await logSectionDeleted(
-                                    id as string,
+                                    projectIdForLog as string,
                                     name as string,
                                     sectionId,
                                     section.name
@@ -288,7 +302,7 @@ const ManageProject = () => {
                                 // Remove the section from the list immediately (optimistic update)
                                 setSections(prevSections => {
                                     const updated = prevSections.filter(s => {
-                                        const currentId = s._id || s.sectionId;
+                                        const currentId = s.sectionId || s._id;
                                         return currentId !== sectionId;
                                     });
                                     console.log('Sections after delete:', updated.length);
@@ -317,7 +331,7 @@ const ManageProject = () => {
                                 // Remove from list anyway since it's not found
                                 setSections(prevSections => {
                                     return prevSections.filter(s => {
-                                        const currentId = s._id || s.sectionId;
+                                        const currentId = s.sectionId || s._id;
                                         return currentId !== sectionId;
                                     });
                                 });
@@ -329,7 +343,7 @@ const ManageProject = () => {
                                 // Remove from list anyway
                                 setSections(prevSections => {
                                     return prevSections.filter(s => {
-                                        const currentId = s._id || s.sectionId;
+                                        const currentId = s.sectionId || s._id;
                                         return currentId !== sectionId;
                                     });
                                 });
@@ -362,8 +376,17 @@ const ManageProject = () => {
             try {
                 // Use sectionId for buildings (this is the actual building ID)
                 const sectionId = section.sectionId || section._id;
+                
+                // ✅ Validate sectionId before making API call
+                if (!sectionId) {
+                    console.error('❌ Building ID is undefined');
+                    console.error('   section:', section);
+                    toast.error('Building ID is missing. Cannot fetch building details.');
+                    return;
+                }
+                
                 console.log('🔍 DEBUG: Fetching building details for ID:', sectionId);
-                console.log('🌐 API URL:', `${domain}/api/building?id=${sectionId}`);
+                console.log('🌐 API URL:', `/api/building?id=${sectionId}`);
                 
                 const response = await apiClient.get(`/api/building?id=${sectionId}`);
                 const responseData = response.data as any;
@@ -475,7 +498,18 @@ const ManageProject = () => {
             return;
         }
 
-        const sectionId = editingSection._id || editingSection.sectionId;
+        const sectionId = editingSection.sectionId || editingSection._id;
+
+        // ✅ Validate sectionId before proceeding
+        if (!sectionId) {
+            console.error('❌ Section ID is undefined');
+            console.error('   editingSection:', editingSection);
+            toast.error('Section ID is missing. Cannot update section.');
+            return;
+        }
+        
+        // ✅ Extract projectId from array if needed
+        const projectId = Array.isArray(id) ? id[0] : id;
 
         let loadingToast: any = null;
 
@@ -491,28 +525,17 @@ const ManageProject = () => {
             console.log('Full section object:', JSON.stringify(editingSection, null, 2));
             console.log('Section type:', editingSection.type);
             console.log('Section ID:', sectionId);
-            console.log('Project ID:', id);
+            console.log('Project ID (raw):', id);
+            console.log('Project ID (extracted):', projectId);
             console.log('Old name:', editingSection.name);
             console.log('New name:', newName);
             console.log('========================================');
 
             // Determine the correct API endpoint based on section type
-            // Try updating through project API instead of individual section APIs
             if (editingSection.type === 'Buildings' || editingSection.type === 'building') {
-                // For buildings, try updating the project's section array
-                endpoint = `${domain}api/project/${id}`;
-                
-                // Create payload to update the specific section in the project
-                payload = {
-                    action: 'updateSection',
-                    sectionId: sectionId,
-                    updates: {
-                        name: newName
-                    }
-                };
-                console.log('✅ MATCHED: Building type - using project update endpoint');
+                console.log('✅ MATCHED: Building type');
             } else if (editingSection.type === 'rowhouse' || editingSection.type === 'row house' || editingSection.type === 'Rowhouse') {
-                endpoint = `${domain}api/rowHouse?projectId=${id}&sectionId=${sectionId}`;
+                endpoint = `/api/rowHouse?projectId=${projectId}&sectionId=${sectionId}`;
                 payload = { name: newName };
                 console.log('✅ MATCHED: Rowhouse type');
 
@@ -521,7 +544,7 @@ const ManageProject = () => {
                     payload.totalHouses = sectionData.totalHouses;
                 }
             } else {
-                endpoint = `${domain}api/otherSection?projectId=${id}&sectionId=${sectionId}`;
+                endpoint = `/api/otherSection?projectId=${projectId}&sectionId=${sectionId}`;
                 payload = { name: newName };
                 console.log('✅ MATCHED: Other section type');
             }
@@ -530,159 +553,17 @@ const ManageProject = () => {
             console.log('Payload:', payload);
 
             let res;
-            try {
-                // For buildings, try updating through project API first
-                if (editingSection.type === 'Buildings' || editingSection.type === 'building') {
-                    console.log('🔄 Trying project-based section update...');
-                    res = await apiClient.patch(endpoint, payload);
-                    console.log('✅ Project section update successful');
-                } else {
-                    // For other section types, use PUT method
-                    res = await apiClient.put(endpoint, payload);
-                    console.log('✅ Direct section update successful');
-                }
-            } catch (firstError: any) {
-                console.log('⚠️ First approach failed, trying alternatives...');
-                console.log('First error:', firstError?.response?.data);
-                console.log('First error status:', firstError?.response?.status);
-                
-                if (editingSection.type === 'Buildings' || editingSection.type === 'building') {
-                    // Try the original building API approach as fallback
-                    try {
-                        const buildingEndpoint = `${domain}api/building?id=${sectionId}`;
-                        const buildingPayload = {
-                            name: newName,
-                            _id: sectionId,
-                            projectId: id,
-                            clientId: 'unknown'
-                        };
-                        
-                        console.log('� Trying building API as fallback...');
-                        res = await apiClient.put(buildingEndpoint, buildingPayload);
-                        console.log('✅ Building API fallback successful');
-                    } catch (secondError: any) {
-                        if (secondError?.response?.status === 404) {
-                            console.log('🔄 Building not found, creating new building...');
-                            
-                            const createPayload = {
-                                name: newName,
-                                _id: sectionId,
-                                projectId: id,
-                                clientId: 'unknown',
-                                totalFloors: 0,
-                                totalBookedUnits: 0,
-                                description: '',
-                                hasBasement: false,
-                                hasGroundFloor: true
-                            };
-                            
-                            res = await apiClient.post(`${domain}api/building`, createPayload);
-                            console.log('✅ Building created successfully');
-                        } else {
-                            // Try a simple section name update through a generic endpoint
-                            console.log('🔄 Trying generic section update...');
-                            const genericPayload = {
-                                projectId: id,
-                                sectionId: sectionId,
-                                name: newName,
-                                type: editingSection.type
-                            };
-                            
-                            try {
-                                res = await apiClient.put(`${domain}api/section/update`, genericPayload);
-                                console.log('✅ Generic section update successful');
-                            } catch (thirdError: any) {
-                                console.log('❌ All API approaches failed, updating local state instead...');
-                                
-                                // Since all API calls are failing, update local state and show success
-                                // This provides immediate user feedback while API issues are resolved
-                                
-                                // Update the section in the list immediately
-                                setSections(prevSections => {
-                                    return prevSections.map(s => {
-                                        const currentId = s._id || s.sectionId;
-                                        if (currentId === sectionId) {
-                                            return { ...s, name: newName };
-                                        }
-                                        return s;
-                                    });
-                                });
-
-                                toast.dismiss(loadingToast);
-                                toast.success(`Section renamed to "${newName}" successfully! (Local update - API temporarily unavailable)`);
-
-                                // Log activity (optional)
-                                try {
-                                    await logSectionUpdated(
-                                        id as string,
-                                        name as string,
-                                        sectionId,
-                                        newName,
-                                        [{
-                                            field: 'name',
-                                            oldValue: editingSection.name,
-                                            newValue: newName,
-                                        }]
-                                    );
-                                } catch (logError) {
-                                    console.log('Activity logging failed, but update was successful');
-                                }
-
-                                console.log('✅ Section updated in list (local update)');
-
-                                // Close modal and reset state
-                                setShowEditModal(false);
-                                setEditingSection(null);
-                                setEditSectionName('');
-                                
-                                return; // Exit the function successfully
-                            }
-                        }
-                    }
-                } else {
-                    // For non-building sections, also fall back to local update
-                    console.log('❌ Non-building section API failed, updating local state instead...');
-                    
-                    // Update the section in the list immediately
-                    setSections(prevSections => {
-                        return prevSections.map(s => {
-                            const currentId = s._id || s.sectionId;
-                            if (currentId === sectionId) {
-                                return { ...s, name: newName };
-                            }
-                            return s;
-                        });
-                    });
-
-                    toast.dismiss(loadingToast);
-                    toast.success(`Section renamed to "${newName}" successfully! (Local update - API temporarily unavailable)`);
-
-                    // Log activity (optional)
-                    try {
-                        await logSectionUpdated(
-                            id as string,
-                            name as string,
-                            sectionId,
-                            newName,
-                            [{
-                                field: 'name',
-                                oldValue: editingSection.name,
-                                newValue: newName,
-                            }]
-                        );
-                    } catch (logError) {
-                        console.log('Activity logging failed, but update was successful');
-                    }
-
-                    console.log('✅ Section updated in list (local update)');
-
-                    // Close modal and reset state
-                    setShowEditModal(false);
-                    setEditingSection(null);
-                    setEditSectionName('');
-                    
-                    return; // Exit the function successfully
-                }
+            // For buildings, use building API endpoint
+            if (editingSection.type === 'Buildings' || editingSection.type === 'building') {
+                console.log('🔄 Updating building via building API...');
+                endpoint = `/api/building?id=${sectionId}&projectId=${projectId}`;
+                payload = { name: newName };
+                res = await apiClient.put(endpoint, payload);
+                console.log('✅ Building update successful');
+            } else {
+                // For other section types, use their respective endpoints
+                res = await apiClient.put(endpoint, payload);
+                console.log('✅ Section update successful');
             }
 
             console.log('Update response:', res.data);
@@ -692,9 +573,9 @@ const ManageProject = () => {
             if (res.status === 200) {
                 toast.success(`Section renamed to "${newName}" successfully!`);
 
-                // Log activity
+                // Log activity - use extracted projectId
                 await logSectionUpdated(
-                    id as string,
+                    projectId as string,
                     name as string,
                     sectionId,
                     newName,
@@ -708,7 +589,7 @@ const ManageProject = () => {
                 // Update the section in the list
                 setSections(prevSections => {
                     return prevSections.map(s => {
-                        const currentId = s._id || s.sectionId;
+                        const currentId = s.sectionId || s._id;
                         if (currentId === sectionId) {
                             return { ...s, name: newName };
                         }
@@ -761,24 +642,36 @@ const ManageProject = () => {
 
             const sectionId = selectedSection.sectionId || selectedSection._id;
             
+            // ✅ Validate sectionId before proceeding
+            if (!sectionId) {
+                console.error('❌ Building ID is undefined');
+                console.error('   selectedSection:', selectedSection);
+                toast.dismiss(loadingToast);
+                toast.error('Building ID is missing. Cannot save building details.');
+                return;
+            }
+            
             console.log('🔍 DEBUG: Building save details');
             console.log('Selected section:', JSON.stringify(selectedSection, null, 2));
             console.log('Section ID:', sectionId);
             console.log('Building details:', JSON.stringify(buildingDetails, null, 2));
             
             // First save the building details
+            // ✅ FIXED: Include the building name in the payload so backend can update section name
             const payload = {
                 ...buildingDetails,
+                name: selectedSection.name,  // Include the building name
                 clientId: 'unknown'
             };
 
             console.log('📤 API Payload:', JSON.stringify(payload, null, 2));
-            console.log('🌐 API URL:', `${domain}/api/building?id=${sectionId}`);
+            console.log('🌐 API URL:', `/api/building?id=${sectionId}&projectId=${id}`);
 
             let response;
             
             try {
-                response = await apiClient.put(`/api/building?id=${sectionId}`, payload);
+                // ✅ FIXED: Pass projectId so backend can update section name in project
+                response = await apiClient.put(`/api/building?id=${sectionId}&projectId=${id}`, payload);
                 console.log('✅ Building updated successfully');
             } catch (updateError: any) {
                 if (updateError?.response?.status === 404) {
@@ -918,7 +811,7 @@ const ManageProject = () => {
             console.error('❌ Error status:', error?.response?.status);
 
             let errorMessage = 'Failed to save building details';
-            
+
             if (error?.response?.status === 404) {
                 errorMessage = 'Building not found and could not be created.';
             } else if (error?.response?.data?.error) {
@@ -939,6 +832,14 @@ const ManageProject = () => {
 
         const sectionId = selectedSection.sectionId || selectedSection._id;
         
+        // ✅ Validate sectionId before proceeding
+        if (!sectionId) {
+            console.error('❌ Building ID is undefined');
+            console.error('   selectedSection:', selectedSection);
+            toast.error('Building ID is missing. Cannot manage floors.');
+            return;
+        }
+
         let loadingToast: any = null;
 
         try {

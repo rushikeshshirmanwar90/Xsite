@@ -7,7 +7,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import NotificationPermissions, { PermissionStatus } from '@/services/notificationPermissions';
+import { SimpleNotificationService } from '@/services/SimpleNotificationService';
 import PushTokenService from '@/services/pushTokenService';
 
 const NotificationPermissionTest: React.FC = () => {
@@ -15,7 +15,8 @@ const NotificationPermissionTest: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [deviceSupported, setDeviceSupported] = useState<boolean | null>(null);
 
-  const permissionService = NotificationPermissions.getInstance();
+  // Test components simplified - using SimpleNotificationService
+  const notificationService = SimpleNotificationService.getInstance();
   const pushTokenService = PushTokenService.getInstance();
 
   useEffect(() => {

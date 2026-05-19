@@ -1,16 +1,15 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import NotificationManager from '@/services/notificationManager';
-import NotificationPermissions from '@/services/notificationPermissions';
+import { SimpleNotificationService } from '@/services/SimpleNotificationService';
 import PushTokenService from '@/services/pushTokenService';
 
 export default function NotificationPermissionFixer() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string>('Ready to setup notifications');
 
-  const notificationManager = NotificationManager.getInstance();
-  const permissionService = NotificationPermissions.getInstance();
+  // Test components simplified - using SimpleNotificationService
+  const notificationService = SimpleNotificationService.getInstance();
   const pushTokenService = PushTokenService.getInstance();
 
   const updateStatus = (message: string) => {

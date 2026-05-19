@@ -1,14 +1,14 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, Alert } from 'react-native';
-import NotificationManager from '../services/notificationManager';
+import { SimpleNotificationService } from '@/services/SimpleNotificationService';
 
 const NotificationTestButton: React.FC = () => {
-  const notificationManager = NotificationManager.getInstance();
+  const notificationService = SimpleNotificationService.getInstance();
 
   const testNotification = async () => {
     try {
       // Test local notification
-      await notificationManager.scheduleLocalNotification(
+      await notificationService.scheduleLocalNotification(
         'Test Notification',
         'This is a test notification from your app!',
         { test: true }

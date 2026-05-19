@@ -4,7 +4,7 @@ import LaborFormModal from '@/components/details/LaborFormModal';
 import SectionManager from '@/components/details/SectionManager';
 import { getSection, addSection } from '@/functions/details';
 import { getClientId } from '@/functions/clientId';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import apiClient from '@/utils/axiosConfig';
 
 import { styles } from '@/style/details';
 import { Section } from '@/types/details';
@@ -21,7 +21,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const LaborPage = () => {
     const params = useLocalSearchParams();
-    const { user } = useAuth();
+    const { user, clientId } = useAuth();
     const { sendProjectNotification } = useSimpleNotifications();
     
     const projectId = params.projectId as string;
@@ -71,19 +71,17 @@ const LaborPage = () => {
                 throw new Error('Client ID not found');
             }
 
-            // Import domain and auth headers
-            const { domain } = await import('@/lib/domain');
-            const { getAuthHeaders } = await import('@/utils/axiosConfig');
-
-            // Use the labor API to get entries for this project
-            const response = await fetch(`${domain}/api/labor?entityType=project&entityId=${projectId}&sectionId=${sectionId}${selectedMiniSection ? `&miniSectionId=${selectedMiniSection}` : ''}`, {
-                method: 'GET',
-                headers: {
-                    ...getAuthHeaders(),
-                },
+            // Use apiClient for authenticated requests
+            const response = await apiClient.get(`/api/labor`, {
+                params: {
+                    entityType: 'project',
+                    entityId: projectId,
+                    sectionId: sectionId,
+                    ...(selectedMiniSection ? { miniSectionId: selectedMiniSection } : {})
+                }
             });
 
-            const result = await response.json();
+            const result = response.data;
             console.log('Labor API response:', result);
 
             if (result.success && result.data) {
@@ -299,20 +297,10 @@ const LaborPage = () => {
 
             console.log('Sending labor data to API:', requestData);
 
-            // Import domain and auth headers
-            const { domain } = await import('@/lib/domain');
-            const { getAuthHeaders } = await import('@/utils/axiosConfig');
+            // Use apiClient for authenticated requests
+            const response = await apiClient.post('/api/labor', requestData);
 
-            // Call the labor API
-            const response = await fetch(`${domain}/api/labor`, {
-                method: 'POST',
-                headers: {
-                    ...getAuthHeaders(),
-                },
-                body: JSON.stringify(requestData)
-            });
-
-            const result = await response.json();
+            const result = response.data;
             console.log('Labor API response:', result);
 
             if (result.success) {
@@ -397,10 +385,13 @@ const LaborPage = () => {
                     
                     const notificationSent = await sendProjectNotification({
                         projectId: projectId,
+                        clientId: clientId || undefined,
                         activityType: 'labor_added',
                         staffName: staffName,
                         projectName: projectName,
                         details: notificationDetails,
+                        performerId: user?._id,
+                        performerRole: user?.role,
                         recipientType: 'admins',
                     });
                     

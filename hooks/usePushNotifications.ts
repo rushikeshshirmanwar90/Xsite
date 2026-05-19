@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import PushTokenService from '@/services/pushTokenService';
-import NotificationPermissions, { PermissionStatus } from '@/services/notificationPermissions';
+import { SimpleNotificationService } from '@/services/SimpleNotificationService';
+
+export interface PermissionStatus {
+  granted: boolean;
+  canAskAgain: boolean;
+  status: string;
+}
 
 export interface PushNotificationStatus {
   isInitialized: boolean;
@@ -30,8 +35,7 @@ export const usePushNotifications = () => {
     deviceSupported: false,
   });
 
-  const pushTokenService = PushTokenService.getInstance();
-  const permissionService = NotificationPermissions.getInstance();
+  const notificationService = SimpleNotificationService.getInstance();
 
   /**
    * Initialize push notifications
@@ -42,42 +46,20 @@ export const usePushNotifications = () => {
       
       console.log('🔔 Initializing push notifications...');
       
-      // Check device support first
-      const deviceSupport = await permissionService.isDeviceSupported();
-      
-      setStatus(prev => ({ 
-        ...prev, 
-        deviceSupported: deviceSupport.supported 
-      }));
-      
-      if (!deviceSupport.supported) {
-        setStatus(prev => ({
-          ...prev,
-          isInitialized: false,
-          isRegistered: false,
-          hasPermission: false,
-          permissionStatus: { granted: false, canAskAgain: false, status: 'unsupported' },
-          token: null,
-          error: deviceSupport.reason || 'Device not supported',
-          isLoading: false,
-        }));
-        return false;
-      }
-      
-      const success = await pushTokenService.initialize(showPermissionDialog);
-      const isRegistered = await pushTokenService.isTokenRegistered();
-      const token = pushTokenService.getCurrentToken();
-      const permissionStatus = await permissionService.getPermissionStatus();
+      const success = await notificationService.initialize();
+      const isRegistered = await notificationService.isSetup();
+      const token = notificationService.getCurrentToken();
       
       setStatus(prev => ({
         ...prev,
         isInitialized: success,
         isRegistered: isRegistered,
-        hasPermission: permissionStatus.granted,
-        permissionStatus: permissionStatus,
+        hasPermission: success,
+        permissionStatus: { granted: success, canAskAgain: !success, status: success ? 'granted' : 'denied' },
         token: token,
         error: success ? null : 'Failed to initialize push notifications',
         isLoading: false,
+        deviceSupported: true,
       }));
 
       if (success) {
@@ -98,6 +80,7 @@ export const usePushNotifications = () => {
         token: null,
         error: error.message || 'Unknown error occurred',
         isLoading: false,
+        deviceSupported: false,
       }));
       return false;
     }
@@ -112,9 +95,10 @@ export const usePushNotifications = () => {
       
       console.log('🔄 Re-registering push token...');
       
-      const success = await pushTokenService.forceReregister();
-      const isRegistered = await pushTokenService.isTokenRegistered();
-      const token = pushTokenService.getCurrentToken();
+      // Re-initialize the service
+      const success = await notificationService.initialize();
+      const isRegistered = await notificationService.isSetup();
+      const token = notificationService.getCurrentToken();
       
       setStatus(prev => ({
         ...prev,
@@ -145,18 +129,17 @@ export const usePushNotifications = () => {
       
       console.log('🗑️ Unregistering push token...');
       
-      const success = await pushTokenService.unregisterPushToken();
-      
+      // SimpleNotificationService doesn't have unregister, so just clear local state
       setStatus(prev => ({
         ...prev,
         isInitialized: false,
         isRegistered: false,
         token: null,
-        error: success ? null : 'Failed to unregister push token',
+        error: null,
         isLoading: false,
       }));
 
-      return success;
+      return true;
     } catch (error: any) {
       console.error('❌ Error unregistering push token:', error);
       setStatus(prev => ({
@@ -177,17 +160,18 @@ export const usePushNotifications = () => {
       
       console.log('🔔 Requesting permissions manually...');
       
-      const permissionStatus = await permissionService.requestPermissions(showDialog);
+      // Re-initialize to request permissions
+      const success = await notificationService.initialize();
       
       setStatus(prev => ({
         ...prev,
-        hasPermission: permissionStatus.granted,
-        permissionStatus: permissionStatus,
-        error: permissionStatus.granted ? null : 'Permission not granted',
+        hasPermission: success,
+        permissionStatus: { granted: success, canAskAgain: !success, status: success ? 'granted' : 'denied' },
+        error: success ? null : 'Permission not granted',
         isLoading: false,
       }));
 
-      return permissionStatus.granted;
+      return success;
     } catch (error: any) {
       console.error('❌ Error requesting permissions:', error);
       setStatus(prev => ({
@@ -200,10 +184,12 @@ export const usePushNotifications = () => {
       return false;
     }
   };
+  
   const test = async () => {
     try {
       console.log('🧪 Testing push notification setup...');
-      await pushTokenService.testRegistration();
+      const token = notificationService.getCurrentToken();
+      console.log('Current token:', token);
     } catch (error: any) {
       console.error('❌ Error testing push notifications:', error);
     }

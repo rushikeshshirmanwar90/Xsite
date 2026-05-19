@@ -15,7 +15,7 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { domain } from '@/lib/domain';
 import PushTokenService from '@/services/pushTokenService';
-import NotificationPermissions from '@/services/notificationPermissions';
+import { SimpleNotificationService } from '@/services/SimpleNotificationService';
 
 // Check if we're in Expo Go
 const isExpoGo = Constants.executionEnvironment === 'storeClient';

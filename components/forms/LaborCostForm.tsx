@@ -30,7 +30,7 @@ const LaborCostForm: React.FC<LaborCostFormProps> = ({
   const [description, setDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  const { user } = useAuth();
+  const { user, clientId } = useAuth();
   const { sendProjectNotification } = useSimpleNotifications();
 
   // Calculate total cost when hours or rate changes
@@ -86,13 +86,14 @@ const LaborCostForm: React.FC<LaborCostFormProps> = ({
       const costDisplay = totalCost ? `₹${totalCost}` : `${hours}h @ ₹${ratePerHour}/h`;
       const notificationSent = await sendProjectNotification({
         projectId,
+        clientId: clientId || undefined,
         activityType: 'labor_added',
         staffName: user?.firstName || user?.name || 'Staff Member',
         projectName,
         details: `Added labor cost: ${costDisplay} for ${workType} by ${laborerName}${description ? ` (${description})` : ''}`,
+        performerId: user?._id,
+        performerRole: user?.role,
         recipientType: 'admins',
-        staffId: user?._id, // ✅ Pass staffId to prevent self-notification
-        // ✅ Remove clientId - let backend get it from project
       });
 
       console.log('📤 Labor notification send result:', notificationSent);

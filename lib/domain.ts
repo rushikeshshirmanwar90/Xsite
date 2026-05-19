@@ -4,7 +4,7 @@
 
 // LOCAL DEVELOPMENT OPTIONS:
 // export const domain = "http://10.86.171.10:8080"; // Current local IP
-export const domain = "http://10.11.24.195:8080"; 
+export const domain = "http://10.44.108.195:8080"; 
 
 // PRODUCTION OPTIONS:
 // export const domain = "https://real-estate-optimize-apis.vercel.app/";

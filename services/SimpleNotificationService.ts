@@ -170,51 +170,60 @@ export class SimpleNotificationService {
         return false;
       }
 
-      // ✅ Determine clientId based on user type and data
-      let clientId = null;
-      
-      if (userData.clientId) {
-        clientId = userData.clientId;
-      } else if (userData.role === 'client' || userData.userType === 'client') {
-        clientId = userData._id; // Client is their own clientId
-      } else if (userData.assignedProjects && userData.assignedProjects.length > 0) {
-        clientId = userData.assignedProjects[0].clientId; // Staff - use first project's client
-      } else if (userData.clients && userData.clients.length > 0) {
-        clientId = userData.clients[0].clientId; // Staff - use first client assignment
+      const userId = userData._id?.toString();
+      if (!userId) {
+        console.log('❌ No userId available');
+        return false;
       }
 
-      // ✅ Determine userType more precisely
-      let userType = 'client'; // Default fallback
+      // ✅ FIX: Determine role
+      const staffRoles = ["site-engineer", "supervisor", "manager"];
+      const isStaff = staffRoles.includes(userData.role);
+      const role = isStaff ? "staff" : "admin";
+
+      // ✅ FIX: Determine clientId — same logic as AuthContext fix
+      let clientId: string | null = null;
       
-      if (userData.role === 'staff') {
-        userType = 'staff';
-      } else if (userData.role === 'admin' || userData.userType === 'admin') {
-        userType = 'admin';
-      } else if (userData.role === 'client' || userData.userType === 'client') {
-        userType = 'client';
-      } else if (userData.userType) {
-        userType = userData.userType;
+      if (isStaff) {
+        // Staff: extract from clients array
+        clientId = userData.clients?.[0]?.clientId?.toString() || null;
+        console.log('👥 Staff clientId from clients[0]:', clientId);
+      } else if (userData.clients?.length > 0) {
+        // Admin with clients array
+        clientId = userData.clients[0].clientId?.toString()
+          || userData.clients[0]._id?.toString()
+          || null;
+        console.log('🏢 Admin clientId from clients[0]:', clientId);
+      } else if (userData.clientId) {
+        // Admin with direct clientId field
+        clientId = userData.clientId.toString();
+        console.log('🏢 Admin clientId from data.clientId:', clientId);
+      } else {
+        // Owner/super-admin: their own _id IS the clientId
+        clientId = userData._id?.toString() || null;
+        console.log('⚠️ Admin: falling back to own _id as clientId:', clientId);
+      }
+
+      if (!clientId) {
+        console.warn("⚠️ Cannot register push token: no clientId resolved");
+        return false;
       }
 
       const payload = {
-        userId: userData._id,
-        userType: userType,
+        userId,
+        clientId,
+        role,
         token: this.currentToken,
-        platform: Platform.OS,
-        deviceId: Constants.sessionId || 'unknown',
-        deviceName: Device.deviceName || `${Platform.OS} Device`,
-        clientId, // ✅ Include clientId for proper grouping
       };
 
-      console.log('📤 Registering push token:', {
-        userId: userData._id,
-        userType: userType,
-        clientId: clientId,
-        originalRole: userData.role,
-        originalUserType: userData.userType,
+      console.log('📤 Registering push token with backend:', {
+        userId,
+        clientId,
+        role,
+        tokenPreview: this.currentToken.substring(0, 20) + '...'
       });
 
-      const response = await apiClient.post(`/api/simple-push-token`, payload, {
+      const response = await apiClient.post(`/api/notifications/register-token`, payload, {
         headers: {
           'Content-Type': 'application/json',
         },
@@ -222,16 +231,20 @@ export class SimpleNotificationService {
       });
 
       if ((response.data as any)?.success) {
-        console.log('✅ Push token registered successfully with clientId:', clientId);
+        console.log('✅ Push token registered successfully');
         await AsyncStorage.setItem('pushTokenRegistered', 'true');
-        await AsyncStorage.setItem('registeredClientId', clientId || '');
+        await AsyncStorage.setItem('registeredClientId', clientId);
         return true;
       } else {
-        console.log('❌ Push token registration failed');
+        console.log('❌ Push token registration failed:', response.data);
         return false;
       }
     } catch (error: any) {
       console.error('❌ Error registering push token:', error);
+      if (error?.response) {
+        console.error('   Response status:', error.response.status);
+        console.error('   Response data:', error.response.data);
+      }
       return false;
     }
   }
@@ -298,41 +311,91 @@ export class SimpleNotificationService {
       // 2. Clean up project name - remove "Tmp" and other unwanted prefixes
       const cleanProjectName = this.cleanProjectName(activityData.projectName);
 
-      // ✅ Let backend get clientId from project automatically
-      let targetClientId = await AsyncStorage.getItem('registeredClientId') || undefined;
-      console.log('📋 Using stored clientId (fallback only):', targetClientId);
+      // 3. Get clientId - use provided or fallback to stored
+      let targetClientId = activityData.clientId || await AsyncStorage.getItem('registeredClientId');
+      
+      if (!targetClientId) {
+        console.error('❌ No clientId available for notification');
+        throw new Error('ClientId is required for notifications');
+      }
+      
+      console.log('📋 Using clientId:', targetClientId);
 
-      // 4. Prepare notification payload
+      // 4. Resolve recipients by calling the recipients API
+      console.log('🔍 Resolving recipients for clientId:', targetClientId);
+      let recipients: any[] = [];
+      
+      try {
+        const recipientsResponse = await apiClient.get(
+          `/api/notifications/recipients?clientId=${targetClientId}`,
+          { timeout: 5000 }
+        );
+        
+        if (recipientsResponse.data?.success && recipientsResponse.data?.data?.recipients) {
+          recipients = recipientsResponse.data.data.recipients;
+          console.log(`✅ Found ${recipients.length} recipients from API`);
+        } else {
+          console.log('⚠️ Recipients API returned no data');
+        }
+      } catch (recipientError: any) {
+        console.error('❌ Failed to resolve recipients:', recipientError.message);
+        // Continue with empty recipients array - backend will handle fallback
+      }
+
+      // 5. Filter out performer (self-notification prevention)
+      const performerId = activityData.performerId || activityData.staffId;
+      if (performerId && recipients.length > 0) {
+        const originalCount = recipients.length;
+        recipients = recipients.filter((r: any) => r.userId !== performerId);
+        const filteredCount = originalCount - recipients.length;
+        if (filteredCount > 0) {
+          console.log(`🚫 Filtered out ${filteredCount} recipient (self-notification prevention)`);
+        }
+      }
+
+      console.log(`📤 Sending notification to ${recipients.length} recipients`);
+
+      // 6. Prepare notification payload with recipients array
       const notificationPayload = {
         projectId: activityData.projectId,
-        clientId: activityData.clientId, // ✅ Pass clientId explicitly
+        clientId: targetClientId,
         type: activityData.activityType,
         title: activityData.title || this.getNotificationTitle(activityData.activityType, activityData.staffName),
         message: cleanProjectName ? `${cleanProjectName}: ${activityData.details}` : activityData.details,
-        recipientType: activityData.recipientType,
-        staffId: activityData.staffId, // Include staffId to prevent self-notification
-        performerRole: activityData.performerRole, // Role of the user performing the action
-        performerId: activityData.performerId, // ID of the user performing the action
-        category: activityData.category, // Activity category
-        materials: activityData.materials, // Material details if applicable
-        transferDetails: activityData.transferDetails, // Transfer details if applicable
+        recipients: recipients, // ✅ Send recipients array instead of recipientType
+        category: activityData.category,
+        action: activityData.activityType,
+        triggeredBy: performerId,
+        metadata: {
+          staffId: activityData.staffId,
+          performerRole: activityData.performerRole,
+          performerId: activityData.performerId,
+          materials: activityData.materials,
+          transferDetails: activityData.transferDetails,
+          projectName: activityData.projectName,
+          sectionName: activityData.sectionName,
+          miniSectionName: activityData.miniSectionName,
+        },
         data: {
           projectId: activityData.projectId,
-          clientId: activityData.clientId, // ✅ Include in data as well
+          clientId: targetClientId,
           activityType: activityData.activityType,
           category: activityData.category,
           projectName: activityData.projectName,
           sectionName: activityData.sectionName,
           miniSectionName: activityData.miniSectionName,
           timestamp: Date.now(),
-          route: 'notifications', // Navigation data
+          route: 'notifications',
           screen: 'notifications',
         }
       };
 
-      console.log('� Notification payload:', notificationPayload);
+      console.log('📦 Notification payload:', {
+        ...notificationPayload,
+        recipients: `${recipients.length} recipients`
+      });
 
-      // 5. Send to backend API with better error handling
+      // 7. Send to backend API with better error handling
       const response = await apiClient.post(`/api/send-project-notification`, notificationPayload, {
         headers: {
           'Content-Type': 'application/json',
@@ -343,20 +406,16 @@ export class SimpleNotificationService {
       console.log('📡 API Response status:', response.status);
       console.log('📡 API Response data:', response.data);
 
-      // 6. Check response
+      // 8. Check response
       if ((response.data as any)?.success) {
-        const sentCount = (response.data as any)?.data?.sent || 0;
+        const sentCount = (response.data as any)?.data?.notificationsSent || 
+                         (response.data as any)?.data?.sent || 0;
         if (sentCount > 0) {
-          console.log(`✅ Successfully sent ${sentCount} notifications to client ${targetClientId}`);
+          console.log(`✅ Successfully sent ${sentCount} notifications`);
           return true;
         } else {
-          console.log('⚠️ API succeeded but no notifications sent, using local fallback');
-          // Fallback to local notification
-          await this.scheduleLocalNotification(
-            notificationPayload.title,
-            notificationPayload.message,
-            notificationPayload.data
-          );
+          console.log('⚠️ API succeeded but no notifications sent (recipients may be empty)');
+          // Still return true as the API call succeeded
           return true;
         }
       } else {
@@ -375,7 +434,7 @@ export class SimpleNotificationService {
       
       // Log more details about the error
       if (error?.response) {
-        console.error('❌ Axios error details:', {
+        console.error('❌ API error details:', {
           message: error.message,
           status: error.response?.status,
           statusText: error.response?.statusText,
@@ -383,7 +442,7 @@ export class SimpleNotificationService {
         });
       }
       
-      // 7. Final fallback: Always send local notification on error
+      // 9. Final fallback: Always send local notification on error
       try {
         console.log('🔄 Final fallback: sending local notification...');
         await this.scheduleLocalNotification(

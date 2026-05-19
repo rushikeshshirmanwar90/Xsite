@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import NotificationManager from '@/services/notificationManager';
-import NotificationPermissions from '@/services/notificationPermissions';
+import { SimpleNotificationService } from '@/services/SimpleNotificationService';
 import PushTokenService from '@/services/pushTokenService';
 
 interface DebugInfo {
@@ -20,8 +19,8 @@ export default function NotificationSystemDebugger() {
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const notificationManager = NotificationManager.getInstance();
-  const permissionService = NotificationPermissions.getInstance();
+  // Test components simplified - using SimpleNotificationService
+  const notificationService = SimpleNotificationService.getInstance();
   const pushTokenService = PushTokenService.getInstance();
 
   const collectDebugInfo = async (): Promise<DebugInfo> => {

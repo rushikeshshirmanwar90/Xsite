@@ -22,6 +22,7 @@ import { toast } from 'sonner-native';
 import { useSimpleNotifications } from '@/hooks/useSimpleNotifications';
 import { useAuth } from '@/contexts/AuthContext';
 import apiClient from '@/utils/axiosConfig';
+import { safeJsonParse, safeDivide, safeFirst } from '@/utils/helpers';
 
 const SwipeableMiniSection = ({ 
     section, 
@@ -197,7 +198,7 @@ const SwipeableMiniSection = ({
 const Details = () => {
     const params = useLocalSearchParams();
     const router = useRouter();
-    const { user } = useAuth();
+    const { user, clientId } = useAuth();
     const { sendProjectNotification } = useSimpleNotifications();
     const projectId = params.projectId as string;
     const projectName = params.projectName as string;
@@ -375,7 +376,7 @@ const Details = () => {
         try {
             const userDetailsString = await AsyncStorage.getItem("user");
             if (userDetailsString) {
-                const userData = JSON.parse(userDetailsString);
+                const userData = safeJsonParse(userDetailsString, {});
 
                 // Build full name from firstName and lastName, or fallback to name/username
                 let fullName = 'Unknown User';
@@ -754,7 +755,7 @@ const Details = () => {
         try {
             const stored = await AsyncStorage.getItem(`ignored_materials_${projectId}`);
             if (stored) {
-                const ignored = JSON.parse(stored);
+                const ignored = safeJsonParse(stored, []);
                 setIgnoredMaterials(ignored);
             }
         } catch (error) {
@@ -1090,11 +1091,12 @@ const Details = () => {
                 try {
                     const userDetailsString = await AsyncStorage.getItem("user");
                     if (userDetailsString) {
-                        const userData = JSON.parse(userDetailsString);
+                        const userData = safeJsonParse(userDetailsString, {});
                         
                         // For staff users, try to use the first client
-                        if (userData?.clients && Array.isArray(userData.clients) && userData.clients.length > 0) {
-                            queryClientId = userData.clients[0].clientId;
+                        const firstClient = safeFirst(userData?.clients);
+                        if (firstClient?.clientId) {
+                            queryClientId = firstClient.clientId;
                         } else if (userData?.clientId) {
                             queryClientId = userData.clientId;
                         } else if (userData?._id) {
@@ -1108,6 +1110,13 @@ const Details = () => {
             
             if (!queryClientId) {
                 console.error('❌ Cannot query project API without clientId parameter');
+                return null;
+            }
+            
+            // ✅ Validate projectId before making API call
+            if (!projectId || projectId === 'undefined' || projectId === 'null') {
+                console.error('❌ Project ID is invalid, cannot fetch project data');
+                console.error('   Received projectId:', projectId);
                 return null;
             }
             
@@ -1184,12 +1193,12 @@ const Details = () => {
             try {
                 const userDetailsString = await AsyncStorage.getItem("user");
                 if (userDetailsString) {
-                    const userData = JSON.parse(userDetailsString);
+                    const userData = safeJsonParse(userDetailsString, {});
                     
                     // For staff users, use the first client
-                    if (userData?.clients && Array.isArray(userData.clients) && userData.clients.length > 0) {
-                        const fallbackClientId = userData.clients[0].clientId;
-                        return fallbackClientId;
+                    const firstClient = safeFirst(userData?.clients);
+                    if (firstClient?.clientId) {
+                        return firstClient.clientId;
                     } else if (userData?.clientId) {
                         return userData.clientId;
                     } else if (userData?._id) {
@@ -1320,9 +1329,9 @@ const Details = () => {
 
         // Fallback: Create a local notification for testing
         try {
-            // Import and use the notification manager for local testing
-            const NotificationManager = (await import('../services/notificationManager')).default;
-            const notificationManager = NotificationManager.getInstance();
+            // Import and use SimpleNotificationService for local testing
+            const { SimpleNotificationService } = await import('../services/SimpleNotificationService');
+            const notificationService = SimpleNotificationService.getInstance();
             
             // Create a test notification to show the system is working
             const materialCount = materials.length;
@@ -1346,7 +1355,7 @@ const Details = () => {
                     break;
             }
             
-            await notificationManager.scheduleLocalNotification(
+            await notificationService.scheduleLocalNotification(
                 title,
                 body,
                 {
@@ -2072,10 +2081,14 @@ const Details = () => {
                         
                         const notificationSent = await sendProjectNotification({
                             projectId: projectId,
+                            clientId: clientId || undefined,
                             activityType: 'usage_added',
                             staffName: staffName,
                             projectName: projectName,
                             details: notificationDetails,
+                            performerId: user?._id,
+                            performerRole: user?.role,
+                            recipientType: 'admins',
                         });
                         
                         if (notificationSent) {
@@ -2227,13 +2240,19 @@ const Details = () => {
             // Get target project name for logging
             let targetProjectName = 'Unknown Project';
             try {
-                const targetProjectResponse = await apiClient.get(`/api/project/${targetProjectId}?clientId=${clientId}`);
-                const targetProjectData = targetProjectResponse.data as any;
-                if (targetProjectData?.success) {
-                    targetProjectName = targetProjectData.project?.name || 
-                                      targetProjectData.data?.name || 
-                                      targetProjectData.name || 
-                                      'Unknown Project';
+                // ✅ Validate targetProjectId before making API call
+                if (!targetProjectId || targetProjectId === 'undefined' || targetProjectId === 'null') {
+                    console.warn('⚠️ Target project ID is invalid, skipping project name fetch');
+                    console.warn('   Received targetProjectId:', targetProjectId);
+                } else {
+                    const targetProjectResponse = await apiClient.get(`/api/project/${targetProjectId}?clientId=${clientId}`);
+                    const targetProjectData = targetProjectResponse.data as any;
+                    if (targetProjectData?.success) {
+                        targetProjectName = targetProjectData.project?.name || 
+                                          targetProjectData.data?.name || 
+                                          targetProjectData.name || 
+                                          'Unknown Project';
+                    }
                 }
             } catch (projectError) {
                 console.warn('⚠️ Could not fetch target project name:', projectError);
@@ -2337,6 +2356,12 @@ const Details = () => {
             return;
         }
 
+        // Check if component is mounted
+        if (!isMountedRef.current) {
+            console.warn('⚠️ Component unmounted, aborting section addition');
+            return;
+        }
+
         const { addSection } = require('@/functions/details');
         const { logMiniSectionCreated } = require('@/utils/activityLogger');
 
@@ -2352,46 +2377,98 @@ const Details = () => {
             }
         };
 
+        console.log('📝 Adding mini-section:', sectionData);
 
         let loadingToast: any = null;
         try {
             loadingToast = toast.loading('Adding section...');
-            const res: any = await addSection(sectionData);
+            
+            // Call API to add section
+            const res: any = await addSection(sectionData, sendProjectNotification);
 
+            console.log('✅ Add section API response:', res);
+
+            // Check if component is still mounted after API call
+            if (!isMountedRef.current) {
+                console.warn('⚠️ Component unmounted after API call, aborting state update');
+                toast.dismiss(loadingToast);
+                return;
+            }
 
             toast.dismiss(loadingToast);
 
             if (res && res.success) {
+                console.log('✅ Section added successfully, refetching sections...');
+                
+                // Show success message
                 toast.success("Section added successfully");
 
-                // Log activity
-                await logMiniSectionCreated(
-                    projectId,
-                    projectName,
-                    sectionId,
-                    sectionName,
-                    res.section?._id || 'unknown',
-                    newSectionName.trim()
-                );
+                // Log activity (fire-and-forget, don't block UI update)
+                setTimeout(() => {
+                    logMiniSectionCreated(
+                        projectId,
+                        projectName,
+                        sectionId,
+                        sectionName,
+                        res.section?._id || res.data?._id || 'unknown',
+                        newSectionName.trim()
+                    ).catch((err) => {
+                        console.error('Failed to log activity:', err);
+                    });
+                }, 0);
+
+                // ✅ CRITICAL FIX: Add delay before refetching to ensure backend has processed the request
+                await new Promise(resolve => setTimeout(resolve, 500));
 
                 // Refetch sections after adding a new one
+                console.log('🔄 Refetching sections from API...');
                 const sections = await getSection(sectionId);
-                if (sections && Array.isArray(sections)) {
+                console.log('📦 Fetched sections:', sections?.length || 0, 'sections');
+                
+                // Check mounted again before updating state
+                if (!isMountedRef.current) {
+                    console.warn('⚠️ Component unmounted after refetch, aborting state update');
+                    return;
+                }
+
+                if (sections && Array.isArray(sections) && sections.length > 0) {
+                    console.log('✅ Updating miniSections state with', sections.length, 'sections');
                     setMiniSections(sections);
+                    
+                    // ✅ ADDITIONAL FIX: Force a small delay to ensure state update completes
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                    
+                    // ✅ ADDITIONAL FIX: Load completion status for new sections
+                    await loadMiniSectionCompletionStatus();
+                    
+                    console.log('✅ Mini-sections state updated successfully');
+                } else {
+                    console.warn('⚠️ No sections returned from API or empty array');
+                    // Still update state with empty array to trigger re-render
+                    setMiniSections(sections || []);
                 }
 
                 // Clear form and close modal
                 setNewSectionName('');
                 setNewSectionDesc('');
                 setShowAddSectionModal(false);
+                
+                console.log('✅ Section addition complete');
             } else {
-                throw new Error(res?.error || 'Failed to add section');
+                console.error('❌ API returned success: false');
+                throw new Error(res?.error || res?.message || 'Failed to add section');
             }
         } catch (error: any) {
             if (loadingToast) {
                 toast.dismiss(loadingToast);
             }
-            console.error('Add section error:', error);
+            console.error('❌ Add section error:', error);
+            
+            // Check if component is still mounted before showing error
+            if (!isMountedRef.current) {
+                return;
+            }
+            
             const errorMessage = error?.response?.data?.error ||
                 error?.response?.data?.message ||
                 error?.message ||
@@ -2809,10 +2886,14 @@ const Details = () => {
                             
                             const notificationSent = await sendProjectNotification({
                                 projectId: projectId,
+                                clientId: clientId || undefined,
                                 activityType: 'material_added',
                                 staffName: staffName,
                                 projectName: projectName,
                                 details: notificationDetails,
+                                performerId: user?._id,
+                                performerRole: user?.role,
+                                recipientType: 'admins',
                             });
                             
                             if (notificationSent) {

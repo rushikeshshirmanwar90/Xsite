@@ -33,9 +33,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<any | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
-
+  
   // Initialize push token service when user is authenticated
   const initializePushTokens = async (userData: any) => {
+    // ✅ FIX: Use AsyncStorage with timestamp instead of ref to persist across app restarts
+    try {
+      const lastRegistration = await AsyncStorage.getItem('pushTokenRegistrationTime');
+      const now = Date.now();
+      const ONE_DAY = 24 * 60 * 60 * 1000; // Re-register once per day
+      
+      if (lastRegistration) {
+        const timeSinceRegistration = now - parseInt(lastRegistration);
+        if (timeSinceRegistration < ONE_DAY) {
+          console.log(`🔔 Push token registered ${Math.round(timeSinceRegistration / 1000 / 60)} minutes ago — skipping`);
+          return;
+        } else {
+          console.log('🔔 Push token registration expired (>24h) — re-registering');
+        }
+      }
+    } catch (storageError) {
+      console.warn('⚠️ Error checking push token registration time:', storageError);
+      // Continue with registration if storage check fails
+    }
+    
     try {
       console.log('🔔 Initializing simple push tokens for authenticated user...');
       console.log('👤 User data for push tokens:', {
@@ -58,6 +78,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const registered = await simpleNotificationService.registerToken(userData);
         
         if (registered) {
+          // ✅ FIX: Save registration time to AsyncStorage
+          await AsyncStorage.setItem('pushTokenRegistrationTime', Date.now().toString());
           console.log('✅ Simple push tokens initialized successfully');
         } else {
           console.log('⚠️ Push token registration failed - user may not receive notifications');
@@ -135,7 +157,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }
             
             // For non-staff users (admin, client, etc.)
-            const extractedClientId = data._id || data.clientId;
+            // ✅ FIX: Extract the real org clientId, not the admin's own _id
+            let extractedClientId: string | null = null;
+            
+            if (data.clients?.length > 0) {
+              // Admin is linked to an org via clients array (same shape as staff)
+              extractedClientId =
+                data.clients[0].clientId?.toString() ||
+                data.clients[0]._id?.toString() ||
+                null;
+              console.log('🏢 Admin clientId from clients[0]:', extractedClientId);
+            } else if (data.clientId) {
+              // Admin has a direct clientId field
+              extractedClientId = data.clientId.toString();
+              console.log('🏢 Admin clientId from data.clientId:', extractedClientId);
+            } else {
+              // Owner/super-admin: their own _id IS the clientId
+              extractedClientId = data._id?.toString() || null;
+              console.log('⚠️ Admin: falling back to own _id as clientId:', extractedClientId);
+            }
             
             if (extractedClientId) {
               console.log('✅ Valid user data found, setting authenticated state');
@@ -144,7 +184,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
               setIsAuthenticated(true);
               setUser(data);
-              setClientId(typeof extractedClientId === 'string' ? extractedClientId : null);
+              setClientId(extractedClientId);
+              
+              // Persist so getClientId() reads the right value
+              await AsyncStorage.setItem('userId', data._id?.toString() || '');
+              await AsyncStorage.setItem('userRole', 'admin');
               
               console.log('✅ Auth state updated successfully');
               

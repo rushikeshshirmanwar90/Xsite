@@ -14,7 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
-import SecureNotificationService from '@/services/secureNotificationService';
+import SimpleNotificationService from '@/services/SimpleNotificationService';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface TestResult {
@@ -243,36 +243,33 @@ const NotificationSystemTest: React.FC = () => {
     }
   };
 
-  /**
-   * Test 3: Notification Permissions
-   */
   const testNotificationPermissions = async (): Promise<void> => {
     updateCurrentTest('Notification Permissions');
     
     try {
-      const secureService = SecureNotificationService.getInstance();
+      const simpleService = SimpleNotificationService.getInstance();
       
-      // Test permission request
-      const permissionResult = await secureService.requestPermissions();
+      // Test permission request - SimpleNotificationService uses initialize()
+      const initialized = await simpleService.initialize();
       
-      if (permissionResult.granted) {
+      if (initialized) {
         addTestResult({
           name: 'Notification Permissions',
           status: 'pass',
-          message: 'Notification permissions granted',
+          message: 'Notification permissions granted and service initialized',
           details: { 
-            granted: permissionResult.granted,
-            status: permissionResult.status
+            granted: true,
+            initialized: true
           }
         });
       } else {
         addTestResult({
           name: 'Notification Permissions',
           status: 'fail',
-          message: 'Notification permissions denied',
+          message: 'Notification permissions denied or initialization failed',
           details: { 
-            granted: permissionResult.granted,
-            status: permissionResult.status
+            granted: false,
+            initialized: false
           }
         });
       }
@@ -294,10 +291,10 @@ const NotificationSystemTest: React.FC = () => {
     updateCurrentTest('Push Token Generation');
     
     try {
-      const secureService = SecureNotificationService.getInstance();
+      const simpleService = SimpleNotificationService.getInstance();
       
-      // Test token generation
-      const token = await secureService.getSecurePushToken();
+      // SimpleNotificationService stores token internally during initialize()
+      const token = simpleService.getCurrentToken();
       
       if (token) {
         addTestResult({
@@ -311,39 +308,21 @@ const NotificationSystemTest: React.FC = () => {
           }
         });
 
-        // Test token storage
-        const stored = await secureService.storeTokenSecurely(token);
-        if (stored) {
+        // Test token registration status
+        const isSetup = await simpleService.isSetup();
+        if (isSetup) {
           addTestResult({
-            name: 'Secure Token Storage',
+            name: 'Token Registration Status',
             status: 'pass',
-            message: 'Token stored securely',
-            details: { stored: true }
+            message: 'Token registered with backend',
+            details: { registered: true }
           });
         } else {
           addTestResult({
-            name: 'Secure Token Storage',
-            status: 'fail',
-            message: 'Failed to store token securely',
-            details: { stored: false }
-          });
-        }
-
-        // Test token retrieval
-        const retrieved = await secureService.getStoredTokenSecurely();
-        if (retrieved === token) {
-          addTestResult({
-            name: 'Secure Token Retrieval',
-            status: 'pass',
-            message: 'Token retrieved and decrypted successfully',
-            details: { retrieved: true, matches: true }
-          });
-        } else {
-          addTestResult({
-            name: 'Secure Token Retrieval',
-            status: 'fail',
-            message: 'Token retrieval or decryption failed',
-            details: { retrieved: !!retrieved, matches: retrieved === token }
+            name: 'Token Registration Status',
+            status: 'warning',
+            message: 'Token not yet registered with backend',
+            details: { registered: false }
           });
         }
 
@@ -367,15 +346,15 @@ const NotificationSystemTest: React.FC = () => {
   };
 
   /**
-   * Test 5: Secure Service Initialization
+   * Test 5: Service Initialization
    */
   const testSecureServiceInitialization = async (): Promise<void> => {
-    updateCurrentTest('Secure Service Initialization');
+    updateCurrentTest('Service Initialization');
     
     try {
       if (!user) {
         addTestResult({
-          name: 'Secure Service Initialization',
+          name: 'Service Initialization',
           status: 'fail',
           message: 'Cannot initialize without authenticated user',
           details: { user: null }
@@ -383,30 +362,42 @@ const NotificationSystemTest: React.FC = () => {
         return;
       }
 
-      const secureService = SecureNotificationService.getInstance();
+      const simpleService = SimpleNotificationService.getInstance();
       
-      // Test full initialization
-      const initialized = await secureService.initializeSecurely(user);
+      // Test initialization
+      const initialized = await simpleService.initialize();
       
       if (initialized) {
-        addTestResult({
-          name: 'Secure Service Initialization',
-          status: 'pass',
-          message: 'Secure notification service initialized successfully',
-          details: { initialized: true }
-        });
+        // Test token registration
+        const registered = await simpleService.registerToken(user);
+        
+        if (registered) {
+          addTestResult({
+            name: 'Service Initialization',
+            status: 'pass',
+            message: 'Notification service initialized and token registered successfully',
+            details: { initialized: true, registered: true }
+          });
+        } else {
+          addTestResult({
+            name: 'Service Initialization',
+            status: 'warning',
+            message: 'Service initialized but token registration failed',
+            details: { initialized: true, registered: false }
+          });
+        }
       } else {
         addTestResult({
-          name: 'Secure Service Initialization',
+          name: 'Service Initialization',
           status: 'fail',
-          message: 'Secure service initialization failed',
+          message: 'Service initialization failed',
           details: { initialized: false }
         });
       }
 
     } catch (error) {
       addTestResult({
-        name: 'Secure Service Initialization',
+        name: 'Service Initialization',
         status: 'fail',
         message: 'Service initialization test failed',
         details: { error: error instanceof Error ? error.message : 'Unknown error' }
@@ -480,91 +471,51 @@ const NotificationSystemTest: React.FC = () => {
   };
 
   /**
-   * Test 7: Security Validation
+   * Test 7: Notification Sending
    */
-  const testSecurityValidation = async (): Promise<void> => {
-    updateCurrentTest('Security Validation');
+  const testNotificationSending = async (): Promise<void> => {
+    updateCurrentTest('Notification Sending');
     
     try {
-      const secureService = SecureNotificationService.getInstance();
+      const simpleService = SimpleNotificationService.getInstance();
       
-      // Test malicious notification content validation
-      const maliciousNotification = {
-        request: {
-          content: {
-            title: '<script>alert("XSS")</script>',
-            body: 'javascript:alert("XSS")',
-            data: {
-              url: 'javascript:alert("XSS")',
-              malicious: '<img src=x onerror=alert(1)>'
-            }
-          }
-        }
-      } as any;
+      // Test sending a project notification
+      const testData = {
+        projectId: 'test-project-123',
+        clientId: user?.clients?.[0]?.clientId || user?.clientId || user?._id,
+        activityType: 'mini_section_created' as const,
+        staffName: user?.firstName || 'Test User',
+        projectName: 'Test Project',
+        miniSectionName: 'Test Mini Section',
+        details: 'This is a test notification from the test suite',
+        recipientType: 'admins' as const,
+        staffId: user?._id,
+        category: 'mini_section' as const,
+      };
 
-      // This should be blocked by the security validation
-      const isValid = (secureService as any).validateNotificationContent(maliciousNotification);
+      const sent = await simpleService.sendProjectNotification(testData);
       
-      if (!isValid) {
+      if (sent) {
         addTestResult({
-          name: 'Malicious Content Blocking',
+          name: 'Notification Sending',
           status: 'pass',
-          message: 'Malicious notification content correctly blocked',
-          details: { blocked: true }
+          message: 'Test notification sent successfully',
+          details: { sent: true, testData }
         });
       } else {
         addTestResult({
-          name: 'Malicious Content Blocking',
-          status: 'fail',
-          message: 'Malicious content was not blocked - security vulnerability!',
-          details: { blocked: false }
-        });
-      }
-
-      // Test URL validation
-      const dangerousUrls = [
-        'javascript:alert(1)',
-        'data:text/html,<script>alert(1)</script>',
-        'vbscript:msgbox(1)',
-        'file:///etc/passwd'
-      ];
-
-      let urlTestsPassed = 0;
-      for (const url of dangerousUrls) {
-        const isValidUrl = (secureService as any).validateNavigationUrl(url);
-        if (!isValidUrl) {
-          urlTestsPassed++;
-        }
-      }
-
-      if (urlTestsPassed === dangerousUrls.length) {
-        addTestResult({
-          name: 'URL Validation Security',
-          status: 'pass',
-          message: 'All dangerous URLs correctly blocked',
-          details: { 
-            tested: dangerousUrls.length,
-            blocked: urlTestsPassed
-          }
-        });
-      } else {
-        addTestResult({
-          name: 'URL Validation Security',
-          status: 'fail',
-          message: 'Some dangerous URLs were not blocked',
-          details: { 
-            tested: dangerousUrls.length,
-            blocked: urlTestsPassed,
-            failed: dangerousUrls.length - urlTestsPassed
-          }
+          name: 'Notification Sending',
+          status: 'warning',
+          message: 'Notification sending returned false (may have used local fallback)',
+          details: { sent: false }
         });
       }
 
     } catch (error) {
       addTestResult({
-        name: 'Security Validation',
+        name: 'Notification Sending',
         status: 'fail',
-        message: 'Security validation test failed',
+        message: 'Notification sending test failed',
         details: { error: error instanceof Error ? error.message : 'Unknown error' }
       });
     }
@@ -600,7 +551,7 @@ const NotificationSystemTest: React.FC = () => {
       await testLocalNotification();
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      await testSecurityValidation();
+      await testNotificationSending();
       
       setCurrentTest('Tests completed');
       
@@ -667,8 +618,8 @@ const NotificationSystemTest: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>🔐 Notification Security Test</Text>
-        <Text style={styles.subtitle}>Comprehensive security validation</Text>
+        <Text style={styles.title}>🔔 Notification System Test</Text>
+        <Text style={styles.subtitle}>Comprehensive notification validation</Text>
       </View>
 
       <View style={styles.controls}>

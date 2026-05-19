@@ -8,8 +8,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import NotificationManager from '@/services/notificationManager';
-import NotificationPermissions from '@/services/notificationPermissions';
+import { SimpleNotificationService } from '@/services/SimpleNotificationService';
 import PushTokenService from '@/services/pushTokenService';
 
 interface TestResult {
@@ -29,8 +28,8 @@ const NotificationSystemTester: React.FC = () => {
   ]);
   const [isRunning, setIsRunning] = useState(false);
 
-  const notificationManager = NotificationManager.getInstance();
-  const permissionService = NotificationPermissions.getInstance();
+  // Test components simplified - using SimpleNotificationService
+  const notificationService = SimpleNotificationService.getInstance();
   const pushTokenService = PushTokenService.getInstance();
 
   useEffect(() => {

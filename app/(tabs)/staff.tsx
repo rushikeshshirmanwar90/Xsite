@@ -12,7 +12,7 @@ import { isAdmin, useUser } from '@/hooks/useUser';
 import { useSimpleNotifications } from '@/hooks/useSimpleNotifications';
 import { domain } from '@/lib/domain';
 import { Staff } from '@/types/staff';
-import { notificationService } from '@/services/notificationService';
+import { emailNotificationService } from '@/services/emailNotificationService';
 import { Ionicons } from '@expo/vector-icons';
 import apiClient from '@/utils/axiosConfig';
 import { useRouter } from 'expo-router';
@@ -333,9 +333,9 @@ const StaffManagement: React.FC = () => {
 
             console.log('📦 Final notification payload:', JSON.stringify(notificationPayload, null, 2));
 
-            // Send notification using the notification service
-            console.log('🚀 Calling notification service...');
-            const success = await notificationService.sendStaffWelcomeMessage(notificationPayload);
+            // Send notification using the email notification service
+            console.log('🚀 Calling email notification service...');
+            const success = await emailNotificationService.sendStaffWelcomeMessage(notificationPayload);
             
             console.log('📊 Notification service result:', success);
             

@@ -7,4 +7,14 @@ module.exports = defineConfig([
   {
     ignores: ['dist/*'],
   },
+  {
+    rules: {
+      'no-restricted-imports': ['error', {
+        paths: [{
+          name: 'axios',
+          message: 'Use apiClient from @/utils/axiosConfig instead to ensure the Bearer token is included.'
+        }]
+      }]
+    }
+  }
 ]);

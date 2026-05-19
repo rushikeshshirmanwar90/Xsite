@@ -3,7 +3,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import apiClient from '@/utils/axiosConfig';
 import { domain } from '@/lib/domain';
-import NotificationPermissions from './notificationPermissions';
 
 // Check if we're in Expo Go (using newer method)
 const isExpoGo = Constants.executionEnvironment === 'storeClient';
@@ -60,7 +59,6 @@ class PushTokenService {
   private static instance: PushTokenService;
   private currentToken: string | null = null;
   private isRegistering: boolean = false;
-  private permissionService: NotificationPermissions;
 
   static getInstance(): PushTokenService {
     if (!PushTokenService.instance) {
@@ -70,7 +68,7 @@ class PushTokenService {
   }
 
   constructor() {
-    this.permissionService = NotificationPermissions.getInstance();
+    // Simplified - no longer uses NotificationPermissions
   }
 
   /**
@@ -81,10 +79,9 @@ class PushTokenService {
     try {
       console.log('🔔 Initializing push token service...');
 
-      // Check device support
-      const deviceSupport = await this.permissionService.isDeviceSupported();
-      if (!deviceSupport.supported) {
-        console.log('⚠️ Device not supported:', deviceSupport.reason);
+      // Check if device is supported
+      if (!Device || !Device.isDevice) {
+        console.log('⚠️ Device not supported: Not a physical device');
         return false;
       }
 
@@ -95,9 +92,21 @@ class PushTokenService {
         return false;
       }
 
-      // Request permissions with user-friendly dialog
-      const permissionStatus = await this.permissionService.requestPermissions(showPermissionDialog);
-      if (!permissionStatus.granted) {
+      // Request permissions
+      if (!Notifications) {
+        console.log('⚠️ Notifications module not available');
+        return false;
+      }
+
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+
+      if (finalStatus !== 'granted') {
         console.log('⚠️ Push notification permissions not granted:', permissionStatus.status);
         return false;
       }
@@ -472,26 +481,21 @@ class PushTokenService {
   }
 
   /**
-   * Get permission service instance
-   */
-  getPermissionService(): NotificationPermissions {
-    return this.permissionService;
-  }
-
-  /**
    * Check if permissions are granted
    */
   async hasPermissions(): Promise<boolean> {
-    const status = await this.permissionService.getPermissionStatus();
-    return status.granted;
+    if (!Notifications) return false;
+    const { status } = await Notifications.getPermissionsAsync();
+    return status === 'granted';
   }
 
   /**
    * Request permissions manually
    */
   async requestPermissions(showDialog: boolean = true): Promise<boolean> {
-    const status = await this.permissionService.requestPermissions(showDialog);
-    return status.granted;
+    if (!Notifications) return false;
+    const { status } = await Notifications.requestPermissionsAsync();
+    return status === 'granted';
   }
 
   /**

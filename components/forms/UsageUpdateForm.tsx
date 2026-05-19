@@ -28,7 +28,7 @@ const UsageUpdateForm: React.FC<UsageUpdateFormProps> = ({
   const [notes, setNotes] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  const { user } = useAuth();
+  const { user, clientId } = useAuth();
   const { sendProjectNotification } = useSimpleNotifications();
 
   const handleUpdateUsage = async () => {
@@ -72,13 +72,14 @@ const UsageUpdateForm: React.FC<UsageUpdateFormProps> = ({
 
       const notificationSent = await sendProjectNotification({
         projectId,
+        clientId: clientId || undefined,
         activityType: 'usage_added',
         staffName: user?.firstName || user?.name || 'Staff Member',
         projectName,
         details: `Updated usage: ${quantityUsed} ${materialUsed} for ${activity}${notes ? ` (${notes})` : ''}`,
+        performerId: user?._id,
+        performerRole: user?.role,
         recipientType: 'admins',
-        staffId: user?._id, // ✅ Pass staffId to prevent self-notification
-        // ✅ Remove clientId - let backend get it from project
       });
 
       console.log('📤 Usage notification send result:', notificationSent);

@@ -45,13 +45,15 @@ export const addSection = async (data: any, notificationCallback?: (data: any) =
                     }
 
                     await notificationCallback({
-                        projectId: data.projectId,
-                        activityType: 'section_created',
+                        projectId: data.projectDetails?.projectId || data.projectId,
+                        activityType: 'mini_section_created',
                         staffName: userInfo?.fullName || 'User',
-                        projectName: data.projectName || 'Project',
-                        sectionName: data.name || 'Section',
-                        details: `Created section "${data.name || 'Section'}"`,
-                        category: 'section',
+                        projectName: data.projectDetails?.projectName || data.projectName || 'Project',
+                        sectionName: data.mainSectionDetails?.sectionName || data.sectionName || 'Section',
+                        miniSectionName: data.name || 'Mini-Section',
+                        details: `Created mini-section "${data.name || 'Mini-Section'}"`,
+                        category: 'mini_section',
+                        recipientType: 'admins', // ✅ CRITICAL FIX: Add required recipientType field
                     });
                 } catch (notificationError: any) {
                     console.error('Error sending section creation notification:', notificationError);
@@ -89,13 +91,15 @@ export const updateSection = async (sectionId: string, data: any, notificationCa
                     }
 
                     await notificationCallback({
-                        projectId: data.projectId,
-                        activityType: 'section_updated',
+                        projectId: data.projectDetails?.projectId || data.projectId,
+                        activityType: 'mini_section_updated',
                         staffName: userInfo?.fullName || 'User',
-                        projectName: data.projectName || 'Project',
-                        sectionName: data.name || 'Section',
-                        details: `Updated section "${data.name || 'Section'}"`,
-                        category: 'section',
+                        projectName: data.projectDetails?.projectName || data.projectName || 'Project',
+                        sectionName: data.mainSectionDetails?.sectionName || data.sectionName || 'Section',
+                        miniSectionName: data.name || 'Mini-Section',
+                        details: `Updated mini-section "${data.name || 'Mini-Section'}"`,
+                        category: 'mini_section',
+                        recipientType: 'admins', // ✅ CRITICAL FIX: Add required recipientType field
                     });
                 } catch (notificationError: any) {
                     console.error('Error sending section update notification:', notificationError);
@@ -134,12 +138,13 @@ export const deleteSection = async (sectionId: string, sectionData?: { name?: st
 
                     await notificationCallback({
                         projectId: sectionData.projectId,
-                        activityType: 'section_deleted',
+                        activityType: 'mini_section_deleted',
                         staffName: userInfo?.fullName || 'User',
                         projectName: sectionData.projectName || 'Project',
-                        sectionName: sectionData.name || 'Section',
-                        details: `Deleted section "${sectionData.name || 'Section'}"`,
-                        category: 'section',
+                        miniSectionName: sectionData.name || 'Mini-Section',
+                        details: `Deleted mini-section "${sectionData.name || 'Mini-Section'}"`,
+                        category: 'mini_section',
+                        recipientType: 'admins', // ✅ CRITICAL FIX: Add required recipientType field
                     });
                 } catch (notificationError: any) {
                     console.error('Error sending section deletion notification:', notificationError);

@@ -1,5 +1,15 @@
 import { useState, useEffect } from 'react';
-import NotificationManager, { LocalNotification } from '../services/notificationManager';
+import { SimpleNotificationService } from '@/services/SimpleNotificationService';
+
+export interface LocalNotification {
+  id: string;
+  title: string;
+  body: string;
+  data?: any;
+  isRead: boolean;
+  timestamp: number;
+  source: 'backend' | 'push';
+}
 
 export const useNotifications = () => {
   const [notifications, setNotifications] = useState<LocalNotification[]>([]);
@@ -8,39 +18,20 @@ export const useNotifications = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let unsubscribe: (() => void) | null = null;
-
     const initializeNotifications = async () => {
       try {
         setIsLoading(true);
         setError(null);
 
-        const notificationManager = NotificationManager.getInstance();
+        const notificationService = SimpleNotificationService.getInstance();
         
-        // Wait a bit for the manager to load notifications
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Initialize the service
+        await notificationService.initialize();
         
-        // Initial load
-        const initialNotifications = notificationManager.getNotifications();
-        const initialUnreadCount = notificationManager.getUnreadCount();
-        
-        setNotifications(initialNotifications);
-        setUnreadCount(initialUnreadCount);
-
-        // Subscribe to updates
-        unsubscribe = notificationManager.subscribe((updatedNotifications) => {
-          try {
-            setNotifications(updatedNotifications);
-            setUnreadCount(notificationManager.getUnreadCount());
-            
-            // Update badge count
-            notificationManager.updateBadgeCount().catch(error => {
-              console.warn('Failed to update badge count:', error);
-            });
-          } catch (subscriptionError) {
-            console.error('Error in notification subscription:', subscriptionError);
-          }
-        });
+        // SimpleNotificationService doesn't store notifications locally
+        // Notifications are managed by the system
+        setNotifications([]);
+        setUnreadCount(0);
 
         setIsLoading(false);
       } catch (initError) {
@@ -51,58 +42,29 @@ export const useNotifications = () => {
     };
 
     initializeNotifications();
-
-    return () => {
-      if (unsubscribe) {
-        try {
-          unsubscribe();
-        } catch (error) {
-          console.error('Error unsubscribing from notifications:', error);
-        }
-      }
-    };
   }, []);
 
   const markAsRead = async (id: string) => {
-    try {
-      const notificationManager = NotificationManager.getInstance();
-      await notificationManager.markAsRead(id);
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-    }
+    console.log('markAsRead not implemented in SimpleNotificationService');
   };
 
   const markAllAsRead = async () => {
-    try {
-      const notificationManager = NotificationManager.getInstance();
-      await notificationManager.markAllAsRead();
-    } catch (error) {
-      console.error('Error marking all notifications as read:', error);
-    }
+    console.log('markAllAsRead not implemented in SimpleNotificationService');
   };
 
   const deleteNotification = async (id: string) => {
-    try {
-      const notificationManager = NotificationManager.getInstance();
-      await notificationManager.deleteNotification(id);
-    } catch (error) {
-      console.error('Error deleting notification:', error);
-    }
+    console.log('deleteNotification not implemented in SimpleNotificationService');
   };
 
   const clearAll = async () => {
-    try {
-      const notificationManager = NotificationManager.getInstance();
-      await notificationManager.clearAll();
-    } catch (error) {
-      console.error('Error clearing all notifications:', error);
-    }
+    console.log('clearAll not implemented in SimpleNotificationService');
   };
 
   const requestPermissions = async () => {
     try {
-      const notificationManager = NotificationManager.getInstance();
-      return await notificationManager.requestPermissions();
+      const notificationService = SimpleNotificationService.getInstance();
+      const success = await notificationService.initialize();
+      return { granted: success, status: success ? 'granted' : 'denied' };
     } catch (error) {
       console.error('Error requesting permissions:', error);
       return { granted: false, status: 'error' };
@@ -111,8 +73,8 @@ export const useNotifications = () => {
 
   const getPushToken = async () => {
     try {
-      const notificationManager = NotificationManager.getInstance();
-      return await notificationManager.getPushToken();
+      const notificationService = SimpleNotificationService.getInstance();
+      return notificationService.getCurrentToken();
     } catch (error) {
       console.error('Error getting push token:', error);
       return null;
@@ -125,8 +87,9 @@ export const useNotifications = () => {
     data?: any
   ) => {
     try {
-      const notificationManager = NotificationManager.getInstance();
-      return await notificationManager.scheduleLocalNotification(title, body, data);
+      const notificationService = SimpleNotificationService.getInstance();
+      await notificationService.scheduleLocalNotification(title, body, data);
+      return 'scheduled';
     } catch (error) {
       console.error('Error scheduling local notification:', error);
       return null;

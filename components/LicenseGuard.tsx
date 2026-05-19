@@ -110,7 +110,7 @@ export const LicenseGuard: React.FC<LicenseGuardProps> = ({ children }) => {
                                     style={styles.contactButton}
                                     onPress={() => {
                                         // Open email or phone
-                                        Linking.openURL('mailto:support@example.com?subject=License Renewal Request');
+                                        Linking.openURL('mailto:growwithexponentor@gmail.com?subject=License Renewal Request');
                                     }}
                                 >
                                     <Ionicons name="mail" size={20} color="#FFFFFF" />
@@ -120,7 +120,7 @@ export const LicenseGuard: React.FC<LicenseGuardProps> = ({ children }) => {
                                 <TouchableOpacity
                                     style={styles.callButton}
                                     onPress={() => {
-                                        Linking.openURL('tel:+1234567890');
+                                        Linking.openURL('tel:9579896842');
                                     }}
                                 >
                                     <Ionicons name="call" size={20} color="#3B82F6" />

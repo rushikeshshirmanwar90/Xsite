@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { toast } from 'sonner-native';
-import { notificationService } from '@/services/notificationService';
+import { emailNotificationService } from '@/services/emailNotificationService';
 
 interface MaterialNotificationData {
     materialName: string;
@@ -22,7 +22,7 @@ export const useMaterialNotifications = () => {
         });
 
         // Send notification to backend (optional - for email/push notifications)
-        notificationService.sendMaterialAddedNotification({
+        emailNotificationService.sendMaterialAddedNotification({
             recipientEmail: data.userEmail,
             recipientName: data.userName,
             materialName: data.materialName,
@@ -44,7 +44,7 @@ export const useMaterialNotifications = () => {
         });
 
         // Send notification to backend (optional - for email/push notifications)
-        notificationService.sendMaterialUsedNotification({
+        emailNotificationService.sendMaterialUsedNotification({
             recipientEmail: data.userEmail,
             recipientName: data.userName,
             materialName: data.materialName,

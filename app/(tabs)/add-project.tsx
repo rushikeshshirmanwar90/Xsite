@@ -2,7 +2,7 @@ import AddProjectModal from '@/components/AddProjectModel';
 import { getClientId } from '@/functions/clientId';
 import { isAdmin, useUser } from '@/hooks/useUser';
 import { useSimpleNotifications } from '@/hooks/useSimpleNotifications';
-import { domain } from '@/lib/domain';
+import { useAuth } from '@/contexts/AuthContext';
 import { Project as BaseProject, ProjectSection } from '@/types/project';
 import { StaffMembers } from '@/types/staff';
 import { Ionicons } from '@expo/vector-icons';
@@ -55,6 +55,7 @@ const ProjectScreen: React.FC = () => {
 
     // Get user role for access control
     const { user, userType } = useUser();
+    const { clientId: authClientId } = useAuth(); // Get clientId from AuthContext (renamed to avoid conflict)
     const userIsAdmin = isAdmin(user);
 
     // Performance optimization
@@ -174,7 +175,14 @@ const ProjectScreen: React.FC = () => {
     // Fetch staff data
     useEffect(() => {
         const getStaffData = async () => {
+            // ✅ Don't fetch if clientId is not available yet
+            if (!clientId || clientId === 'unknown') {
+                console.log('⏸️ Skipping staff fetch - clientId not available yet');
+                return;
+            }
+
             try {
+                console.log('📡 Fetching staff for clientId:', clientId);
                 const res = await apiClient.get(`/api/staff?clientId=${clientId}`);
                 const data = (res.data as any)?.data || [];
                 const filterData = data.map((item: any) => ({
@@ -182,8 +190,14 @@ const ProjectScreen: React.FC = () => {
                     _id: item._id,
                 }));
                 setStaffMembers(filterData);
+                console.log('✅ Staff data loaded:', filterData.length, 'members');
             } catch (error) {
                 console.error('Error fetching staff:', error);
+                // Don't show error toast for 400 errors (missing clientId)
+                if ((error as any)?.response?.status !== 400) {
+                    // Only log other errors
+                    console.error('Staff fetch error details:', (error as any)?.response?.data);
+                }
             }
         };
 
@@ -315,17 +329,13 @@ const ProjectScreen: React.FC = () => {
                                 },
                             };
 
-                            console.log('\n📝 Activity Payload:');
-                            console.log(JSON.stringify(activityPayload, null, 2));
-                            console.log('\n🌐 Sending POST request to:', `${domain}/api/activity`);
-                            console.log('🌐 Domain value:', domain);
-                            console.log('🌐 Full URL:', `${domain}/api/activity`);
+                            console.log('\n🌐 Sending POST request to:', `/api/activity`);
                             console.log('🌐 Request will be sent NOW...');
 
                             // DIRECT AXIOS CALL TO ACTIVITY API
                             console.log('⏳ Making axios.post call...');
                             const activityResponse = await apiClient.post(
-                                `${domain}/api/activity`,
+                                `/api/activity`,
                                 activityPayload
                             );
                             console.log('⏳ axios.post call completed!');
@@ -359,7 +369,7 @@ const ProjectScreen: React.FC = () => {
                                         console.log(`\n📝 Logging staff: ${staff.fullName}`);
 
                                         const staffResponse = await apiClient.post(
-                                            `${domain}/api/activity`,
+                                            `/api/activity`,
                                             staffPayload
                                         );
 
@@ -480,10 +490,14 @@ const ProjectScreen: React.FC = () => {
                     console.log('🔔 Sending project creation notification...');
                     const notificationSent = await sendProjectNotification({
                         projectId: projectId,
+                        clientId: authClientId || undefined,
                         activityType: 'project_created',
                         staffName: userInfo?.fullName || 'Admin',
                         projectName: projectName,
                         details: `Created new project "${projectName}"${newProject.budget ? ` with budget ₹${Number(newProject.budget).toLocaleString('en-IN')}` : ''}`,
+                        performerId: user?._id,
+                        performerRole: user?.role,
+                        recipientType: 'admins',
                         category: 'project',
                         message: newProject.description || undefined,
                     });
@@ -706,8 +720,17 @@ const ProjectScreen: React.FC = () => {
             console.log('📝 Updating project:', editingProject._id, updatePayload);
             console.log('📊 Detected changes:', changedData);
 
+            // ✅ Validate project ID before making API call
+            if (!editingProject._id || editingProject._id === 'undefined' || editingProject._id === 'null') {
+                console.error('❌ Project ID is invalid, cannot update project');
+                console.error('   Received editingProject._id:', editingProject._id);
+                Alert.alert('Error', 'Invalid project ID. Cannot update project.');
+                setUpdatingProject(false);
+                return;
+            }
+
             const response = await apiClient.put(
-                `${domain}/api/project/${editingProject._id}`,
+                `/api/project/${editingProject._id}`,
                 updatePayload
             );
 
@@ -851,10 +874,14 @@ const ProjectScreen: React.FC = () => {
 
                     const notificationSent = await sendProjectNotification({
                         projectId: editingProject._id,
+                        clientId: authClientId || undefined,
                         activityType: 'project_updated',
                         staffName: userInfo?.fullName || 'Admin',
                         projectName: editProjectName.trim(),
                         details: `Updated project "${editProjectName.trim()}"${changesSummary ? `: ${changesSummary}` : ''}`,
+                        performerId: user?._id,
+                        performerRole: user?.role,
+                        recipientType: 'admins',
                         category: 'project',
                         message: changedData.length > 0 ? `${changedData.length} field${changedData.length > 1 ? 's' : ''} updated` : undefined,
                     });
@@ -914,6 +941,14 @@ const ProjectScreen: React.FC = () => {
         try {
             console.log('🗑️ Deleting project:', project._id);
 
+            // ✅ Validate project ID before making API call
+            if (!project._id || project._id === 'undefined' || project._id === 'null') {
+                console.error('❌ Project ID is invalid, cannot delete project');
+                console.error('   Received project._id:', project._id);
+                Alert.alert('Error', 'Invalid project ID. Cannot delete project.');
+                return;
+            }
+
             // Start delete loading animation
             startDeleteLoadingAnimation(project._id!);
 
@@ -942,10 +977,14 @@ const ProjectScreen: React.FC = () => {
 
                     const notificationSent = await sendProjectNotification({
                         projectId: project._id,
+                        clientId: authClientId || undefined,
                         activityType: 'project_deleted',
                         staffName: userInfo?.fullName || 'Admin',
                         projectName: project.name,
                         details: `Deleted project "${project.name}"`,
+                        performerId: user?._id,
+                        performerRole: user?.role,
+                        recipientType: 'admins',
                         category: 'project',
                         message: 'Project and all associated data have been permanently removed',
                     });

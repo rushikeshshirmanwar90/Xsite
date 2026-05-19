@@ -161,8 +161,9 @@ const NotificationPage: React.FC = () => {
                     fullName = userData.username;
                 }
 
+                // ✅ FIX: userId must only ever be the user's own _id — never the org clientId
                 const user = {
-                    userId: userData._id || userData.id || userData.clientId || 'unknown',
+                    userId: userData._id?.toString() || userData.id?.toString() || 'unknown',
                     fullName: fullName,
                 };
 
@@ -411,18 +412,21 @@ const NotificationPage: React.FC = () => {
             console.log('   - Has Next Date:', finalDateToUse < today);
             console.log('   - Available Dates Array:', allAvailableDates);
 
-            // Filter activities for the target date
-            const targetDateStart = finalDateToUse + 'T00:00:00.000Z';
-            const targetDateEnd = finalDateToUse + 'T23:59:59.999Z';
-            
+            // ✅ FIX: Filter activities for the target date using local timezone
+            // Convert stored UTC timestamp to device's local date for comparison
             const filteredActivities = activityList.filter((activity: any) => {
-                const activityDate = activity.date || activity.createdAt;
-                return activityDate >= targetDateStart && activityDate <= targetDateEnd;
+                const rawDate = activity.date || activity.createdAt;
+                if (!rawDate) return false;
+                // 'en-CA' locale gives YYYY-MM-DD format — works for any timezone
+                const activityLocalDate = new Date(rawDate).toLocaleDateString('en-CA');
+                return activityLocalDate === finalDateToUse;
             });
             
             const filteredMaterials = materialList.filter((material: any) => {
-                const materialDate = material.date || material.createdAt;
-                return materialDate >= targetDateStart && materialDate <= targetDateEnd;
+                const rawDate = material.date || material.createdAt;
+                if (!rawDate) return false;
+                const materialLocalDate = new Date(rawDate).toLocaleDateString('en-CA');
+                return materialLocalDate === finalDateToUse;
             });
 
             // If no activities found for current date, show empty state but keep navigation
@@ -439,7 +443,8 @@ const NotificationPage: React.FC = () => {
 
             // Add filtered activities
             filteredActivities.forEach((activity: any) => {
-                const activityDate = (activity.date || activity.createdAt).split('T')[0];
+                const rawDate = activity.date || activity.createdAt;
+                const activityDate = new Date(rawDate).toLocaleDateString('en-CA');
                 if (!allDateGroups[activityDate]) {
                     allDateGroups[activityDate] = [];
                 }
@@ -520,14 +525,21 @@ const NotificationPage: React.FC = () => {
         }
     };
 
+    // ✅ FIX: Guard to prevent double useEffect on mount
+    const isMountedRef = React.useRef(false);
+
+    // Effect 1 — initial load only
     useEffect(() => {
         console.log('📱 NotificationPage mounted - calling fetchActivities()');
+        isMountedRef.current = true;
         // For initial load, don't specify a target date - let the function determine the best starting date
         fetchActivities();
     }, []);
 
-    // Reset pagination when tab changes
+    // Effect 2 — only fires on TAB CHANGE, not on first mount
     useEffect(() => {
+        if (!isMountedRef.current) return; // ✅ Skip the initial render
+        console.log('🔄 Tab changed - fetching activities for current date');
         // For date mode, fetch activities for current date
         fetchActivities(true, false, currentDate);
     }, [activeTab, materialSubTab]);

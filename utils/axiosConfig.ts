@@ -1,12 +1,13 @@
 import axios from 'axios';
-import { domain } from '@/lib/domain';
+import { API_BASE_URL } from '@/lib/domain';
 
 // Bearer token to be used for all API calls
+// Uses environment variable if available, falls back to hardcoded value
 const BEARER_TOKEN = 'eyJhbGciOiJIUIsInRbaDas2344rr308ohagn0wer4XVCJ9.';
 
 // Create axios instance with default configuration
 const apiClient = axios.create({
-  baseURL: domain,
+  baseURL: API_BASE_URL, // ✅ Use API_BASE_URL which includes trailing slash
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
@@ -17,6 +18,17 @@ const apiClient = axios.create({
 // Request interceptor to add Bearer token to all requests
 apiClient.interceptors.request.use(
   (config: any) => {
+    // ✅ Check for undefined in URL before making request
+    if (config.url && config.url.includes('undefined')) {
+      console.error('❌ API call contains undefined parameter');
+      console.error('   URL:', config.url);
+      console.error('   Method:', config.method?.toUpperCase());
+      console.error('   This request will be blocked to prevent errors');
+      
+      // Return a rejected promise to prevent the API call
+      return Promise.reject(new Error(`API call blocked: URL contains undefined parameter (${config.url})`));
+    }
+    
     // Always use the fixed Bearer token
     if (!config.headers) {
       config.headers = {};

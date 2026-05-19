@@ -1,4 +1,3 @@
-import { domain } from '@/lib/domain';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from '@/utils/axiosConfig';
 import { useEffect, useState } from 'react';
@@ -129,7 +128,7 @@ export const useUser = (): UseUserReturn => {
       setError(null);
 
       const response = await apiClient.get(
-        `${domain}/api/${userType}?email=${user.email}`
+        `/api/${userType}?email=${user.email}`
       );
 
       if ((response.data as any).success) {
@@ -161,7 +160,7 @@ export const useUser = (): UseUserReturn => {
       setError(null);
 
       const response = await apiClient.put(
-        `${domain}/api/${userType}?id=${user._id}`,
+        `/api/${userType}?id=${user._id}`,
         updates
       );
 
