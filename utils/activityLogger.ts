@@ -7,6 +7,8 @@ import { getClientId as getClientIdFromFunction } from "@/functions/clientId";
 const getUserData = async () => {
   try {
     const userDetailsString = await AsyncStorage.getItem("user");
+    const userType = await AsyncStorage.getItem("userType"); // Get userType separately
+    
     if (userDetailsString) {
       const userData = JSON.parse(userDetailsString);
 
@@ -28,6 +30,7 @@ const getUserData = async () => {
         userId: userData._id || userData.id || userData.clientId || "unknown",
         fullName: fullName,
         email: userData.email || undefined,
+        userType: userType || undefined, // Include userType (admin or staff)
       };
     }
   } catch (error) {
