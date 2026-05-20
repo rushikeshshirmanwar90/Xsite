@@ -197,13 +197,29 @@ const MaterialDetailsForm: React.FC<MaterialDetailsFormProps> = ({
           onChangeText={(value) => onInputChange('perUnitCost', value)}
           keyboardType="decimal-pad"
           placeholderTextColor="#94A3B8"
-          returnKeyType="done"
+          returnKeyType="next"
         />
         {formData.quantity && formData.perUnitCost && (
           <Text style={{ fontSize: 12, color: '#10B981', marginTop: 4, fontWeight: '500' }}>
             Total Cost: ₹{(parseFloat(formData.quantity) * parseFloat(formData.perUnitCost)).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
           </Text>
         )}
+      </View>
+
+      <View style={sharedStyles.formGroup}>
+        <Text style={sharedStyles.label}>Contractor Name (Optional)</Text>
+        <TextInput
+          style={sharedStyles.input}
+          placeholder="Enter contractor/vendor name"
+          value={formData.contractor_name || ''}
+          onChangeText={(value) => onInputChange('contractor_name', value)}
+          placeholderTextColor="#94A3B8"
+          returnKeyType="done"
+          autoCapitalize="words"
+        />
+        <Text style={{ fontSize: 12, color: '#64748B', marginTop: 4, fontStyle: 'italic' }}>
+          💡 Track which contractor supplied this material
+        </Text>
       </View>
     </View>
   );

@@ -61,6 +61,7 @@ interface MaterialActivity {
         specs?: Record<string, any>;
         qnt: number;
         cost: number;
+        contractor_name?: string; // ✅ NEW: Contractor name field
     }[];
     message?: string;
     activity: 'imported' | 'used' | 'transferred';
@@ -70,6 +71,7 @@ interface MaterialActivity {
         fromProject: { id: string; name: string };
         toProject: { id: string; name: string };
     };
+    contractor_name?: string; // ✅ NEW: Contractor name at activity level
 }
 
 type TabType = 'all' | 'project' | 'material' | 'labor';
@@ -85,6 +87,11 @@ const NotificationPage: React.FC = () => {
         console.log('🎬 Initializing activities state to empty array');
         return [];
     });
+    
+    // ✅ NEW: Vendor filter state - Changed to array for multiple selection
+    const [selectedVendors, setSelectedVendors] = useState<string[]>([]);
+    const [showVendorModal, setShowVendorModal] = useState(false);
+    const [availableVendors, setAvailableVendors] = useState<string[]>([]);
 
     // SAFETY: Ensure activities is always an array, even if state gets corrupted
     const activities = React.useMemo(() => {
@@ -477,6 +484,17 @@ const NotificationPage: React.FC = () => {
             // Also update legacy state for backward compatibility
             setActivitiesRaw(filteredActivities);
             setMaterialActivities(filteredMaterials);
+
+            // ✅ NEW: Extract unique vendor names from material activities
+            const vendorNames = new Set<string>();
+            filteredMaterials.forEach((material: any) => {
+                if (material.contractor_name && material.contractor_name.trim() !== '') {
+                    vendorNames.add(material.contractor_name.trim());
+                }
+            });
+            const sortedVendors = Array.from(vendorNames).sort();
+            setAvailableVendors(sortedVendors);
+            console.log('📋 Available vendors:', sortedVendors);
 
             console.log('✅ Date navigation state updated');
             console.log('   - Date Groups:', newDateGroups.length);
@@ -987,6 +1005,20 @@ const NotificationPage: React.FC = () => {
             });
         }
 
+        // Debug: Log contractor_name to verify it's being received
+        if (__DEV__) {
+            console.log('🏗️ Contractor Name Debug:', {
+                _id: activity._id,
+                contractor_name: activity.contractor_name,
+                hasContractorName: !!activity.contractor_name,
+                contractorNameType: typeof activity.contractor_name,
+                materials: activity.materials.map(m => ({
+                    name: m.name,
+                    contractor_name: m.contractor_name,
+                })),
+            });
+        }
+
         // Use activity user or fallback to current user
         const displayUser = activity.user?.fullName && activity.user.fullName !== 'Unknown User'
             ? activity.user
@@ -1063,6 +1095,17 @@ const NotificationPage: React.FC = () => {
                                         {activity.transferDetails.toProject.name}
                                     </Text>
                                 </View>
+                            </View>
+                        </View>
+                    )}
+
+                    {/* Contractor Name - Show if available */}
+                    {activity.contractor_name && (
+                        <View style={styles.contractorInfoContainer}>
+                            <View style={styles.contractorInfoItem}>
+                                <Ionicons name="person-outline" size={14} color="#8B5CF6" />
+                                <Text style={styles.contractorLabel}>Contractor:</Text>
+                                <Text style={styles.contractorName}>{activity.contractor_name}</Text>
                             </View>
                         </View>
                     )}
@@ -1165,11 +1208,22 @@ const NotificationPage: React.FC = () => {
     const getFilteredActivities = () => {
         console.log('🔍 getFilteredActivities called with activeTab:', activeTab);
         console.log('🔍 activities array length:', activities.length);
+        console.log('🔍 selectedVendors:', selectedVendors);
         
         if (activeTab === 'all') {
-            return getCombinedActivities();
+            const combined = getCombinedActivities();
+            // ✅ NEW: Filter by vendors if selected (multiple vendors)
+            if (selectedVendors.length > 0) {
+                return combined.filter(item => {
+                    if (item.type === 'material') {
+                        const materialActivity = item.data as MaterialActivity;
+                        return selectedVendors.includes(materialActivity.contractor_name || '');
+                    }
+                    return false; // Hide non-material activities when vendor filter is active
+                });
+            }
+            return combined;
         } else if (activeTab === 'project') {
-            // Safely map activities (ensure it's an array) - include project, section, mini-section, and equipment activities
             if (Array.isArray(activities)) {
                 const projectActivities = activities.filter(a => {
                     const isProjectCategory = a.category === 'project' || a.category === 'section' || a.category === 'mini_section' || a.category === 'equipment';
@@ -1193,16 +1247,23 @@ const NotificationPage: React.FC = () => {
         } else if (activeTab === 'material') {
             // Filter materials based on sub-tab (ensure it's an array)
             if (Array.isArray(materialActivities)) {
+                let filtered = materialActivities;
+                
+                // ✅ NEW: Filter by vendors if selected (multiple vendors)
+                if (selectedVendors.length > 0) {
+                    filtered = filtered.filter(m => selectedVendors.includes(m.contractor_name || ''));
+                }
+                
                 // If 'all' sub-tab is selected, show all material activities
                 if (materialSubTab === 'all') {
-                    return materialActivities.map(m => ({
+                    return filtered.map(m => ({
                         type: 'material' as const,
                         data: m,
                         timestamp: m.date || m.createdAt || new Date().toISOString()
                     }));
                 }
                 // Otherwise filter by specific activity type
-                return materialActivities
+                return filtered
                     .filter(m => m.activity === materialSubTab)
                     .map(m => ({
                         type: 'material' as const,
@@ -1240,18 +1301,30 @@ const NotificationPage: React.FC = () => {
         // Use the new date groups from API if available
         if (dateGroups.length > 0) {
             return dateGroups.map(group => {
-                // Filter activities based on active tab
+                // Filter activities based on active tab AND vendor filter
                 let filteredGroupActivities = group.activities;
                 
+                // ✅ FIRST: Apply vendor filter if selected (multiple vendors)
+                if (selectedVendors.length > 0) {
+                    filteredGroupActivities = filteredGroupActivities.filter(item => {
+                        if (item.type === 'material') {
+                            const materialActivity = item.data as MaterialActivity;
+                            return selectedVendors.includes(materialActivity.contractor_name || '');
+                        }
+                        return false; // Hide non-material activities when vendor filter is active
+                    });
+                }
+                
+                // ✅ THEN: Apply tab filter
                 if (activeTab === 'project') {
                     // Only show regular activities (not material activities) - include project, section, mini-section, and equipment activities
-                    filteredGroupActivities = group.activities.filter(item => 
+                    filteredGroupActivities = filteredGroupActivities.filter(item => 
                         item.type === 'activity' && 
                         ['project', 'section', 'mini_section', 'equipment'].includes((item.data as Activity).category)
                     );
                 } else if (activeTab === 'labor') {
                     // Only show labor activities
-                    filteredGroupActivities = group.activities.filter(item => 
+                    filteredGroupActivities = filteredGroupActivities.filter(item => 
                         item.type === 'activity' && 
                         (item.data as Activity).category === 'labor'
                     );
@@ -1259,19 +1332,19 @@ const NotificationPage: React.FC = () => {
                     // Only show material activities that match the sub-tab
                     if (materialSubTab === 'all') {
                         // Show all material activities
-                        filteredGroupActivities = group.activities.filter(item => 
+                        filteredGroupActivities = filteredGroupActivities.filter(item => 
                             item.type === 'material'
                         );
                     } else {
                         // Filter by specific activity type
-                        filteredGroupActivities = group.activities.filter(item => 
+                        filteredGroupActivities = filteredGroupActivities.filter(item => 
                             item.type === 'material' && 
                             (item.data as MaterialActivity).activity === materialSubTab
                         );
                     }
                 } else {
-                    // 'all' tab - show everything
-                    filteredGroupActivities = group.activities;
+                    // 'all' tab - show everything (already filtered by vendor if applicable)
+                    filteredGroupActivities = filteredGroupActivities;
                 }
                 
                 return {
@@ -1376,6 +1449,15 @@ const NotificationPage: React.FC = () => {
 
     const groupedActivities = getGroupedByDate();
 
+    // ✅ DEBUG: Log vendor filter state (multiple vendors)
+    if (selectedVendors.length > 0) {
+        console.log('🏗️ VENDOR FILTER ACTIVE:', selectedVendors);
+        console.log('   - Selected vendors count:', selectedVendors.length);
+        console.log('   - Total date groups:', dateGroups.length);
+        console.log('   - Filtered date groups:', groupedActivities.length);
+        console.log('   - Total activities after filter:', groupedActivities.reduce((sum, group) => sum + group.activities.length, 0));
+    }
+
     // DEBUG: Log rendering state
     console.log('\n🎨 RENDERING STATE:');
     console.log('- Loading:', loading);
@@ -1443,15 +1525,27 @@ const NotificationPage: React.FC = () => {
                         <Text style={styles.headerTitle}>Activity Feed</Text>
                     </View>
                     <Text style={styles.headerSubtitle}>
-                        {`${formatDateHeader(currentDate)} • ${groupedActivities.reduce((sum, group) => sum + group.activities.length, 0)} activities`}
+                        {selectedVendors.length > 0
+                            ? `${selectedVendors.length} vendor${selectedVendors.length > 1 ? 's' : ''} selected • ${groupedActivities.reduce((sum, group) => sum + group.activities.length, 0)} activities`
+                            : `${formatDateHeader(currentDate)} • ${groupedActivities.reduce((sum, group) => sum + group.activities.length, 0)} activities`
+                        }
                     </Text>
                 </View>
-                <TouchableOpacity onPress={onRefresh} style={styles.refreshButton}>
+                {/* ✅ NEW: Vendor Filter Button (replaces refresh button) */}
+                <TouchableOpacity 
+                    onPress={() => setShowVendorModal(true)} 
+                    style={[styles.vendorFilterButton, selectedVendors.length > 0 && styles.vendorFilterButtonActive]}
+                >
                     <Ionicons
-                        name={refreshing ? "sync" : "refresh"}
-                        size={22}
-                        color="#3B82F6"
+                        name={selectedVendors.length > 0 ? "funnel" : "funnel-outline"}
+                        size={20}
+                        color={selectedVendors.length > 0 ? "#FFFFFF" : "#3B82F6"}
                     />
+                    {selectedVendors.length > 0 && (
+                        <View style={styles.vendorFilterBadge}>
+                            <Text style={styles.vendorFilterBadgeText}>{selectedVendors.length}</Text>
+                        </View>
+                    )}
                 </TouchableOpacity>
             </View>
 
@@ -1876,6 +1970,156 @@ const NotificationPage: React.FC = () => {
                     maximumDate={new Date()} // Can't select future dates
                 />
             )}
+
+            {/* ✅ NEW: Vendor Filter Modal */}
+            <Modal
+                visible={showVendorModal}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowVendorModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.vendorModalContainer}>
+                        {/* Modal Header */}
+                        <View style={styles.vendorModalHeader}>
+                            <View>
+                                <Text style={styles.vendorModalTitle}>Filter by Vendors</Text>
+                                {selectedVendors.length > 0 && (
+                                    <Text style={styles.vendorModalSubtitle}>
+                                        {selectedVendors.length} vendor{selectedVendors.length > 1 ? 's' : ''} selected
+                                    </Text>
+                                )}
+                            </View>
+                            <TouchableOpacity 
+                                onPress={() => setShowVendorModal(false)}
+                                style={styles.modalCloseButton}
+                            >
+                                <Ionicons name="close" size={24} color="#64748B" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Vendor List */}
+                        <ScrollView style={styles.vendorList}>
+                            {/* All Vendors Option */}
+                            <TouchableOpacity
+                                style={[
+                                    styles.vendorItem,
+                                    selectedVendors.length === 0 && styles.vendorItemActive
+                                ]}
+                                onPress={() => {
+                                    setSelectedVendors([]);
+                                }}
+                            >
+                                <View style={styles.vendorItemLeft}>
+                                    <View style={[
+                                        styles.checkbox,
+                                        selectedVendors.length === 0 && styles.checkboxChecked
+                                    ]}>
+                                        {selectedVendors.length === 0 && (
+                                            <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                                        )}
+                                    </View>
+                                    <Ionicons 
+                                        name="apps-outline" 
+                                        size={20} 
+                                        color={selectedVendors.length === 0 ? "#3B82F6" : "#64748B"} 
+                                    />
+                                    <Text style={[
+                                        styles.vendorItemText,
+                                        selectedVendors.length === 0 && styles.vendorItemTextActive
+                                    ]}>
+                                        All Vendors
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
+
+                            {/* Divider */}
+                            {availableVendors.length > 0 && (
+                                <View style={styles.vendorDivider} />
+                            )}
+
+                            {/* Individual Vendors */}
+                            {availableVendors.length > 0 ? (
+                                availableVendors.map((vendor, index) => {
+                                    const isSelected = selectedVendors.includes(vendor);
+                                    return (
+                                        <TouchableOpacity
+                                            key={index}
+                                            style={[
+                                                styles.vendorItem,
+                                                isSelected && styles.vendorItemActive
+                                            ]}
+                                            onPress={() => {
+                                                if (isSelected) {
+                                                    // Remove vendor from selection
+                                                    setSelectedVendors(selectedVendors.filter(v => v !== vendor));
+                                                } else {
+                                                    // Add vendor to selection
+                                                    setSelectedVendors([...selectedVendors, vendor]);
+                                                }
+                                            }}
+                                        >
+                                            <View style={styles.vendorItemLeft}>
+                                                <View style={[
+                                                    styles.checkbox,
+                                                    isSelected && styles.checkboxChecked
+                                                ]}>
+                                                    {isSelected && (
+                                                        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                                                    )}
+                                                </View>
+                                                <Ionicons 
+                                                    name="person-outline" 
+                                                    size={20} 
+                                                    color={isSelected ? "#8B5CF6" : "#64748B"} 
+                                                />
+                                                <Text style={[
+                                                    styles.vendorItemText,
+                                                    isSelected && styles.vendorItemTextActive
+                                                ]}>
+                                                    {vendor}
+                                                </Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    );
+                                })
+                            ) : (
+                                <View style={styles.noVendorsContainer}>
+                                    <Ionicons name="business-outline" size={48} color="#CBD5E1" />
+                                    <Text style={styles.noVendorsText}>No vendors found</Text>
+                                    <Text style={styles.noVendorsHint}>
+                                        Add materials with contractor names to see vendors here
+                                    </Text>
+                                </View>
+                            )}
+                        </ScrollView>
+
+                        {/* Modal Footer */}
+                        <View style={styles.vendorModalFooter}>
+                            {selectedVendors.length > 0 && (
+                                <TouchableOpacity
+                                    style={styles.clearFilterButton}
+                                    onPress={() => {
+                                        setSelectedVendors([]);
+                                    }}
+                                >
+                                    <Ionicons name="close-circle-outline" size={18} color="#EF4444" />
+                                    <Text style={styles.clearFilterButtonText}>Clear All Filters</Text>
+                                </TouchableOpacity>
+                            )}
+                            <TouchableOpacity
+                                style={styles.applyFilterButton}
+                                onPress={() => setShowVendorModal(false)}
+                            >
+                                <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
+                                <Text style={styles.applyFilterButtonText}>
+                                    Apply {selectedVendors.length > 0 ? `(${selectedVendors.length})` : ''}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -1923,6 +2167,183 @@ const styles = StyleSheet.create({
     },
     refreshButton: {
         padding: 8,
+    },
+    // ✅ NEW: Vendor Filter Button Styles
+    vendorFilterButton: {
+        padding: 10,
+        borderRadius: 10,
+        backgroundColor: '#EFF6FF',
+        position: 'relative',
+    },
+    vendorFilterButtonActive: {
+        backgroundColor: '#3B82F6',
+    },
+    vendorFilterBadge: {
+        position: 'absolute',
+        top: 4,
+        right: 4,
+        backgroundColor: '#EF4444',
+        borderRadius: 8,
+        width: 16,
+        height: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    vendorFilterBadgeText: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#FFFFFF',
+    },
+    // ✅ NEW: Vendor Modal Styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
+    },
+    vendorModalContainer: {
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        maxHeight: '70%',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 10,
+    },
+    vendorModalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 18,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    vendorModalTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1F2937',
+    },
+    vendorModalSubtitle: {
+        fontSize: 13,
+        color: '#64748B',
+        marginTop: 2,
+    },
+    modalCloseButton: {
+        padding: 4,
+    },
+    vendorList: {
+        maxHeight: 400,
+    },
+    vendorItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F8FAFC',
+    },
+    vendorItemActive: {
+        backgroundColor: '#F8FAFC',
+    },
+    vendorItemLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        flex: 1,
+    },
+    // ✅ NEW: Checkbox styles
+    checkbox: {
+        width: 22,
+        height: 22,
+        borderRadius: 6,
+        borderWidth: 2,
+        borderColor: '#CBD5E1',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+    },
+    checkboxChecked: {
+        backgroundColor: '#3B82F6',
+        borderColor: '#3B82F6',
+    },
+    vendorItemText: {
+        fontSize: 15,
+        fontWeight: '500',
+        color: '#475569',
+        flex: 1,
+    },
+    vendorItemTextActive: {
+        color: '#1E293B',
+        fontWeight: '600',
+    },
+    vendorDivider: {
+        height: 8,
+        backgroundColor: '#F8FAFC',
+    },
+    noVendorsContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 48,
+        paddingHorizontal: 32,
+    },
+    noVendorsText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#64748B',
+        marginTop: 16,
+        marginBottom: 8,
+    },
+    noVendorsHint: {
+        fontSize: 13,
+        color: '#94A3B8',
+        textAlign: 'center',
+        lineHeight: 18,
+    },
+    vendorModalFooter: {
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+        flexDirection: 'row',
+        gap: 12,
+    },
+    clearFilterButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        borderRadius: 12,
+        backgroundColor: '#FEF2F2',
+        borderWidth: 1,
+        borderColor: '#FEE2E2',
+        flex: 1,
+    },
+    clearFilterButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#EF4444',
+    },
+    // ✅ NEW: Apply button styles
+    applyFilterButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        borderRadius: 12,
+        backgroundColor: '#3B82F6',
+        flex: 1,
+    },
+    applyFilterButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#FFFFFF',
     },
     tabsContainer: {
         flexDirection: 'row',
@@ -2978,6 +3399,31 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#334155',
         marginLeft: 6,
+        flex: 1,
+    },
+    // ✅ NEW: Contractor info styles
+    contractorInfoContainer: {
+        backgroundColor: '#F5F3FF',
+        borderRadius: 10,
+        padding: 10,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#DDD6FE',
+    },
+    contractorInfoItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    contractorLabel: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: '#6B7280',
+    },
+    contractorName: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#8B5CF6',
         flex: 1,
     },
 });

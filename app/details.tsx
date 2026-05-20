@@ -1243,6 +1243,7 @@ const Details = () => {
                 activity,
                 user,
                 date: new Date().toISOString(),
+                contractor_name: materials[0]?.contractor_name || '', // ✅ NEW: Include contractor name from first material
             };
 
             const response = await apiClient.post(`/api/materialActivity`, activityPayload);
@@ -2808,6 +2809,7 @@ const Details = () => {
             qnt: material.qnt,
             perUnitCost: material.perUnitCost, // ✅ FIXED: Use perUnitCost instead of cost
             mergeIfExists: material.mergeIfExists !== undefined ? material.mergeIfExists : true,
+            contractor_name: material.contractor_name || '', // ✅ NEW: Include contractor_name
         }));
 
 

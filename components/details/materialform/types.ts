@@ -22,6 +22,7 @@ export interface InternalMaterial {
   perUnitCost: number; // ✅ UPDATED: Use perUnitCost instead of cost
   specs: Record<string, string | number | boolean>;
   date: string;
+  contractor_name?: string; // ✅ NEW: Contractor name field
 }
 
 export interface MaterialFormData {
@@ -30,6 +31,7 @@ export interface MaterialFormData {
   quantity: string;
   perUnitCost: string; // ✅ UPDATED: Use perUnitCost instead of cost
   specs: Record<string, any>;
+  contractor_name?: string; // ✅ NEW: Contractor name field
 }
 
 export interface CustomSpec {

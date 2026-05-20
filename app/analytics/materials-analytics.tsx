@@ -421,30 +421,6 @@ const MaterialsAnalytics: React.FC = () => {
             {/* Materials Section */}
             {activeTab === 'materials' && materials.length > 0 && (
               <View style={styles.sectionContainer}>
-                {/* Pie Chart for Materials */}
-                <View style={styles.chartCard}>
-                  <View style={styles.chartHeading}>
-                    <Text style={styles.chartTitle}>Material Cost Distribution</Text>
-                    <Text style={styles.chartSubtitle}>Sorted by highest usage</Text>
-                  </View>
-                  
-                  <View style={styles.chartContainer}>
-                    <PieChart
-                      data={materialPieData}
-                      colors={colors}
-                      size={260}
-                      enableAnimation={true}
-                      enableHover={true}
-                      labelType="amount"
-                      centerContent={{
-                        label: 'TOTAL MATERIALS',
-                        value: formatCurrency(totalExpense),
-                        subtitle: `${materials.length} Material${materials.length > 1 ? 's' : ''}`
-                      }}
-                    />
-                  </View>
-                </View>
-
                 {/* Material Cards */}
                 <Text style={styles.sectionTitle}>Materials Breakdown</Text>
                 {sortedMaterials.map((material, index) => (
@@ -504,37 +480,6 @@ const MaterialsAnalytics: React.FC = () => {
             {/* Labor Section */}
             {activeTab === 'labor' && labors.length > 0 && (
               <View style={styles.sectionContainer}>
-                {/* Pie Chart for Labor */}
-                <View style={styles.chartCard}>
-                  <View style={styles.chartHeading}>
-                    <Text style={styles.chartTitle}>Labor Cost Distribution</Text>
-                    <Text style={styles.chartSubtitle}>Sorted by highest cost</Text>
-                  </View>
-                  
-                  <View style={styles.chartContainer}>
-                    <PieChart
-                      data={laborPieData}
-                      colors={colors}
-                      size={260}
-                      enableAnimation={true}
-                      enableHover={true}
-                      labelType="amount"
-                      centerContent={{
-                        label: 'TOTAL LABOR',
-                        value: formatCurrency(totalLaborExpense),
-                        subtitle: `${labors.length} Labor Type${labors.length > 1 ? 's' : ''}`
-                      }}
-                    />
-                  </View>
-
-                  <PieChartLegend
-                    items={laborLegendData}
-                    showPercentage={true}
-                    showDescription={true}
-                    layout="vertical"
-                  />
-                </View>
-
                 {/* Labor Cards */}
                 <Text style={styles.sectionTitle}>Labor Breakdown</Text>
                 {sortedLabors.map((labor, index) => {

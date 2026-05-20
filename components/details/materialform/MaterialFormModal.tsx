@@ -67,6 +67,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     quantity: '',
     specs: {},
     perUnitCost: '', // ✅ UPDATED: Use perUnitCost instead of cost
+    contractor_name: '', // ✅ NEW: Contractor name field
   });
   const [customSpecs, setCustomSpecs] = useState<CustomSpec[]>([]);
   const [showAddSpecModal, setShowAddSpecModal] = useState(false);
@@ -213,6 +214,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       quantity: '',
       specs: {},
       perUnitCost: '', // ✅ UPDATED: Use perUnitCost instead of cost
+      contractor_name: '', // ✅ NEW: Reset contractor name on template select
     });
     setSelectedTemplateKey(templateKey);
     setCustomSpecs([]);
@@ -304,6 +306,15 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
 
   const proceedWithAddMaterial = (quantity: number, perUnitCost: number) => {
 
+    // 🔍 DEBUG: Log formData to verify contractor_name is present
+    console.log('🏗️ proceedWithAddMaterial Debug:', {
+      materialName: formData.name,
+      contractor_name: formData.contractor_name,
+      hasContractorName: !!formData.contractor_name,
+      contractorNameLength: formData.contractor_name?.length || 0,
+      fullFormData: formData,
+    });
+
     if (editingMaterialIndex !== null) {
       const updatedMaterials = [...addedMaterials];
       updatedMaterials[editingMaterialIndex] = {
@@ -313,6 +324,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
         quantity,
         perUnitCost: perUnitCost,
         specs: formData.specs,
+        contractor_name: formData.contractor_name, // ✅ NEW: Include contractor name
       };
       updateAddedMaterials(updatedMaterials);
       setEditingMaterialIndex(null); // Clear editing state
@@ -328,6 +340,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
         perUnitCost: perUnitCost,
         specs: formData.specs,
         date: new Date().toLocaleDateString('en-IN'),
+        contractor_name: formData.contractor_name, // ✅ NEW: Include contractor name
       };
       const newMaterials = [...addedMaterials, newEntry];
       updateAddedMaterials(newMaterials);
@@ -360,6 +373,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       quantity: String(materialToEdit.quantity),
       perUnitCost: String(perUnitCost.toFixed(2)), // ✅ UPDATED: Use perUnitCost
       specs: materialToEdit.specs || {},
+      contractor_name: materialToEdit.contractor_name || '', // ✅ NEW: Include contractor name
     });
 
     setCustomSpecs(specsArray);
@@ -490,7 +504,28 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       specs: material.specs || {},
       perUnitCost: material.perUnitCost || 0,
       mergeIfExists: true,
+      contractor_name: material.contractor_name || '', // ✅ NEW: Include contractor name
     }));
+
+    // 🔍 DEBUG: Log current added materials before formatting
+    console.log('🏗️ Current Added Materials Debug:', {
+      materialsCount: currentAddedMaterials.length,
+      materials: currentAddedMaterials.map(m => ({
+        name: m.name,
+        contractor_name: m.contractor_name,
+        hasContractorName: !!m.contractor_name,
+      })),
+    });
+
+    // 🔍 DEBUG: Log formatted materials to verify contractor_name
+    console.log('🏗️ Formatted Materials Debug:', {
+      materialsCount: formattedMaterials.length,
+      materials: formattedMaterials.map(m => ({
+        materialName: m.materialName,
+        contractor_name: m.contractor_name,
+        hasContractorName: !!m.contractor_name,
+      })),
+    });
 
     // Final validation before API call
     if (formattedMaterials.length === 0) {
@@ -661,6 +696,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       quantity: '',
       specs: {},
       perUnitCost: '', // ✅ UPDATED: Use perUnitCost instead of cost
+      contractor_name: '', // ✅ NEW: Reset contractor name
     });
     setSelectedTemplateKey(null);
     setShowSpecDropdown(null);
@@ -1164,7 +1200,6 @@ const styles = StyleSheet.create<Styles>({
      backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 32,
-    alignItems: 'center' as const,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,

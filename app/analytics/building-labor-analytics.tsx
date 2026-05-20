@@ -229,37 +229,6 @@ const BuildingLaborAnalytics: React.FC = () => {
 
             {/* Labor Breakdown Section */}
             <View style={styles.section}>
-              {/* Pie Chart for Labor */}
-              <View style={styles.chartCard}>
-                <View style={styles.chartHeading}>
-                  <Text style={styles.chartTitle}>Labor Cost Distribution</Text>
-                  <Text style={styles.chartSubtitle}>Sorted by highest cost</Text>
-                </View>
-                
-                <View style={styles.chartContainer}>
-                  <PieChart
-                    data={laborPieData}
-                    colors={colors}
-                    size={260}
-                    enableAnimation={true}
-                    enableHover={true}
-                    labelType="amount"
-                    centerContent={{
-                      label: 'TOTAL LABOR',
-                      value: formatCurrency(totalExpense),
-                      subtitle: `${laborDetails.length} Labor Type${laborDetails.length > 1 ? 's' : ''}`
-                    }}
-                  />
-                </View>
-
-                <PieChartLegend
-                  items={laborLegendData}
-                  showPercentage={true}
-                  showDescription={true}
-                  layout="vertical"
-                />
-              </View>
-
               <Text style={styles.sectionTitle}>Labor Breakdown</Text>
             </View>
 

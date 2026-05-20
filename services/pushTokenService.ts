@@ -4,21 +4,25 @@ import Constants from 'expo-constants';
 import apiClient from '@/utils/axiosConfig';
 import { domain } from '@/lib/domain';
 
-// Check if we're in Expo Go (using newer method)
-const isExpoGo = Constants.executionEnvironment === 'storeClient';
+// ✅ FIX: Use consistent Expo Go detection (same as SimpleNotificationService)
+const isExpoGo = Constants.appOwnership === 'expo';
 
-// Dynamic imports to avoid loading expo-notifications in Expo Go on Android
+// ✅ FIX: Import notifications for ALL platforms (not just iOS)
+// Development builds support notifications on both iOS and Android
 let Notifications: any = null;
 let Device: any = null;
 
-// Only import if not in Expo Go on Android
-if (!(isExpoGo && Platform.OS === 'android')) {
+// Only skip in actual Expo Go environment
+if (!isExpoGo) {
   try {
     Notifications = require('expo-notifications');
     Device = require('expo-device');
   } catch (error) {
-    console.warn('Failed to load notification modules:', error);
+    console.warn('⚠️ Failed to load notification modules:', error);
   }
+} else {
+  console.log('⚠️ Running in Expo Go - push notifications not available');
+  console.log('   Use a development build: eas build --profile development');
 }
 
 export interface PushTokenData {
@@ -107,7 +111,7 @@ class PushTokenService {
       }
 
       if (finalStatus !== 'granted') {
-        console.log('⚠️ Push notification permissions not granted:', permissionStatus.status);
+        console.log('⚠️ Push notification permissions not granted:', finalStatus);
         return false;
       }
 
@@ -118,7 +122,7 @@ class PushTokenService {
         
         // Set up token refresh listener
         this.setupTokenRefreshListener();
-        
+
         return true;
       } else {
         console.log('❌ Failed to register push token');
@@ -143,7 +147,7 @@ class PushTokenService {
     try {
       // EXPO FIX: Use Expo's push notification service directly
       const projectId = Constants.expoConfig?.extra?.eas?.projectId || 
-                        Constants.expoConfig?.projectId || 
+                        (Constants.expoConfig as any)?.projectId || 
                         '2fcc4ccc-b8b5-4ff4-ae3c-b195aa9eb32f';
 
       console.log('📱 Getting Expo push notification data:', {

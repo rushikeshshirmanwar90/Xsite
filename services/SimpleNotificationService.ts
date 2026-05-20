@@ -70,6 +70,9 @@ export class SimpleNotificationService {
   async initialize(): Promise<boolean> {
     try {
       console.log('🔔 Initializing simple notification service...');
+      console.log('📱 Platform:', Platform.OS);
+      console.log('📱 Device type:', Device.isDevice ? 'Physical device' : 'Simulator/Emulator');
+      console.log('📱 Expo Go:', isExpoGo ? 'Yes' : 'No');
 
       // ✅ Skip initialization in Expo Go
       if (isExpoGo) {
@@ -86,12 +89,16 @@ export class SimpleNotificationService {
       }
 
       // Request permissions
+      console.log('🔐 Requesting notification permissions...');
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      console.log('🔐 Existing permission status:', existingStatus);
+      
       let finalStatus = existingStatus;
 
       if (existingStatus !== 'granted') {
         const { status } = await Notifications.requestPermissionsAsync();
         finalStatus = status;
+        console.log('🔐 New permission status:', finalStatus);
       }
 
       if (finalStatus !== 'granted') {
@@ -101,35 +108,50 @@ export class SimpleNotificationService {
 
       // Set up notification channels for Android
       if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('default', {
-          name: 'Default Notifications',
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#3B82F6',
-          sound: 'default',
-          enableVibrate: true,
-          enableLights: true,
-          showBadge: true,
-        });
+        console.log('📱 Creating Android notification channels...');
+        
+        try {
+          // Create 'default' channel
+          await Notifications.setNotificationChannelAsync('default', {
+            name: 'Default Notifications',
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#3B82F6',
+            sound: 'default',
+            enableVibrate: true,
+            enableLights: true,
+            showBadge: true,
+          });
+          console.log('✅ Created "default" notification channel');
 
-        await Notifications.setNotificationChannelAsync('project-updates', {
-          name: 'Project Updates',
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#10B981',
-          sound: 'default',
-          enableVibrate: true,
-          enableLights: true,
-          showBadge: true,
-        });
+          // Create 'project-updates' channel
+          await Notifications.setNotificationChannelAsync('project-updates', {
+            name: 'Project Updates',
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#10B981',
+            sound: 'default',
+            enableVibrate: true,
+            enableLights: true,
+            showBadge: true,
+          });
+          console.log('✅ Created "project-updates" notification channel');
+        } catch (channelError) {
+          console.error('❌ Failed to create Android notification channels:', channelError);
+          // Don't fail initialization if channel creation fails
+        }
       }
 
       // Get push token
+      console.log('🎫 Getting push token...');
       const token = await this.getPushToken();
       if (token) {
         this.currentToken = token;
         console.log('✅ Notification service initialized successfully');
+        console.log('📊 Token length:', token.length, 'characters');
         return true;
+      } else {
+        console.log('❌ Failed to get push token');
       }
 
       return false;
@@ -561,25 +583,37 @@ export class SimpleNotificationService {
    */
   async scheduleLocalNotification(title: string, body: string, data?: any): Promise<void> {
     try {
+      const notificationContent: any = {
+        title,
+        body,
+        data: {
+          ...data,
+          route: 'notifications', // ✅ Navigate to notifications page
+          screen: 'notifications',
+        },
+        sound: 'default', // ✅ Enable default sound
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+      };
+
+      const trigger: any = {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: 1,
+      };
+
+      // ✅ FIX: Add channelId for Android
+      if (Platform.OS === 'android') {
+        trigger.channelId = 'project-updates'; // Use project-updates channel
+      }
+
       await Notifications.scheduleNotificationAsync({
-        content: {
-          title,
-          body,
-          data: {
-            ...data,
-            route: 'notifications', // ✅ Navigate to notifications page
-            screen: 'notifications',
-          },
-          sound: 'default', // ✅ Enable default sound
-          priority: Notifications.AndroidNotificationPriority.HIGH,
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-          seconds: 1,
-          channelId: 'project-updates', // Use project-updates channel
-        },
+        content: notificationContent,
+        trigger: trigger,
       });
+      
       console.log('✅ Local notification scheduled with sound and navigation');
+      if (Platform.OS === 'android') {
+        console.log('📱 Android: Using channel "project-updates"');
+      }
     } catch (error) {
       console.error('❌ Error scheduling local notification:', error);
     }
