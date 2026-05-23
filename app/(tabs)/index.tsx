@@ -384,7 +384,7 @@ const Index: React.FC = () => {
                 params: {
                     projectId: project._id ?? '',
                     projectName: project.name,
-                    sectionId: section.sectionId || section._id,
+                    sectionId: section._id || section.sectionId,  // ✅ FIXED: Use _id first (MongoDB document ID)
                     sectionName: section.name
                     // ✅ OPTIMIZED: Removed material data - will be fetched in details page
                 }

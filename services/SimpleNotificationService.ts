@@ -236,12 +236,14 @@ export class SimpleNotificationService {
         clientId,
         role,
         token: this.currentToken,
+        platform: Platform.OS as 'ios' | 'android', // ✅ FIX: Add platform field for Android notifications
       };
 
       console.log('📤 Registering push token with backend:', {
         userId,
         clientId,
         role,
+        platform: Platform.OS,
         tokenPreview: this.currentToken.substring(0, 20) + '...'
       });
 

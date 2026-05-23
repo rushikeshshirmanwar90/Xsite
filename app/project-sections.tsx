@@ -137,7 +137,7 @@ const ProjectSections = () => {
       params: {
         projectId: id as string,
         projectName: name as string,
-        sectionId: section.sectionId || section._id,
+        sectionId: section._id || section.sectionId,  // ✅ FIXED: Use _id first (MongoDB document ID)
         sectionName: section.name,
         materialAvailable: materialAvailable as string,
         materialUsed: materialUsed as string

@@ -13,8 +13,8 @@ import { logSectionCompleted, logSectionReopened } from '@/utils/activityLogger'
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Animated, FlatList, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
 import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -204,6 +204,18 @@ const Details = () => {
     const projectName = params.projectName as string;
     const sectionId = params.sectionId as string;
     const sectionName = params.sectionName as string;
+    
+    // 🔍 DEBUG: Log params on component mount
+    console.log('\n🚀 ========== DETAILS.TSX COMPONENT MOUNTED ==========');
+    console.log('   - All params:', params);
+    console.log('   - projectId:', projectId);
+    console.log('   - projectName:', projectName);
+    console.log('   - sectionId:', sectionId);
+    console.log('   - sectionName:', sectionName);
+    console.log('   - sectionId type:', typeof sectionId);
+    console.log('   - sectionId length:', sectionId?.length);
+    console.log('   - sectionId is valid MongoDB ID?', sectionId?.length === 24);
+    console.log('🚀 ========== END COMPONENT MOUNT ==========\n');
     let consoleLogCount = 0;
     const MAX_CONSOLE_LOGS = 50;
     const [activeTab, setActiveTab] = useState<'imported' | 'used'>('imported');
@@ -376,7 +388,7 @@ const Details = () => {
         try {
             const userDetailsString = await AsyncStorage.getItem("user");
             if (userDetailsString) {
-                const userData = safeJsonParse(userDetailsString, {});
+                const userData = safeJsonParse(userDetailsString, {}) as any;
 
                 // Build full name from firstName and lastName, or fallback to name/username
                 let fullName = 'Unknown User';
@@ -452,11 +464,18 @@ const Details = () => {
                 isMongoId: selectedMiniSection ? isValidMongoId(selectedMiniSection) : false
             });
             
+            // ✅ Compute ALL aliases for this section
+            const sectionAliases = [...new Set([
+                sectionId,
+                ...miniSections.map(s => s.mainSectionDetails?.sectionId),
+                ...miniSections.map(s => (s as any).sectionId)
+            ])].filter(id => id && String(id).length === 24);
+
             const usedParams = {
                 ...baseParams,
-                // ✅ CRITICAL FIX: Always filter used materials by the current section
-                sectionId: sectionId, // Filter by the main section being viewed
-                // ✅ OPTIONAL: Add mini-section filter ONLY if it's a valid MongoDB ObjectId
+                // ✅ Fetch for ALL section aliases to guarantee we don't miss materials saved under an old/different alias!
+                sectionId: sectionAliases.join(','),
+                // ✅ Add mini-section filter ONLY if it's a valid MongoDB ObjectId
                 ...(isValidMiniSectionId ? {
                     miniSectionId: selectedMiniSection
                 } : {})
@@ -1091,10 +1110,10 @@ const Details = () => {
                 try {
                     const userDetailsString = await AsyncStorage.getItem("user");
                     if (userDetailsString) {
-                        const userData = safeJsonParse(userDetailsString, {});
+                        const userData = safeJsonParse(userDetailsString, {}) as any;
                         
                         // For staff users, try to use the first client
-                        const firstClient = safeFirst(userData?.clients);
+                        const firstClient = safeFirst(userData?.clients) as any;
                         if (firstClient?.clientId) {
                             queryClientId = firstClient.clientId;
                         } else if (userData?.clientId) {
@@ -1193,10 +1212,10 @@ const Details = () => {
             try {
                 const userDetailsString = await AsyncStorage.getItem("user");
                 if (userDetailsString) {
-                    const userData = safeJsonParse(userDetailsString, {});
+                    const userData = safeJsonParse(userDetailsString, {}) as any;
                     
                     // For staff users, use the first client
-                    const firstClient = safeFirst(userData?.clients);
+                    const firstClient = safeFirst(userData?.clients) as any;
                     if (firstClient?.clientId) {
                         return firstClient.clientId;
                     } else if (userData?.clientId) {
@@ -1646,38 +1665,149 @@ const Details = () => {
     }, [activeTab]);
 
     // Fetch mini-sections for the section selector
+    // ✅ CRITICAL FIX: Add a refresh trigger to force re-fetch when needed
+    const [miniSectionRefreshTrigger, setMiniSectionRefreshTrigger] = useState(0);
+    
+    // ✅ NEW: Add useFocusEffect to refresh mini-sections when page comes into focus
+    useFocusEffect(
+        useCallback(() => {
+            console.log('📱 Page focused - triggering mini-section refresh');
+            setMiniSectionRefreshTrigger(prev => prev + 1);
+        }, [])
+    );
+    
     useEffect(() => {
         let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        let isCancelled = false;
         
         const fetchMiniSections = async () => {
-            if (!sectionId) return;
+            console.log('\n🔍 ========== DETAILS.TSX: FETCHING MINI-SECTIONS (ROBUST) ==========');
+            console.log('   - SectionId:', sectionId);
+            console.log('   - ProjectId:', projectId);
+            console.log('   - Function called at:', new Date().toISOString());
+            
+            if (!sectionId) {
+                console.warn('   ⚠️ No sectionId provided, skipping mini-section fetch');
+                return;
+            }
+            
+            if (sectionId.length !== 24) {
+                console.error('   ❌ Invalid sectionId format! Expected 24 characters, got:', sectionId.length);
+                return;
+            }
 
             try {
-                const sections = await getSection(sectionId);
-                if (sections && Array.isArray(sections) && isMountedRef.current) {
-                    setMiniSections(sections);
+                // ✅ Step 1: Resolve parent section ID aliases (like _id vs sectionId in database)
+                let sectionAliases = [sectionId];
+                const clientId = await getClientIdFromStorage() || await getClientId();
+                if (isCancelled) return;
+                
+                if (clientId && clientId.length === 24) {
+                    try {
+                        console.log('   - Resolving parent section aliases from project...');
+                        const projectRes = await apiClient.get(`/api/project/${projectId}?clientId=${clientId}`);
+                        const projectData = projectRes.data?.project || projectRes.data?.data?.project || projectRes.data?.data || projectRes.data;
+                        if (projectData && projectData.section && Array.isArray(projectData.section)) {
+                            const matchedSec = projectData.section.find((sec: any) => 
+                                String(sec._id) === String(sectionId) || String(sec.sectionId) === String(sectionId)
+                            );
+                            if (matchedSec) {
+                                if (matchedSec._id) sectionAliases.push(String(matchedSec._id));
+                                if (matchedSec.sectionId) sectionAliases.push(String(matchedSec.sectionId));
+                                sectionAliases = [...new Set(sectionAliases)].filter(id => id && id.length === 24);
+                                console.log('   ✅ Resolved parent section ID aliases:', sectionAliases);
+                            }
+                        }
+                    } catch (aliasError) {
+                        console.warn('   ⚠️ Failed to resolve section aliases:', aliasError);
+                    }
+                }
+
+                // ✅ Step 2: Fetch mini-sections from API for all section ID aliases!
+                console.log('   - Fetching mini-sections from API for aliases:', sectionAliases);
+                const miniSectionsDataArrays = await Promise.all(
+                    sectionAliases.map(async (alias) => {
+                        try {
+                            return await getSection(alias);
+                        } catch (err) {
+                            console.error(`   ❌ Failed to fetch for alias ${alias}:`, err);
+                            return [];
+                        }
+                    })
+                );
+                
+                if (isCancelled) return;
+                
+                // Combine and deduplicate mini-sections
+                const combinedMiniSections: any[] = [];
+                const combinedIds = new Set();
+                for (const arr of miniSectionsDataArrays) {
+                    if (arr && Array.isArray(arr)) {
+                        for (const ms of arr) {
+                            if (ms && ms._id && !combinedIds.has(ms._id)) {
+                                combinedIds.add(ms._id);
+                                combinedMiniSections.push(ms);
+                            }
+                        }
+                    }
+                }
+                
+                console.log('   - Combined mini-sections count:', combinedMiniSections.length);
+
+                // ✅ Step 3: Update state with resolved mini-sections
+                if (isMountedRef.current && !isCancelled) {
+                    setMiniSections(combinedMiniSections);
+                    console.log('   ✅ Mini-sections state updated with', combinedMiniSections.length, 'sections');
+                    
+                    // Auto-select first mini-section if none selected
+                    if (!selectedMiniSection && combinedMiniSections.length > 0) {
+                        setSelectedMiniSection(combinedMiniSections[0]._id);
+                        console.log('   ✅ Auto-selected first mini-section:', combinedMiniSections[0].name);
+                    }
                     
                     // Load completion status after mini-sections are loaded
                     timeoutId = setTimeout(async () => {
-                        if (isMountedRef.current) {
+                        if (isMountedRef.current && !isCancelled) {
                             await loadMiniSectionCompletionStatus();
                         }
                     }, 500);
                 }
+                
             } catch (error) {
-                console.error('Error fetching mini-sections:', error);
+                if (isCancelled) return;
+                console.error('   ❌ Error fetching mini-sections:', error);
+                
+                // Final fallback: Basic getSection call
+                try {
+                    console.log('   - Falling back to basic getSection call...');
+                    const sections = await getSection(sectionId);
+                    if (sections && Array.isArray(sections) && isMountedRef.current && !isCancelled) {
+                        setMiniSections(sections);
+                        
+                        // Load completion status
+                        timeoutId = setTimeout(async () => {
+                            if (isMountedRef.current && !isCancelled) {
+                                await loadMiniSectionCompletionStatus();
+                            }
+                        }, 500);
+                    }
+                } catch (fallbackError) {
+                    console.error('   ❌ Fallback also failed:', fallbackError);
+                }
             }
+            
+            console.log('🔍 ========== END MINI-SECTIONS FETCH ==========\n');
         };
 
         fetchMiniSections();
         
-        // Cleanup timeout on unmount
         return () => {
+            isCancelled = true;
             if (timeoutId) {
                 clearTimeout(timeoutId);
             }
         };
-    }, [sectionId, projectId]);
+    }, [sectionId, projectId, miniSectionRefreshTrigger]);
 
     // ✅ OPTIMIZED: Wrapper function for material grouping with safety checks
     const getGroupedMaterialsWithCompleteData = (materialsToDisplay: any[], isUsedTab: boolean) => {
@@ -1969,10 +2099,14 @@ const Details = () => {
         // - Timing issues with async state updates
 
 
+        // Resolve parent section ID to handle _id vs sectionId mismatches perfectly
+        const selectedSectionDoc = miniSections.find(s => s._id === miniSectionId);
+        const resolvedSectionId = (selectedSectionDoc?.mainSectionDetails?.sectionId) || sectionId;
+
         // Create the API payload
         const apiPayload = {
             projectId: projectId,
-            sectionId: sectionId,
+            sectionId: resolvedSectionId,
             miniSectionId: miniSectionId,
             materialUsages: materialUsages,
             clientId: clientId,
@@ -2087,9 +2221,6 @@ const Details = () => {
                             staffName: staffName,
                             projectName: projectName,
                             details: notificationDetails,
-                            performerId: user?._id,
-                            performerRole: user?.role,
-                            recipientType: 'admins',
                         });
                         
                         if (notificationSent) {
@@ -2132,7 +2263,7 @@ const Details = () => {
                         try {
                             const singleApiPayload = {
                                 projectId: projectId,
-                                sectionId: sectionId,
+                                sectionId: resolvedSectionId,
                                 miniSectionId: miniSectionId,
                                 materialId: usage.materialId,
                                 qnt: usage.quantity,
@@ -2413,41 +2544,14 @@ const Details = () => {
                         sectionName,
                         res.section?._id || res.data?._id || 'unknown',
                         newSectionName.trim()
-                    ).catch((err) => {
+                    ).catch((err: any) => {
                         console.error('Failed to log activity:', err);
                     });
                 }, 0);
 
-                // ✅ CRITICAL FIX: Add delay before refetching to ensure backend has processed the request
-                await new Promise(resolve => setTimeout(resolve, 500));
-
-                // Refetch sections after adding a new one
-                console.log('🔄 Refetching sections from API...');
-                const sections = await getSection(sectionId);
-                console.log('📦 Fetched sections:', sections?.length || 0, 'sections');
-                
-                // Check mounted again before updating state
-                if (!isMountedRef.current) {
-                    console.warn('⚠️ Component unmounted after refetch, aborting state update');
-                    return;
-                }
-
-                if (sections && Array.isArray(sections) && sections.length > 0) {
-                    console.log('✅ Updating miniSections state with', sections.length, 'sections');
-                    setMiniSections(sections);
-                    
-                    // ✅ ADDITIONAL FIX: Force a small delay to ensure state update completes
-                    await new Promise(resolve => setTimeout(resolve, 200));
-                    
-                    // ✅ ADDITIONAL FIX: Load completion status for new sections
-                    await loadMiniSectionCompletionStatus();
-                    
-                    console.log('✅ Mini-sections state updated successfully');
-                } else {
-                    console.warn('⚠️ No sections returned from API or empty array');
-                    // Still update state with empty array to trigger re-render
-                    setMiniSections(sections || []);
-                }
+                // ✅ CRITICAL FIX: Trigger refresh to fetch updated mini-sections
+                console.log('🔄 Triggering mini-section refresh...');
+                setMiniSectionRefreshTrigger(prev => prev + 1);
 
                 // Clear form and close modal
                 setNewSectionName('');
@@ -2526,16 +2630,9 @@ const Details = () => {
                                 if (result && result.success) {
                                     toast.success(`"${miniSectionName}" deleted successfully`);
 
-                                    // ✅ DOUBLE-CHECK: Refetch from server to ensure consistency
-                                    try {
-                                        const sections = await getSection(sectionId);
-                                        if (sections && Array.isArray(sections)) {
-                                            setMiniSections(sections);
-                                        }
-                                    } catch (refetchError) {
-                                        console.warn('Failed to refetch sections after delete:', refetchError);
-                                        // Keep the optimistic update if refetch fails
-                                    }
+                                    // ✅ CRITICAL FIX: Trigger refresh to fetch updated mini-sections
+                                    console.log('🔄 Triggering mini-section refresh after deletion...');
+                                    setMiniSectionRefreshTrigger(prev => prev + 1);
 
                                     // Reload materials to reflect the changes
                                     await reloadMaterials(1, true);
@@ -2557,18 +2654,11 @@ const Details = () => {
                                     toast.dismiss(loadingToast);
                                 }
                                 
-                                // ✅ ROLLBACK: Restore original state on error
+                                // ✅ ROLLBACK: Restore original state on error by re-triggering full fetch
                                 const originalMiniSections = miniSections.filter(section => section._id !== miniSectionId);
                                 if (originalMiniSections.length < miniSections.length) {
-                                    // Only restore if we actually removed something
-                                    try {
-                                        const sections = await getSection(sectionId);
-                                        if (sections && Array.isArray(sections)) {
-                                            setMiniSections(sections);
-                                        }
-                                    } catch (restoreError) {
-                                        console.error('Failed to restore sections after error:', restoreError);
-                                    }
+                                    // Trigger a full re-fetch (includes additional mini-sections from materials/labor)
+                                    setMiniSectionRefreshTrigger(prev => prev + 1);
                                 }
                                 
                                 console.error('Delete section error:', error);
@@ -2675,6 +2765,12 @@ const Details = () => {
 
     useEffect(() => {
         fetchMaterials(1, 10, true);
+        
+        // ✅ CRITICAL FIX: Refresh mini-sections when switching to "used" tab
+        if (activeTab === 'used') {
+            console.log('🔄 Switched to used tab - refreshing mini-sections');
+            setMiniSectionRefreshTrigger(prev => prev + 1);
+        }
     }, [activeTab, selectedMiniSection]);
 
     const getGroupedByDate = () => {
@@ -2893,9 +2989,6 @@ const Details = () => {
                                 staffName: staffName,
                                 projectName: projectName,
                                 details: notificationDetails,
-                                performerId: user?._id,
-                                performerRole: user?.role,
-                                recipientType: 'admins',
                             });
                             
                             if (notificationSent) {
@@ -3297,7 +3390,11 @@ const Details = () => {
                                                     shadowRadius: 2,
                                                     elevation: 1,
                                                 }}
-                                                onPress={() => setShowSectionModal(true)}
+                                                onPress={() => {
+                                    // ✅ Refresh mini-sections before opening modal
+                                    setMiniSectionRefreshTrigger(prev => prev + 1);
+                                    setShowSectionModal(true);
+                                }}
                                                 activeOpacity={0.7}
                                             >
                                                 <Text style={{
@@ -3348,10 +3445,8 @@ const Details = () => {
                                         }}
                                         onAddSection={async (newSection) => {
                                             // Refetch sections after adding a new one
-                                            const sections = await getSection(sectionId);
-                                            if (sections && Array.isArray(sections)) {
-                                                setMiniSections(sections);
-                                            }
+                                            // ✅ FIX: Use refresh trigger to run full fetch (including additional mini-sections)
+                                            setMiniSectionRefreshTrigger(prev => prev + 1);
                                         }}
                                         selectedSection={null}
                                         sections={[]}
@@ -4485,6 +4580,17 @@ const Details = () => {
                         </TouchableOpacity>
 
                         {/* Mini Sections List */}
+                        {(() => {
+                            console.log('\n🎨 ========== RENDERING MINI-SECTIONS ==========');
+                            console.log('   - miniSections.length:', miniSections.length);
+                            console.log('   - miniSections:', miniSections);
+                            if (miniSections.length > 0) {
+                                console.log('   - Mini-section IDs:', miniSections.map(s => s._id));
+                                console.log('   - Mini-section names:', miniSections.map(s => s.name));
+                            }
+                            console.log('🎨 ========== END RENDERING ==========\n');
+                            return null;
+                        })()}
                         {miniSections.length > 0 && (
                             <View>
                                 <Text style={{

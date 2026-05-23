@@ -2,6 +2,7 @@
 import PieChart, { PieChartColors20 } from '@/components/PieChart';
 import PieChartLegend, { LegendItem } from '@/components/PieChartLegend';
 import { getSection } from '@/functions/details';
+import { getClientId } from '@/functions/clientId';
 import { formatCurrency } from '@/utils/analytics';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -79,26 +80,68 @@ const MiniSectionsAnalytics: React.FC = () => {
       console.log('   - Equipments param:', equipmentsData ? 'Present' : 'Missing');
 
       // Fetch mini-sections for this section
-      const miniSectionsData = await getSection(sectionId);
+      let sectionAliases = [sectionId];
+      try {
+        const clientId = await getClientId();
+        const projectRes = await apiClient.get(`/api/project/${projectId}?clientId=${clientId}`);
+        const projectData = projectRes.data?.project || projectRes.data?.data?.project || projectRes.data?.data || projectRes.data;
+        if (projectData && projectData.section && Array.isArray(projectData.section)) {
+            const matchedSec = projectData.section.find((sec: any) => 
+                String(sec._id) === String(sectionId) || String(sec.sectionId) === String(sectionId)
+            );
+            if (matchedSec) {
+                if (matchedSec._id) sectionAliases.push(String(matchedSec._id));
+                if (matchedSec.sectionId) sectionAliases.push(String(matchedSec.sectionId));
+                sectionAliases = [...new Set(sectionAliases)].filter(id => id && id.length === 24);
+                console.log('   ✅ Resolved parent section ID aliases:', sectionAliases);
+            }
+        }
+      } catch (aliasError) {
+        console.warn('   ⚠️ Failed to resolve section aliases:', aliasError);
+      }
+
+      console.log('   - About to call getSection API for all aliases:', sectionAliases);
+      const miniSectionsDataArrays = await Promise.all(
+          sectionAliases.map(alias => getSection(alias))
+      );
+      
+      const combinedMiniSectionsData: any[] = [];
+      const combinedIds = new Set();
+      for (const arr of miniSectionsDataArrays) {
+          for (const ms of arr) {
+              if (ms && ms._id && !combinedIds.has(ms._id)) {
+                  combinedIds.add(ms._id);
+                  combinedMiniSectionsData.push(ms);
+              }
+          }
+      }
+      const miniSectionsData = combinedMiniSectionsData;
+
       console.log('   - Mini-sections from API:', miniSectionsData.length);
       if (miniSectionsData.length > 0) {
         console.log('   - Mini-section IDs:', miniSectionsData.map((ms: any) => ms._id));
         console.log('   - Mini-section names:', miniSectionsData.map((ms: any) => ms.name));
       }
       
-      const parsedMaterialUsed = materialUsed
+      let parsedMaterialUsed = materialUsed
         ? JSON.parse(Array.isArray(materialUsed) ? materialUsed[0] : materialUsed)
         : [];
 
       // Parse materialAvailable from params
-      const parsedMaterialAvailable = materialAvailable
+      let parsedMaterialAvailable = materialAvailable
         ? JSON.parse(Array.isArray(materialAvailable) ? materialAvailable[0] : materialAvailable)
         : [];
 
       // Parse labors from params
-      const parsedLabors = laborsData
+      let parsedLabors = laborsData
         ? JSON.parse(Array.isArray(laborsData) ? laborsData[0] : laborsData)
         : [];
+
+      // CRITICAL FIX: Filter out materials/labor that belong to other sections!
+      // This is necessary because the previous screen might pass ALL project materials
+      parsedMaterialUsed = parsedMaterialUsed.filter((m: any) => sectionAliases.includes(m.sectionId));
+      parsedMaterialAvailable = parsedMaterialAvailable.filter((m: any) => sectionAliases.includes(m.sectionId));
+      parsedLabors = parsedLabors.filter((l: any) => sectionAliases.includes(l.sectionId));
 
       console.log('\n📊 PARSED DATA:');
       console.log('   - Parsed material used:', parsedMaterialUsed.length);
@@ -142,7 +185,7 @@ const MiniSectionsAnalytics: React.FC = () => {
         .filter(id => 
           id !== 'no-mini-section' && // Exclude special string
           id !== 'undefined' && // Exclude undefined string
-          id !== sectionId && // Exclude the section ID itself
+          !sectionAliases.includes(id) && // Exclude the section ID itself
           id.length === 24 // MongoDB ObjectId is 24 characters
         );
       
@@ -219,8 +262,8 @@ const MiniSectionsAnalytics: React.FC = () => {
         // Create virtual mini-sections for orphaned data
         // Group materials/labor by their sectionId to create separate virtual mini-sections
         const orphanedSectionIds = [...new Set([
-          ...parsedMaterialUsed.map((m: any) => m.sectionId).filter((id: string) => id && id !== sectionId),
-          ...parsedLabors.map((l: any) => l.sectionId).filter((id: string) => id && id !== sectionId && id !== 'no-mini-section'),
+          ...parsedMaterialUsed.map((m: any) => m.sectionId).filter((id: string) => id && !sectionAliases.includes(id)),
+          ...parsedLabors.map((l: any) => l.sectionId).filter((id: string) => id && !sectionAliases.includes(id) && id !== 'no-mini-section'),
         ])];
         
         if (orphanedSectionIds.length > 0) {
@@ -418,7 +461,7 @@ const MiniSectionsAnalytics: React.FC = () => {
         
         // Building-level labor has miniSectionId="no-mini-section" (General Building Labor)
         // This means it's assigned to the section but not to any specific mini-section
-        const isBuildingLevel = labor.miniSectionId === 'no-mini-section' && labor.sectionId === sectionId;
+        const isBuildingLevel = labor.miniSectionId === 'no-mini-section' && sectionAliases.includes(labor.sectionId);
         console.log(`   - Labor "${labor.type}": sectionId="${labor.sectionId}", miniSectionId="${labor.miniSectionId}", isBuilding-level=${isBuildingLevel}, totalCost=₹${labor.totalCost || 0}`);
         return isBuildingLevel;
       });
@@ -462,7 +505,7 @@ const MiniSectionsAnalytics: React.FC = () => {
         // CRITICAL FIX: Distinguish between two types of virtual mini-sections:
         // 1. Virtual mini-section for the section itself (miniSection._id === sectionId)
         // 2. Orphaned virtual mini-sections (created for deleted mini-sections, miniSection.isOrphaned === true)
-        const isVirtualForSection = miniSection._id === sectionId;
+        const isVirtualForSection = sectionAliases.includes(miniSection._id);
         const isOrphanedVirtual = miniSection.isOrphaned === true;
         
         // Calculate used materials cost
@@ -471,7 +514,7 @@ const MiniSectionsAnalytics: React.FC = () => {
             if (isVirtualForSection) {
               // For virtual mini-section representing the section itself:
               // Include if: has matching sectionId, OR has no sectionId
-              const hasSectionId = material.sectionId === sectionId;
+              const hasSectionId = sectionAliases.includes(material.sectionId);
               const hasNoSectionId = !material.sectionId;
               const matches = hasSectionId || hasNoSectionId;
               console.log(`     - Material "${material.name}": sectionId="${material.sectionId}", matches=${matches}, cost=₹${material.totalCost || material.cost || 0}`);
@@ -501,7 +544,7 @@ const MiniSectionsAnalytics: React.FC = () => {
           (material: any) => {
             if (isVirtualForSection) {
               // For virtual mini-section representing the section itself
-              const hasSectionId = material.sectionId === sectionId;
+              const hasSectionId = sectionAliases.includes(material.sectionId);
               const hasNoSectionId = !material.sectionId;
               const matches = hasSectionId || hasNoSectionId;
               console.log(`     - Available material "${material.name}": sectionId="${material.sectionId}", matches=${matches}, cost=₹${material.totalCost || material.cost || 0}`);
