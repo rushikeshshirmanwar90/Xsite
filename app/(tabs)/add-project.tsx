@@ -8,8 +8,8 @@ import { StaffMembers } from '@/types/staff';
 import { Ionicons } from '@expo/vector-icons';
 import apiClient from '@/utils/axiosConfig';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import { useRouter, useFocusEffect } from 'expo-router';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
     Alert,
     Animated,
@@ -23,6 +23,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { staffStorage } from '@/utils/staffStorage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const ProjectScreen: React.FC = () => {
@@ -173,36 +174,62 @@ const ProjectScreen: React.FC = () => {
     };
 
     // Fetch staff data
-    useEffect(() => {
-        const getStaffData = async () => {
-            // ✅ Don't fetch if clientId is not available yet
-            if (!clientId || clientId === 'unknown') {
-                console.log('⏸️ Skipping staff fetch - clientId not available yet');
-                return;
-            }
+    const getStaffData = useCallback(async () => {
+        // ✅ Don't fetch if clientId is not available yet
+        if (!clientId || clientId === 'unknown') {
+            console.log('⏸️ Skipping staff fetch - clientId not available yet');
+            return;
+        }
 
-            try {
-                console.log('📡 Fetching staff for clientId:', clientId);
-                const res = await apiClient.get(`/api/staff?clientId=${clientId}`);
-                const data = (res.data as any)?.data || [];
-                const filterData = data.map((item: any) => ({
-                    fullName: `${item.firstName} ${item.lastName}`,
-                    _id: item._id,
-                }));
-                setStaffMembers(filterData);
-                console.log('✅ Staff data loaded:', filterData.length, 'members');
-            } catch (error) {
-                console.error('Error fetching staff:', error);
-                // Don't show error toast for 400 errors (missing clientId)
-                if ((error as any)?.response?.status !== 400) {
-                    // Only log other errors
-                    console.error('Staff fetch error details:', (error as any)?.response?.data);
-                }
+        try {
+            console.log('📡 Fetching staff for clientId:', clientId);
+            
+            // ✅ First try to get cached data
+            const cachedStaff = await staffStorage.getStaffData(clientId);
+            if (cachedStaff && cachedStaff.length > 0) {
+                console.log('✅ Using cached staff data:', cachedStaff.length, 'members');
+                setStaffMembers(cachedStaff);
+                return; // Use cached data and return early
             }
-        };
-
-        getStaffData();
+            
+            // ✅ If no cached data, fetch from API
+            console.log('📡 No cached data, fetching from API...');
+            const res = await apiClient.get(`/api/staff?clientId=${clientId}`);
+            const data = (res.data as any)?.data || [];
+            const filterData = data.map((item: any) => ({
+                fullName: `${item.firstName} ${item.lastName}`,
+                _id: item._id,
+            }));
+            
+            // ✅ Save to cache for future use
+            await staffStorage.saveStaffData(clientId, filterData);
+            
+            setStaffMembers(filterData);
+            console.log('✅ Staff data loaded from API and cached:', filterData.length, 'members');
+        } catch (error) {
+            console.error('Error fetching staff:', error);
+            // Don't show error toast for 400 errors (missing clientId)
+            if ((error as any)?.response?.status !== 400) {
+                // Only log other errors
+                console.error('Staff fetch error details:', (error as any)?.response?.data);
+            }
+        }
     }, [clientId]);
+
+    // Fetch staff data when clientId changes
+    useEffect(() => {
+        getStaffData();
+    }, [getStaffData]);
+
+    // Refresh staff data when screen comes into focus
+    useFocusEffect(
+        useCallback(() => {
+            if (clientId && clientId !== 'unknown') {
+                console.log('🔄 Screen focused - refreshing staff data');
+                getStaffData();
+            }
+        }, [getStaffData])
+    );
     const handleAddProject = async (newProject: BaseProject) => {
         try {
             // Start loading animation

@@ -101,9 +101,14 @@ export const updateStaff = async (staffId: string, staffData: Partial<Staff>, no
 
 export const removeStaff = async (staffId: string, staffName?: string, notificationCallback?: (data: any) => Promise<boolean>, clientId?: string): Promise<any | null> => {
   try {
-    console.log('📤 Removing staff via API:', `/api/users/staff/${staffId}`);
+    console.log('📤 Removing staff from client via API:', `/api/clients/staff/remove?staffId=${staffId}&clientId=${clientId}`);
     
-    const res = await apiClient.delete(`/api/users/staff/${staffId}`);
+    if (!clientId) {
+      console.error('❌ ClientId is required for staff removal');
+      return null;
+    }
+    
+    const res = await apiClient.delete(`/api/clients/staff/remove?staffId=${staffId}&clientId=${clientId}`);
     console.log('✅ Staff removal API response:', res.data);
     
     const result = (res.data as any)?.success ?? false;
@@ -119,9 +124,9 @@ export const removeStaff = async (staffId: string, staffName?: string, notificat
           activityType: 'staff_removed',
           staffName: staffName || 'Staff Member',
           projectName: 'Organization',
-          details: `Removed staff member: ${staffName || 'Staff Member'}`,
+          details: `Removed staff member from organization: ${staffName || 'Staff Member'}`,
           category: 'staff',
-          message: 'Staff member has been removed from the organization',
+          message: 'Staff member has been removed from your organization but their account remains active',
         });
 
         console.log('🔔 Staff removal notification result:', notificationSent);

@@ -4,7 +4,7 @@ import { Section } from '@/types/details';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View, Modal, StyleSheet } from 'react-native';
 import SectionManager from './SectionManager';
 
 interface HeaderProps {
@@ -23,6 +23,13 @@ interface HeaderProps {
     sectionCompleted?: boolean;
     onToggleSectionCompletion?: () => void;
     isUpdatingCompletion?: boolean;
+    // New prop for contractor addition
+    onAddContractor?: () => void;
+    isAddingContractor?: boolean;
+    // New props for menu actions
+    onContractorPress?: () => void;
+    onEquipmentPress?: () => void;
+    onOtherCostPress?: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -41,9 +48,18 @@ const Header: React.FC<HeaderProps> = ({
     sectionCompleted = false,
     onToggleSectionCompletion,
     isUpdatingCompletion = false,
+    // New props for contractor addition
+    onAddContractor,
+    isAddingContractor = false,
+    // New props for menu actions
+    onContractorPress,
+    onEquipmentPress,
+    onOtherCostPress,
 }) => {
     // State to store fetched sections
     const [sections, setSections] = useState<Section[]>([]);
+    // State for menu visibility
+    const [showMenu, setShowMenu] = useState(false);
 
     // Get the building/main section name from selectedSection
     const getBuildingName = () => {
@@ -143,41 +159,190 @@ const Header: React.FC<HeaderProps> = ({
 
                 {/* Right side buttons */}
                 <View style={styles.headerActions}>
-                    {/* Section Completion Button */}
-                    {onToggleSectionCompletion && (
+                    {/* Add Contractor Button */}
+                    {onAddContractor && (
                         <TouchableOpacity
                             style={[
-                                styles.completionButton,
-                                sectionCompleted 
-                                    ? { backgroundColor: '#ECFDF5', borderColor: '#10B981' }
-                                    : { backgroundColor: '#F3F4F6', borderColor: '#D1D5DB' },
-                                isUpdatingCompletion && { opacity: 0.6 }
+                                styles.addContractorButton,
+                                isAddingContractor && styles.addContractorButtonDisabled
                             ]}
-                            onPress={onToggleSectionCompletion}
-                            disabled={isUpdatingCompletion}
+                            onPress={onAddContractor}
+                            disabled={isAddingContractor}
                             activeOpacity={0.7}
                         >
-                            <Ionicons 
-                                name={sectionCompleted ? "checkmark-circle" : "ellipse-outline"}
-                                size={16} 
-                                color={sectionCompleted ? "#10B981" : "#6B7280"}
-                            />
-                            <Text style={[
-                                styles.completionButtonText,
-                                sectionCompleted && { color: '#059669' }
-                            ]}>
-                                {isUpdatingCompletion 
-                                    ? 'Updating...' 
-                                    : sectionCompleted 
-                                        ? 'Reopen' 
-                                        : 'Mark Complete'}
-                            </Text>
+                            {isAddingContractor ? (
+                                <Ionicons name="sync" size={18} color="#FFFFFF" />
+                            ) : (
+                                <Ionicons name="add" size={20} color="#FFFFFF" />
+                            )}
                         </TouchableOpacity>
                     )}
+
+                    {/* Three Dot Menu Button */}
+                    <TouchableOpacity
+                        style={menuStyles.menuButton}
+                        onPress={() => setShowMenu(true)}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons name="ellipsis-vertical" size={20} color="#374151" />
+                    </TouchableOpacity>
                 </View>
             </View>
+
+            {/* Menu Modal */}
+            <Modal
+                visible={showMenu}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowMenu(false)}
+            >
+                <TouchableOpacity
+                    style={menuStyles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => setShowMenu(false)}
+                >
+                    <View style={menuStyles.menuContainer}>
+                        {/* Contractor Option */}
+                        {onContractorPress && (
+                            <TouchableOpacity
+                                style={menuStyles.menuItem}
+                                onPress={() => {
+                                    setShowMenu(false);
+                                    onContractorPress();
+                                }}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="people-outline" size={20} color="#374151" />
+                                <Text style={menuStyles.menuItemText}>Add Contractor</Text>
+                            </TouchableOpacity>
+                        )}
+
+                        {/* Equipment Option */}
+                        {onEquipmentPress && (
+                            <TouchableOpacity
+                                style={menuStyles.menuItem}
+                                onPress={() => {
+                                    setShowMenu(false);
+                                    onEquipmentPress();
+                                }}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="construct-outline" size={20} color="#374151" />
+                                <Text style={menuStyles.menuItemText}>Add Equipment</Text>
+                            </TouchableOpacity>
+                        )}
+
+                        {/* Other Cost Option */}
+                        {onOtherCostPress && (
+                            <TouchableOpacity
+                                style={menuStyles.menuItem}
+                                onPress={() => {
+                                    setShowMenu(false);
+                                    onOtherCostPress();
+                                }}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="receipt-outline" size={20} color="#374151" />
+                                <Text style={menuStyles.menuItemText}>Add Other Cost</Text>
+                            </TouchableOpacity>
+                        )}
+
+                        {/* Divider */}
+                        {onToggleSectionCompletion && (onContractorPress || onEquipmentPress || onOtherCostPress) && (
+                            <View style={menuStyles.divider} />
+                        )}
+
+                        {/* Mark Complete Option */}
+                        {onToggleSectionCompletion && (
+                            <TouchableOpacity
+                                style={[
+                                    menuStyles.menuItem,
+                                    isUpdatingCompletion && menuStyles.menuItemDisabled
+                                ]}
+                                onPress={() => {
+                                    setShowMenu(false);
+                                    onToggleSectionCompletion();
+                                }}
+                                disabled={isUpdatingCompletion}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons 
+                                    name={sectionCompleted ? "refresh-outline" : "checkmark-circle-outline"}
+                                    size={20} 
+                                    color={sectionCompleted ? "#EF4444" : "#10B981"}
+                                />
+                                <Text style={[
+                                    menuStyles.menuItemText,
+                                    sectionCompleted ? { color: '#EF4444' } : { color: '#10B981' }
+                                ]}>
+                                    {isUpdatingCompletion 
+                                        ? 'Updating...' 
+                                        : sectionCompleted 
+                                            ? 'Reopen Section' 
+                                            : 'Mark Complete'}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                </TouchableOpacity>
+            </Modal>
         </View>
     );
 };
+
+// Menu styles
+const menuStyles = StyleSheet.create({
+    menuButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#F9FAFB',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: 8,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-start',
+        alignItems: 'flex-end',
+        paddingTop: 100, // Adjust based on header height
+        paddingRight: 16,
+    },
+    menuContainer: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        paddingVertical: 8,
+        minWidth: 180,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 8,
+    },
+    menuItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+    },
+    menuItemDisabled: {
+        opacity: 0.6,
+    },
+    menuItemText: {
+        fontSize: 16,
+        fontWeight: '500',
+        color: '#374151',
+        marginLeft: 12,
+    },
+    divider: {
+        height: 1,
+        backgroundColor: '#E5E7EB',
+        marginVertical: 4,
+        marginHorizontal: 16,
+    },
+});
 
 export default Header;

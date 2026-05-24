@@ -21,6 +21,7 @@ export interface Project {
   licenseStatus?: string; // Added for license control - 'active', 'expired', 'lifetime', 'unknown'
   blockReason?: string; // Added for license control - reason why project is blocked
   isCompleted?: boolean; // Added for project completion tracking
+  isPinned?: boolean; // Added for project pinning functionality
 }
 
 export interface MaterialItem {

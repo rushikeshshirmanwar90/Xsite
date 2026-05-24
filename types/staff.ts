@@ -39,6 +39,8 @@ export interface AddStaffModalProps {
 export interface StaffCardProps {
   staff: Staff;
   onPress?: () => void;
+  onRemove?: (staff: Staff) => void;
+  showRemoveButton?: boolean;
 }
 
 export interface AddProjectModalProps {

@@ -38,6 +38,14 @@ if (!Notifications || isExpoGo) {
 export class SimpleNotificationService {
   private static instance: SimpleNotificationService;
   private currentToken: string | null = null;
+  
+  // ✅ ENHANCED: Configuration options
+  private config = {
+    enableBackendNotifications: true, // Set to false to disable backend calls entirely
+    enableLocalFallback: true,
+    networkCheckTimeout: 3000,
+    apiTimeout: 10000,
+  };
 
   static getInstance(): SimpleNotificationService {
     if (!SimpleNotificationService.instance) {
@@ -48,6 +56,13 @@ export class SimpleNotificationService {
 
   constructor() {
     this.setupNotificationHandler();
+    
+    // ✅ ENHANCED: Allow configuration override via environment or debug settings
+    if (__DEV__) {
+      // In development, you can disable backend notifications to avoid connection errors
+      // this.config.enableBackendNotifications = false;
+      console.log('🔧 SimpleNotificationService config:', this.config);
+    }
   }
 
   /**
@@ -419,46 +434,95 @@ export class SimpleNotificationService {
         recipients: `${recipients.length} recipients`
       });
 
-      // 7. Send to backend API with better error handling
-      const response = await apiClient.post(`/api/send-project-notification`, notificationPayload, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        timeout: 15000, // Increased timeout
-      });
-
-      console.log('📡 API Response status:', response.status);
-      console.log('📡 API Response data:', response.data);
-
-      // 8. Check response
-      if ((response.data as any)?.success) {
-        const sentCount = (response.data as any)?.data?.notificationsSent || 
-                         (response.data as any)?.data?.sent || 0;
-        if (sentCount > 0) {
-          console.log(`✅ Successfully sent ${sentCount} notifications`);
-          return true;
-        } else {
-          console.log('⚠️ API succeeded but no notifications sent (recipients may be empty)');
-          // Still return true as the API call succeeded
-          return true;
+      // 7. Send to backend API with enhanced error handling and fallback
+      try {
+        console.log('📤 Attempting to send notification to backend...');
+        
+        // ✅ ENHANCED: Check network connectivity first
+        const isNetworkAvailable = await this.checkNetworkConnectivity();
+        if (!isNetworkAvailable) {
+          console.log('📱 No network connectivity - sending local notification only');
+          throw new Error('No network connectivity');
         }
-      } else {
-        console.log('❌ API response indicates failure:', response.data);
-        // Fallback to local notification
-        await this.scheduleLocalNotification(
-          notificationPayload.title,
-          notificationPayload.message,
-          notificationPayload.data
-        );
-        return true;
+
+        const response = await apiClient.post(`/api/send-project-notification`, notificationPayload, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          timeout: 10000, // Reduced timeout to 10 seconds
+        });
+
+        console.log('📡 API Response status:', response.status);
+        console.log('📡 API Response data:', response.data);
+
+        // 8. Check response
+        if ((response.data as any)?.success) {
+          const sentCount = (response.data as any)?.data?.notificationsSent || 
+                           (response.data as any)?.data?.sent || 0;
+          if (sentCount > 0) {
+            console.log(`✅ Successfully sent ${sentCount} notifications`);
+            return true;
+          } else {
+            console.log('⚠️ API succeeded but no notifications sent (recipients may be empty)');
+            // Still return true as the API call succeeded
+            return true;
+          }
+        } else {
+          console.log('❌ API response indicates failure:', response.data);
+          throw new Error((response.data as any)?.message || 'API returned unsuccessful response');
+        }
+
+      } catch (apiError: any) {
+        console.log('❌ Backend API failed:', apiError.message);
+        
+        // ✅ ENHANCED: Determine if we should retry or fallback immediately
+        const shouldFallbackImmediately = 
+          apiError.code === 'ECONNREFUSED' ||
+          apiError.code === 'ENOTFOUND' ||
+          apiError.code === 'ECONNABORTED' ||
+          apiError.message?.includes('Network Error') ||
+          apiError.message?.includes('fetch failed') ||
+          apiError.message?.includes('No network connectivity');
+
+        if (shouldFallbackImmediately) {
+          console.log('🔄 Network/connection error detected - using local notification fallback');
+          throw apiError; // Will be caught by outer try-catch for local fallback
+        }
+
+        // For other errors (like 500, 401, etc.), still try local fallback
+        console.log('🔄 API error - using local notification fallback');
+        throw apiError;
       }
 
     } catch (error: any) {
       console.error('❌ Error sending project notification:', error);
       
-      // Log more details about the error
+      // ✅ ENHANCED: Better error categorization and logging
+      let errorCategory = 'unknown';
+      let shouldShowUserError = false;
+      
+      if (error?.code === 'ECONNREFUSED' || error?.code === 'ENOTFOUND') {
+        errorCategory = 'connection';
+        console.log('🔌 Connection error - backend server may be offline');
+      } else if (error?.code === 'ECONNABORTED' || error?.message?.includes('timeout')) {
+        errorCategory = 'timeout';
+        console.log('⏰ Request timeout - backend server may be slow');
+      } else if (error?.response?.status === 401) {
+        errorCategory = 'auth';
+        console.log('🔐 Authentication error - token may be invalid');
+        shouldShowUserError = true;
+      } else if (error?.response?.status === 500) {
+        errorCategory = 'server';
+        console.log('🔥 Server error - backend API issue');
+      } else if (error?.message?.includes('Network Error') || error?.message?.includes('fetch failed')) {
+        errorCategory = 'network';
+        console.log('📡 Network error - connectivity issue');
+      }
+      
+      // Log detailed error info for debugging
       if (error?.response) {
         console.error('❌ API error details:', {
+          category: errorCategory,
           message: error.message,
           status: error.response?.status,
           statusText: error.response?.statusText,
@@ -466,24 +530,64 @@ export class SimpleNotificationService {
         });
       }
       
-      // 9. Final fallback: Always send local notification on error
+      // 9. Enhanced fallback: Always send local notification on error
       try {
-        console.log('🔄 Final fallback: sending local notification...');
+        console.log('🔄 Sending local notification fallback...');
+        
+        const fallbackTitle = this.getNotificationTitle(activityData.activityType, activityData.staffName);
+        const fallbackMessage = activityData.details;
+        
         await this.scheduleLocalNotification(
-          this.getNotificationTitle(activityData.activityType, activityData.staffName),
-          activityData.details,
+          fallbackTitle,
+          fallbackMessage,
           {
             projectId: activityData.projectId,
             activityType: activityData.activityType,
             route: 'notifications',
             screen: 'notifications',
+            source: 'local_fallback',
+            originalError: errorCategory
           }
         );
+        
+        console.log('✅ Local notification sent successfully as fallback');
         return true; // Return true since we sent local notification
+        
       } catch (localError: any) {
         console.error('❌ Even local notification failed:', localError);
+        
+        // ✅ ENHANCED: Show user-friendly error only for critical failures
+        if (shouldShowUserError) {
+          // Could show a toast or alert here if needed
+          console.error('💥 Critical notification failure - user should be informed');
+        }
+        
         return false;
       }
+    }
+  }
+
+  /**
+   * Check network connectivity
+   */
+  private async checkNetworkConnectivity(): Promise<boolean> {
+    try {
+      // Simple connectivity check - try to reach a reliable endpoint
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+      
+      const response = await fetch('https://www.google.com/generate_204', {
+        method: 'HEAD',
+        mode: 'no-cors',
+        cache: 'no-cache',
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      return true;
+    } catch (error) {
+      console.log('📡 Network connectivity check failed:', error);
+      return false;
     }
   }
 

@@ -838,15 +838,18 @@ const CompanyProfile: React.FC = () => {
                 {/* Stats Cards */}
                 <View style={styles.statsContainer}>
                     <View style={styles.statsRow}>
-                        <View style={[styles.statCard, styles.statCardPrimary]}>
-                            <View style={styles.statIconContainer}>
-                                <Ionicons name="folder-open" size={24} color="#3B82F6" />
+                        {/* Only show Total Projects for non-staff users */}
+                        {!isCurrentUserStaff && (
+                            <View style={[styles.statCard, styles.statCardPrimary]}>
+                                <View style={styles.statIconContainer}>
+                                    <Ionicons name="folder-open" size={24} color="#3B82F6" />
+                                </View>
+                                <Text style={styles.statValue}>
+                                    {loading ? '...' : stats.totalProjects}
+                                </Text>
+                                <Text style={styles.statLabel}>Total Projects</Text>
                             </View>
-                            <Text style={styles.statValue}>
-                                {loading ? '...' : stats.totalProjects}
-                            </Text>
-                            <Text style={styles.statLabel}>Total Projects</Text>
-                        </View>
+                        )}
 
                         {/* Only show Total Spent for non-staff users */}
                         {!isCurrentUserStaff && (
@@ -1453,28 +1456,30 @@ const CompanyProfile: React.FC = () => {
                     </TouchableOpacity>
                 </View>
 
-                {/* Reports Section */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Reports</Text>
-                    <TouchableOpacity
-                        style={styles.reportButton}
-                        onPress={() => setShowReportGenerator(true)}
-                        activeOpacity={0.7}
-                    >
-                        <View style={styles.reportButtonLeft}>
-                            <View style={styles.reportButtonIcon}>
-                                <Ionicons name="document-text-outline" size={22} color="#10B981" />
+                {/* Reports Section - Only for non-staff users */}
+                {!isCurrentUserStaff && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Reports</Text>
+                        <TouchableOpacity
+                            style={styles.reportButton}
+                            onPress={() => setShowReportGenerator(true)}
+                            activeOpacity={0.7}
+                        >
+                            <View style={styles.reportButtonLeft}>
+                                <View style={styles.reportButtonIcon}>
+                                    <Ionicons name="document-text-outline" size={22} color="#10B981" />
+                                </View>
+                                <View style={styles.reportButtonContent}>
+                                    <Text style={styles.reportButtonTitle}>Generate Complete Report</Text>
+                                    <Text style={styles.reportButtonSubtitle}>Download PDF report with material usage details, labor & equipment costs</Text>
+                                </View>
                             </View>
-                            <View style={styles.reportButtonContent}>
-                                <Text style={styles.reportButtonTitle}>Generate Complete Report</Text>
-                                <Text style={styles.reportButtonSubtitle}>Download PDF report with material usage details, labor & equipment costs</Text>
+                            <View style={styles.reportButtonBadge}>
+                                <Ionicons name="download" size={16} color="#10B981" />
                             </View>
-                        </View>
-                        <View style={styles.reportButtonBadge}>
-                            <Ionicons name="download" size={16} color="#10B981" />
-                        </View>
-                    </TouchableOpacity>
-                </View>
+                        </TouchableOpacity>
+                    </View>
+                )}
 
                 {/* Logout Button */}
                 <View style={styles.section}>
@@ -1495,13 +1500,15 @@ const CompanyProfile: React.FC = () => {
                 </View>
             </ScrollView>
 
-            {/* Report Generator Modal */}
-            <ReportGenerator
-                visible={showReportGenerator}
-                onClose={() => setShowReportGenerator(false)}
-                clientData={clientData}
-                userData={userData}
-            />
+            {/* Report Generator Modal - Only for non-staff users */}
+            {!isCurrentUserStaff && (
+                <ReportGenerator
+                    visible={showReportGenerator}
+                    onClose={() => setShowReportGenerator(false)}
+                    clientData={clientData}
+                    userData={userData}
+                />
+            )}
 
             {/* QR Code Modal - Only for Staff with clients */}
             {isCurrentUserStaff && user && userData.clientId && (

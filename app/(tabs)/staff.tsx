@@ -7,12 +7,12 @@ import AdminCard from '@/components/staff/AdminCard';
 import StaffQRScannerModal from '@/components/staff/StaffQRScannerModal';
 import ManualStaffAssignModal from '@/components/staff/ManualStaffAssignModal';
 import { getClientId } from '@/functions/clientId';
-import { addStaff } from '@/functions/staff';
+import { addStaff, removeStaff } from '@/functions/staff';
 import { isAdmin, useUser } from '@/hooks/useUser';
 import { useSimpleNotifications } from '@/hooks/useSimpleNotifications';
 import { domain } from '@/lib/domain';
 import { Staff } from '@/types/staff';
-import { emailNotificationService } from '@/services/emailNotificationService';
+import { emailNotificationService, notificationService } from '@/services/emailNotificationService';
 import { Ionicons } from '@expo/vector-icons';
 import apiClient from '@/utils/axiosConfig';
 import { useRouter } from 'expo-router';
@@ -28,6 +28,7 @@ import {
     RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { staffStorage } from '@/utils/staffStorage';
 import { toast } from 'sonner-native';
 
 interface Admin {
@@ -393,6 +394,14 @@ const StaffManagement: React.FC = () => {
                 toast.success('Staff Added successfully');
                 setShowAddModal(false);
                 
+                // ✅ Update cached staff data immediately
+                const newStaffForCache = {
+                    fullName: `${newStaff.firstName} ${newStaff.lastName}`,
+                    _id: res._id || res.id || 'temp_id'
+                };
+                await staffStorage.addStaffMember(clientId, newStaffForCache);
+                console.log('✅ Staff added to cache for immediate availability');
+                
                 // Send welcome message to the new staff member
                 console.log('📧 Preparing to send welcome message...');
                 const staffWithId = { ...newStaff, _id: res._id || res.id };
@@ -446,6 +455,121 @@ const StaffManagement: React.FC = () => {
                 staff: JSON.stringify(staff)
             }
         });
+    };
+
+    const handleRemoveStaff = async (staff: Staff) => {
+        // Check if user is admin
+        if (!userIsAdmin) {
+            toast.error('Only admins can remove staff members');
+            return;
+        }
+
+        if (!clientId) {
+            toast.error('Client ID not found');
+            return;
+        }
+
+        // Check if staff is assigned to any projects for this client
+        const clientProjects = filterStaffProjectsByClient(staff);
+        
+        if (clientProjects.length > 0) {
+            const projectNames = clientProjects.map(p => p.projectName).join(', ');
+            Alert.alert(
+                'Cannot Remove Staff',
+                `${staff.firstName} ${staff.lastName} is currently assigned to the following project(s): ${projectNames}.\n\nPlease unassign them from all projects before removing.`,
+                [{ text: 'OK', style: 'default' }]
+            );
+            return;
+        }
+
+        // Show confirmation dialog
+        Alert.alert(
+            'Remove Staff Member',
+            `Are you sure you want to remove ${staff.firstName} ${staff.lastName} from your organization?`,
+            [
+                {
+                    text: 'Cancel',
+                    style: 'cancel'
+                },
+                {
+                    text: 'Remove',
+                    style: 'destructive',
+                    onPress: async () => {
+                        await performStaffRemoval(staff);
+                    }
+                }
+            ]
+        );
+    };
+
+    const performStaffRemoval = async (staff: Staff) => {
+        try {
+            console.log('🗑️ Starting staff removal process...');
+            console.log('👤 Staff to remove:', JSON.stringify(staff, null, 2));
+            console.log('🆔 Client ID:', clientId);
+
+            if (!staff._id) {
+                toast.error('Staff ID not found');
+                return;
+            }
+
+            // Call the removeStaff function from staff functions
+            const result = await removeStaff(
+                staff._id,
+                `${staff.firstName} ${staff.lastName}`,
+                sendProjectNotification,
+                clientId
+            );
+
+            if (result) {
+                console.log('✅ Staff removed successfully');
+                toast.success(`${staff.firstName} ${staff.lastName} has been removed from your organization`);
+
+                // Remove from cached staff data
+                await staffStorage.removeStaffMember(clientId, staff._id);
+                console.log('✅ Staff removed from cache');
+
+                // Refresh staff and admin list
+                console.log('🔄 Refreshing staff and admin data...');
+                setLoading(true);
+                try {
+                    await fetchStaffAndAdminData();
+                    console.log('✅ Data refresh completed after removal');
+                } catch (error) {
+                    console.error('❌ Error refreshing data after removal:', error);
+                    toast.error('Staff removed but failed to refresh data');
+                }
+            } else {
+                console.log('❌ Staff removal failed');
+                toast.error('Failed to remove staff member');
+            }
+        } catch (error: any) {
+            console.error('❌ Error in performStaffRemoval:', error);
+            
+            if (error.response) {
+                console.error('❌ Error response:', error.response.data);
+                console.error('❌ Error status:', error.response.status);
+                
+                if (error.response.status === 400) {
+                    const errorMessage = error.response.data?.message || 'Invalid request';
+                    if (errorMessage.includes('assigned to the following project')) {
+                        toast.error(errorMessage);
+                    } else if (errorMessage.includes('not assigned to this client')) {
+                        toast.error('Staff member is not part of your organization.');
+                    } else {
+                        toast.error(errorMessage);
+                    }
+                } else if (error.response.status === 404) {
+                    toast.error('Staff member not found or already removed.');
+                } else if (error.response.status === 403) {
+                    toast.error('You do not have permission to remove this staff member.');
+                } else {
+                    toast.error('Failed to remove staff member. Please try again.');
+                }
+            } else {
+                toast.error('Network error. Please check your connection and try again.');
+            }
+        }
     };
 
     const filteredStaff = staffList.filter(staff => {
@@ -597,6 +721,8 @@ const StaffManagement: React.FC = () => {
                                 assignedProjects: filterStaffProjectsByClient(item.data)
                             }}
                             onPress={() => handleStaffPress(item.data)}
+                            onRemove={handleRemoveStaff}
+                            showRemoveButton={userIsAdmin}
                         />
                     </View>
                 );

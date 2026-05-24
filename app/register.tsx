@@ -8,7 +8,7 @@ import apiClient from '@/utils/axiosConfig';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     ActivityIndicator,
     KeyboardAvoidingView,
@@ -17,7 +17,8 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
-    View
+    View,
+    Animated
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -72,8 +73,30 @@ export default function RegisterScreen() {
     const [showOtpInput, setShowOtpInput] = useState(false);
     const [sendingOtp, setSendingOtp] = useState(false);
 
+    // Animation for header icon
+    const scaleAnim = new Animated.Value(1);
+
     // Default role for all new staff
     const role: Role = 'site-engineer';
+
+    // Animate icon on mount
+    useEffect(() => {
+        const pulse = () => {
+            Animated.sequence([
+                Animated.timing(scaleAnim, {
+                    toValue: 1.1,
+                    duration: 1000,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(scaleAnim, {
+                    toValue: 1,
+                    duration: 1000,
+                    useNativeDriver: true,
+                }),
+            ]).start(() => pulse());
+        };
+        pulse();
+    }, []);
 
     const handleSendOtp = async () => {
         // Validate email first
@@ -164,35 +187,6 @@ export default function RegisterScreen() {
             return;
         }
 
-        if (password.length < 8) {
-            toast.error('Password must be at least 8 characters long');
-            return;
-        }
-
-        // Check for uppercase letter
-        if (!/[A-Z]/.test(password)) {
-            toast.error('Password must contain at least one uppercase letter');
-            return;
-        }
-
-        // Check for lowercase letter
-        if (!/[a-z]/.test(password)) {
-            toast.error('Password must contain at least one lowercase letter');
-            return;
-        }
-
-        // Check for number
-        if (!/\d/.test(password)) {
-            toast.error('Password must contain at least one number');
-            return;
-        }
-
-        // Check for special character
-        if (!/[@$!%*?&]/.test(password)) {
-            toast.error('Password must contain at least one special character (@$!%*?&)');
-            return;
-        }
-
         // Confirm password validation
         if (!confirmPassword.trim()) {
             toast.error('Please confirm your password');
@@ -211,12 +205,6 @@ export default function RegisterScreen() {
             console.log('Data:', { firstName, lastName, email, phoneNumber, role });
             console.log('🔑 Password length:', password.trim().length);
             console.log('🔑 Password provided:', !!password.trim());
-            console.log('🔑 Password validation check:');
-            console.log('  - Has uppercase:', /[A-Z]/.test(password));
-            console.log('  - Has lowercase:', /[a-z]/.test(password));
-            console.log('  - Has number:', /\d/.test(password));
-            console.log('  - Has special char:', /[@$!%*?&]/.test(password));
-            console.log('  - Length >= 8:', password.length >= 8);
 
             const payload = {
                 firstName: firstName.trim(),
@@ -335,220 +323,231 @@ export default function RegisterScreen() {
 
                     <View style={styles.content}>
                         <View style={styles.formContainer}>
-                            <Text style={styles.welcomeText}>Create Staff Account</Text>
-                            <Text style={styles.stepDescription}>
-                                Fill in the details to register a new staff member
-                            </Text>
+                            <View style={styles.headerSection}>
+                                <Animated.View style={[styles.iconContainer, { transform: [{ scale: scaleAnim }] }]}>
+                                    <Ionicons name="person-add" size={32} color="#3B82F6" />
+                                </Animated.View>
+                                <Text style={styles.welcomeText}>Create Staff Account</Text>
+                                <Text style={styles.stepDescription}>
+                                    Join our team and start managing projects efficiently
+                                </Text>
+                            </View>
 
-                            {/* First Name */}
-                            <CustomTextInput
-                                icon="person"
-                                placeholder="First Name"
-                                value={firstName}
-                                onChangeText={setFirstName}
-                                autoCapitalize="words"
-                            />
+                            <View style={styles.inputSection}>
+                                {/* First Name */}
+                                <CustomTextInput
+                                    icon="person"
+                                    placeholder="First Name"
+                                    value={firstName}
+                                    onChangeText={setFirstName}
+                                    autoCapitalize="words"
+                                />
 
-                            {/* Last Name */}
-                            <CustomTextInput
-                                icon="person-outline"
-                                placeholder="Last Name"
-                                value={lastName}
-                                onChangeText={setLastName}
-                                autoCapitalize="words"
-                            />
+                                {/* Last Name */}
+                                <CustomTextInput
+                                    icon="person-outline"
+                                    placeholder="Last Name"
+                                    value={lastName}
+                                    onChangeText={setLastName}
+                                    autoCapitalize="words"
+                                />
 
-                            {/* Email */}
-                            <CustomTextInput
-                                icon="email"
-                                iconColor={emailVerified ? "#10B981" : "#666"}
-                                placeholder="Email Address"
-                                value={email}
-                                onChangeText={(text) => {
-                                    setEmail(text);
-                                    // Reset verification if email changes
-                                    if (emailVerified) {
-                                        setEmailVerified(false);
-                                        setShowOtpInput(false);
-                                        setOtp('');
-                                    }
-                                }}
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                                autoComplete="email"
-                                editable={!emailVerified}
-                                containerStyle={emailVerified ? styles.inputContainerVerified : undefined}
-                                inputStyle={emailVerified ? styles.inputDisabled : undefined}
-                                rightElement={emailVerified ? (
-                                    <Ionicons name="checkmark-circle" size={24} color="#10B981" style={{ marginRight: 8 }} />
-                                ) : undefined}
-                            />
-
-                            {/* Verified Email Display */}
-                            {emailVerified && (
-                                <View style={styles.verifiedEmailContainer}>
-                                    <View style={styles.verifiedEmailContent}>
-                                        <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                                        <Text style={styles.verifiedEmailText}>
-                                            Email verified: {email}
-                                        </Text>
-                                    </View>
-                                </View>
-                            )}
-
-                            {/* Change Email Button - Always visible after verification */}
-                            {emailVerified && (
-                                <TouchableOpacity
-                                    style={styles.changeEmailButtonVerified}
-                                    onPress={() => {
-                                        setEmailVerified(false);
-                                        setShowOtpInput(false);
-                                        setOtp('');
-                                        setGeneratedOTP(0);
-                                        setEmail('');
-                                        toast.info('Email verification reset. You can now enter a different email address');
+                                {/* Email */}
+                                <CustomTextInput
+                                    icon="email"
+                                    iconColor={emailVerified ? "#10B981" : "#666"}
+                                    placeholder="Email Address"
+                                    value={email}
+                                    onChangeText={(text) => {
+                                        setEmail(text);
+                                        // Reset verification if email changes
+                                        if (emailVerified) {
+                                            setEmailVerified(false);
+                                            setShowOtpInput(false);
+                                            setOtp('');
+                                        }
                                     }}
-                                >
-                                    <Ionicons name="mail" size={16} color="#3b82f6" />
-                                    <Text style={styles.changeEmailButtonVerifiedText}>Change Email</Text>
-                                </TouchableOpacity>
-                            )}
+                                    keyboardType="email-address"
+                                    autoCapitalize="none"
+                                    autoComplete="email"
+                                    editable={!emailVerified}
+                                    containerStyle={emailVerified ? styles.inputContainerVerified : undefined}
+                                    inputStyle={emailVerified ? styles.inputDisabled : undefined}
+                                    rightElement={emailVerified ? (
+                                        <Ionicons name="checkmark-circle" size={24} color="#10B981" style={{ marginRight: 8 }} />
+                                    ) : undefined}
+                                />
 
-                            {/* Email Verification Button */}
-                            {!emailVerified && !showOtpInput && (
-                                <TouchableOpacity
-                                    style={styles.verifyButton}
-                                    onPress={handleSendOtp}
-                                    disabled={sendingOtp || !email.trim()}
-                                >
-                                    {sendingOtp ? (
-                                        <ActivityIndicator size="small" color="#3b82f6" />
-                                    ) : (
-                                        <>
-                                            <Ionicons name="mail-outline" size={18} color="#3b82f6" />
-                                            <Text style={styles.verifyButtonText}>Verify Email</Text>
-                                        </>
-                                    )}
-                                </TouchableOpacity>
-                            )}
- 
-                            {/* OTP Input */}
-                            {showOtpInput && !emailVerified && (
-                                <View style={styles.otpContainer}>
-                                    {/* Email Display */}
-                                    <View style={styles.emailDisplayContainer}>
-                                        <MaterialIcons name="email" size={16} color="#3B82F6" />
-                                        <Text style={styles.emailDisplayText}>
-                                            Verifying: {email}
-                                        </Text>
+                                {/* Verified Email Display */}
+                                {emailVerified && (
+                                    <View style={styles.verifiedEmailContainer}>
+                                        <View style={styles.verifiedEmailContent}>
+                                            <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                                            <Text style={styles.verifiedEmailText}>
+                                                Email verified: {email}
+                                            </Text>
+                                        </View>
                                     </View>
-                                    
-                                    <CustomTextInput
-                                        icon="lock"
-                                        placeholder="Enter 6-digit OTP"
-                                        value={otp}
-                                        onChangeText={setOtp}
-                                        keyboardType="number-pad"
-                                        maxLength={6}
-                                    />
-                                    <View style={styles.otpActions}>
-                                        <TouchableOpacity
-                                            style={styles.verifyOtpButton}
-                                            onPress={handleVerifyOtp}
-                                        >
-                                            <Text style={styles.verifyOtpButtonText}>Verify OTP</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity
-                                            style={styles.resendButton}
-                                            onPress={handleSendOtp}
-                                            disabled={sendingOtp}
-                                        >
-                                            <Text style={styles.resendButtonText}>Resend OTP</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                    
-                                    {/* Change Email Button */}
+                                )}
+
+                                {/* Change Email Button - Always visible after verification */}
+                                {emailVerified && (
                                     <TouchableOpacity
-                                        style={styles.changeEmailButton}
+                                        style={styles.changeEmailButtonVerified}
                                         onPress={() => {
+                                            setEmailVerified(false);
                                             setShowOtpInput(false);
                                             setOtp('');
                                             setGeneratedOTP(0);
                                             setEmail('');
-                                            toast.info('You can now enter a different email address');
+                                            toast.info('Email verification reset. You can now enter a different email address');
                                         }}
                                     >
-                                        <Ionicons name="mail" size={16} color="#6B7280" />
-                                        <Text style={styles.changeEmailText}>Change Email</Text>
+                                        <Ionicons name="mail" size={16} color="#3b82f6" />
+                                        <Text style={styles.changeEmailButtonVerifiedText}>Change Email</Text>
                                     </TouchableOpacity>
-                                </View>
-                            )}
+                                )}
 
-                            {/* Phone Number */}
-                            <CustomTextInput
-                                icon="phone"
-                                placeholder="Phone Number"
-                                value={phoneNumber}
-                                onChangeText={setPhoneNumber}
-                                keyboardType="phone-pad"
-                                maxLength={15}
-                            />
+                                {/* Email Verification Button */}
+                                {!emailVerified && !showOtpInput && (
+                                    <TouchableOpacity
+                                        style={styles.verifyButton}
+                                        onPress={handleSendOtp}
+                                        disabled={sendingOtp || !email.trim()}
+                                    >
+                                        {sendingOtp ? (
+                                            <ActivityIndicator size="small" color="#3b82f6" />
+                                        ) : (
+                                            <>
+                                                <Ionicons name="mail-outline" size={18} color="#3b82f6" />
+                                                <Text style={styles.verifyButtonText}>Verify Email</Text>
+                                            </>
+                                        )}
+                                    </TouchableOpacity>
+                                )}
+     
+                                {/* OTP Input */}
+                                {showOtpInput && !emailVerified && (
+                                    <View style={styles.otpContainer}>
+                                        {/* Email Display */}
+                                        <View style={styles.emailDisplayContainer}>
+                                            <MaterialIcons name="email" size={16} color="#3B82F6" />
+                                            <Text style={styles.emailDisplayText}>
+                                                Verifying: {email}
+                                            </Text>
+                                        </View>
+                                        
+                                        <CustomTextInput
+                                            icon="lock"
+                                            placeholder="Enter 6-digit OTP"
+                                            value={otp}
+                                            onChangeText={setOtp}
+                                            keyboardType="number-pad"
+                                            maxLength={6}
+                                        />
+                                        <View style={styles.otpActions}>
+                                            <TouchableOpacity
+                                                style={styles.verifyOtpButton}
+                                                onPress={handleVerifyOtp}
+                                            >
+                                                <Text style={styles.verifyOtpButtonText}>Verify OTP</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={styles.resendButton}
+                                                onPress={handleSendOtp}
+                                                disabled={sendingOtp}
+                                            >
+                                                <Text style={styles.resendButtonText}>Resend OTP</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                        
+                                        {/* Change Email Button */}
+                                        <TouchableOpacity
+                                            style={styles.changeEmailButton}
+                                            onPress={() => {
+                                                setShowOtpInput(false);
+                                                setOtp('');
+                                                setGeneratedOTP(0);
+                                                setEmail('');
+                                                toast.info('You can now enter a different email address');
+                                            }}
+                                        >
+                                            <Ionicons name="mail" size={16} color="#6B7280" />
+                                            <Text style={styles.changeEmailText}>Change Email</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
 
-                            {/* Password */}
-                            <CustomTextInput
-                                icon="lock"
-                                placeholder="Password (8+ chars, A-z, 0-9, @$!%*?&)"
-                                value={password}
-                                onChangeText={setPassword}
-                                isPassword={true}
-                                showPasswordToggle={true}
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                            />
+                                {/* Phone Number */}
+                                <CustomTextInput
+                                    icon="phone"
+                                    placeholder="Phone Number"
+                                    value={phoneNumber}
+                                    onChangeText={setPhoneNumber}
+                                    keyboardType="phone-pad"
+                                    maxLength={15}
+                                />
 
-                            {/* Confirm Password */}
-                            <CustomTextInput
-                                icon="lock-outline"
-                                placeholder="Confirm Password"
-                                value={confirmPassword}
-                                onChangeText={setConfirmPassword}
-                                isPassword={true}
-                                showPasswordToggle={true}
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                            />
+                                {/* Password */}
+                                <CustomTextInput
+                                    icon="lock"
+                                    placeholder="Password"
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    isPassword={true}
+                                    showPasswordToggle={true}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                />
 
-                            <Text style={styles.helperText}>
-                                * Password must be 8+ characters with uppercase, lowercase, number, and special character (@$!%*?&)
-                            </Text>
+                                {/* Confirm Password */}
+                                <CustomTextInput
+                                    icon="lock-outline"
+                                    placeholder="Confirm Password"
+                                    value={confirmPassword}
+                                    onChangeText={setConfirmPassword}
+                                    isPassword={true}
+                                    showPasswordToggle={true}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                />
+                            </View>
 
-                            {/* Register Button */}
-                            <TouchableOpacity
-                                style={styles.button}
-                                onPress={handleRegister}
-                                disabled={loading}
-                            >
-                                <LinearGradient
-                                    colors={['#3b82f6', '#4f46e5']}
-                                    style={styles.buttonGradient}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 1 }}
+
+
+                            <View style={styles.buttonSection}>
+                                {/* Register Button */}
+                                <TouchableOpacity
+                                    style={styles.button}
+                                    onPress={handleRegister}
+                                    disabled={loading}
                                 >
-                                    {loading ? (
-                                        <ActivityIndicator color="white" />
-                                    ) : (
-                                        <Text style={styles.buttonText}>Register Staff</Text>
-                                    )}
-                                </LinearGradient>
-                            </TouchableOpacity>
+                                    <LinearGradient
+                                        colors={['#3b82f6', '#4f46e5']}
+                                        style={styles.buttonGradient}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 1 }}
+                                    >
+                                        {loading ? (
+                                            <ActivityIndicator color="white" />
+                                        ) : (
+                                            <>
+                                                <Ionicons name="person-add" size={20} color="white" style={{ marginRight: 8 }} />
+                                                <Text style={styles.buttonText}>Create Account</Text>
+                                            </>
+                                        )}
+                                    </LinearGradient>
+                                </TouchableOpacity>
 
-                            {/* Back to Login */}
-                            <TouchableOpacity
-                                style={styles.secondaryButton}
-                                onPress={() => router.back()}
-                            >
-                                <Text style={styles.secondaryButtonText}>Back to Login</Text>
-                            </TouchableOpacity>
+                                {/* Back to Login */}
+                                <TouchableOpacity
+                                    style={styles.secondaryButton}
+                                    onPress={() => router.back()}
+                                >
+                                    <Ionicons name="arrow-back" size={18} color="#3b82f6" style={{ marginRight: 8 }} />
+                                    <Text style={styles.secondaryButtonText}>Back to Login</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
                     </View>
                 </ScrollView>
@@ -570,13 +569,14 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#ffffff',
+        backgroundColor: '#F8FAFC',
     },
     keyboardAvoidingView: {
         flex: 1,
     },
     scrollContent: {
         flexGrow: 1,
+        paddingBottom: 20,
     },
     header: {
         flexDirection: 'row',
@@ -584,11 +584,19 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: 20,
         paddingVertical: 16,
+        backgroundColor: '#ffffff',
         borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
+        borderBottomColor: '#E2E8F0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
     },
     backButton: {
         padding: 8,
+        borderRadius: 8,
+        backgroundColor: '#F1F5F9',
     },
     headerTitle: {
         fontSize: 18,
@@ -596,60 +604,92 @@ const styles = StyleSheet.create({
         color: '#1F2937',
     },
     content: {
-        padding: 24,
+        padding: 20,
         justifyContent: 'center',
     },
     formContainer: {
         backgroundColor: '#ffffff',
-        borderRadius: 20,
-        padding: 24,
+        borderRadius: 24,
+        padding: 28,
         shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+        elevation: 8,
+        marginVertical: 10,
+    },
+    headerSection: {
+        alignItems: 'center',
+        marginBottom: 32,
+    },
+    iconContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: '#EFF6FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+        shadowColor: '#3B82F6',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-        elevation: 5,
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
     },
     welcomeText: {
-        fontSize: 26,
-        fontWeight: 'bold',
-        color: '#4f46e5',
+        fontSize: 28,
+        fontWeight: '800',
+        color: '#1E293B',
         marginBottom: 8,
         textAlign: 'center',
     },
     stepDescription: {
-        fontSize: 14,
-        color: '#666',
-        marginBottom: 24,
+        fontSize: 16,
+        color: '#64748B',
+        marginBottom: 8,
         textAlign: 'center',
+        lineHeight: 22,
+    },
+    inputSection: {
+        marginBottom: 24,
+    },
+    buttonSection: {
+        gap: 16,
     },
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#f7f9fc',
-        borderWidth: 1,
-        borderColor: '#e6e8eb',
-        borderRadius: 12,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 2,
+        borderColor: '#E2E8F0',
+        borderRadius: 16,
         marginBottom: 16,
         padding: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
     },
     inputContainerVerified: {
         backgroundColor: '#F0FDF4',
         borderColor: '#BBF7D0',
     },
     inputIcon: {
-        padding: 10,
+        padding: 12,
     },
     visibilityIcon: {
-        padding: 10,
+        padding: 12,
         justifyContent: 'center',
         alignItems: 'center',
     },
     input: {
         flex: 1,
-        paddingVertical: 12,
+        paddingVertical: 16,
         paddingRight: 12,
         fontSize: 16,
-        color: '#333',
+        color: '#1E293B',
+        fontWeight: '500',
     },
     inputDisabled: {
         color: '#9CA3AF',
@@ -660,38 +700,45 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 12,
+        paddingVertical: 16,
         paddingRight: 12,
     },
     dropdownText: {
         fontSize: 16,
-        color: '#333',
+        color: '#1E293B',
+        fontWeight: '500',
     },
     dropdownList: {
         backgroundColor: '#ffffff',
-        borderWidth: 1,
-        borderColor: '#e6e8eb',
-        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: '#E2E8F0',
+        borderRadius: 16,
         marginBottom: 16,
         marginTop: -8,
         overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
     },
     dropdownItem: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 14,
-        paddingHorizontal: 16,
+        paddingVertical: 16,
+        paddingHorizontal: 20,
         borderBottomWidth: 1,
-        borderBottomColor: '#f1f5f9',
+        borderBottomColor: '#F1F5F9',
     },
     dropdownItemText: {
         fontSize: 16,
-        color: '#333',
+        color: '#1E293B',
+        fontWeight: '500',
     },
     dropdownItemTextActive: {
         color: '#3B82F6',
-        fontWeight: '600',
+        fontWeight: '700',
     },
     helperText: {
         fontSize: 12,
@@ -700,52 +747,60 @@ const styles = StyleSheet.create({
         fontStyle: 'italic',
     },
     button: {
-        borderRadius: 12,
+        borderRadius: 16,
         overflow: 'hidden',
-        marginTop: 8,
-        shadowColor: '#4f46e5',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 4,
+        shadowColor: '#3B82F6',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.25,
+        shadowRadius: 12,
+        elevation: 6,
     },
     buttonGradient: {
-        paddingVertical: 16,
+        paddingVertical: 18,
         alignItems: 'center',
+        flexDirection: 'row',
+        justifyContent: 'center',
     },
     buttonText: {
         color: 'white',
-        fontSize: 16,
-        fontWeight: 'bold',
+        fontSize: 18,
+        fontWeight: '700',
     },
     secondaryButton: {
         backgroundColor: 'transparent',
-        borderWidth: 1,
+        borderWidth: 2,
         borderColor: '#3b82f6',
-        borderRadius: 12,
-        paddingVertical: 15,
-        marginTop: 16,
+        borderRadius: 16,
+        paddingVertical: 16,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     secondaryButtonText: {
         color: '#3b82f6',
-        textAlign: 'center',
-        fontWeight: 'bold',
+        fontSize: 16,
+        fontWeight: '600',
     },
     verifyButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: '#EFF6FF',
-        borderWidth: 1,
+        borderWidth: 2,
         borderColor: '#3b82f6',
-        borderRadius: 12,
-        paddingVertical: 12,
+        borderRadius: 16,
+        paddingVertical: 14,
         marginBottom: 16,
         gap: 8,
+        shadowColor: '#3B82F6',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
     },
     verifyButtonText: {
         color: '#3b82f6',
-        fontSize: 14,
+        fontSize: 15,
         fontWeight: '600',
     },
     otpContainer: {
@@ -755,48 +810,53 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#EFF6FF',
-        borderRadius: 8,
-        padding: 12,
-        marginBottom: 12,
-        borderWidth: 1,
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+        borderWidth: 2,
         borderColor: '#BFDBFE',
     },
     emailDisplayText: {
         marginLeft: 8,
-        fontSize: 14,
+        fontSize: 15,
         color: '#1E40AF',
-        fontWeight: '500',
+        fontWeight: '600',
         flex: 1,
     },
     otpActions: {
         flexDirection: 'row',
         gap: 12,
-        marginTop: -8,
+        marginTop: 8,
     },
     verifyOtpButton: {
         flex: 1,
         backgroundColor: '#10B981',
-        borderRadius: 12,
-        paddingVertical: 12,
+        borderRadius: 16,
+        paddingVertical: 14,
         alignItems: 'center',
+        shadowColor: '#10B981',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
     },
     verifyOtpButtonText: {
         color: '#ffffff',
-        fontSize: 14,
-        fontWeight: '600',
+        fontSize: 15,
+        fontWeight: '700',
     },
     resendButton: {
         flex: 1,
         backgroundColor: 'transparent',
-        borderWidth: 1,
+        borderWidth: 2,
         borderColor: '#3b82f6',
-        borderRadius: 12,
-        paddingVertical: 12,
+        borderRadius: 16,
+        paddingVertical: 14,
         alignItems: 'center',
     },
     resendButtonText: {
         color: '#3b82f6',
-        fontSize: 14,
+        fontSize: 15,
         fontWeight: '600',
     },
     changeEmailButton: {
@@ -804,16 +864,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: 'transparent',
-        borderWidth: 1,
+        borderWidth: 2,
         borderColor: '#D1D5DB',
-        borderRadius: 12,
-        paddingVertical: 10,
-        marginTop: 12,
+        borderRadius: 16,
+        paddingVertical: 12,
+        marginTop: 16,
         gap: 6,
     },
     changeEmailText: {
         color: '#6B7280',
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: '500',
     },
     changeEmailButtonVerified: {
@@ -821,36 +881,46 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: '#EFF6FF',
-        borderWidth: 1,
+        borderWidth: 2,
         borderColor: '#3b82f6',
-        borderRadius: 12,
-        paddingVertical: 10,
+        borderRadius: 16,
+        paddingVertical: 12,
         marginBottom: 16,
         gap: 6,
+        shadowColor: '#3B82F6',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
     },
     changeEmailButtonVerifiedText: {
         color: '#3b82f6',
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: '600',
     },
     verifiedEmailContainer: {
         backgroundColor: '#F0FDF4',
-        borderWidth: 1,
+        borderWidth: 2,
         borderColor: '#BBF7D0',
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 12,
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 16,
+        shadowColor: '#10B981',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
     },
     verifiedEmailContent: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 12,
     },
     verifiedEmailText: {
         flex: 1,
-        fontSize: 14,
+        fontSize: 15,
         color: '#166534',
-        fontWeight: '500',
+        fontWeight: '600',
     },
     navigatingOverlay: {
         position: 'absolute',
@@ -865,19 +935,21 @@ const styles = StyleSheet.create({
     },
     navigatingContainer: {
         backgroundColor: '#ffffff',
-        borderRadius: 16,
-        padding: 32,
+        borderRadius: 24,
+        padding: 40,
         alignItems: 'center',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-        elevation: 8,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.15,
+        shadowRadius: 20,
+        elevation: 12,
+        minWidth: 200,
     },
     navigatingText: {
-        marginTop: 16,
-        fontSize: 16,
+        marginTop: 20,
+        fontSize: 17,
         fontWeight: '600',
         color: '#3b82f6',
+        textAlign: 'center',
     },
 });

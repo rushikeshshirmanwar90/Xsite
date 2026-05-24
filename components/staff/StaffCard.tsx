@@ -10,7 +10,7 @@ import {
     View,
 } from 'react-native';
 
-const StaffCard: React.FC<StaffCardProps> = ({ staff, onPress }) => {
+const StaffCard: React.FC<StaffCardProps> = ({ staff, onPress, onRemove, showRemoveButton = false }) => {
     const getInitials = (firstName: string, lastName: string): string => {
         return (firstName[0] + lastName[0]).toUpperCase();
     };
@@ -116,6 +116,18 @@ const StaffCard: React.FC<StaffCardProps> = ({ staff, onPress }) => {
             </View>
 
             <View style={styles.cardAction}>
+                {showRemoveButton && onRemove && (
+                    <TouchableOpacity
+                        style={styles.removeButton}
+                        onPress={(e) => {
+                            e.stopPropagation();
+                            onRemove(staff);
+                        }}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                    </TouchableOpacity>
+                )}
                 <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
             </View>
         </TouchableOpacity>
@@ -267,6 +279,16 @@ const styles = StyleSheet.create({
     cardAction: {
         paddingRight: 16,
         paddingLeft: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    removeButton: {
+        padding: 8,
+        borderRadius: 8,
+        backgroundColor: '#FEF2F2',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });
 

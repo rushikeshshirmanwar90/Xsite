@@ -198,7 +198,7 @@ const NotificationPage: React.FC = () => {
     // Date-based navigation state
     const [currentDate, setCurrentDate] = useState<string>(() => {
         // Always start with today's date
-        return new Date().toISOString().split('T')[0];
+        return new Date().toLocaleDateString('en-CA');
     });
     const [availableDates, setAvailableDates] = useState<string[]>([]);
     const [hasNextDate, setHasNextDate] = useState(false);
@@ -253,16 +253,18 @@ const NotificationPage: React.FC = () => {
 
             // Date-based navigation - fetch activities for specific date
             const dateToFetch = targetDate || currentDate;
+            // If contractor filter is active, do NOT filter by date on the backend so we fetch all materials!
+            const shouldFilterByDate = selectedVendors.length === 0;
             
             // Simplified API parameters - the API doesn't support date-based pagination
             const activityParams = new URLSearchParams({
                 clientId,
-                ...(targetDate && { targetDate: dateToFetch }) // Only add targetDate if specified
+                ...(shouldFilterByDate && targetDate && { targetDate: dateToFetch }) // Only add targetDate if specified
             });
             
             const materialParams = new URLSearchParams({
                 clientId,
-                ...(targetDate && { targetDate: dateToFetch }) // Only add targetDate if specified
+                ...(shouldFilterByDate && targetDate && { targetDate: dateToFetch }) // Only add targetDate if specified
             });
 
             console.log('📅 Date-based navigation - fetching for date:', dateToFetch);
@@ -370,13 +372,13 @@ const NotificationPage: React.FC = () => {
 
             // Get available dates for navigation - extract unique dates from activities
             const activityDates = activityList.map((activity: any) => {
-                const date = activity.date || activity.createdAt;
-                return date ? date.split('T')[0] : null;
+                const rawDate = activity.date || activity.createdAt;
+                return rawDate ? new Date(rawDate).toLocaleDateString('en-CA') : null;
             }).filter(Boolean);
             
             const materialDates = materialList.map((material: any) => {
-                const date = material.date || material.createdAt;
-                return date ? date.split('T')[0] : null;
+                const rawDate = material.date || material.createdAt;
+                return rawDate ? new Date(rawDate).toLocaleDateString('en-CA') : null;
             }).filter(Boolean);
             
             // Merge and sort all available dates
@@ -391,8 +393,9 @@ const NotificationPage: React.FC = () => {
 
             // Check if there are previous/next dates available using the actual date being used
             // For navigation, we should allow going to any date, not just dates with activities
-            const today = new Date().toISOString().split('T')[0];
-            const currentDateObj = new Date(finalDateToUse);
+            const today = new Date().toLocaleDateString('en-CA');
+            const [year, month, day] = finalDateToUse.split('-').map(Number);
+            const currentDateObj = new Date(year, month - 1, day);
             const todayObj = new Date(today);
             
             // Allow navigation to previous dates (older dates)
@@ -421,20 +424,27 @@ const NotificationPage: React.FC = () => {
 
             // ✅ FIX: Filter activities for the target date using local timezone
             // Convert stored UTC timestamp to device's local date for comparison
-            const filteredActivities = activityList.filter((activity: any) => {
-                const rawDate = activity.date || activity.createdAt;
-                if (!rawDate) return false;
-                // 'en-CA' locale gives YYYY-MM-DD format — works for any timezone
-                const activityLocalDate = new Date(rawDate).toLocaleDateString('en-CA');
-                return activityLocalDate === finalDateToUse;
-            });
+            // If contractor filter is active, skip single-day client-side filtering to show all materials!
+            const skipDayFilter = selectedVendors.length > 0;
+
+            const filteredActivities = skipDayFilter
+                ? activityList
+                : activityList.filter((activity: any) => {
+                    const rawDate = activity.date || activity.createdAt;
+                    if (!rawDate) return false;
+                    // 'en-CA' locale gives YYYY-MM-DD format — works for any timezone
+                    const activityLocalDate = new Date(rawDate).toLocaleDateString('en-CA');
+                    return activityLocalDate === finalDateToUse;
+                });
             
-            const filteredMaterials = materialList.filter((material: any) => {
-                const rawDate = material.date || material.createdAt;
-                if (!rawDate) return false;
-                const materialLocalDate = new Date(rawDate).toLocaleDateString('en-CA');
-                return materialLocalDate === finalDateToUse;
-            });
+            const filteredMaterials = skipDayFilter
+                ? materialList
+                : materialList.filter((material: any) => {
+                    const rawDate = material.date || material.createdAt;
+                    if (!rawDate) return false;
+                    const materialLocalDate = new Date(rawDate).toLocaleDateString('en-CA');
+                    return materialLocalDate === finalDateToUse;
+                });
 
             // If no activities found for current date, show empty state but keep navigation
             if (filteredActivities.length === 0 && filteredMaterials.length === 0) {
@@ -460,7 +470,8 @@ const NotificationPage: React.FC = () => {
 
             // Add filtered materials
             filteredMaterials.forEach((material: any) => {
-                const materialDate = (material.date || material.createdAt).split('T')[0];
+                const rawDate = material.date || material.createdAt;
+                const materialDate = rawDate ? new Date(rawDate).toLocaleDateString('en-CA') : new Date().toLocaleDateString('en-CA');
                 const timestamp = material.date || material.createdAt || new Date().toISOString();
                 if (!allDateGroups[materialDate]) {
                     allDateGroups[materialDate] = [];
@@ -485,16 +496,18 @@ const NotificationPage: React.FC = () => {
             setActivitiesRaw(filteredActivities);
             setMaterialActivities(filteredMaterials);
 
-            // ✅ NEW: Extract unique vendor names from material activities
-            const vendorNames = new Set<string>();
-            filteredMaterials.forEach((material: any) => {
-                if (material.contractor_name && material.contractor_name.trim() !== '') {
-                    vendorNames.add(material.contractor_name.trim());
-                }
-            });
-            const sortedVendors = Array.from(vendorNames).sort();
-            setAvailableVendors(sortedVendors);
-            console.log('📋 Available vendors:', sortedVendors);
+            // ✅ NEW: Fetch all available contractors for this client asynchronously
+            apiClient.get(`/api/materialActivity/contractors?clientId=${clientId}`)
+                .then(res => {
+                    console.log('📋 Fetched all unique contractors:', res.data);
+                    if (res.data && res.data.success !== false) {
+                        const contractors = res.data.data || [];
+                        setAvailableVendors(contractors);
+                    }
+                })
+                .catch(err => {
+                    console.error('⚠️ Failed to fetch unique contractors:', err);
+                });
 
             console.log('✅ Date navigation state updated');
             console.log('   - Date Groups:', newDateGroups.length);
@@ -554,21 +567,23 @@ const NotificationPage: React.FC = () => {
         fetchActivities();
     }, []);
 
-    // Effect 2 — only fires on TAB CHANGE, not on first mount
+    // Effect 2 — fires on activeTab, materialSubTab, or selectedVendors change
     useEffect(() => {
         if (!isMountedRef.current) return; // ✅ Skip the initial render
-        console.log('🔄 Tab changed - fetching activities for current date');
-        // For date mode, fetch activities for current date
-        fetchActivities(true, false, currentDate);
-    }, [activeTab, materialSubTab]);
+        console.log('🔄 Tab or Filters changed - fetching activities');
+        // If a contractor filter is active, we don't pass targetDate to fetch everything!
+        const targetDateToPass = selectedVendors.length > 0 ? undefined : currentDate;
+        fetchActivities(true, false, targetDateToPass);
+    }, [activeTab, materialSubTab, selectedVendors]);
 
     // Date navigation functions
     const handlePreviousDay = async () => {
         if (hasPrevDate && !loading) {
             // Go to previous day (yesterday)
-            const currentDateObj = new Date(currentDate);
+            const [year, month, day] = currentDate.split('-').map(Number);
+            const currentDateObj = new Date(year, month - 1, day);
             currentDateObj.setDate(currentDateObj.getDate() - 1);
-            const previousDate = currentDateObj.toISOString().split('T')[0];
+            const previousDate = currentDateObj.toLocaleDateString('en-CA');
             
             console.log('📅 Navigating to previous day:', previousDate);
             
@@ -594,9 +609,10 @@ const NotificationPage: React.FC = () => {
     const handleNextDay = async () => {
         if (hasNextDate && !loading) {
             // Go to next day (tomorrow, but not beyond today)
-            const currentDateObj = new Date(currentDate);
+            const [year, month, day] = currentDate.split('-').map(Number);
+            const currentDateObj = new Date(year, month - 1, day);
             currentDateObj.setDate(currentDateObj.getDate() + 1);
-            const nextDate = currentDateObj.toISOString().split('T')[0];
+            const nextDate = currentDateObj.toLocaleDateString('en-CA');
             
             console.log('📅 Navigating to next day:', nextDate);
             
@@ -637,7 +653,7 @@ const NotificationPage: React.FC = () => {
             setSelectedDate(date);
             // On Android, picker closes automatically after selection
             if (event.type === 'set') {
-                const dateString = date.toISOString().split('T')[0];
+                const dateString = date.toLocaleDateString('en-CA');
                 console.log('📅 Date selected from picker:', dateString);
                 setShowDatePicker(false);
                 
@@ -1385,7 +1401,7 @@ const NotificationPage: React.FC = () => {
                 }
 
                 // Use ISO date string (YYYY-MM-DD) as key for proper sorting
-                const dateKey = date.toISOString().split('T')[0]; // "2025-12-07"
+                const dateKey = date.toLocaleDateString('en-CA'); // "2025-12-07"
 
                 if (!groupedByDate[dateKey]) {
                     groupedByDate[dateKey] = [];
@@ -1715,96 +1731,118 @@ const NotificationPage: React.FC = () => {
                         {console.log('📭 Rendering: EMPTY STATE')}
                         {/* Simple "No activity today" message while keeping all UI elements */}
                         <View style={styles.simpleEmptyState}>
-                            <View style={styles.simpleEmptyContainer}>
-                                <Ionicons name="calendar-outline" size={48} color="#94A3B8" />
-                                <Text style={styles.simpleEmptyTitle}>
-                                    {(() => {
-                                        const today = new Date().toISOString().split('T')[0];
-                                        if (currentDate === today) {
-                                            return 'No activity today';
-                                        } else {
-                                            return `No activity on ${formatDateHeader(currentDate)}`;
-                                        }
-                                    })()}
-                                </Text>
-                            </View>
+                            {selectedVendors.length > 0 && (activeTab === 'project' || activeTab === 'labor') ? (
+                                <View style={styles.simpleEmptyContainer}>
+                                    <Ionicons name="funnel-outline" size={56} color="#3B82F6" />
+                                    <Text style={styles.simpleEmptyTitle}>
+                                        To see {activeTab === 'project' ? 'Project' : 'Labor'} activities, please remove the vendor filter.
+                                    </Text>
+                                    <TouchableOpacity 
+                                        style={styles.removeFilterButton} 
+                                        onPress={() => setSelectedVendors([])}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name="trash-outline" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+                                        <Text style={styles.removeFilterButtonText}>Remove Filter</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ) : (
+                                <View style={styles.simpleEmptyContainer}>
+                                    <Ionicons name="calendar-outline" size={48} color="#94A3B8" />
+                                    <Text style={styles.simpleEmptyTitle}>
+                                        {(() => {
+                                            if (selectedVendors.length > 0) {
+                                                return 'No material activity found for selected vendor';
+                                            }
+                                            const today = new Date().toLocaleDateString('en-CA');
+                                            if (currentDate === today) {
+                                                return 'No activity today';
+                                            } else {
+                                                return `No activity on ${formatDateHeader(currentDate)}`;
+                                            }
+                                        })()}
+                                    </Text>
+                                </View>
+                            )}
                         </View>
                         
                         {/* Show Date Navigation Controls even when no activities */}
-                        <View style={styles.compactDateNavigation}>
-                            {/* Compact Date Navigation Bar */}
-                            <View style={styles.dateNavigationBar}>
-                                {/* Previous Day Button */}
-                                <TouchableOpacity
-                                    style={[
-                                        styles.compactNavButton,
-                                        styles.prevButton,
-                                        (!hasPrevDate || loading) && styles.navButtonDisabled
-                                    ]}
-                                    onPress={handlePreviousDay}
-                                    disabled={!hasPrevDate || loading}
-                                    activeOpacity={0.7}
-                                >
-                                    <Ionicons 
-                                        name="chevron-back" 
-                                        size={20} 
-                                        color={(!hasPrevDate || loading) ? '#9CA3AF' : '#10B981'} 
-                                    />
-                                </TouchableOpacity>
+                        {selectedVendors.length === 0 && (
+                            <View style={styles.compactDateNavigation}>
+                                {/* Compact Date Navigation Bar */}
+                                <View style={styles.dateNavigationBar}>
+                                    {/* Previous Day Button */}
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.compactNavButton,
+                                            styles.prevButton,
+                                            (!hasPrevDate || loading) && styles.navButtonDisabled
+                                        ]}
+                                        onPress={handlePreviousDay}
+                                        disabled={!hasPrevDate || loading}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons 
+                                            name="chevron-back" 
+                                            size={20} 
+                                            color={(!hasPrevDate || loading) ? '#9CA3AF' : '#10B981'} 
+                                        />
+                                    </TouchableOpacity>
 
-                                {/* Current Date Display - Compact - Clickable */}
-                                <TouchableOpacity 
-                                    style={styles.compactDateDisplay}
-                                    onPress={handleDatePickerOpen}
-                                    activeOpacity={0.7}
-                                >
-                                    <View style={styles.compactDateBadge}>
-                                        <Ionicons name="calendar" size={14} color="#10B981" />
-                                        <Text style={styles.compactDateText}>
-                                            {formatDateHeader(currentDate)}
+                                    {/* Current Date Display - Compact - Clickable */}
+                                    <TouchableOpacity 
+                                        style={styles.compactDateDisplay}
+                                        onPress={handleDatePickerOpen}
+                                        activeOpacity={0.7}
+                                    >
+                                        <View style={styles.compactDateBadge}>
+                                            <Ionicons name="calendar" size={14} color="#10B981" />
+                                            <Text style={styles.compactDateText}>
+                                                {formatDateHeader(currentDate)}
+                                            </Text>
+                                        </View>
+                                        <Text style={styles.compactActivityCount}>
+                                            0 activities
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    {/* Next Day Button */}
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.compactNavButton,
+                                            styles.nextButton,
+                                            (!hasNextDate || loading) && styles.navButtonDisabled
+                                        ]}
+                                        onPress={handleNextDay}
+                                        disabled={!hasNextDate || loading}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons 
+                                            name="chevron-forward" 
+                                            size={20} 
+                                            color={(!hasNextDate || loading) ? '#9CA3AF' : '#10B981'} 
+                                        />
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* Loading indicator - show when loading with enhanced animation */}
+                                {loading && (
+                                    <View style={styles.compactLoadingIndicator}>
+                                        <ActivityIndicator size="small" color="#10B981" />
+                                        <Text style={styles.compactLoadingText}>Loading date...</Text>
+                                    </View>
+                                )}
+
+                                {/* Optional: Date navigation info - very compact */}
+                                {availableDates.length > 1 && (
+                                    <View style={styles.compactNavigationInfo}>
+                                        <Text style={styles.compactInfoText}>
+                                            {availableDates.length} dates with activities available
                                         </Text>
                                     </View>
-                                    <Text style={styles.compactActivityCount}>
-                                        0 activities
-                                    </Text>
-                                </TouchableOpacity>
-
-                                {/* Next Day Button */}
-                                <TouchableOpacity
-                                    style={[
-                                        styles.compactNavButton,
-                                        styles.nextButton,
-                                        (!hasNextDate || loading) && styles.navButtonDisabled
-                                    ]}
-                                    onPress={handleNextDay}
-                                    disabled={!hasNextDate || loading}
-                                    activeOpacity={0.7}
-                                >
-                                    <Ionicons 
-                                        name="chevron-forward" 
-                                        size={20} 
-                                        color={(!hasNextDate || loading) ? '#9CA3AF' : '#10B981'} 
-                                    />
-                                </TouchableOpacity>
+                                )}
                             </View>
-
-                            {/* Loading indicator - show when loading with enhanced animation */}
-                            {loading && (
-                                <View style={styles.compactLoadingIndicator}>
-                                    <ActivityIndicator size="small" color="#10B981" />
-                                    <Text style={styles.compactLoadingText}>Loading date...</Text>
-                                </View>
-                            )}
-
-                            {/* Optional: Date navigation info - very compact */}
-                            {availableDates.length > 1 && (
-                                <View style={styles.compactNavigationInfo}>
-                                    <Text style={styles.compactInfoText}>
-                                        {availableDates.length} dates with activities available
-                                    </Text>
-                                </View>
-                            )}
-                        </View>
+                        )}
                     </>
                 ) : (
                     <>
@@ -1885,76 +1923,78 @@ const NotificationPage: React.FC = () => {
                             )}
                             
                             {/* Date Navigation Controls */}
-                            <View style={styles.compactDateNavigation}>
-                                {/* Compact Date Navigation Bar */}
-                                <View style={styles.dateNavigationBar}>
-                                    {/* Previous Day Button */}
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.compactNavButton,
-                                            styles.prevButton,
-                                            (!hasPrevDate || loading) && styles.navButtonDisabled
-                                        ]}
-                                        onPress={handlePreviousDay}
-                                        disabled={!hasPrevDate || loading}
-                                        activeOpacity={0.7}
-                                    >
-                                        <Ionicons 
-                                            name="chevron-back" 
-                                            size={20} 
-                                            color={(!hasPrevDate || loading) ? '#9CA3AF' : '#10B981'} 
-                                        />
-                                    </TouchableOpacity>
+                            {selectedVendors.length === 0 && (
+                                <View style={styles.compactDateNavigation}>
+                                    {/* Compact Date Navigation Bar */}
+                                    <View style={styles.dateNavigationBar}>
+                                        {/* Previous Day Button */}
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.compactNavButton,
+                                                styles.prevButton,
+                                                (!hasPrevDate || loading) && styles.navButtonDisabled
+                                            ]}
+                                            onPress={handlePreviousDay}
+                                            disabled={!hasPrevDate || loading}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Ionicons 
+                                                name="chevron-back" 
+                                                size={20} 
+                                                color={(!hasPrevDate || loading) ? '#9CA3AF' : '#10B981'} 
+                                            />
+                                        </TouchableOpacity>
 
-                                    {/* Current Date Display - Compact */}
-                                    <View style={styles.compactDateDisplay}>
-                                        <View style={styles.compactDateBadge}>
-                                            <Ionicons name="calendar" size={14} color="#10B981" />
-                                            <Text style={styles.compactDateText}>
-                                                {formatDateHeader(currentDate)}
+                                        {/* Current Date Display - Compact */}
+                                        <View style={styles.compactDateDisplay}>
+                                            <View style={styles.compactDateBadge}>
+                                                <Ionicons name="calendar" size={14} color="#10B981" />
+                                                <Text style={styles.compactDateText}>
+                                                    {formatDateHeader(currentDate)}
+                                                </Text>
+                                            </View>
+                                            <Text style={styles.compactActivityCount}>
+                                                {groupedActivities.reduce((sum, group) => sum + group.activities.length, 0)} activities
                                             </Text>
                                         </View>
-                                        <Text style={styles.compactActivityCount}>
-                                            {groupedActivities.reduce((sum, group) => sum + group.activities.length, 0)} activities
-                                        </Text>
+
+                                        {/* Next Day Button */}
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.compactNavButton,
+                                                styles.nextButton,
+                                                (!hasNextDate || loading) && styles.navButtonDisabled
+                                            ]}
+                                            onPress={handleNextDay}
+                                            disabled={!hasNextDate || loading}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Ionicons 
+                                                name="chevron-forward" 
+                                                size={20} 
+                                                color={(!hasNextDate || loading) ? '#9CA3AF' : '#10B981'} 
+                                            />
+                                        </TouchableOpacity>
                                     </View>
 
-                                    {/* Next Day Button */}
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.compactNavButton,
-                                            styles.nextButton,
-                                            (!hasNextDate || loading) && styles.navButtonDisabled
-                                        ]}
-                                        onPress={handleNextDay}
-                                        disabled={!hasNextDate || loading}
-                                        activeOpacity={0.7}
-                                    >
-                                        <Ionicons 
-                                            name="chevron-forward" 
-                                            size={20} 
-                                            color={(!hasNextDate || loading) ? '#9CA3AF' : '#10B981'} 
-                                        />
-                                    </TouchableOpacity>
+                                    {/* Loading indicator - show when loading with enhanced animation */}
+                                    {loading && (
+                                        <View style={styles.compactLoadingIndicator}>
+                                            <ActivityIndicator size="small" color="#10B981" />
+                                            <Text style={styles.compactLoadingText}>Loading date...</Text>
+                                        </View>
+                                    )}
+
+                                    {/* Optional: Date navigation info - very compact */}
+                                    {availableDates.length > 1 && (
+                                        <View style={styles.compactNavigationInfo}>
+                                            <Text style={styles.compactInfoText}>
+                                                {availableDates.indexOf(currentDate) + 1} of {availableDates.length} dates
+                                            </Text>
+                                        </View>
+                                    )}
                                 </View>
-
-                                {/* Loading indicator - show when loading with enhanced animation */}
-                                {loading && (
-                                    <View style={styles.compactLoadingIndicator}>
-                                        <ActivityIndicator size="small" color="#10B981" />
-                                        <Text style={styles.compactLoadingText}>Loading date...</Text>
-                                    </View>
-                                )}
-
-                                {/* Optional: Date navigation info - very compact */}
-                                {availableDates.length > 1 && (
-                                    <View style={styles.compactNavigationInfo}>
-                                        <Text style={styles.compactInfoText}>
-                                            {availableDates.indexOf(currentDate) + 1} of {availableDates.length} dates
-                                        </Text>
-                                    </View>
-                                )}
-                            </View>
+                            )}
                         </Animated.View>
                     </>
                 )}
@@ -3362,6 +3402,26 @@ const styles = StyleSheet.create({
         color: '#6B7280',
         marginTop: 16,
         textAlign: 'center',
+    },
+    removeFilterButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#EF4444',
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        borderRadius: 12,
+        marginTop: 20,
+        shadowColor: '#EF4444',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 3,
+    },
+    removeFilterButtonText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '600',
     },
     // Loading Animation Styles
     navigationBarLoading: {

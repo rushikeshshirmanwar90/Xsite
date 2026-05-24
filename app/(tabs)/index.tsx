@@ -15,6 +15,7 @@ import QRCode from 'react-native-qrcode-svg';
 import * as Sharing from 'expo-sharing';
 import ViewShot from 'react-native-view-shot';
 import PushTokenStatusIndicator from '@/components/PushTokenStatusIndicator';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     Alert,
     Image,
@@ -26,6 +27,7 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import axios from 'axios';
 
 // Main App Component
 const Index: React.FC = () => {
@@ -40,6 +42,7 @@ const Index: React.FC = () => {
     const [logoError, setLogoError] = useState<boolean>(false);
     const [isSharing, setIsSharing] = useState(false);
     const [showCompletedProjects, setShowCompletedProjects] = useState(false); // Toggle for completed projects
+    const [pinnedProjects, setPinnedProjects] = useState<Set<string>>(new Set()); // Track pinned projects
 
     // Refs for capturing QR code views
     const embeddedQRRef = useRef<ViewShot | null>(null);
@@ -59,6 +62,22 @@ const Index: React.FC = () => {
     const lastLoadTimeRef = React.useRef<number>(0);
     const isInitializedRef = React.useRef(false);
     const DEBOUNCE_DELAY = 500;
+
+    // Load pinned projects from AsyncStorage
+    const loadPinnedProjects = async () => {
+        try {
+            const savedPinnedProjects = await AsyncStorage.getItem('pinnedProjects');
+            if (savedPinnedProjects) {
+                const pinnedProjectIds = JSON.parse(savedPinnedProjects) as string[];
+                setPinnedProjects(new Set(pinnedProjectIds));
+                console.log('📌 Loaded pinned projects from storage:', pinnedProjectIds);
+                return new Set(pinnedProjectIds);
+            }
+        } catch (error) {
+            console.error('Failed to load pinned projects:', error);
+        }
+        return new Set<string>();
+    };
 
     // Simplified fetch project data function
     const fetchProjectData = async (showLoadingState = true) => {
@@ -153,9 +172,17 @@ const Index: React.FC = () => {
                                 })
                             );
                             
-                            console.log('✅ Staff projects with completion status loaded:', projectsWithCompletion.length);
-                            console.log('📊 Completion status summary:', projectsWithCompletion.map(p => `${p.name}: ${p.isCompleted}`).join(', '));
-                            setProjects(projectsWithCompletion);
+                            // Load pinned projects and merge with project data
+                            const savedPinnedProjects = await loadPinnedProjects();
+                            const projectsWithPinStatus = projectsWithCompletion.map(project => ({
+                                ...project,
+                                isPinned: savedPinnedProjects.has(project._id)
+                            }));
+                            
+                            console.log('✅ Staff projects with completion and pin status loaded:', projectsWithPinStatus.length);
+                            console.log('📊 Completion status summary:', projectsWithPinStatus.map(p => `${p.name}: completed=${p.isCompleted}, pinned=${p.isPinned}`).join(', '));
+                            
+                            setProjects(projectsWithPinStatus);
                             return;
                         } else {
                             console.log('⚠️ Staff has no assigned projects');
@@ -203,9 +230,17 @@ const Index: React.FC = () => {
                     })
                 );
                 
-                console.log('✅ Projects with completion status loaded:', projectsWithCompletion.length);
-                console.log('📊 Completion status summary:', projectsWithCompletion.map(p => `${p.name}: ${p.isCompleted}`).join(', '));
-                setProjects(projectsWithCompletion);
+                // Load pinned projects and merge with project data
+                const savedPinnedProjects = await loadPinnedProjects();
+                const projectsWithPinStatus = projectsWithCompletion.map(project => ({
+                    ...project,
+                    isPinned: savedPinnedProjects.has(project._id)
+                }));
+                
+                console.log('✅ Projects with completion and pin status loaded:', projectsWithPinStatus.length);
+                console.log('📊 Status summary:', projectsWithPinStatus.map(p => `${p.name}: completed=${p.isCompleted}, pinned=${p.isPinned}`).join(', '));
+                
+                setProjects(projectsWithPinStatus);
             } else {
                 // No clientId - staff without clients
                 console.log('⚠️ No clientId - skipping project fetch');
@@ -414,6 +449,36 @@ const Index: React.FC = () => {
         }
     };
 
+    // Handle pin toggle for projects
+    const handlePinToggle = async (projectId: string, isPinned: boolean) => {
+        console.log(`📌 ${isPinned ? 'Pinning' : 'Unpinning'} project:`, projectId);
+        
+        // Update the pinned projects set
+        setPinnedProjects(prev => {
+            const newSet = new Set(prev);
+            if (isPinned) {
+                newSet.add(projectId);
+            } else {
+                newSet.delete(projectId);
+            }
+            
+            // Persist to AsyncStorage
+            AsyncStorage.setItem('pinnedProjects', JSON.stringify(Array.from(newSet)))
+                .catch(error => console.error('Failed to save pinned projects:', error));
+            
+            return newSet;
+        });
+
+        // Update the projects array to reflect the pin status
+        setProjects(prevProjects => 
+            prevProjects.map(project => 
+                project._id === projectId 
+                    ? { ...project, isPinned: isPinned }
+                    : project
+            )
+        );
+    };
+
     const companyInitials = generateInitials(companyName);
 
     const shareQRCode = async (viewShotRef: React.RefObject<ViewShot | null>) => {
@@ -583,32 +648,34 @@ const Index: React.FC = () => {
             <View style={styles.sectionHeader}>
                 <View>
                     <Text style={styles.sectionTitle}>
-                        {showCompletedProjects ? 'Completed Projects' : 'My Projects'}
+                        {isStaff ? 'My Projects' : (showCompletedProjects ? 'Completed Projects' : 'My Projects')}
                     </Text>
                     {userIsAdmin && <View style={styles.sectionDivider} />}
                 </View>
                 
-                {/* Toggle Button */}
-                <TouchableOpacity
-                    style={[
-                        styles.toggleButton,
-                        showCompletedProjects && styles.toggleButtonActive
-                    ]}
-                    onPress={() => setShowCompletedProjects(!showCompletedProjects)}
-                    activeOpacity={0.7}
-                >
-                    <Ionicons 
-                        name={showCompletedProjects ? "list" : "checkmark-done"} 
-                        size={18} 
-                        color={showCompletedProjects ? "#0EA5E9" : "#6B7280"} 
-                    />
-                    <Text style={[
-                        styles.toggleButtonText,
-                        showCompletedProjects && styles.toggleButtonTextActive
-                    ]}>
-                        {showCompletedProjects ? 'View Ongoing' : 'View Completed'}
-                    </Text>
-                </TouchableOpacity>
+                {/* Toggle Button - Only for non-staff users */}
+                {!isStaff && (
+                    <TouchableOpacity
+                        style={[
+                            styles.toggleButton,
+                            showCompletedProjects && styles.toggleButtonActive
+                        ]}
+                        onPress={() => setShowCompletedProjects(!showCompletedProjects)}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons 
+                            name={showCompletedProjects ? "list" : "checkmark-done"} 
+                            size={18} 
+                            color={showCompletedProjects ? "#0EA5E9" : "#6B7280"} 
+                        />
+                        <Text style={[
+                            styles.toggleButtonText,
+                            showCompletedProjects && styles.toggleButtonTextActive
+                        ]}>
+                            {showCompletedProjects ? 'View Ongoing' : 'View Completed'}
+                        </Text>
+                    </TouchableOpacity>
+                )}
             </View>
 
             <ScrollView
@@ -654,31 +721,49 @@ const Index: React.FC = () => {
                                     console.log('🔍 Filtering projects:', {
                                         totalProjects: projects.length,
                                         showCompletedProjects,
+                                        isStaff,
                                         projectsWithStatus: projects.map(p => ({
                                             name: p.name,
-                                            isCompleted: p.isCompleted
+                                            isCompleted: p.isCompleted,
+                                            isPinned: p.isPinned
                                         }))
                                     });
                                     
-                                    const filteredProjects = showCompletedProjects
-                                        ? projects.filter(p => p.isCompleted === true)
-                                        : projects.filter(p => p.isCompleted === false);
+                                    // For staff users, always show only ongoing projects (not completed)
+                                    // For non-staff users, respect the toggle state
+                                    const filteredProjects = isStaff 
+                                        ? projects.filter(p => p.isCompleted === false)
+                                        : showCompletedProjects
+                                            ? projects.filter(p => p.isCompleted === true)
+                                            : projects.filter(p => p.isCompleted === false);
                                     
-                                    console.log('✅ Filtered result:', {
-                                        filteredCount: filteredProjects.length,
-                                        filteredProjects: filteredProjects.map(p => ({
+                                    // Sort projects: pinned projects first, then by name
+                                    const sortedProjects = filteredProjects.sort((a, b) => {
+                                        // First, sort by pin status (pinned projects first)
+                                        if (a.isPinned && !b.isPinned) return -1;
+                                        if (!a.isPinned && b.isPinned) return 1;
+                                        
+                                        // Then sort by name alphabetically
+                                        return a.name.localeCompare(b.name);
+                                    });
+                                    
+                                    console.log('✅ Filtered and sorted result:', {
+                                        filteredCount: sortedProjects.length,
+                                        sortedProjects: sortedProjects.map(p => ({
                                             name: p.name,
-                                            isCompleted: p.isCompleted
+                                            isCompleted: p.isCompleted,
+                                            isPinned: p.isPinned
                                         }))
                                     });
                                     
-                                    return filteredProjects.length > 0 ? (
-                                        filteredProjects.map((project, index) => (
+                                    return sortedProjects.length > 0 ? (
+                                        sortedProjects.map((project, index) => (
                                             <View key={index} style={{ marginBottom: 10 }}>
                                                 <ProjectCard
                                                     key={project._id}
                                                     project={project}
                                                     onViewDetails={handleViewDetails}
+                                                    onPinToggle={handlePinToggle}
                                                     userType={userIsAdmin ? 'admin' : (isStaff ? 'staff' : 'client')}
                                                 />
                                             </View>
@@ -686,17 +771,19 @@ const Index: React.FC = () => {
                                     ) : (
                                         <View style={styles.centerContainer}>
                                             <Ionicons 
-                                                name={showCompletedProjects ? "checkmark-done-circle-outline" : "folder-open-outline"} 
+                                                name={isStaff ? "folder-open-outline" : (showCompletedProjects ? "checkmark-done-circle-outline" : "folder-open-outline")} 
                                                 size={64} 
                                                 color="#CBD5E1" 
                                             />
                                             <Text style={styles.emptyText}>
-                                                {showCompletedProjects ? 'No completed projects' : 'No ongoing projects'}
+                                                {isStaff ? 'No ongoing projects' : (showCompletedProjects ? 'No completed projects' : 'No ongoing projects')}
                                             </Text>
                                             <Text style={styles.emptySubText}>
-                                                {showCompletedProjects
-                                                    ? 'Mark projects as complete to see them here'
-                                                    : 'All your projects are completed'}
+                                                {isStaff 
+                                                    ? 'Contact your admin to assign projects to you'
+                                                    : showCompletedProjects
+                                                        ? 'Mark projects as complete to see them here'
+                                                        : 'All your projects are completed'}
                                             </Text>
                                         </View>
                                     );

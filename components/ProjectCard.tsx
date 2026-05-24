@@ -10,12 +10,15 @@ interface ProjectCardProps {
     project: Project;
     onViewDetails: (project: Project) => void;
     userType?: string; // Add userType prop to determine if user is admin or staff
+    onPinToggle?: (projectId: string, isPinned: boolean) => void; // Add pin toggle callback
 }
 
-const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userType = 'admin' }) => {
+const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userType = 'admin', onPinToggle }) => {
     const [projectCompleted, setProjectCompleted] = useState(false);
     const [isUpdatingCompletion, setIsUpdatingCompletion] = useState(false);
     const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+    const [projectPinned, setProjectPinned] = useState(project.isPinned || false);
+    const [isUpdatingPin, setIsUpdatingPin] = useState(false);
 
     // Debug: Log project license status
     useEffect(() => {
@@ -116,6 +119,37 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userT
         }
     };
 
+    // Function to toggle project pin status
+    const toggleProjectPin = async () => {
+        if (isUpdatingPin || !project._id) return;
+        
+        setIsUpdatingPin(true);
+        try {
+            console.log('📌 Toggling project pin status...');
+            console.log('Project ID:', project._id);
+            console.log('Current pin status:', projectPinned);
+            
+            const newPinStatus = !projectPinned;
+            setProjectPinned(newPinStatus);
+            
+            // Call the parent callback to update the project list
+            if (onPinToggle) {
+                onPinToggle(project._id, newPinStatus);
+            }
+            
+            toast.success(`Project ${newPinStatus ? 'pinned' : 'unpinned'} successfully`);
+            
+        } catch (error: any) {
+            console.error('❌ Error updating project pin status:', error);
+            // Revert the pin status on error
+            setProjectPinned(projectPinned);
+            toast.error('Failed to update project pin status');
+        } finally {
+            setIsUpdatingPin(false);
+            setShowOptionsMenu(false);
+        }
+    };
+
 
 
     // const statusColor = getStatusColor(project.status);
@@ -132,6 +166,11 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userT
                         {projectCompleted && (
                             <View style={styles.completedIconContainer}>
                                 <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                            </View>
+                        )}
+                        {projectPinned && (
+                            <View style={styles.pinnedIconContainer}>
+                                <Ionicons name="bookmark" size={16} color="#F59E0B" />
                             </View>
                         )}
                         <Text style={styles.projectTitle}>{project.name}</Text>
@@ -263,6 +302,28 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userT
                         onPress={() => setShowOptionsMenu(false)}
                     >
                         <View style={styles.optionsMenu}>
+                            <TouchableOpacity
+                                style={[
+                                    styles.optionItem,
+                                    isUpdatingPin && styles.optionItemDisabled
+                                ]}
+                                onPress={toggleProjectPin}
+                                disabled={isUpdatingPin}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons 
+                                    name={projectPinned ? "bookmark" : "bookmark-outline"} 
+                                    size={20} 
+                                    color={projectPinned ? "#F59E0B" : "#6B7280"} 
+                                />
+                                <Text style={[
+                                    styles.optionText,
+                                    projectPinned && styles.optionTextPinned,
+                                    isUpdatingPin && styles.optionTextDisabled
+                                ]}>
+                                    {isUpdatingPin ? 'Updating...' : (projectPinned ? 'Unpin Project' : 'Pin Project')}
+                                </Text>
+                            </TouchableOpacity>
                             <TouchableOpacity
                                 style={[
                                     styles.optionItem,
@@ -572,6 +633,10 @@ const styles = StyleSheet.create({
     completedIconContainer: {
         flexShrink: 0,
     },
+    pinnedIconContainer: {
+        flexShrink: 0,
+        marginRight: 4,
+    },
     projectTitle: {
         fontSize: 18,
         fontWeight: '700',
@@ -834,6 +899,9 @@ const styles = StyleSheet.create({
     },
     optionTextCompleted: {
         color: '#10B981',
+    },
+    optionTextPinned: {
+        color: '#F59E0B',
     },
     optionTextDisabled: {
         color: '#9CA3AF',

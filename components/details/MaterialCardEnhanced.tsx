@@ -9,6 +9,7 @@ interface MaterialVariant {
     quantity: number;
     cost: number;
     miniSectionId?: string;
+    contractor_name?: string;
 }
 
 interface GroupedMaterial {
@@ -63,6 +64,14 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
     userType = 'staff', // Default to 'staff' if not provided
     onRefresh, // Add refresh callback
 }) => {
+    // ✅ DEBUG: Log material values being passed to component
+    console.log(`\n🎯 MATERIAL CARD DEBUG: ${material.name}`);
+    console.log(`   totalQuantity: ${material.totalQuantity}`);
+    console.log(`   totalImported: ${material.totalImported}`);
+    console.log(`   totalUsed: ${material.totalUsed}`);
+    console.log(`   currentlyAvailable: ${material.currentlyAvailable}`);
+    console.log(`   activeTab: ${activeTab}`);
+    
     // Format date to readable format (e.g., "15 Jan 2024")
     const formatDate = (dateString: string): string => {
         try {
@@ -113,6 +122,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
     const [selectedStockVariant, setSelectedStockVariant] = useState<MaterialVariant | null>(null);
     const [addStockQuantity, setAddStockQuantity] = useState('');
     const [addStockCost, setAddStockCost] = useState('');
+    const [addStockVendor, setAddStockVendor] = useState('');
 
     // Transfer functionality functions
     const fetchAvailableProjects = async () => {
@@ -321,6 +331,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
             setSelectedStockVariant(variant);
             setAddStockQuantity('');
             setAddStockCost('');
+            setAddStockVendor(variant.contractor_name || '');
             setShowVariantSelector(false);
             setShowAddStockModal(true);
         }
@@ -377,6 +388,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
             setSelectedStockVariant(material.variants[0]);
             setAddStockQuantity('');
             setAddStockCost('');
+            setAddStockVendor(material.variants[0].contractor_name || '');
             setShowAddStockModal(true);
         } else {
             // Multiple variants, show selector first
@@ -393,15 +405,21 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
 
         const quantity = parseFloat(addStockQuantity);
         const perUnitCost = addStockCost ? parseFloat(addStockCost) : 0;
+        const vendorName = addStockVendor.trim();
 
         if (perUnitCost < 0) {
             Alert.alert('Error', 'Cost cannot be negative');
             return;
         }
 
+        let confirmMsg = `Add ${quantity} ${material.unit} of ${material.name}`;
+        if (perUnitCost > 0) confirmMsg += ` at ₹${perUnitCost}/${material.unit}`;
+        if (vendorName) confirmMsg += `\nVendor: ${vendorName}`;
+        confirmMsg += '?';
+
         Alert.alert(
             'Confirm Add Stock',
-            `Add ${quantity} ${material.unit} of ${material.name}${perUnitCost > 0 ? ` at ₹${perUnitCost}/${material.unit}` : ''}?`,
+            confirmMsg,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
@@ -410,7 +428,6 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                     onPress: async () => {
                         try {
                             // Import required modules
-                            const { domain } = await import('@/lib/domain');
                             const { getClientId } = await import('@/functions/clientId');
                             
                             const clientId = await getClientId();
@@ -423,6 +440,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                             console.log('Material ID:', selectedStockVariant._id);
                             console.log('Quantity:', quantity);
                             console.log('Per Unit Cost:', perUnitCost);
+                            console.log('Vendor:', vendorName);
                             console.log('Client ID:', clientId);
 
                             // Call API to add stock
@@ -430,14 +448,22 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 materialId: selectedStockVariant._id,
                                 quantity: quantity,
                                 perUnitCost: perUnitCost > 0 ? perUnitCost : undefined,
+                                contractor_name: vendorName || undefined,
                                 clientId: clientId,
                             });
 
                             console.log('📥 API Response:', response.data);
 
                             if (response.data.success) {
-                                const message = response.data.action === 'created'
-                                    ? `New material entry created!\n\nAdded ${quantity} ${material.unit} at ₹${perUnitCost}/${material.unit}\n\nNote: A separate entry was created because the cost is different from existing stock.`
+                                const isNewEntry = response.data.action === 'created';
+                                const reasons: string[] = [];
+                                if (isNewEntry && response.data.data?.newEntryReason === 'vendor') {
+                                    reasons.push('Vendor changed');
+                                } else if (isNewEntry) {
+                                    reasons.push('Cost changed');
+                                }
+                                const message = isNewEntry
+                                    ? `New material entry created!\n\nAdded ${quantity} ${material.unit}${perUnitCost > 0 ? ` at ₹${perUnitCost}/${material.unit}` : ''}${vendorName ? `\nVendor: ${vendorName}` : ''}\n\nReason: ${reasons.join(' & ')} — tracked separately.`
                                     : `Successfully added ${quantity} ${material.unit} to stock`;
                                 
                                 Alert.alert('Success', message);
@@ -447,13 +473,14 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 setSelectedStockVariant(null);
                                 setAddStockQuantity('');
                                 setAddStockCost('');
+                                setAddStockVendor('');
                                 
                                 // Trigger refresh
                                 if (onRefresh) {
                                     onRefresh();
                                 }
                             } else {
-                                throw new Error(result.error || 'Failed to add stock');
+                                throw new Error(response.data.error || 'Failed to add stock');
                             }
                         } catch (error: any) {
                             console.error('Error adding stock:', error);
@@ -539,7 +566,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                             <View style={styles.statItem}>
                                 <Text style={styles.statLabel}>Total Imported</Text>
                                 <Text style={styles.statValue}>
-                                    {material.totalImported || 0} {material.unit}
+                                    {material.totalImported || material.totalQuantity || 0} {material.unit}
                                 </Text>
                             </View>
                             <View style={styles.statDivider} />
@@ -553,7 +580,9 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 ]}>
                                     {activeTab === 'used' 
                                         ? material.totalQuantity  // In used tab, totalQuantity = used quantity
-                                        : (material.currentlyAvailable || material.totalQuantity)  // In imported tab, show currently available
+                                        : (material.currentlyAvailable !== undefined && material.currentlyAvailable !== null 
+                                            ? material.currentlyAvailable 
+                                            : material.totalQuantity)  // In imported tab, show currently available or fallback to totalQuantity
                                     } {material.unit}
                                 </Text>
                             </View>
@@ -567,8 +596,12 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                     activeTab === 'used' ? styles.statValueAvailable : styles.statValueUsed
                                 ]}>
                                     {activeTab === 'used'
-                                        ? (material.currentlyAvailable || 0)  // In used tab, show currently available
-                                        : (material.totalUsed || 0)  // In imported tab, show total used
+                                        ? (material.currentlyAvailable !== undefined && material.currentlyAvailable !== null 
+                                            ? material.currentlyAvailable 
+                                            : Math.max(0, (material.totalImported || material.totalQuantity) - (material.totalUsed || 0)))  // Calculate remaining
+                                        : (material.totalUsed !== undefined && material.totalUsed !== null 
+                                            ? material.totalUsed 
+                                            : 0)  // In imported tab, show total used
                                     } {material.unit}
                                 </Text>
                             </View>
@@ -1082,6 +1115,23 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                             </Text>
                         </View>
 
+                        {/* Vendor / Contractor Input */}
+                        <View style={styles.inputSection}>
+                            <Text style={styles.inputLabel}>Vendor / Contractor - Optional</Text>
+                            <TextInput
+                                style={styles.quantityInput}
+                                value={addStockVendor}
+                                onChangeText={setAddStockVendor}
+                                keyboardType="default"
+                                placeholder="Enter vendor or contractor name"
+                                placeholderTextColor="#9CA3AF"
+                                autoCapitalize="words"
+                            />
+                            <Text style={styles.inputHint}>
+                                Leave empty if vendor remains the same
+                            </Text>
+                        </View>
+
                         {/* Quick Add Buttons */}
                         <View style={styles.quickAddSection}>
                             <Text style={styles.quickAddLabel}>Quick Add:</Text>
@@ -1126,6 +1176,15 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                             </View>
                                         )}
                                     </>
+                                )}
+                                {/* Warning if vendor is different */}
+                                {addStockVendor.trim() !== '' && (
+                                    <View style={[styles.costWarning, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}>
+                                        <Ionicons name="person-circle" size={16} color="#3B82F6" />
+                                        <Text style={[styles.costWarningText, { color: '#1D4ED8' }]}>
+                                            Vendor entered! A new material entry will be created for this vendor.
+                                        </Text>
+                                    </View>
                                 )}
                             </View>
                         )}
