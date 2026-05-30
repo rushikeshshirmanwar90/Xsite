@@ -128,7 +128,7 @@ const CompanyProfile: React.FC = () => {
                 console.log('🔍 Profile page - full user data:', JSON.stringify(data, null, 2));
                 
                 // ✅ ENHANCED: More robust clientId detection with better fallbacks
-                let clientId = '';
+                let clientId: string = '';
                 
                 console.log('🔍 Checking clientId sources:');
                 console.log('  - data.clientId:', data.clientId);
@@ -138,19 +138,25 @@ const CompanyProfile: React.FC = () => {
                 console.log('  - data.userType:', data.userType);
                 
                 // Method 1: Direct clientId field (most common for admin users)
-                if (data.clientId && data.clientId.trim() !== '' && data.clientId !== 'null' && data.clientId !== 'undefined') {
+                if (data.clientId && typeof data.clientId === 'string' && data.clientId.trim() !== '' && data.clientId !== 'null' && data.clientId !== 'undefined') {
                     clientId = data.clientId;
                     console.log('✅ Using direct clientId:', clientId);
+                }
+                // Handle ObjectId objects in clientId field
+                else if (data.clientId && typeof data.clientId === 'object' && data.clientId !== null) {
+                    clientId = String(data.clientId);
+                    console.log('✅ Using direct clientId (converted from object):', clientId);
                 }
                 // Method 2: For staff users with clients array
                 else if (data.clients && Array.isArray(data.clients) && data.clients.length > 0) {
                     const firstClient = data.clients[0];
-                    clientId = firstClient.clientId || firstClient._id || '';
+                    const rawClientId = firstClient.clientId || firstClient._id || '';
+                    clientId = typeof rawClientId === 'string' ? rawClientId : String(rawClientId);
                     console.log('✅ Using clientId from clients array:', clientId);
                 }
                 // Method 3: For admin/client users, their _id IS the clientId
                 else if (data._id && (!data.role || data.role === 'admin' || data.userType === 'clients')) {
-                    clientId = data._id;
+                    clientId = typeof data._id === 'string' ? data._id : String(data._id);
                     console.log('✅ Using _id as clientId for admin/client user:', clientId);
                 }
                 // Method 4: Try getClientId function as fallback
@@ -165,11 +171,6 @@ const CompanyProfile: React.FC = () => {
                     } catch (error) {
                         console.error('❌ getClientId function failed:', error);
                     }
-                }
-                
-                // Handle ObjectId objects (convert to string)
-                if (typeof clientId === 'object' && clientId !== null) {
-                    clientId = clientId.toString();
                 }
                 
                 // Final validation
@@ -335,7 +336,8 @@ const CompanyProfile: React.FC = () => {
             // ✅ ENHANCED: Use userData.clientId first, then fallback to getClientId()
             let clientId = userData.clientId;
             if (!clientId || clientId.trim() === '') {
-                clientId = await getClientId();
+                const fallbackClientId = await getClientId();
+                clientId = fallbackClientId || undefined;
             }
             
             console.log('🔍 Profile stats - clientId sources:');
@@ -563,7 +565,7 @@ const CompanyProfile: React.FC = () => {
             };
         }
 
-        if (clientData.license > 0) {
+        if (typeof clientData.license === 'number' && clientData.license > 0) {
             return { hasAccess: true, message: '' }; // Active license with days remaining
         }
 
@@ -613,7 +615,7 @@ const CompanyProfile: React.FC = () => {
         }
 
         // Active with days remaining (>0)
-        if (clientData.license > 0) {
+        if (typeof clientData.license === 'number' && clientData.license > 0) {
             const daysText = clientData.license === 1 ? 'day' : 'days';
             const isExpiringSoon = clientData.license <= 7;
             
@@ -789,7 +791,7 @@ const CompanyProfile: React.FC = () => {
                 )}
 
                 {/* License Expiring Soon Warning */}
-                {!isCurrentUserStaff && licenseAccess.hasAccess && clientData.license > 0 && clientData.license <= 7 && (
+                {!isCurrentUserStaff && licenseAccess.hasAccess && typeof clientData.license === 'number' && clientData.license > 0 && clientData.license <= 7 && (
                     <View style={styles.expiringSoonWarning}>
                         <View style={styles.expiringSoonHeader}>
                             <Ionicons name="time" size={20} color="#F59E0B" />
@@ -824,15 +826,7 @@ const CompanyProfile: React.FC = () => {
                         </View>
                     )}
                     
-                    {/* Staff Role Badge */}
-                    {isCurrentUserStaff && user && 'role' in user && (
-                        <View style={styles.staffBadge}>
-                            <Ionicons name="person" size={14} color="#10B981" />
-                            <Text style={styles.staffBadgeText}>
-                                {user.role.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                            </Text>
-                        </View>
-                    )}
+
                 </LinearGradient>
 
                 {/* Stats Cards */}
@@ -875,6 +869,7 @@ const CompanyProfile: React.FC = () => {
                         )}
                     </View>
                 </View>
+
 
                 {/* License Status Section - Only for non-staff users */}
                 {!isCurrentUserStaff && (
@@ -959,7 +954,7 @@ const CompanyProfile: React.FC = () => {
                                         </View>
                                     )}
 
-                                    {clientData.license > 0 && clientData.license <= 7 && (
+                                    {typeof clientData.license === 'number' && clientData.license > 0 && clientData.license <= 7 && (
                                         <View style={styles.licenseWarning}>
                                             <Ionicons name="alert-circle" size={16} color="#F59E0B" />
                                             <Text style={[styles.licenseWarningText, { color: '#F59E0B' }]}>
@@ -1379,20 +1374,7 @@ const CompanyProfile: React.FC = () => {
                             </View>
                         )}
 
-                        {/* Show role for staff users */}
-                        {isCurrentUserStaff && user && 'role' in user && (
-                            <View style={styles.infoRow}>
-                                <View style={styles.infoIconContainer}>
-                                    <Ionicons name="person-outline" size={20} color="#64748B" />
-                                </View>
-                                <View style={styles.infoContent}>
-                                    <Text style={styles.infoLabel}>Role</Text>
-                                    <Text style={styles.infoValue}>
-                                        {user.role.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                                    </Text>
-                                </View>
-                            </View>
-                        )}
+
 
                         {/* Show client ID for non-staff users */}
                         {!isCurrentUserStaff && !loading && userData.clientId && (

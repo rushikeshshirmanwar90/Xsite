@@ -145,7 +145,8 @@ const BuildingLaborAnalytics: React.FC = () => {
       'Waterproofing & Treatment Works': { icon: 'shield-outline', color: '#10B981' },
       'Site Management & Support Staff': { icon: 'people-outline', color: '#1E40AF' },
       'Equipment Operators': { icon: 'car-outline', color: '#7C2D12' },
-      'Security & Housekeeping': { icon: 'shield-checkmark-outline', color: '#374151' }
+      'Security & Housekeeping': { icon: 'shield-checkmark-outline', color: '#374151' },
+      'RCC contractor': { icon: 'grid-outline', color: '#475569' }
     };
 
     return categoryMap[category] || { icon: 'people-outline', color: '#10B981' };

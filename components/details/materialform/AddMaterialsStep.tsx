@@ -32,6 +32,7 @@ interface AddMaterialsStepProps {
   onShowAddForm: () => void;
   onCancelEdit: () => void;
   onClose: () => void;
+  vendorSuggestions?: string[];
 }
 
 const AddMaterialsStep: React.FC<AddMaterialsStepProps> = ({
@@ -58,6 +59,7 @@ const AddMaterialsStep: React.FC<AddMaterialsStepProps> = ({
   onShowAddForm,
   onCancelEdit,
   onClose,
+  vendorSuggestions = [],
 }) => {
   const internalScrollViewRef = useRef<ScrollView>(null);
   const scrollViewRef = externalScrollViewRef || internalScrollViewRef;
@@ -139,6 +141,7 @@ const AddMaterialsStep: React.FC<AddMaterialsStepProps> = ({
             onInputChange={onInputChange}
             showUnitDropdown={showUnitDropdown}
             onToggleUnitDropdown={onToggleUnitDropdown}
+            vendorSuggestions={vendorSuggestions}
           />
 
           <MaterialSpecifications

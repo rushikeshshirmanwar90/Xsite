@@ -75,8 +75,8 @@ const StaffQRScannerModal: React.FC<StaffQRScannerModalProps> = ({
 
       // Show confirmation dialog
       Alert.alert(
-        'Assign Staff Member',
-        `Do you want to assign ${staffData.firstName} ${staffData.lastName} (${staffData.role}) to your organization?`,
+        'Add Staff Member',
+        `Do you want to add ${staffData.firstName} ${staffData.lastName} to your organization?`,
         [
           {
             text: 'Cancel',
@@ -87,7 +87,7 @@ const StaffQRScannerModal: React.FC<StaffQRScannerModalProps> = ({
             },
           },
           {
-            text: 'Assign',
+            text: 'Add',
             onPress: () => assignStaffToClient(staffData),
           },
         ]

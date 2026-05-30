@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { PDFReportGenerator } from '@/utils/pdfReportGenerator';
 
 interface Activity {
     _id: string;
@@ -61,20 +62,45 @@ interface MaterialActivity {
         specs?: Record<string, any>;
         qnt: number;
         cost: number;
-        contractor_name?: string; // ✅ NEW: Contractor name field
+        contractor_name?: string;
     }[];
     message?: string;
     activity: 'imported' | 'used' | 'transferred';
     createdAt?: string;
-    date?: string; // Material activities use 'date' field instead of 'createdAt'
+    date?: string;
     transferDetails?: {
         fromProject: { id: string; name: string };
         toProject: { id: string; name: string };
     };
-    contractor_name?: string; // ✅ NEW: Contractor name at activity level
+    contractor_name?: string;
 }
 
-type TabType = 'all' | 'project' | 'material' | 'labor';
+interface OtherCostActivity {
+    _id: string;
+    user: {
+        userId: string;
+        fullName: string;
+    };
+    projectId: string;
+    projectName?: string;
+    sectionName?: string;
+    miniSectionName?: string;
+    otherCosts: {
+        name: string;
+        category: string;
+        quantity: number;
+        unit: string;
+        unitCost: number;
+        totalCost: number;
+        status: string;
+    }[];
+    message?: string;
+    activity: 'added' | 'updated' | 'approved';
+    createdAt?: string;
+    date?: string;
+}
+
+type TabType = 'all' | 'project' | 'material' | 'labor' | 'other_cost';
 type MaterialSubTab = 'all' | 'imported' | 'used' | 'transferred';
 
 const NotificationPage: React.FC = () => {
@@ -130,6 +156,7 @@ const NotificationPage: React.FC = () => {
         return [];
     }, [activitiesRaw]);
     const [materialActivities, setMaterialActivities] = useState<MaterialActivity[]>([]);
+    const [otherCostActivities, setOtherCostActivities] = useState<OtherCostActivity[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -139,6 +166,8 @@ const NotificationPage: React.FC = () => {
     const lastLoadTimeRef = React.useRef<number>(0);
     const DEBOUNCE_DELAY = 500;
     const [currentUser, setCurrentUser] = useState<{ userId: string; fullName: string } | null>(null);
+    const [clientData, setClientData] = useState<any>({});
+    const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
     // Animation
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -184,9 +213,24 @@ const NotificationPage: React.FC = () => {
         return null;
     };
 
+    const fetchClientData = async () => {
+        try {
+            const clientId = await getClientId();
+            if (clientId) {
+                const res = await apiClient.get(`/api/client/details?clientId=${clientId}`);
+                if (res.data && res.data.success) {
+                    setClientData(res.data.data);
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching client data:', error);
+        }
+    };
+
     // Load current user on mount
     useEffect(() => {
         getCurrentUser();
+        fetchClientData();
     }, []);
 
     // State for date-based pagination
@@ -267,14 +311,20 @@ const NotificationPage: React.FC = () => {
                 ...(shouldFilterByDate && targetDate && { targetDate: dateToFetch }) // Only add targetDate if specified
             });
 
+            const otherCostParams = new URLSearchParams({
+                clientId,
+                ...(shouldFilterByDate && targetDate && { targetDate: dateToFetch }) // Only add targetDate if specified
+            });
+
             console.log('📅 Date-based navigation - fetching for date:', dateToFetch);
 
             console.log('API URLs:');
             console.log('  - Activity:', `${domain}/api/activity?${activityParams.toString()}`);
             console.log('  - Material Activity:', `${domain}/api/materialActivity?${materialParams.toString()}`);
+            console.log('  - Other Cost Activity:', `${domain}/api/otherCostActivity?${otherCostParams.toString()}`);
 
-            // Fetch both activities in parallel with enhanced error handling
-            const [activityRes, materialActivityRes] = await Promise.all([
+            // Fetch all activities in parallel with enhanced error handling
+            const [activityRes, materialActivityRes, otherCostActivityRes] = await Promise.all([
                 apiClient.get(`/api/activity?${activityParams.toString()}`)
                     .catch((err) => {
                         console.error('❌ Activity API Error Details:');
@@ -303,12 +353,30 @@ const NotificationPage: React.FC = () => {
                         console.error('   - Error Message:', err.message);
                         console.error('   - Error Code:', err.code);
                         // Return structure that matches successful response but indicates failure
-                        return { 
-                            data: { 
-                                success: false, 
+                        return {
+                            data: {
+                                success: false,
                                 error: err?.response?.data?.message || err.message,
                                 data: { dateGroups: [], hasMoreDates: false, nextDate: null }
-                            } 
+                            }
+                        };
+                    }),
+                apiClient.get(`/api/otherCostActivity?${otherCostParams.toString()}`)
+                    .catch((err) => {
+                        console.error('❌ Other Cost Activity API Error Details:');
+                        console.error('   - URL:', `${domain}/api/otherCostActivity?${otherCostParams.toString()}`);
+                        console.error('   - Status:', err?.response?.status);
+                        console.error('   - Status Text:', err?.response?.statusText);
+                        console.error('   - Response Data:', err?.response?.data);
+                        console.error('   - Error Message:', err.message);
+                        console.error('   - Error Code:', err.code);
+                        // Return structure that matches successful response but indicates failure
+                        return {
+                            data: {
+                                success: false,
+                                error: err?.response?.data?.message || err.message,
+                                data: { dateGroups: [], hasMoreDates: false, nextDate: null }
+                            }
                         };
                     }),
             ]);
@@ -341,13 +409,17 @@ const NotificationPage: React.FC = () => {
 
             const activityData = activityRes.data as any;
             const materialData = materialActivityRes.data as any;
+            const otherCostData = otherCostActivityRes.data as any;
 
             // Handle actual API response format - activities are returned directly
-            const activityList = (activityData.success !== false) 
+            const activityList = (activityData.success !== false)
                 ? (activityData.data?.activities || activityData.activities || [])
                 : [];
             const materialList = (materialData.success !== false)
                 ? (materialData.data?.activities || materialData.activities || [])
+                : [];
+            const otherCostList = (otherCostData.success !== false)
+                ? (otherCostData.data?.activities || otherCostData.activities || [])
                 : [];
 
             console.log('\n--- ACTIVITY DATA ---');
@@ -380,9 +452,14 @@ const NotificationPage: React.FC = () => {
                 const rawDate = material.date || material.createdAt;
                 return rawDate ? new Date(rawDate).toLocaleDateString('en-CA') : null;
             }).filter(Boolean);
-            
+
+            const otherCostDates = otherCostList.map((otherCost: any) => {
+                const rawDate = otherCost.date || otherCost.createdAt;
+                return rawDate ? new Date(rawDate).toLocaleDateString('en-CA') : null;
+            }).filter(Boolean);
+
             // Merge and sort all available dates
-            const allAvailableDates = [...new Set([...activityDates, ...materialDates])].sort((a, b) => b.localeCompare(a));
+            const allAvailableDates = [...new Set([...activityDates, ...materialDates, ...otherCostDates])].sort((a, b) => b.localeCompare(a));
             setAvailableDates(allAvailableDates);
 
             // Update current date if targetDate was provided
@@ -446,12 +523,23 @@ const NotificationPage: React.FC = () => {
                     return materialLocalDate === finalDateToUse;
                 });
 
+            // If contractor filter is active, hide non-material activities (other costs have no vendor)
+            const filteredOtherCosts = skipDayFilter
+                ? []
+                : otherCostList.filter((otherCost: any) => {
+                    const rawDate = otherCost.date || otherCost.createdAt;
+                    if (!rawDate) return false;
+                    const otherCostLocalDate = new Date(rawDate).toLocaleDateString('en-CA');
+                    return otherCostLocalDate === finalDateToUse;
+                });
+
             // If no activities found for current date, show empty state but keep navigation
-            if (filteredActivities.length === 0 && filteredMaterials.length === 0) {
+            if (filteredActivities.length === 0 && filteredMaterials.length === 0 && filteredOtherCosts.length === 0) {
                 console.log('📭 No activities found for date:', finalDateToUse);
                 setDateGroups([]);
                 setActivitiesRaw([]);
                 setMaterialActivities([]);
+                setOtherCostActivities([]);
                 return;
             }
 
@@ -479,6 +567,17 @@ const NotificationPage: React.FC = () => {
                 allDateGroups[materialDate].push({ type: 'material', data: material, timestamp });
             });
 
+            // Add filtered other costs
+            filteredOtherCosts.forEach((otherCost: any) => {
+                const rawDate = otherCost.date || otherCost.createdAt;
+                const otherCostDate = rawDate ? new Date(rawDate).toLocaleDateString('en-CA') : new Date().toLocaleDateString('en-CA');
+                const timestamp = otherCost.date || otherCost.createdAt || new Date().toISOString();
+                if (!allDateGroups[otherCostDate]) {
+                    allDateGroups[otherCostDate] = [];
+                }
+                allDateGroups[otherCostDate].push({ type: 'other_cost', data: otherCost, timestamp });
+            });
+
             // Convert to sorted array (should only be one date)
             const sortedDates = Object.keys(allDateGroups).sort((a, b) => b.localeCompare(a));
             const newDateGroups = sortedDates.map(date => ({
@@ -495,6 +594,7 @@ const NotificationPage: React.FC = () => {
             // Also update legacy state for backward compatibility
             setActivitiesRaw(filteredActivities);
             setMaterialActivities(filteredMaterials);
+            setOtherCostActivities(filteredOtherCosts);
 
             // ✅ NEW: Fetch all available contractors for this client asynchronously
             apiClient.get(`/api/materialActivity/contractors?clientId=${clientId}`)
@@ -506,7 +606,13 @@ const NotificationPage: React.FC = () => {
                     }
                 })
                 .catch(err => {
-                    console.error('⚠️ Failed to fetch unique contractors:', err);
+                    // Handle 404 gracefully - it just means no contractors exist for this client yet
+                    if (err.response?.status === 404) {
+                        console.log('📝 No contractors found for this client');
+                        setAvailableVendors([]);
+                    } else {
+                        console.error('⚠️ Failed to fetch unique contractors:', err);
+                    }
                 });
 
             console.log('✅ Date navigation state updated');
@@ -545,6 +651,7 @@ const NotificationPage: React.FC = () => {
             if (!loadMore) {
                 setActivitiesRaw([]);
                 setMaterialActivities([]);
+                setOtherCostActivities([]);
                 setDateGroups([]);
                 setHasMoreDates(false);
                 setNextDate(null);
@@ -691,6 +798,38 @@ const NotificationPage: React.FC = () => {
         }
     };
 
+    const generateVendorReport = async () => {
+        if (selectedVendors.length === 0) return;
+        setIsGeneratingReport(true);
+        try {
+            // Apply exactly the same filters as the UI
+            let filtered = materialActivities;
+            if (materialSubTab !== 'all') {
+                filtered = filtered.filter(m => m.activity === materialSubTab);
+            }
+            // Vendor filter — keep only imported activities for the selected vendors
+            filtered = filtered.filter(m =>
+                m.activity === 'imported' &&
+                selectedVendors.includes(m.contractor_name || '')
+            );
+
+            if (filtered.length === 0) {
+                alert('No imported materials found for the selected vendor(s) to generate a report.');
+                return;
+            }
+
+            const pdfGenerator = new PDFReportGenerator(clientData, currentUser);
+            // Use the new vendor-focused PDF generator
+            await pdfGenerator.generateVendorPDF(filtered, selectedVendors);
+
+        } catch (error) {
+            console.error('Failed to generate vendor report:', error);
+            alert('Failed to generate report. Please try again.');
+        } finally {
+            setIsGeneratingReport(false);
+        }
+    };
+
     const getActivityIcon = (type: string, category: string) => {
         if (category === 'project') return { name: 'folder', color: '#3B82F6' };
         if (category === 'section') return { name: 'layers', color: '#8B5CF6' };
@@ -699,6 +838,7 @@ const NotificationPage: React.FC = () => {
         if (category === 'labor') return { name: 'hammer', color: '#F59E0B' };
         if (category === 'material') return { name: 'cube', color: '#06B6D4' };
         if (category === 'equipment') return { name: 'construct', color: '#8B5CF6' };
+        if (category === 'other_cost') return { name: 'briefcase', color: '#8B5CF6' };
         return { name: 'information-circle', color: '#6B7280' };
     };
 
@@ -849,7 +989,8 @@ const NotificationPage: React.FC = () => {
                         {entries.length > 0 && (
                             <View style={styles.materialsList}>
                                 {entries.map((entry: any, index: number) => (
-                                    <View key={index} style={styles.materialItem}>
+                                    <React.Fragment key={index}>
+                                    <View style={styles.materialItem}>
                                         <View style={[
                                             styles.materialIconSmall,
                                             { backgroundColor: `${icon.color}15` }
@@ -882,6 +1023,19 @@ const NotificationPage: React.FC = () => {
                                             )}
                                         </View>
                                     </View>
+                                    {entry.description ? (
+                                        <View style={styles.laborDescriptionCard}>
+                                            <View style={styles.laborDescriptionAccent} />
+                                            <View style={styles.laborDescriptionContent}>
+                                                <Ionicons name="document-text-outline" size={14} color="#F59E0B" style={{ marginTop: 1 }} />
+                                                <View style={{ flex: 1 }}>
+                                                    <Text style={styles.laborDescriptionLabel}>Work Done</Text>
+                                                    <Text style={styles.laborDescriptionText} numberOfLines={3}>{entry.description}</Text>
+                                                </View>
+                                            </View>
+                                        </View>
+                                    ) : null}
+                                    </React.Fragment>
                                 ))}
                             </View>
                         )}
@@ -896,8 +1050,8 @@ const NotificationPage: React.FC = () => {
                             </View>
                         )}
 
-                        {/* Message */}
-                        {enhancedMessage && (
+                        {/* Message - only show for non-labor activities */}
+                        {!isLaborActivity && enhancedMessage && (
                             <View style={styles.messageContainer}>
                                 <Ionicons name="chatbox-outline" size={14} color="#64748B" />
                                 <Text style={styles.messageText}>{enhancedMessage}</Text>
@@ -1196,8 +1350,142 @@ const NotificationPage: React.FC = () => {
         );
     };
 
+    const renderOtherCostActivityItem = (activity: OtherCostActivity) => {
+        const icon = { name: 'briefcase', color: '#8B5CF6' };
+        const totalCost = activity.otherCosts.reduce((sum, o) => sum + (o.totalCost || 0), 0);
+        const costCount = activity.otherCosts.length;
+
+        const displayUser = activity.user?.fullName && activity.user.fullName !== 'Unknown User'
+            ? activity.user
+            : currentUser || { userId: 'unknown', fullName: 'Unknown User' };
+
+        return (
+            <View key={activity._id} style={styles.materialActivityCard}>
+                <View style={styles.materialActivityGradient}>
+                    {/* Header with activity type badge */}
+                    <View style={styles.materialActivityHeader}>
+                        <View style={[
+                            styles.activityBadge,
+                            {
+                                backgroundColor: '#8B5CF6',
+                                shadowColor: '#8B5CF6',
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.3,
+                                shadowRadius: 4,
+                                elevation: 3,
+                            }
+                        ]}>
+                            <Ionicons
+                                name={icon.name as any}
+                                size={16}
+                                color="#FFFFFF"
+                            />
+                            <Text style={[
+                                styles.activityBadgeText,
+                                { color: '#FFFFFF' }
+                            ]}>
+                                OTHER COST ADDED
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Project/Section Info */}
+                    {(activity.projectName || activity.sectionName) && (
+                        <View style={styles.projectInfo}>
+                            {activity.projectName && (
+                                <View style={styles.projectInfoItem}>
+                                    <Ionicons name="folder-outline" size={14} color="#64748B" />
+                                    <Text style={styles.projectInfoText}>{activity.projectName}</Text>
+                                </View>
+                            )}
+                            {activity.sectionName && (
+                                <View style={styles.projectInfoItem}>
+                                    <Ionicons name="layers-outline" size={14} color="#64748B" />
+                                    <Text style={styles.projectInfoText}>{activity.sectionName}</Text>
+                                </View>
+                            )}
+                            {activity.miniSectionName && (
+                                <View style={styles.projectInfoItem}>
+                                    <Ionicons name="grid-outline" size={14} color="#64748B" />
+                                    <Text style={styles.projectInfoText}>{activity.miniSectionName}</Text>
+                                </View>
+                            )}
+                        </View>
+                    )}
+
+                    {/* Other Costs List */}
+                    <View style={styles.materialsList}>
+                        {activity.otherCosts.map((cost, index) => (
+                            <View key={index} style={styles.materialItem}>
+                                <View style={[
+                                    styles.materialIconSmall,
+                                    { backgroundColor: '#8B5CF615' }
+                                ]}>
+                                    <Ionicons
+                                        name="briefcase-outline"
+                                        size={18}
+                                        color="#8B5CF6"
+                                    />
+                                </View>
+                                <View style={styles.materialDetails}>
+                                    <Text style={styles.materialName}>{cost.name}</Text>
+                                    <Text style={styles.materialQuantity}>
+                                        {cost.quantity} {cost.unit}
+                                        {cost.totalCost > 0 && (
+                                            <Text style={styles.materialCost}>
+                                                {' '}• ₹{cost.totalCost.toLocaleString('en-IN')}
+                                            </Text>
+                                        )}
+                                    </Text>
+                                    {cost.category && (
+                                        <Text style={styles.laborCategory}>
+                                            {cost.category}
+                                        </Text>
+                                    )}
+                                </View>
+                            </View>
+                        ))}
+                    </View>
+
+                    {/* Total Cost */}
+                    {totalCost > 0 && (
+                        <View style={styles.totalCostContainer}>
+                            <Text style={styles.totalCostLabel}>Total Cost</Text>
+                            <Text style={styles.totalCostValue}>
+                                ₹{totalCost.toLocaleString('en-IN')}
+                            </Text>
+                        </View>
+                    )}
+
+                    {/* Message */}
+                    {activity.message && (
+                        <View style={styles.messageContainer}>
+                            <Ionicons name="chatbox-outline" size={14} color="#64748B" />
+                            <Text style={styles.messageText}>{activity.message}</Text>
+                        </View>
+                    )}
+
+                    {/* Footer with user info and time ago */}
+                    <View style={styles.materialActivityFooter}>
+                        <View style={styles.userInfo}>
+                            <View style={[styles.userAvatar, { backgroundColor: '#8B5CF6' }]}>
+                                <Text style={styles.userAvatarText}>
+                                    {displayUser.fullName.charAt(0).toUpperCase()}
+                                </Text>
+                            </View>
+                            <Text style={styles.userName}>{displayUser.fullName}</Text>
+                        </View>
+                        <Text style={styles.activityTimeNew}>
+                            {formatTimeAgo(activity.date || activity.createdAt)}
+                        </Text>
+                    </View>
+                </View>
+            </View>
+        );
+    };
+
     const getCombinedActivities = () => {
-        const combined: { type: 'activity' | 'material'; data: Activity | MaterialActivity; timestamp: string }[] = [];
+        const combined: { type: 'activity' | 'material' | 'other_cost'; data: Activity | MaterialActivity | OtherCostActivity; timestamp: string }[] = [];
 
         // Safely iterate over activities (ensure it's an array)
         if (Array.isArray(activities)) {
@@ -1209,9 +1497,16 @@ const NotificationPage: React.FC = () => {
         // Safely iterate over material activities (ensure it's an array)
         if (Array.isArray(materialActivities)) {
             materialActivities.forEach(m => {
-                // Material activities use 'date' field, fallback to 'createdAt'
                 const timestamp: string = m.date || m.createdAt || new Date().toISOString();
                 combined.push({ type: 'material' as const, data: m, timestamp });
+            });
+        }
+
+        // Safely iterate over other cost activities (ensure it's an array)
+        if (Array.isArray(otherCostActivities)) {
+            otherCostActivities.forEach(o => {
+                const timestamp: string = o.date || o.createdAt || new Date().toISOString();
+                combined.push({ type: 'other_cost' as const, data: o, timestamp });
             });
         }
 
@@ -1264,12 +1559,12 @@ const NotificationPage: React.FC = () => {
             // Filter materials based on sub-tab (ensure it's an array)
             if (Array.isArray(materialActivities)) {
                 let filtered = materialActivities;
-                
+
                 // ✅ NEW: Filter by vendors if selected (multiple vendors)
                 if (selectedVendors.length > 0) {
                     filtered = filtered.filter(m => selectedVendors.includes(m.contractor_name || ''));
                 }
-                
+
                 // If 'all' sub-tab is selected, show all material activities
                 if (materialSubTab === 'all') {
                     return filtered.map(m => ({
@@ -1286,6 +1581,16 @@ const NotificationPage: React.FC = () => {
                         data: m,
                         timestamp: m.date || m.createdAt || new Date().toISOString()
                     }));
+            }
+            return [];
+        } else if (activeTab === 'other_cost') {
+            // Filter other cost activities (ensure it's an array)
+            if (Array.isArray(otherCostActivities)) {
+                return otherCostActivities.map(o => ({
+                    type: 'other_cost' as const,
+                    data: o,
+                    timestamp: o.date || o.createdAt || new Date().toISOString()
+                }));
             }
             return [];
         }
@@ -1348,16 +1653,21 @@ const NotificationPage: React.FC = () => {
                     // Only show material activities that match the sub-tab
                     if (materialSubTab === 'all') {
                         // Show all material activities
-                        filteredGroupActivities = filteredGroupActivities.filter(item => 
+                        filteredGroupActivities = filteredGroupActivities.filter(item =>
                             item.type === 'material'
                         );
                     } else {
                         // Filter by specific activity type
-                        filteredGroupActivities = filteredGroupActivities.filter(item => 
-                            item.type === 'material' && 
+                        filteredGroupActivities = filteredGroupActivities.filter(item =>
+                            item.type === 'material' &&
                             (item.data as MaterialActivity).activity === materialSubTab
                         );
                     }
+                } else if (activeTab === 'other_cost') {
+                    // Only show other cost activities
+                    filteredGroupActivities = filteredGroupActivities.filter(item =>
+                        item.type === 'other_cost'
+                    );
                 } else {
                     // 'all' tab - show everything (already filtered by vendor if applicable)
                     filteredGroupActivities = filteredGroupActivities;
@@ -1547,22 +1857,41 @@ const NotificationPage: React.FC = () => {
                         }
                     </Text>
                 </View>
-                {/* ✅ NEW: Vendor Filter Button (replaces refresh button) */}
-                <TouchableOpacity 
-                    onPress={() => setShowVendorModal(true)} 
-                    style={[styles.vendorFilterButton, selectedVendors.length > 0 && styles.vendorFilterButtonActive]}
-                >
-                    <Ionicons
-                        name={selectedVendors.length > 0 ? "funnel" : "funnel-outline"}
-                        size={20}
-                        color={selectedVendors.length > 0 ? "#FFFFFF" : "#3B82F6"}
-                    />
-                    {selectedVendors.length > 0 && (
-                        <View style={styles.vendorFilterBadge}>
-                            <Text style={styles.vendorFilterBadgeText}>{selectedVendors.length}</Text>
-                        </View>
+                
+                {/* Header Actions */}
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    {/* ✅ NEW: Generate Report Button */}
+                    {selectedVendors.length > 0 && (activeTab === 'material' || activeTab === 'all') && (
+                        <TouchableOpacity 
+                            onPress={generateVendorReport}
+                            disabled={isGeneratingReport}
+                            style={[styles.vendorFilterButton, { marginRight: 8, backgroundColor: '#10B981', borderColor: '#10B981' }]}
+                        >
+                            {isGeneratingReport ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                                <Ionicons name="document-text" size={20} color="#FFFFFF" />
+                            )}
+                        </TouchableOpacity>
                     )}
-                </TouchableOpacity>
+
+                    {/* ✅ NEW: Vendor Filter Button (replaces refresh button) */}
+                    <TouchableOpacity 
+                        onPress={() => setShowVendorModal(true)} 
+                        style={[styles.vendorFilterButton, selectedVendors.length > 0 && styles.vendorFilterButtonActive]}
+                    >
+                        <Ionicons
+                            name={selectedVendors.length > 0 ? "funnel" : "funnel-outline"}
+                            size={20}
+                            color={selectedVendors.length > 0 ? "#FFFFFF" : "#3B82F6"}
+                        />
+                        {selectedVendors.length > 0 && (
+                            <View style={styles.vendorFilterBadge}>
+                                <Text style={styles.vendorFilterBadgeText}>{selectedVendors.length}</Text>
+                            </View>
+                        )}
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {/* Main Tabs */}
@@ -1605,6 +1934,16 @@ const NotificationPage: React.FC = () => {
                         Materials
                     </Text>
                     {activeTab === 'material' && <View style={styles.tabIndicator} />}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={[styles.tab, activeTab === 'other_cost' && styles.tabActive]}
+                    onPress={() => setActiveTab('other_cost')}
+                >
+                    <Text style={[styles.tabText, activeTab === 'other_cost' && styles.tabTextActive]}>
+                        Other
+                    </Text>
+                    {activeTab === 'other_cost' && <View style={styles.tabIndicator} />}
                 </TouchableOpacity>
             </View>
 
@@ -1886,7 +2225,9 @@ const NotificationPage: React.FC = () => {
                                                 <React.Fragment key={`${dateGroup.date}-${item.type}-${item.data._id}`}>
                                                     {item.type === 'activity'
                                                         ? renderActivityItem(item.data as Activity)
-                                                        : renderMaterialActivityItem(item.data as MaterialActivity)
+                                                        : item.type === 'material'
+                                                        ? renderMaterialActivityItem(item.data as MaterialActivity)
+                                                        : renderOtherCostActivityItem(item.data as OtherCostActivity)
                                                     }
                                                 </React.Fragment>
                                             );
@@ -2685,6 +3026,42 @@ const styles = StyleSheet.create({
         color: '#64748B',
         marginTop: 2,
         fontStyle: 'italic',
+    },
+    laborDescriptionCard: {
+        backgroundColor: '#FFFBEB',
+        borderRadius: 8,
+        marginTop: 6,
+        marginRight: 4,
+        overflow: 'hidden',
+        flexDirection: 'row',
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    laborDescriptionAccent: {
+        width: 3,
+        backgroundColor: '#F59E0B',
+    },
+    laborDescriptionContent: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+        gap: 8,
+    },
+    laborDescriptionLabel: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#B45309',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: 2,
+    },
+    laborDescriptionText: {
+        fontSize: 12,
+        color: '#78350F',
+        lineHeight: 17,
+        fontWeight: '500',
     },
     totalCostContainer: {
         flexDirection: 'row',

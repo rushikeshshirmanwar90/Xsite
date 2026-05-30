@@ -68,6 +68,13 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
     clientData,
     userData
 }) => {
+    const getLocalDateString = (date: Date): string => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     const [startDate, setStartDate] = useState<Date>(() => {
         // ✅ FIXED: Start from 5 years ago to capture ALL historical data
         // This ensures all material activities are included in the report
@@ -221,8 +228,8 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
             console.log('📊 GENERATING MATERIAL ACTIVITY REPORT');
             console.log('========================================');
             console.log('Report Parameters:');
-            console.log('  - Start Date:', startDate.toISOString().split('T')[0]);
-            console.log('  - End Date:', endDate.toISOString().split('T')[0]);
+            console.log('  - Start Date:', getLocalDateString(startDate));
+            console.log('  - End Date:', getLocalDateString(endDate));
             console.log('  - Activity Filter:', activityFilter);
             console.log('  - Project Filter:', selectedProjectId);
             console.log('  - Selected Sections:', selectedSections);
@@ -241,8 +248,8 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
             // Build API parameters
             const params = new URLSearchParams({
                 clientId,
-                startDate: startDate.toISOString().split('T')[0],
-                endDate: endDate.toISOString().split('T')[0],
+                startDate: getLocalDateString(startDate),
+                endDate: getLocalDateString(endDate),
                 activity: activityFilter
             });
 
@@ -394,12 +401,74 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                 // Continue without equipment data
             }
 
+            // Fetch other cost data for project
+            console.log('🔍 Fetching other cost data for project:', selectedProjectId);
+            let otherCostData: any[] = [];
+            
+            try {
+                const ocResponse = await apiClient.get<ApiResponse<any>>('/api/otherCost', {
+                    params: { entityType: 'project', entityId: selectedProjectId, useStandalone: true }
+                });
+                
+                if (ocResponse.data.success && ocResponse.data.data?.otherCostEntries) {
+                    const rawOtherCosts = ocResponse.data.data.otherCostEntries;
+                    
+                    // Transform entries to standard structure
+                    otherCostData = rawOtherCosts.map((e: any) => {
+                        const amt = e.amount ?? e.totalCost ?? 0;
+                        // Find section name if available
+                        let secName = '';
+                        if (e.sectionId && projectSections.length > 0) {
+                            const matchedSec = projectSections.find(s => (s.sectionId === e.sectionId || s._id === e.sectionId));
+                            if (matchedSec) secName = matchedSec.name;
+                        }
+                        return {
+                            _id: e._id,
+                            name: e.title || e.name || 'Other Cost',
+                            title: e.title || e.name || 'Other Cost',
+                            amount: amt,
+                            totalCost: amt,
+                            description: e.description,
+                            date: e.addedAt || e.createdAt || new Date().toISOString(),
+                            sectionId: e.sectionId,
+                            sectionName: secName,
+                        };
+                    });
+
+                    // Filter other cost data by selected sections only if there are multiple sections
+                    if (projectSections.length > 1 && selectedSections.length > 0 && selectedSections.length < projectSections.length && otherCostData.length > 0) {
+                        const beforeFilterCount = otherCostData.length;
+                        otherCostData = otherCostData.filter((oc: any) => 
+                            selectedSections.includes(oc.sectionId)
+                        );
+                        console.log(`✅ Other cost filtered by sections: ${beforeFilterCount} → ${otherCostData.length} entries`);
+                    }
+
+                    // Filter by date range
+                    const startStr = getLocalDateString(startDate);
+                    const endStr = getLocalDateString(endDate);
+                    otherCostData = otherCostData.filter((oc: any) => {
+                        const dateStr = oc.date;
+                        if (!dateStr) return false;
+                        const itemDate = getLocalDateString(new Date(dateStr));
+                        return itemDate >= startStr && itemDate <= endStr;
+                    });
+                    
+                    console.log('✅ Other cost data fetched and filtered:', otherCostData.length, 'entries');
+                } else {
+                    console.warn('⚠️ Could not fetch project other cost data');
+                }
+            } catch (ocError) {
+                console.error('❌ Error fetching other cost data:', ocError);
+                // Continue without other cost data
+            }
+
             if (!activities || activities.length === 0) {
-                // Check if we have labor data or equipment data even if no material activities
-                if (laborData.length === 0 && equipmentData.length === 0) {
+                // Check if we have labor data, equipment data, or other cost data even if no material activities
+                if (laborData.length === 0 && equipmentData.length === 0 && otherCostData.length === 0) {
                     Alert.alert(
                         'No Data Found',
-                        `No material activities, labor entries, or equipment entries found for the selected period${selectedSections.length > 0 ? ' and sections' : ''} (${formatDate(startDate)} to ${formatDate(endDate)}).`,
+                        `No material activities, labor entries, equipment entries, or other costs found for the selected period${selectedSections.length > 0 ? ' and sections' : ''} (${formatDate(startDate)} to ${formatDate(endDate)}).`,
                         [
                             { text: 'OK' },
                             {
@@ -417,10 +486,10 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                 }
             }
 
-            console.log('📄 Generating PDF with activities:', activities.length, ', labor entries:', laborData.length, ', and equipment entries:', equipmentData.length);
+            console.log('📄 Generating PDF with activities:', activities.length, ', labor entries:', laborData.length, ', equipment entries:', equipmentData.length, ', and other costs:', otherCostData.length);
             console.log('📄 Equipment data being passed to PDF:', equipmentData.slice(0, 2));
 
-            // ✅ NEW: Show activity count summary before generating PDF
+            // Show activity count summary before generating PDF
             const importedCount = activities.filter(a => a.activity === 'imported').length;
             const usedCount = activities.filter(a => a.activity === 'used').length;
             const transferredCount = activities.filter(a => a.activity === 'transferred').length;
@@ -431,6 +500,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
             console.log(`  - Transferred: ${transferredCount}`);
             console.log(`  - Labor Entries: ${laborData.length}`);
             console.log(`  - Equipment Entries: ${equipmentData.length}`);
+            console.log(`  - Other Cost Entries: ${otherCostData.length}`);
 
             // Get selected project name for PDF title
             const selectedProject = projects.find(p => p._id === selectedProjectId);
@@ -456,7 +526,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
             const pdfGenerator = new PDFReportGenerator(clientData, userData);
             
             console.log('📄 Calling generatePDF...');
-            await pdfGenerator.generatePDF(activities || [], reportTitle, laborData, equipmentData);
+            await pdfGenerator.generatePDF(activities || [], reportTitle, laborData, equipmentData, otherCostData, startDate, endDate);
             console.log('📄 generatePDF completed successfully');
 
             console.log('✅ PDF generation completed successfully');
@@ -620,9 +690,20 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                                             key={preset.days}
                                             style={styles.presetButton}
                                             onPress={() => {
-                                                const newStartDate = new Date();
-                                                newStartDate.setDate(newStartDate.getDate() - preset.days);
-                                                setStartDate(newStartDate);
+                                                if (preset.label === 'All Time') {
+                                                    const selectedProject = projects.find(p => p._id === selectedProjectId);
+                                                    if (selectedProject && selectedProject.createdAt) {
+                                                        setStartDate(new Date(selectedProject.createdAt));
+                                                    } else {
+                                                        const newStartDate = new Date();
+                                                        newStartDate.setFullYear(newStartDate.getFullYear() - 5);
+                                                        setStartDate(newStartDate);
+                                                    }
+                                                } else {
+                                                    const newStartDate = new Date();
+                                                    newStartDate.setDate(newStartDate.getDate() - preset.days);
+                                                    setStartDate(newStartDate);
+                                                }
                                                 setEndDate(new Date());
                                             }}
                                         >

@@ -42,7 +42,8 @@ const LaborCardEnhanced: React.FC<LaborCardEnhancedProps> = ({
             'Waterproofing & Treatment Works': '#10B981', // Emerald
             'Site Management & Support Staff': '#1E40AF', // Dark Blue
             'Equipment Operators': '#7C2D12',             // Brown
-            'Security & Housekeeping': '#374151'          // Gray
+            'Security & Housekeeping': '#374151',         // Gray
+            'RCC contractor': '#475569'                   // Slate
         };
         return colorMap[category] || '#6B7280';
     };
@@ -59,7 +60,8 @@ const LaborCardEnhanced: React.FC<LaborCardEnhancedProps> = ({
             'Waterproofing & Treatment Works': 'shield-outline',
             'Site Management & Support Staff': 'people-outline',
             'Equipment Operators': 'car-outline',
-            'Security & Housekeeping': 'shield-checkmark-outline'
+            'Security & Housekeeping': 'shield-checkmark-outline',
+            'RCC contractor': 'grid-outline'
         };
         return iconMap[category] || 'people-outline';
     };
@@ -92,13 +94,13 @@ const LaborCardEnhanced: React.FC<LaborCardEnhancedProps> = ({
                         <View style={styles.laborSummaryLeft}>
                             {/* Colorful circular icon container matching LaborFormModal */}
                             <View style={[
-                                styles.categoryIconContainer, 
+                                styles.categoryIconContainer,
                                 { backgroundColor: (labor.color || getCategoryColor(labor.category)) + '20' }
                             ]}>
-                                <Ionicons 
-                                    name={labor.icon || getCategoryIcon(labor.category)} 
-                                    size={24} 
-                                    color={labor.color || getCategoryColor(labor.category)} 
+                                <Ionicons
+                                    name={labor.icon || getCategoryIcon(labor.category)}
+                                    size={24}
+                                    color={labor.color || getCategoryColor(labor.category)}
                                 />
                             </View>
                             <View style={styles.headerInfo}>
@@ -107,7 +109,7 @@ const LaborCardEnhanced: React.FC<LaborCardEnhancedProps> = ({
                                     styles.category,
                                     { color: labor.color || getCategoryColor(labor.category) }
                                 ]}>{labor.category}</Text>
-                                
+
                                 {/* Mini Section Label below category */}
                                 {showMiniSectionLabel && labor.miniSectionId && (
                                     <View style={styles.miniSectionInline}>
@@ -120,7 +122,7 @@ const LaborCardEnhanced: React.FC<LaborCardEnhancedProps> = ({
                             </View>
                         </View>
                     </View>
-                    
+
                     {/* Enhanced Quick Summary without icons */}
                     <View style={styles.laborQuickSummary}>
                         <View style={styles.laborSummaryItem}>
@@ -140,6 +142,14 @@ const LaborCardEnhanced: React.FC<LaborCardEnhancedProps> = ({
                     </View>
                 </View>
             </View>
+
+            {/* Description */}
+            {labor.description ? (
+                <View style={styles.descriptionSection}>
+                    <Ionicons name="document-text-outline" size={14} color="#64748B" style={{ marginRight: 6 }} />
+                    <Text style={styles.descriptionText}>{labor.description}</Text>
+                </View>
+            ) : null}
 
             {/* Cost Breakdown */}
             <View style={styles.costBreakdown}>
@@ -176,6 +186,7 @@ const styles = StyleSheet.create({
         position: 'relative',
         overflow: 'hidden',
     },
+
     cardAccentBackground: {
         position: 'absolute',
         top: 0,
@@ -184,6 +195,7 @@ const styles = StyleSheet.create({
         bottom: 0,
         borderRadius: 16,
     },
+
     enhancedHeader: {
         marginBottom: 16,
         zIndex: 1,
@@ -313,6 +325,24 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: '#94A3B8',
         fontWeight: '600',
+    },
+    descriptionSection: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        marginBottom: 10,
+        zIndex: 1,
+    },
+    descriptionText: {
+        fontSize: 13,
+        color: '#475569',
+        fontStyle: 'italic',
+        flex: 1,
+        lineHeight: 18,
     },
 });
 

@@ -485,7 +485,7 @@ const StaffManagement: React.FC = () => {
         // Show confirmation dialog
         Alert.alert(
             'Remove Staff Member',
-            `Are you sure you want to remove ${staff.firstName} ${staff.lastName} from your organization?`,
+            `Are you sure you want to remove ${staff.firstName} ${staff.lastName} from the organization?`,
             [
                 {
                     text: 'Cancel',

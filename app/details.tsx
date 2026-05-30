@@ -18,6 +18,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Animated, FlatList, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
 import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import { toast } from 'sonner-native';
 import { useSimpleNotifications } from '@/hooks/useSimpleNotifications';
 import { useAuth } from '@/contexts/AuthContext';
@@ -958,17 +959,15 @@ const Details = () => {
 
     // New handler functions for menu actions
     const handleContractorPress = () => {
-        // Navigate to labor page with required parameters
-        console.log('Contractor button pressed - navigating to labor.tsx');
-        console.log('Passing parameters:', { projectId, projectName, sectionId, sectionName });
-        
+        console.log('Contractor button pressed - navigating to contractor.tsx');
         router.push({
-            pathname: '/labor',
+            pathname: '/contractor',
             params: {
-                projectId: projectId,
-                projectName: projectName,
-                sectionId: sectionId,
-                sectionName: sectionName
+                projectId: projectId || '',
+                projectName: projectName || '',
+                sectionId: sectionId || '',
+                sectionName: sectionName || '',
+                clientId: clientId || ''
             }
         });
     };
@@ -979,11 +978,99 @@ const Details = () => {
         router.push('/equipment');
     };
 
+    const handleLaborPress = async () => {
+        console.log('Labor button pressed - navigating to labor.tsx');
+        
+        // First, always check if this is a multiple-section project
+        try {
+            const projectRes = await apiClient.get(`/api/project/${projectId}?clientId=${clientId}`);
+            const projectData = projectRes.data?.project || projectRes.data?.data?.project || projectRes.data?.data || projectRes.data;
+            const sections = projectData?.section || [];
+            
+            console.log(`📋 Project has ${sections.length} sections`);
+            
+            // If multiple sections, check if we're in a specific section context
+            if (sections.length > 1) {
+                // Check if we're currently viewing a specific section (not the main project view)
+                if (!sectionId || sectionId === 'undefined' || sectionId === 'null') {
+                    console.log(`📋 Multiple sections (${sections.length}) - user must select section first`);
+                    Alert.alert(
+                        'Select Section First',
+                        `This project has ${sections.length} sections. Please select a specific section first before accessing labor management.`,
+                        [
+                            {
+                                text: 'OK',
+                                style: 'default'
+                            }
+                        ]
+                    );
+                    return;
+                }
+                console.log(`✅ Multiple sections but user is in specific section: ${sectionName}`);
+            }
+        } catch (projectErr) {
+            console.error('Error fetching project data for section count:', projectErr);
+            // If we can't determine section count, proceed with caution
+        }
+        
+        // Check if user is a contractor for this project
+        const isStaff = !!user?.role; // Staff users have a role field (site-engineer/supervisor/manager), admins do not
+        if (isStaff && user?._id && clientId) {
+            // Check if this staff member is a contractor for this client
+            const clientAssignment = user.clients?.find((c: any) => c.clientId === clientId);
+            
+            if (clientAssignment?.isContractor) {
+                console.log('📡 Staff user is contractor - fetching contractor details for labor navigation...');
+                
+                try {
+                    const res = await apiClient.get(`/api/contractor?projectId=${projectId}&staffId=${user._id}`);
+                    if (res.data?.success && res.data?.data) {
+                        const contractor = res.data.data;
+                        
+                        // Navigate to labor with contractor details
+                        router.push({
+                            pathname: '/labor',
+                            params: {
+                                projectId: projectId,
+                                projectName: projectName,
+                                sectionId: sectionId,
+                                sectionName: sectionName,
+                                contractorId: contractor._id,
+                                contractorType: contractor.contractType,
+                                userId: user._id,
+                            }
+                        });
+                        return;
+                    }
+                } catch (err) {
+                    console.log('📝 No contractor record found, proceeding with standard labor navigation');
+                }
+            }
+        }
+        
+        // Standard labor navigation (non-contractor or contractor without record)
+        router.push({
+            pathname: '/labor',
+            params: {
+                projectId: projectId,
+                projectName: projectName,
+                sectionId: sectionId,
+                sectionName: sectionName,
+            }
+        });
+    };
+
     const handleOtherCostPress = () => {
-        // Navigate to other cost page or show other cost modal
-        console.log('Other Cost button pressed');
-        // You can add navigation logic here
-        // router.push('/other-cost') or show a modal
+        console.log('Other Cost button pressed - navigating to other-cost.tsx');
+        router.push({
+            pathname: '/other-cost',
+            params: {
+                projectId: projectId || '',
+                projectName: projectName || '',
+                sectionId: sectionId || '',
+                sectionName: sectionName || '',
+            }
+        });
     };
 
     // Function to toggle section completion
@@ -1735,6 +1822,7 @@ const Details = () => {
             checkLowStockMaterials();
         }
     }, [materials.available, materials.used, materials.loading, ignoredMaterials]);
+
 
     // Load initial completion status for section and mini-sections
     const loadInitialCompletionStatus = async () => {
@@ -3335,6 +3423,7 @@ const Details = () => {
         }
     };
 
+
     return (
         <SafeAreaView style={styles.container}>
             <Header
@@ -3350,11 +3439,12 @@ const Details = () => {
                 onShowSectionPrompt={() => { }}
                 hideSection={true}
                 sectionCompleted={sectionCompleted}
-                onToggleSectionCompletion={handleCompletionButtonPress}
+                onToggleSectionCompletion={!user?.role ? handleCompletionButtonPress : undefined}
                 isUpdatingCompletion={isUpdatingCompletion}
-                onContractorPress={handleContractorPress}
+                onContractorPress={!user?.role ? handleContractorPress : undefined}
                 onEquipmentPress={handleEquipmentPress}
                 onOtherCostPress={handleOtherCostPress}
+                onLaborPress={handleLaborPress}
             />
 
             {/* Action Buttons - Sticky at top, visible to everyone in "imported" tab */}
@@ -3512,13 +3602,14 @@ const Details = () => {
                 sectionId={sectionId}
                 miniSectionCompletions={miniSectionCompletions}
             />
-
+            
             <ScrollView
                 ref={scrollViewRef}
                 style={styles.scrollContainer}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
             >
+
                 <TabSelector 
                     activeTab={activeTab} 
                     onSelectTab={setActiveTab}
@@ -3818,6 +3909,7 @@ const Details = () => {
                                             showMiniSectionLabel={!selectedMiniSection}
                                             userType={currentUserType}
                                             onRefresh={() => reloadMaterials(1, true)}
+                                            canEdit={!user?.role && (material.totalUsed || 0) === 0}
                                         />
                                     ))}
                                 </View>
@@ -3838,6 +3930,7 @@ const Details = () => {
                                 showMiniSectionLabel={false}
                                 userType={currentUserType}
                                 onRefresh={() => reloadMaterials(1, true)}
+                                canEdit={!user?.role && (material.totalUsed || 0) === 0}
                             />
                         ))
                     ) : (

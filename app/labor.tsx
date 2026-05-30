@@ -148,6 +148,10 @@ const LaborPage = () => {
     const projectName = params.projectName as string;
     const sectionId = params.sectionId as string;
     const sectionName = params.sectionName as string;
+
+    const contractorId = params.contractorId as string;
+    const userId = params.userId as string;
+    const contractorType = params.contractorType as string;
     
     console.log('   - Extracted projectId:', projectId, '(type:', typeof projectId, ')');
     console.log('   - Extracted projectName:', projectName, '(type:', typeof projectName, ')');
@@ -188,51 +192,138 @@ const LaborPage = () => {
     // Loading animation for adding labor
     const loadingAnimation = useRef(new Animated.Value(0)).current;
 
+    // Contractor state variables
+    const [contractorDetails, setContractorDetails] = useState<any>(null);
+    const [contractorContracts, setContractorContracts] = useState<any[]>([]);
+    const [loadingContractorDetails, setLoadingContractorDetails] = useState(false);
+    const [showContractorModal, setShowContractorModal] = useState(false);
+    
+    // Contractor expansion state for dropdown functionality
+    const [expandedContractors, setExpandedContractors] = useState<Set<string>>(new Set());
+    
+    // Contractor filtering - always show only contractor's work (no toggle needed)
+
+    // Helper function to group contractor contracts by staff
+    const groupContractorsByStaff = () => {
+        if (!contractorContracts || contractorContracts.length === 0) return {};
+        
+        const grouped: { [key: string]: any[] } = {};
+        
+        contractorContracts.forEach(contract => {
+            // Use staffId._id if it's populated, otherwise use staffId directly
+            const staffId = contract.staffId?._id || contract.staffId;
+            const staffKey = staffId ? staffId.toString() : 'unknown';
+            
+            if (!grouped[staffKey]) {
+                grouped[staffKey] = [];
+            }
+            grouped[staffKey].push(contract);
+        });
+        
+        return grouped;
+    };
+
+    // Helper function to toggle contractor expansion
+    const toggleContractorExpansion = (staffId: string) => {
+        const newExpanded = new Set(expandedContractors);
+        if (newExpanded.has(staffId)) {
+            newExpanded.delete(staffId);
+        } else {
+            newExpanded.add(staffId);
+        }
+        setExpandedContractors(newExpanded);
+    };
+
+    // Helper function to get staff display name
+    const getStaffDisplayName = (contract: any) => {
+        return contract.staffId
+            ? `${contract.staffId.firstName} ${contract.staffId.lastName}`
+            : 'Unknown Contractor';
+    };
+
     // Function to fetch all labor entries from API
     const fetchLaborEntries = async () => {
         try {
             setLoading(true);
-            console.log('📋 Fetching all labor entries - Project:', projectId);
+            console.log('📋 Fetching labor entries - Project:', projectId);
             
             const clientId = await getClientId();
             if (!clientId) {
                 throw new Error('Client ID not found');
             }
 
-            // Use apiClient for authenticated requests - fetch all entries
+            // ✅ Build API params with automatic contractor filtering
+            const apiParams: any = {
+                entityType: 'project',
+                entityId: projectId,
+                sectionId: sectionId
+            };
+
+            // ✅ AUTOMATIC CONTRACTOR FILTERING: Always filter by contractor's work if user is a contractor
+            const isContractor = !!(contractorId && userId);
+            
+            if (isContractor) {
+                // Always filter by userId for contractors - no toggle needed
+                apiParams.addedBy = userId;
+                console.log('🔍 Contractor detected - filtering by userId:', userId);
+            } else {
+                console.log('🔍 Non-contractor user - showing all entries');
+            }
+
+            console.log('📋 Final API Params:', apiParams);
+
+            // Use apiClient for authenticated requests
             const response = await apiClient.get(`/api/labor`, {
-                params: {
-                    entityType: 'project',
-                    entityId: projectId,
-                    sectionId: sectionId
-                }
+                params: apiParams
             });
 
             const result = response.data;
-            console.log('✅ Labor API response:', result);
+            console.log('✅ Labor API response success:', result.success);
+            console.log('✅ Raw labor entries count:', result?.data?.laborEntries?.length || 0);
 
             if (result.success && result.data) {
                 // Transform API response to match our Labor interface
-                const transformedEntries: Labor[] = (result.data.laborEntries || []).map((entry: any, index: number) => ({
-                    id: index + 1,
-                    _id: entry._id || `labor_${index}`,
-                    type: entry.type,
-                    category: entry.category,
-                    count: entry.count,
-                    perLaborCost: entry.perLaborCost,
-                    totalCost: entry.totalCost,
-                    date: entry.addedAt || entry.createdAt || new Date().toISOString(),
-                    icon: getLaborIconAndColor(entry.category).icon,
-                    color: getLaborIconAndColor(entry.category).color,
-                    sectionId: sectionId,
-                    miniSectionId: entry.miniSectionId,
-                    addedAt: entry.addedAt || entry.createdAt || new Date().toISOString(),
-                    createdAt: entry.createdAt || new Date().toISOString(),
-                    updatedAt: entry.updatedAt || new Date().toISOString()
-                }));
+                const transformedEntries: Labor[] = (result.data.laborEntries || []).map((entry: any, index: number) => {
+                    return {
+                        id: index + 1,
+                        _id: entry._id || `labor_${index}`,
+                        type: entry.type,
+                        category: entry.category,
+                        count: entry.count,
+                        perLaborCost: entry.perLaborCost,
+                        totalCost: entry.totalCost,
+                        date: entry.addedAt || entry.createdAt || new Date().toISOString(),
+                        icon: getLaborIconAndColor(entry.category).icon,
+                        color: getLaborIconAndColor(entry.category).color,
+                        sectionId: sectionId,
+                        miniSectionId: entry.miniSectionId,
+                        addedBy: entry.addedBy,
+                        addedAt: entry.addedAt || entry.createdAt || new Date().toISOString(),
+                        createdAt: entry.createdAt || new Date().toISOString(),
+                        updatedAt: entry.updatedAt || new Date().toISOString()
+                    };
+                });
 
-                console.log('📋 Total entries fetched:', transformedEntries.length);
-                setLaborEntries(transformedEntries);
+                console.log('📋 Transformed entries count:', transformedEntries.length);
+                console.log('📋 Contractor filtering applied:', isContractor);
+
+                // ✅ BACKUP CLIENT-SIDE FILTERING: Apply additional filtering if needed
+                let finalEntries = transformedEntries;
+                
+                // Only apply client-side filtering if we're a contractor and API didn't filter properly
+                if (isContractor && transformedEntries.length > 0) {
+                    const apiFilteredCorrectly = transformedEntries.every(entry => entry.addedBy === userId);
+                    
+                    if (!apiFilteredCorrectly) {
+                        console.log('⚠️ API filtering incomplete, applying client-side backup filter');
+                        finalEntries = transformedEntries.filter(entry => entry.addedBy === userId);
+                        console.log('📋 Client-side filtered entries:', finalEntries.length);
+                    } else {
+                        console.log('✅ API filtering worked correctly');
+                    }
+                }
+
+                setLaborEntries(finalEntries);
 
                 // Clear animations array completely before reinitializing
                 while (cardAnimations.length > 0) {
@@ -240,7 +331,7 @@ const LaborPage = () => {
                 }
                 
                 // Initialize fresh animations for all items
-                for (let i = 0; i < transformedEntries.length; i++) {
+                for (let i = 0; i < finalEntries.length; i++) {
                     cardAnimations.push(new Animated.Value(0));
                 }
 
@@ -282,7 +373,8 @@ const LaborPage = () => {
             'Waterproofing & Treatment Works': { icon: 'shield-outline', color: '#10B981' },
             'Site Management & Support Staff': { icon: 'people-outline', color: '#1E40AF' },
             'Equipment Operators': { icon: 'car-outline', color: '#7C2D12' },
-            'Security & Housekeeping': { icon: 'shield-checkmark-outline', color: '#374151' }
+            'Security & Housekeeping': { icon: 'shield-checkmark-outline', color: '#374151' },
+            'RCC contractor': { icon: 'grid-outline', color: '#475569' }
         };
 
         return categoryMap[category] || { icon: 'people-outline', color: '#6B7280' };
@@ -371,6 +463,69 @@ const LaborPage = () => {
         }
     };
 
+    const fetchContractorDetails = async () => {
+        if (!projectId || !userId) return;
+        try {
+            setLoadingContractorDetails(true);
+            console.log('🔍 Fetching contractor details for:', { projectId: projectId.slice(-6), userId: userId.slice(-6) });
+            
+            // Fetch ALL contractor records for this staff member in this project (including completed ones)
+            const res = await apiClient.get(`/api/contractor`, {
+                params: {
+                    projectId: projectId,
+                    staffId: userId,
+                    all: true,
+                    includeCompleted: true // Explicitly request completed contracts
+                }
+            });
+            
+            console.log('📋 Contractor API response:', {
+                success: (res.data as any)?.success,
+                dataType: typeof (res.data as any)?.data,
+                isArray: Array.isArray((res.data as any)?.data),
+                count: Array.isArray((res.data as any)?.data) ? (res.data as any).data.length : 1
+            });
+            
+            if ((res.data as any)?.success && (res.data as any)?.data) {
+                const data = (res.data as any).data;
+                const arr = Array.isArray(data) ? data : [data];
+                
+                console.log('✅ Contractor contracts found:', arr.length);
+                arr.forEach((contract: any, index: number) => {
+                    console.log(`   Contract ${index + 1}:`, {
+                        id: contract._id?.slice(-6),
+                        type: contract.contractType,
+                        status: contract.status,
+                        totalAmount: contract.totalAmount,
+                        totalPaid: contract.totalPaid,
+                        usedAmount: contract.usedAmount
+                    });
+                });
+                
+                setContractorContracts(arr);
+                if (arr.length > 0) {
+                    setContractorDetails(arr[0]);
+                }
+            } else {
+                console.log('⚠️ No contractor data in response');
+                setContractorContracts([]);
+                setContractorDetails(null);
+            }
+        } catch (err: any) {
+            console.error('❌ Error fetching contractor details:', err);
+            // Handle 404 gracefully - it just means no contractor record exists yet
+            if (err.response?.status === 404) {
+                console.log('📝 No contractor record found for this project/staff combination in labor.tsx');
+                setContractorContracts([]);
+                setContractorDetails(null);
+            } else {
+                console.error('Failed to fetch contractor details in labor.tsx:', err);
+            }
+        } finally {
+            setLoadingContractorDetails(false);
+        }
+    };
+
     // Function to load data
     const loadData = async () => {
         setLoading(true);
@@ -378,6 +533,9 @@ const LaborPage = () => {
         try {
             // Load labor entries from API
             await fetchLaborEntries();
+            if (contractorId && userId) {
+                await fetchContractorDetails();
+            }
         } catch (error) {
             console.error('Error loading data:', error);
         } finally {
@@ -427,12 +585,15 @@ const LaborPage = () => {
                     totalCost: entry.count * entry.perLaborCost,
                     notes: message || '',
                     workDate: new Date().toISOString(),
-                    status: 'active'
+                    status: 'active',
+                    description: entry.description || '',
+                    miniSectionId: entry.miniSectionId,
+                    miniSectionName: entry.miniSectionName
                 })),
                 entityType: 'project',
                 entityId: projectId,
                 sectionId: sectionId,
-                addedBy: clientId
+                addedBy: user?._id || clientId
             };
 
             console.log('Sending labor data to API:', requestData);
@@ -464,6 +625,7 @@ const LaborPage = () => {
                             count: entry.count,
                             perLaborCost: entry.perLaborCost,
                             totalCost: entry.count * entry.perLaborCost,
+                            description: entry.description || '',
                         })),
                         message
                     );
@@ -476,6 +638,9 @@ const LaborPage = () => {
 
                 // Refresh the labor entries list
                 await fetchLaborEntries();
+                if (contractorId && userId) {
+                    await fetchContractorDetails();
+                }
 
                 // Stop loading animation and show success
                 stopLoadingAnimation();
@@ -489,8 +654,9 @@ const LaborPage = () => {
                     const staffName = user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Staff Member';
                     const laborCount = laborEntries.length;
                     const totalValue = laborEntries.reduce((sum, entry) => sum + (entry.count * entry.perLaborCost), 0);
+                    const descriptions = laborEntries.map(entry => `${entry.type} (${entry.description || ''})`).join(', ');
                     
-                    const notificationDetails = `Added ${laborCount} labor ${laborCount === 1 ? 'entry' : 'entries'} worth ₹${totalValue.toLocaleString()}`;
+                    const notificationDetails = `Added ${laborCount} labor ${laborCount === 1 ? 'entry' : 'entries'} worth ₹${totalValue.toLocaleString()}. Work done: ${descriptions}`;
                     
                     const notificationSent = await sendProjectNotification({
                         projectId: projectId,
@@ -546,7 +712,7 @@ const LaborPage = () => {
 
     // Function to group labor entries by date with filtering
     const getGroupedByDate = () => {
-        // ✅ Apply mini-section filtering
+        // ✅ Apply mini-section filtering (contractor filtering now happens at API level)
         let filteredEntries = laborEntries;
         
         if (selectedMiniSection && isValidMongoId(selectedMiniSection)) {
@@ -626,6 +792,8 @@ const LaborPage = () => {
         console.log('   - projectName:', projectName);
         console.log('   - sectionId:', sectionId, '(type:', typeof sectionId, ', length:', sectionId?.length, ')');
         console.log('   - sectionName:', sectionName);
+        console.log('   - contractorId:', contractorId);
+        console.log('   - userId:', userId);
         console.log('   - sectionId is valid MongoDB ID?', sectionId?.length === 24);
         console.log('   - projectId is valid MongoDB ID?', projectId?.length === 24);
         console.log('🚀 ========== END COMPONENT MOUNT ==========\n');
@@ -636,14 +804,20 @@ const LaborPage = () => {
         return () => {
             isMountedRef.current = false;
         };
-    }, [projectId, sectionId]);
+    }, [projectId, sectionId, contractorId, userId]); // Added contractorId and userId as dependencies
 
     // ✅ ADD: useFocusEffect to refresh mini-sections when page comes into focus
     useFocusEffect(
         useCallback(() => {
             console.log('📱 Labor page focused - triggering mini-section refresh');
             setMiniSectionRefreshTrigger(prev => prev + 1);
-        }, [])
+            
+            // Also refresh contractor details when page comes into focus
+            if (contractorId && userId) {
+                console.log('🔄 Refreshing contractor details on focus');
+                fetchContractorDetails();
+            }
+        }, [contractorId, userId])
     );
     
     // ✅ COPY EXACT WORKING LOGIC FROM DETAILS.TSX
@@ -769,12 +943,6 @@ const LaborPage = () => {
                     setMiniSections(combinedMiniSections);
                     console.log('   ✅ Mini-sections state updated with', combinedMiniSections.length, 'sections');
                     
-                    // Auto-select first mini-section if none selected
-                    if (!selectedMiniSection && combinedMiniSections.length > 0) {
-                        setSelectedMiniSection(combinedMiniSections[0]._id);
-                        console.log('   ✅ Auto-selected first mini-section:', combinedMiniSections[0].name);
-                    }
-                    
                     // Load completion status after mini-sections are loaded
                     timeoutId = setTimeout(async () => {
                         if (isMountedRef.current && !isCancelled) {
@@ -796,12 +964,6 @@ const LaborPage = () => {
                     if (sections && Array.isArray(sections) && isMountedRef.current && !isCancelled) {
                         setMiniSections(sections);
                         console.log('   ✅ Fallback: Mini-sections state updated with', sections.length, 'sections');
-                        
-                        // Auto-select first mini-section if none selected
-                        if (!selectedMiniSection && sections.length > 0) {
-                            setSelectedMiniSection(sections[0]._id);
-                            console.log('   ✅ Fallback: Auto-selected first mini-section:', sections[0].name);
-                        }
                         
                         // Load completion status
                         timeoutId = setTimeout(async () => {
@@ -832,6 +994,21 @@ const LaborPage = () => {
     useEffect(() => {
         console.log('🔄 LABOR.TSX: miniSectionRefreshTrigger changed to:', miniSectionRefreshTrigger);
     }, [miniSectionRefreshTrigger]);
+
+    // ✅ Effect to refresh data when component mounts or key params change
+    useEffect(() => {
+        if (projectId && sectionId) {
+            console.log('🔄 LABOR.TSX: Loading data for:', {
+                projectId: projectId.slice(-6),
+                sectionId: sectionId.slice(-6),
+                isContractor: !!(contractorId && userId),
+                userId: userId?.slice(-6)
+            });
+            
+            // Load data whenever key parameters change
+            fetchLaborEntries();
+        }
+    }, [projectId, sectionId, contractorId, userId]);
 
     return (
         <SafeAreaView style={styles.container}>
@@ -871,6 +1048,7 @@ const LaborPage = () => {
                 sectionId={sectionId || ''}
                 onShowSectionPrompt={() => { }}
                 hideSection={true}
+                hideMenu={true}
                 onAddContractor={() => setShowLaborForm(true)}
                 isAddingContractor={isAddingLabor}
             />
@@ -912,6 +1090,9 @@ const LaborPage = () => {
                 sectionId={sectionId}
                 sectionName={sectionName}
                 miniSections={miniSections}
+                contractorId={contractorId || undefined}
+                contractorType={contractorType || undefined}
+                contractorContracts={contractorContracts}
             />
 
             <ScrollView
@@ -920,6 +1101,173 @@ const LaborPage = () => {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
             >
+                {/* Contractor Progress Cards - only shown when user is a contractor */}
+                {contractorId && contractorContracts && contractorContracts.length > 0 && (() => {
+                    const formatCurrencyLocal = (amount: number) =>
+                        new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
+                    
+                    const groupedContracts = groupContractorsByStaff();
+                    
+                    return Object.entries(groupedContracts).map(([staffId, contractGroup]) => {
+                        const isExpanded = expandedContractors.has(staffId);
+                        const firstContract = contractGroup[0];
+                        const staffName = getStaffDisplayName(firstContract);
+
+                        // Calculate totals for the staff member
+                        const totalBudget = contractGroup.reduce((sum, c) => sum + (c.totalAmount || 0), 0);
+                        const totalUsed = contractGroup.reduce((sum, c) => sum + (c.usedAmount || 0), 0);
+                        const totalPaid = contractGroup.reduce((sum, c) => sum + (c.totalPaid || 0), 0);
+                        const totalRemaining = totalBudget - totalUsed;
+                        const totalOutstanding = totalUsed - totalPaid;
+                        
+                        // Check if all contracts are completed
+                        const allCompleted = contractGroup.every(c => c.status === 'completed');
+                        const allFullyPaid = totalOutstanding <= 0 && totalUsed > 0;
+
+                        return (
+                            <View key={staffId} style={contractorProgressStyles.groupContainer}>
+                                {/* Staff Header */}
+                                <TouchableOpacity
+                                    style={contractorProgressStyles.staffHeader}
+                                    onPress={() => toggleContractorExpansion(staffId)}
+                                    activeOpacity={0.7}
+                                >
+                                    <View style={contractorProgressStyles.staffHeaderLeft}>
+                                        <View style={contractorProgressStyles.avatarContainer}>
+                                            <Text style={contractorProgressStyles.avatarText}>
+                                                {staffName.charAt(0).toUpperCase()}
+                                            </Text>
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                <Text style={contractorProgressStyles.staffName}>{staffName}</Text>
+                                                {allCompleted && (
+                                                    <View style={[contractorProgressStyles.statusBadge, contractorProgressStyles.statusCompleted]}>
+                                                        <Text style={[contractorProgressStyles.statusText, contractorProgressStyles.statusTextCompleted]}>
+                                                            COMPLETED
+                                                        </Text>
+                                                    </View>
+                                                )}
+                                                {allFullyPaid && (
+                                                    <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                                                )}
+                                            </View>
+                                            <Text style={contractorProgressStyles.contractCount}>
+                                                {contractGroup.length} Contract{contractGroup.length > 1 ? 's' : ''} • Total Budget: {formatCurrencyLocal(totalBudget)}
+                                            </Text>
+                                            {allCompleted && (
+                                                <Text style={{ fontSize: 11, color: allFullyPaid ? '#10B981' : '#F59E0B', fontWeight: '600', marginTop: 2 }}>
+                                                    {allFullyPaid ? 'All payments completed ✅' : `Outstanding: ${formatCurrencyLocal(totalOutstanding)}`}
+                                                </Text>
+                                            )}
+                                        </View>
+                                    </View>
+                                    <View style={contractorProgressStyles.staffHeaderRight}>
+                                        <View style={{ alignItems: 'flex-end' }}>
+                                            <Text style={contractorProgressStyles.totalUsedText}>{formatCurrencyLocal(totalUsed)} Used</Text>
+                                            <Text style={{ fontSize: 10, color: '#10B981', fontWeight: '600' }}>
+                                                {formatCurrencyLocal(totalPaid)} Paid
+                                            </Text>
+                                            {totalOutstanding > 0 && (
+                                                <Text style={{ fontSize: 10, color: '#EF4444', fontWeight: '600' }}>
+                                                    {formatCurrencyLocal(totalOutstanding)} Due
+                                                </Text>
+                                            )}
+                                        </View>
+                                        <Ionicons 
+                                            name={isExpanded ? "chevron-up" : "chevron-down"} 
+                                            size={20} 
+                                            color="#64748B" 
+                                        />
+                                    </View>
+                                </TouchableOpacity>
+
+                                {/* Expanded Contracts */}
+                                {isExpanded && (
+                                    <View style={contractorProgressStyles.expandedContracts}>
+                                        {contractGroup.map((contract: any, idx: number) => {
+                                            const totalAmount = contract.totalAmount || 0;
+                                            const usedAmount = contract.usedAmount || 0;
+                                            const totalPaid = contract.totalPaid || 0;
+                                            const remaining = totalAmount - usedAmount;
+                                            const outstandingPayment = usedAmount - totalPaid;
+                                            const percentUsed = totalAmount > 0 ? Math.min(100, Math.max(0, (usedAmount / totalAmount) * 100)) : 0;
+                                            const percentPaid = usedAmount > 0 ? Math.min(100, Math.max(0, (totalPaid / usedAmount) * 100)) : 0;
+                                            
+                                            let progressColor = '#10B981';
+                                            if (percentUsed > 85) progressColor = '#EF4444';
+                                            else if (percentUsed > 60) progressColor = '#F59E0B';
+
+                                            const contractStatus = contract.status || 'active';
+                                            const isCompleted = contractStatus === 'completed';
+                                            const isFullyPaid = totalPaid >= usedAmount && usedAmount > 0;
+
+                                            return (
+                                                <View key={contract._id || idx} style={[contractorProgressStyles.compactCard, { marginBottom: 12 }]}>
+                                                    {/* Compact Header with Budget */}
+                                                    <View style={contractorProgressStyles.compactHeader}>
+                                                        <View style={contractorProgressStyles.compactIconBox}>
+                                                            <Ionicons 
+                                                                name={isCompleted ? "checkmark-circle" : "wallet-outline"} 
+                                                                size={18} 
+                                                                color={isCompleted ? "#10B981" : "#3B82F6"} 
+                                                            />
+                                                        </View>
+                                                        <View style={{ flex: 1 }}>
+                                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                                    <Text style={contractorProgressStyles.compactTitle}>{contract.contractType}</Text>
+                                                                    <Text style={contractorProgressStyles.compactBudgetText}>
+                                                                        {formatCurrencyLocal(totalAmount)}
+                                                                    </Text>
+                                                                </View>
+                                                            </View>
+                                                        </View>
+                                                    </View>
+
+                                                    {/* Financial Summary - Work Done, Paid, Pending */}
+                                                    <View style={contractorProgressStyles.compactFinancialRow}>
+                                                        <View style={contractorProgressStyles.compactFinancialItem}>
+                                                            <Text style={contractorProgressStyles.compactFinancialLabel}>Work Done</Text>
+                                                            <Text style={[contractorProgressStyles.compactFinancialValue, { color: '#F59E0B' }]}>
+                                                                {formatCurrencyLocal(usedAmount)}
+                                                            </Text>
+                                                        </View>
+                                                        <View style={contractorProgressStyles.compactDivider} />
+                                                        <View style={contractorProgressStyles.compactFinancialItem}>
+                                                            <Text style={contractorProgressStyles.compactFinancialLabel}>Paid</Text>
+                                                            <Text style={[contractorProgressStyles.compactFinancialValue, { color: '#10B981' }]}>
+                                                                {formatCurrencyLocal(totalPaid)}
+                                                            </Text>
+                                                        </View>
+                                                        <View style={contractorProgressStyles.compactDivider} />
+                                                        <View style={contractorProgressStyles.compactFinancialItem}>
+                                                            <Text style={contractorProgressStyles.compactFinancialLabel}>Pending</Text>
+                                                            <Text style={[contractorProgressStyles.compactFinancialValue, { color: outstandingPayment > 0 ? '#DC2626' : '#10B981' }]}>
+                                                                {formatCurrencyLocal(Math.max(0, outstandingPayment))}
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+
+                                                    {/* Completion Status */}
+                                                    {isCompleted && (
+                                                        <View style={contractorProgressStyles.compactCompletionBanner}>
+                                                            <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                                                            <Text style={contractorProgressStyles.compactCompletionText}>
+                                                                {isFullyPaid ? 'Contract Completed & Fully Paid' : 'Contract Completed'}
+                                                            </Text>
+                                                        </View>
+                                                    )}
+                                                </View>
+                                            );
+                                        })}
+                                    </View>
+                                )}
+                            </View>
+                        );
+                    });
+                })()}
+
                 {/* Labor Entries Display */}
                 {loading ? (
                     <View style={styles.noMaterialsContainer}>
@@ -977,9 +1325,17 @@ const LaborPage = () => {
                 ) : (
                     <View style={styles.noMaterialsContainer}>
                         <Ionicons name="people-outline" size={64} color="#CBD5E1" />
-                        <Text style={styles.noMaterialsTitle}>No Labor Entries Found</Text>
+                        <Text style={styles.noMaterialsTitle}>
+                            {contractorId && userId 
+                                ? 'No Labor Entries Found for You' 
+                                : 'No Labor Entries Found'
+                            }
+                        </Text>
                         <Text style={styles.noMaterialsDescription}>
-                            No labor entries found for this section. Add some labor entries to get started.
+                            {contractorId && userId 
+                                ? 'No labor entries found that were added by you. Add some labor entries to get started.'
+                                : 'No labor entries found for this section. Add some labor entries to get started.'
+                            }
                         </Text>
                     </View>
                 )}
@@ -1410,6 +1766,309 @@ const modalStyles = StyleSheet.create({
         color: '#6B7280',
         textAlign: 'center',
         lineHeight: 20,
+    },
+});
+
+const contractorProgressStyles = StyleSheet.create({
+    card: {
+        backgroundColor: '#FFFFFF',
+        marginHorizontal: 16,
+        marginTop: 12,
+        marginBottom: 8,
+        borderRadius: 18,
+        padding: 20,
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+        shadowColor: '#3B82F6',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 4,
+    },
+    titleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    iconBox: {
+        width: 40,
+        height: 40,
+        backgroundColor: '#EBF5FF',
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    title: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#0F172A',
+        marginBottom: 2,
+    },
+    subtitle: {
+        fontSize: 11,
+        color: '#64748B',
+        fontWeight: '500',
+    },
+    remaining: {
+        fontSize: 16,
+        fontWeight: '700',
+        textAlign: 'right',
+    },
+    statsRow: {
+        flexDirection: 'row',
+        gap: 8,
+        marginBottom: 16,
+    },
+    statBox: {
+        flex: 1,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 10,
+        paddingVertical: 10,
+        paddingHorizontal: 8,
+        alignItems: 'center',
+    },
+    statLabel: {
+        fontSize: 9,
+        fontWeight: '700',
+        color: '#64748B',
+        letterSpacing: 0.6,
+        marginBottom: 4,
+    },
+    statValue: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#1E293B',
+    },
+    progressContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    progressTrack: {
+        flex: 1,
+        height: 8,
+        backgroundColor: '#E2E8F0',
+        borderRadius: 4,
+        overflow: 'hidden',
+    },
+    progressFill: {
+        height: '100%',
+        borderRadius: 4,
+    },
+    progressText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#64748B',
+        minWidth: 52,
+        textAlign: 'right',
+    },
+    
+    // Status Badge Styles
+    statusBadge: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    statusActive: {
+        backgroundColor: '#DCFCE7',
+    },
+    statusCompleted: {
+        backgroundColor: '#E0E7FF',
+    },
+    statusText: {
+        fontSize: 9,
+        fontWeight: '700',
+    },
+    statusTextActive: {
+        color: '#15803D',
+    },
+    statusTextCompleted: {
+        color: '#4338CA',
+    },
+    
+    // Completion Banner Styles
+    completionBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#ECFDF5',
+        borderRadius: 8,
+        padding: 12,
+        marginTop: 12,
+        gap: 8,
+        borderWidth: 1,
+        borderColor: '#D1FAE5',
+    },
+    completionText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#065F46',
+        flex: 1,
+    },
+    
+    // ── Grouped Contractor Styles ────────────────────────────────────
+    groupContainer: {
+        marginBottom: 16,
+        marginHorizontal: 16,
+    },
+    staffHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+        elevation: 2,
+        shadowColor: '#3B82F6',
+        shadowOpacity: 0.08,
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 4,
+    },
+    staffHeaderLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        marginRight: 12,
+    },
+    staffHeaderRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    avatarContainer: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#EFF6FF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    avatarText: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#2563EB',
+    },
+    staffName: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1E293B',
+    },
+    contractCount: {
+        fontSize: 13,
+        color: '#64748B',
+        marginTop: 2,
+    },
+    totalUsedText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#F59E0B',
+    },
+    expandedContracts: {
+        marginTop: 8,
+        paddingLeft: 8,
+    },
+    groupedCard: {
+        marginHorizontal: 0,
+        marginLeft: 8,
+        borderLeftWidth: 3,
+        borderLeftColor: '#3B82F6',
+    },
+    
+    // ── Compact Card Styles ────────────────────────────────────
+    compactCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 3,
+    },
+    compactHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    compactIconBox: {
+        width: 36,
+        height: 36,
+        backgroundColor: '#F1F5F9',
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    compactTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#1E293B',
+    },
+    compactBudgetText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#64748B',
+        backgroundColor: '#F1F5F9',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    compactStatusBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+    },
+    compactStatusText: {
+        fontSize: 10,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+    },
+    compactFinancialRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    compactFinancialItem: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    compactFinancialLabel: {
+        fontSize: 11,
+        color: '#64748B',
+        fontWeight: '500',
+        marginBottom: 2,
+    },
+    compactFinancialValue: {
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    compactDivider: {
+        width: 1,
+        height: 24,
+        backgroundColor: '#E2E8F0',
+        marginHorizontal: 8,
+    },
+    compactCompletionBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F0FDF4',
+        borderRadius: 8,
+        padding: 8,
+        marginTop: 8,
+        gap: 6,
+        borderWidth: 1,
+        borderColor: '#BBF7D0',
+    },
+    compactCompletionText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#15803D',
+        flex: 1,
     },
 });
 

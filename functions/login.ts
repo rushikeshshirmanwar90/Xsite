@@ -99,7 +99,7 @@ export const sendOtp = async (email: string, OTP: number): Promise<boolean> => {
     console.log("📧 Sending OTP email...");
     console.log("   Email:", email);
     console.log("   OTP:", OTP);
-    console.log("   URL:", `${domain}/api/otp`);
+    console.log("   URL:", `/api/otp`);
 
     const res = await apiClient.post<ApiResponse>(`/api/otp`, {
       email: email,
@@ -170,7 +170,7 @@ export const login = async (email: string, password: string): Promise<{ success:
   try {
     console.log('🌐 LOGIN API CALL:');
     console.log('  - Email:', email);
-    console.log('  - URL:', `${domain}/api/login`);
+    console.log('  - URL:', `/api/login`);
     
     const res = await apiClient.post<ApiResponse>(`/api/login`, {
       email,
@@ -249,7 +249,7 @@ export const forgetPassword = async (email: string, userType: string): Promise<{
     console.log("\n========================================");
     console.log("FORGET PASSWORD API CALL");
     console.log("========================================");
-    console.log("API Endpoint:", `${domain}/api/forget-password`);
+    console.log("API Endpoint:", `/api/forget-password`);
     console.log("Payload:", JSON.stringify(payload, null, 2));
     console.log("Email:", email);
     console.log("UserType:", userType);

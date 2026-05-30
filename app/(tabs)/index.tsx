@@ -407,46 +407,147 @@ const Index: React.FC = () => {
     }, [clientId]);
 
     const handleViewDetails = (project: Project) => {
-        console.log('Navigating to project:', project._id);
+        console.log('🔍 [DEBUG] handleViewDetails called with project:', {
+            projectId: project._id,
+            projectName: project.name,
+            sectionsRaw: project.section,
+            sectionsLength: (project.section || []).length,
+            sectionsData: (project.section || []).map(s => ({
+                id: s._id || s.sectionId,
+                name: s.name
+            }))
+        });
 
         const sections = project.section || [];
 
-        // If only one section, navigate directly to details
-        if (sections.length === 1) {
-            const section = sections[0];
-            router.push({
-                pathname: '/details',
-                params: {
-                    projectId: project._id ?? '',
-                    projectName: project.name,
-                    sectionId: section._id || section.sectionId,  // ✅ FIXED: Use _id first (MongoDB document ID)
-                    sectionName: section.name
-                    // ✅ OPTIMIZED: Removed material data - will be fetched in details page
-                }
+        const proceedWithStandardViewDetails = (proj: Project) => {
+            const secs = proj.section || [];
+            if (secs.length === 1) {
+                const section = secs[0];
+                router.push({
+                    pathname: '/details',
+                    params: {
+                        projectId: proj._id ?? '',
+                        projectName: proj.name,
+                        sectionId: section._id || section.sectionId,
+                        sectionName: section.name
+                    }
+                });
+            } else if (secs.length > 1) {
+                router.push({
+                    pathname: '/project-sections',
+                    params: {
+                        id: proj._id ?? '',
+                        name: proj.name,
+                        sectionData: JSON.stringify(secs)
+                    }
+                });
+            } else {
+                router.push({
+                    pathname: '/project-sections',
+                    params: {
+                        id: proj._id ?? '',
+                        name: proj.name,
+                        sectionData: JSON.stringify([])
+                    }
+                });
+            }
+        };
+
+        // Check if user is staff and has contractor status under this project's client
+        const projClientId = typeof project.clientId === 'object'
+            ? (project.clientId?._id?.toString() || project.clientId?.toString())
+            : project.clientId?.toString();
+
+        const clientAssignment = (user as any)?.clients?.find(
+            (c: any) => c.clientId?.toString() === projClientId
+        );
+
+        console.log('🔍 [DEBUG] User and contractor detection:', {
+            isStaff,
+            userId: user?._id,
+            projClientId,
+            userHasClients: !!(user as any)?.clients,
+            userClientsCount: (user as any)?.clients?.length || 0,
+            clientAssignmentFound: !!clientAssignment,
+            isContractorFlag: clientAssignment?.isContractor
+        });
+
+        if (isStaff && clientAssignment?.isContractor && user?._id) {
+            console.log(`📡 Staff user is contractor for client ${projClientId}. Fetching details...`);
+            console.log(`🔍 [DEBUG] Sections data:`, {
+                sectionsLength: sections.length,
+                sections: sections.map(s => ({
+                    id: s._id || s.sectionId,
+                    name: s.name
+                }))
             });
-        } else if (sections.length > 1) {
-            // Multiple sections - show section selection page
-            router.push({
-                pathname: '/project-sections',
-                params: {
-                    id: project._id ?? '',
-                    name: project.name,
-                    sectionData: JSON.stringify(sections)
-                    // ✅ OPTIMIZED: Removed material data - will be fetched when needed
-                }
-            });
-        } else {
-            // No sections - show section selection with empty state
-            router.push({
-                pathname: '/project-sections',
-                params: {
-                    id: project._id ?? '',
-                    name: project.name,
-                    sectionData: JSON.stringify([])
-                    // ✅ OPTIMIZED: Removed material data - will be fetched when needed
-                }
-            });
+            
+            apiClient.get(`/api/contractor?projectId=${project._id}&staffId=${user._id}`)
+                .then((res: any) => {
+                    if (res.data?.success && res.data?.data) {
+                        const contractor = res.data.data;
+                        
+                        console.log(`🔍 [DEBUG] Contractor data:`, {
+                            contractorId: contractor._id,
+                            contractorSectionId: contractor.sectionId,
+                            contractorType: contractor.contractType
+                        });
+
+                        // ✅ SECTION COUNT CHECK: Direct to labor for single section, section picker for multiple
+                        if (sections.length <= 1) {
+                            // Single section (or no sections) — go directly to labor.tsx
+                            const defaultSec = sections.length > 0 ? sections[0] : null;
+                            const secId = defaultSec?._id || defaultSec?.sectionId || 'no-section';
+                            const secName = defaultSec?.name || 'General';
+
+                            console.log(`🚀 Single section — redirecting contractor directly to labor.tsx`);
+                            router.push({
+                                pathname: '/labor',
+                                params: {
+                                    projectId: project._id ?? '',
+                                    projectName: project.name,
+                                    sectionId: secId,
+                                    sectionName: secName,
+                                    contractorId: contractor._id,
+                                    contractorType: contractor.contractType,
+                                    userId: user._id,
+                                }
+                            });
+                        } else {
+                            // Multiple sections — contractor MUST pick a section first
+                            console.log(`📋 Multiple sections (${sections.length}) — showing section picker for contractor`);
+                            router.push({
+                                pathname: '/project-sections',
+                                params: {
+                                    id: project._id ?? '',
+                                    name: project.name,
+                                    sectionData: JSON.stringify(sections),
+                                    contractorId: contractor._id,
+                                    contractorType: contractor.contractType,
+                                    userId: user._id,
+                                }
+                            });
+                        }
+
+                    } else {
+                        console.log('📝 No contractor details found, proceeding with standard view');
+                        proceedWithStandardViewDetails(project);
+                    }
+                })
+                .catch((err) => {
+                    // Handle 404 gracefully - it just means no contractor record exists yet
+                    if (err.response?.status === 404) {
+                        console.log('📝 No contractor record found for this project/staff combination, proceeding with standard view');
+                    } else {
+                        console.error('Error fetching contractor details:', err);
+                    }
+                    proceedWithStandardViewDetails(project);
+                });
+            return;
         }
+
+        proceedWithStandardViewDetails(project);
     };
 
     // Handle pin toggle for projects
@@ -567,6 +668,21 @@ const Index: React.FC = () => {
                     >
                         <Ionicons name="notifications" size={22} color="#1F2937" />
                     </TouchableOpacity>
+                </View>
+            )}
+
+            {/* Header - Show for staff users */}
+            {isStaff && (
+                <View style={styles.fixedHeader}>
+                    <View style={styles.userInfo}>
+                        <View style={styles.avatarContainer}>
+                            <Text style={styles.avatarText}>{generateInitials(userName)}</Text>
+                        </View>
+                        <View style={styles.userDetails}>
+                            <Text style={styles.userName}>{userName}</Text>
+                            <Text style={styles.userSubtitle}>Staff Portal</Text>
+                        </View>
+                    </View>
                 </View>
             )}
 

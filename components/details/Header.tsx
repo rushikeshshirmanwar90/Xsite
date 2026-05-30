@@ -30,6 +30,8 @@ interface HeaderProps {
     onContractorPress?: () => void;
     onEquipmentPress?: () => void;
     onOtherCostPress?: () => void;
+    onLaborPress?: () => void;
+    hideMenu?: boolean;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -55,11 +57,15 @@ const Header: React.FC<HeaderProps> = ({
     onContractorPress,
     onEquipmentPress,
     onOtherCostPress,
+    onLaborPress,
+    hideMenu = false,
 }) => {
     // State to store fetched sections
     const [sections, setSections] = useState<Section[]>([]);
     // State for menu visibility
     const [showMenu, setShowMenu] = useState(false);
+
+    const hasMenuItems = !!(onContractorPress || onLaborPress || onEquipmentPress || onOtherCostPress || onToggleSectionCompletion);
 
     // Get the building/main section name from selectedSection
     const getBuildingName = () => {
@@ -179,13 +185,15 @@ const Header: React.FC<HeaderProps> = ({
                     )}
 
                     {/* Three Dot Menu Button */}
-                    <TouchableOpacity
-                        style={menuStyles.menuButton}
-                        onPress={() => setShowMenu(true)}
-                        activeOpacity={0.7}
-                    >
-                        <Ionicons name="ellipsis-vertical" size={20} color="#374151" />
-                    </TouchableOpacity>
+                    {!hideMenu && hasMenuItems && (
+                        <TouchableOpacity
+                            style={menuStyles.menuButton}
+                            onPress={() => setShowMenu(true)}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons name="ellipsis-vertical" size={20} color="#374151" />
+                        </TouchableOpacity>
+                    )}
                 </View>
             </View>
 
@@ -214,6 +222,21 @@ const Header: React.FC<HeaderProps> = ({
                             >
                                 <Ionicons name="people-outline" size={20} color="#374151" />
                                 <Text style={menuStyles.menuItemText}>Add Contractor</Text>
+                            </TouchableOpacity>
+                        )}
+
+                        {/* Labor Option */}
+                        {onLaborPress && (
+                            <TouchableOpacity
+                                style={menuStyles.menuItem}
+                                onPress={() => {
+                                    setShowMenu(false);
+                                    onLaborPress();
+                                }}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="people-circle" size={20} color="#374151" />
+                                <Text style={menuStyles.menuItemText}>Manage Labor</Text>
                             </TouchableOpacity>
                         )}
 

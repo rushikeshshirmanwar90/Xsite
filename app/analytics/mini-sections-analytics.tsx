@@ -41,6 +41,21 @@ interface BuildingLaborExpense {
   totalCost: number;
 }
 
+interface OtherCostExpense {
+  _id: string;
+  title: string;
+  totalCost: number;
+}
+
+interface OtherCostDetail {
+  _id: string;
+  title: string;
+  description?: string;
+  amount: number;
+  addedByName?: string;
+  date?: string;
+}
+
 const MiniSectionsAnalytics: React.FC = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -59,6 +74,8 @@ const MiniSectionsAnalytics: React.FC = () => {
   const [miniSections, setMiniSections] = useState<MiniSectionExpense[]>([]);
   const [equipmentExpenses, setEquipmentExpenses] = useState<EquipmentExpense[]>([]);
   const [buildingLaborExpenses, setBuildingLaborExpenses] = useState<BuildingLaborExpense[]>([]);
+  const [otherCostExpenses, setOtherCostExpenses] = useState<OtherCostExpense[]>([]);
+  const [otherCostDetails, setOtherCostDetails] = useState<OtherCostDetail[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -446,6 +463,58 @@ const MiniSectionsAnalytics: React.FC = () => {
         }
       }
 
+      // ========== OTHER COST PROCESSING ==========
+      console.log('\n💵 ========== OTHER COST PROCESSING ==========');
+      let sectionOtherCosts: OtherCostExpense[] = [];
+      let sectionOtherCostDetails: OtherCostDetail[] = [];
+      try {
+        const otherCostResponse = await apiClient.get(`/api/otherCost`, {
+          params: {
+            entityType: 'project',
+            entityId: projectId,
+            useStandalone: true,
+          },
+        });
+        if (otherCostResponse.data?.success) {
+          const entries = otherCostResponse.data?.data?.otherCostEntries || [];
+          console.log('   - Other cost entries from API (project-wide):', entries.length);
+
+          // Keep only active (non-cancelled) entries belonging to the current section
+          const activeEntries = entries.filter(
+            (entry: any) => entry.status !== 'cancelled' &&
+                            entry.sectionId &&
+                            sectionAliases.includes(String(entry.sectionId))
+          );
+
+          // Per-entry details (for the detailed list)
+          sectionOtherCostDetails = activeEntries.map((entry: any) => ({
+            _id: String(entry._id),
+            title: entry.title || 'Other Cost',
+            description: entry.description || '',
+            amount: entry.amount ?? entry.totalCost ?? 0,
+            addedByName: entry.addedByName || '',
+            date: entry.addedAt || entry.createdAt || '',
+          }));
+
+          // Grouped by title (for the pie slice + total)
+          const groups: { [key: string]: number } = {};
+          activeEntries.forEach((entry: any) => {
+            const key = entry.title || 'Other Cost';
+            groups[key] = (groups[key] || 0) + (entry.amount ?? entry.totalCost ?? 0);
+          });
+          sectionOtherCosts = Object.entries(groups).map(([title, totalCost]) => ({
+            _id: `other_cost_${title.replace(/\s+/g, '_')}`,
+            title,
+            totalCost,
+          }));
+
+          console.log('   - Active section other cost entries:', sectionOtherCostDetails.length);
+          console.log('   - Grouped section other cost titles:', sectionOtherCosts.length);
+        }
+      } catch (ocError) {
+        console.warn('⚠️ Could not fetch other costs:', ocError);
+      }
+
       // ========== BUILDING-LEVEL LABOR PROCESSING ==========
       console.log('\n👷 ========== BUILDING-LEVEL LABOR PROCESSING ==========');
       console.log('   - Starting building-level labor separation...');
@@ -665,12 +734,10 @@ const MiniSectionsAnalytics: React.FC = () => {
       console.log('🔍 ================================================\n');
       
       setMiniSections(activeMiniSections);
-      
-      // Set equipment expenses separately
       setEquipmentExpenses(sectionEquipmentCosts);
-      
-      // Set building-level labor expenses separately
       setBuildingLaborExpenses(buildingLaborCosts);
+      setOtherCostExpenses(sectionOtherCosts);
+      setOtherCostDetails(sectionOtherCostDetails);
 
       // Animate
       Animated.timing(fadeAnim, {
@@ -688,8 +755,9 @@ const MiniSectionsAnalytics: React.FC = () => {
   const totalMiniSectionExpense = miniSections.reduce((sum, ms) => sum + ms.totalExpense, 0);
   const totalEquipmentExpense = equipmentExpenses.reduce((sum, eq) => sum + eq.totalCost, 0);
   const totalBuildingLaborExpense = buildingLaborExpenses.reduce((sum, labor) => sum + labor.totalCost, 0);
-  const totalExpense = totalMiniSectionExpense + totalEquipmentExpense + totalBuildingLaborExpense;
-  
+  const totalOtherCostExpense = otherCostExpenses.reduce((sum, oc) => sum + oc.totalCost, 0);
+  const totalExpense = totalMiniSectionExpense + totalEquipmentExpense + totalBuildingLaborExpense + totalOtherCostExpense;
+
   const totalUsedMaterials = miniSections.reduce((sum, ms) => sum + ms.usedMaterialsCost, 0);
   const totalAvailableMaterials = miniSections.reduce((sum, ms) => sum + ms.availableMaterialsCost, 0);
   const totalLaborCost = miniSections.reduce((sum, ms) => sum + ms.laborCost, 0) + totalBuildingLaborExpense;
@@ -737,7 +805,22 @@ const MiniSectionsAnalytics: React.FC = () => {
     description: `Building-Level Labor Costs`,
   }] : [];
 
-  const pieData = [...miniSectionPieData, ...equipmentPieData, ...buildingLaborPieData];
+  // Other cost slice
+  const otherCostColorIndex = miniSections.length + (totalEquipmentExpense > 0 ? 1 : 0) + (totalBuildingLaborExpense > 0 ? 1 : 0);
+  const otherCostPieData = totalOtherCostExpense > 0 ? [{
+    key: 'other_cost_total',
+    value: totalOtherCostExpense,
+    svg: {
+      fill: colors[otherCostColorIndex % colors.length].primary,
+      gradientId: `gradient_other_cost_total`,
+    },
+    name: 'Other Cost',
+    formattedBudget: formatCurrency(totalOtherCostExpense),
+    percentage: ((totalOtherCostExpense / totalExpense) * 100).toFixed(1),
+    description: `${otherCostExpenses.length} other cost entr${otherCostExpenses.length === 1 ? 'y' : 'ies'}`,
+  }] : [];
+
+  const pieData = [...miniSectionPieData, ...equipmentPieData, ...buildingLaborPieData, ...otherCostPieData];
 
   // Create legend data with separators
   const miniSectionLegendData: LegendItem[] = miniSectionPieData.map((item, index) => ({
@@ -767,6 +850,57 @@ const MiniSectionsAnalytics: React.FC = () => {
     description: item.description,
   }));
 
+  const otherCostLegendData: LegendItem[] = otherCostPieData.map((item) => ({
+    key: item.key,
+    name: item.name,
+    value: item.formattedBudget,
+    percentage: item.percentage,
+    color: colors[otherCostColorIndex % colors.length].primary,
+    description: item.description,
+  }));
+
+  // ===== Other Cost Analysis (dedicated section) — break down by individual title =====
+  const otherCostBreakdownPieData = [...otherCostExpenses]
+    .filter((oc) => oc.totalCost > 0)
+    .sort((a, b) => b.totalCost - a.totalCost)
+    .map((oc, index) => ({
+      key: oc._id,
+      value: oc.totalCost,
+      svg: {
+        fill: colors[index % colors.length].primary,
+        gradientId: `gradient_oc_breakdown_${oc._id}`,
+      },
+      name: oc.title,
+      formattedBudget: formatCurrency(oc.totalCost),
+      percentage: totalOtherCostExpense > 0
+        ? ((oc.totalCost / totalOtherCostExpense) * 100).toFixed(1)
+        : '0',
+      description: '',
+    }));
+
+  const otherCostBreakdownLegendData: LegendItem[] = otherCostBreakdownPieData.map((item, index) => ({
+    key: item.key,
+    name: item.name,
+    value: item.formattedBudget,
+    percentage: item.percentage,
+    color: colors[index % colors.length].primary,
+    description: item.description,
+  }));
+
+  // Navigate to the dedicated Other Cost Analysis page
+  const handleViewOtherCostAnalysis = () => {
+    router.push({
+      pathname: '/analytics/other-cost-analytics',
+      params: {
+        projectId,
+        projectName,
+        sectionId,
+        sectionName,
+        otherCosts: JSON.stringify(otherCostDetails),
+      },
+    });
+  };
+
   const legendData: LegendItem[] = pieData.map((item, index) => ({
     key: item.key,
     name: item.name,
@@ -792,6 +926,12 @@ const MiniSectionsAnalytics: React.FC = () => {
       return;
     }
     
+    // Other cost slice — navigate to dedicated Other Cost Analysis page
+    if (miniSectionId === 'other_cost_total') {
+      handleViewOtherCostAnalysis();
+      return;
+    }
+
     // Handle building-level labor click - navigate to dedicated page
     if (miniSectionId === 'building_labor_total') {
       router.push({
@@ -857,7 +997,7 @@ const MiniSectionsAnalytics: React.FC = () => {
         </View>
 
         {/* Material, Equipment & Labor Breakdown Stats */}
-        {(totalUsedMaterials > 0 || totalAvailableMaterials > 0 || totalEquipmentExpense > 0 || totalLaborCost > 0) && (
+        {(totalUsedMaterials > 0 || totalAvailableMaterials > 0 || totalEquipmentExpense > 0 || totalLaborCost > 0 || totalOtherCostExpense > 0) && (
           <View style={styles.breakdownStatsSection}>
             <View style={styles.breakdownStatBox}>
               <View style={styles.breakdownStatItem}>
@@ -887,6 +1027,17 @@ const MiniSectionsAnalytics: React.FC = () => {
                   <Text style={styles.breakdownStatValue}>{formatCurrency(totalLaborCost)}</Text>
                 </View>
               </View>
+              {totalOtherCostExpense > 0 && (
+                <View style={styles.breakdownStatItem}>
+                  <View style={styles.breakdownStatIconContainer}>
+                    <Ionicons name="receipt-outline" size={18} color="#8B5CF6" />
+                  </View>
+                  <View style={styles.breakdownStatInfo}>
+                    <Text style={styles.breakdownStatLabel}>Other Costs</Text>
+                    <Text style={styles.breakdownStatValue}>{formatCurrency(totalOtherCostExpense)}</Text>
+                  </View>
+                </View>
+              )}
             </View>
           </View>
         )}
@@ -896,7 +1047,7 @@ const MiniSectionsAnalytics: React.FC = () => {
             <ActivityIndicator size="large" color="#3B82F6" />
             <Text style={styles.loadingText}>Loading mini-section expenses...</Text>
           </View>
-        ) : (miniSections.length === 0 && equipmentExpenses.length === 0 && buildingLaborExpenses.length === 0) || totalExpense === 0 ? (
+        ) : (miniSections.length === 0 && equipmentExpenses.length === 0 && buildingLaborExpenses.length === 0 && otherCostExpenses.length === 0) || totalExpense === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="grid-outline" size={64} color="#CBD5E1" />
             <Text style={styles.emptyTitle}>No Expenses Found</Text>
@@ -1067,9 +1218,57 @@ const MiniSectionsAnalytics: React.FC = () => {
                   ))}
                 </View>
               )}
+
+              {/* Other Cost Legend (total slice only) */}
+              {otherCostLegendData.length > 0 && (
+                <>
+                  {(miniSectionLegendData.length > 0 || equipmentLegendData.length > 0 || buildingLaborLegendData.length > 0) && (
+                    <View style={styles.legendSeparator}>
+                      <View style={styles.legendSeparatorLine} />
+                      <Text style={styles.legendSeparatorText}>Other Cost</Text>
+                      <View style={styles.legendSeparatorLine} />
+                    </View>
+                  )}
+                  <View style={styles.legendSection}>
+                    {otherCostLegendData.map((item) => (
+                      <TouchableOpacity
+                        key={item.key}
+                        style={styles.legendItem}
+                        onPress={() => handleMiniSectionPress(item.key, item.name)}
+                      >
+                        <View style={[styles.legendColorIndicator, { backgroundColor: item.color }]} />
+                        <View style={styles.legendTextContainer}>
+                          <View style={styles.legendMainInfo}>
+                            <Text style={styles.legendItemName} numberOfLines={1}>
+                              {item.name}
+                            </Text>
+                            <Text style={styles.legendItemValue}>
+                              {item.value}
+                              {item.percentage && (
+                                <Text style={styles.legendPercentageText}>
+                                  {' '}({item.percentage}%)
+                                </Text>
+                              )}
+                            </Text>
+                          </View>
+                          {item.description && (
+                            <View style={styles.legendDescriptionContainer}>
+                              <Text style={styles.legendItemDescription} numberOfLines={2}>
+                                {item.description}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
             </View>
           </Animated.View>
         )}
+
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -1482,5 +1681,93 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
+  },
+  // Other Cost Details Styles
+  otherCostHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  otherCostHeaderIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#F5F3FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  otherCostHeaderTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  otherCostHeaderSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  otherCostViewAll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: '#F5F3FF',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+  },
+  otherCostViewAllText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#8B5CF6',
+  },
+  otherCostItem: {
+    backgroundColor: '#FAFAFC',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#EEF1F6',
+  },
+  otherCostItemTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  otherCostItemTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1E293B',
+    flex: 1,
+    marginRight: 8,
+  },
+  otherCostItemAmount: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#8B5CF6',
+  },
+  otherCostItemDescription: {
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: 4,
+    lineHeight: 18,
+  },
+  otherCostItemMeta: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
+    marginTop: 8,
+  },
+  otherCostMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  otherCostMetaText: {
+    fontSize: 11,
+    color: '#94A3B8',
+    fontWeight: '500',
   },
 });

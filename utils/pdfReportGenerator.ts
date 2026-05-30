@@ -15,18 +15,20 @@ interface MaterialActivity {
     projectName?: string;
     sectionName?: string;
     miniSectionName?: string;
+    contractor_name?: string; // ✅ FIXED: Vendor/contractor name at activity level
     materials: Array<{
         name: string;
         unit: string;
         specs?: Record<string, any>;
         qnt: number;
-        perUnitCost: number; // ✅ UPDATED: Use perUnitCost instead of cost
-        totalCost: number;   // ✅ UPDATED: Add totalCost field
+        perUnitCost?: number; // ✅ UPDATED: Use perUnitCost instead of cost
+        totalCost?: number;   // ✅ UPDATED: Add totalCost field
         cost?: number;       // ✅ LEGACY: Keep for backward compatibility
+        contractor_name?: string; // ✅ FIXED: Vendor/contractor name at material level
     }>;
     message?: string;
     activity: 'imported' | 'used' | 'transferred';
-    date: string;
+    date?: string;
     transferDetails?: {
         fromProject: { id: string; name: string };
         toProject: { id: string; name: string };
@@ -46,12 +48,19 @@ export class PDFReportGenerator {
         this.userData = userData;
     }
 
+    private getLocalDateString(date: Date): string {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
     // Group activities by date
     private groupActivitiesByDate(activities: MaterialActivity[]): GroupedActivities {
         const grouped: GroupedActivities = {};
         
         activities.forEach(activity => {
-            const date = new Date(activity.date).toISOString().split('T')[0]; // YYYY-MM-DD format
+            const date = new Date(activity.date || new Date()).toISOString().split('T')[0]; // YYYY-MM-DD format
             if (!grouped[date]) {
                 grouped[date] = [];
             }
@@ -94,6 +103,24 @@ export class PDFReportGenerator {
                 grouped[date] = [];
             }
             grouped[date].push(equipment);
+        });
+
+        return grouped;
+    }
+
+    // Group other cost data by date
+    private groupOtherCostsByDate(otherCostData: any[]): { [date: string]: any[] } {
+        const grouped: { [date: string]: any[] } = {};
+        
+        (otherCostData || []).forEach(oc => {
+            const dateStr = oc.date || oc.addedAt || oc.createdAt;
+            if (!dateStr) return; // Skip if no date
+            
+            const date = new Date(dateStr).toISOString().split('T')[0]; // YYYY-MM-DD format
+            if (!grouped[date]) {
+                grouped[date] = [];
+            }
+            grouped[date].push(oc);
         });
 
         return grouped;
@@ -192,6 +219,11 @@ export class PDFReportGenerator {
                             </tr>
                         </tfoot>
                     </table>
+                    ${labor.description ? `
+                    <div style="padding: 10px 12px; background-color: #fdfaf2; border-top: 1px solid #e2e8f0; font-size: 12px; color: #4b5563;">
+                        <strong>Work done:</strong> ${labor.description}
+                    </div>
+                    ` : ''}
                 </div>
             `;
         }).join('');
@@ -296,6 +328,46 @@ export class PDFReportGenerator {
                             </tr>
                         </tfoot>
                     </table>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Generate other costs HTML
+    private generateOtherCostsHTML(otherCosts: any[]): string {
+        if (!otherCosts || otherCosts.length === 0) return '';
+
+        return otherCosts.map(oc => {
+            const name = oc.title || oc.name || 'Other Cost';
+            const amount = oc.amount ?? oc.totalCost ?? 0;
+            const description = oc.description || '';
+            const sectionName = oc.sectionName || '';
+
+            return `
+                <div style="margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                    <div style="background-color: #faf5ff; padding: 12px; border-bottom: 1px solid #e2e8f0;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <span style="background-color: #8b5cf6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
+                                    💸 OTHER COST
+                                </span>
+                                <span style="margin-left: 10px; font-weight: 600; color: #374151;">
+                                    ${name}
+                                </span>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 16px; font-weight: bold; color: #8b5cf6;">
+                                    ${this.formatCurrency(amount)}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    ${description || sectionName ? `
+                    <div style="padding: 10px 12px; background-color: #fffbeb; font-size: 12px; color: #4b5563;">
+                        ${sectionName ? `<strong>Section:</strong> ${sectionName}<br/>` : ''}
+                        ${description ? `<strong>Description:</strong> ${description}` : ''}
+                    </div>
+                    ` : ''}
                 </div>
             `;
         }).join('');
@@ -456,6 +528,16 @@ export class PDFReportGenerator {
                                 <span style="margin-left: 10px; font-weight: 600; color: #374151;">
                                     ${activity.user.fullName}
                                 </span>
+                                ${isImported && (() => {
+                                    // Check activity-level contractor_name first, then scan all materials
+                                    const vendorName = activity.contractor_name || 
+                                        activity.materials.find(m => m.contractor_name)?.contractor_name || '';
+                                    return vendorName ? `
+                                        <span style="margin-left: 10px; font-size: 12px; color: #059669; font-weight: 600; background-color: #d1fae5; padding: 3px 8px; border-radius: 4px; border: 1px solid #34d399; display: inline-flex; align-items: center; vertical-align: middle;">
+                                            🏢 Vendor: ${vendorName}
+                                        </span>
+                                    ` : '';
+                                })()}
                             </div>
                             
                             ${isUsed && hasLocationDetails ? `
@@ -525,7 +607,7 @@ export class PDFReportGenerator {
     }
 
     // ✅ NEW: Generate comprehensive summary page with aggregated costs
-    private generateSummaryPage(activities: MaterialActivity[], laborData: any[], equipmentData: any[]): string {
+    private generateSummaryPage(activities: MaterialActivity[], laborData: any[], equipmentData: any[], otherCostData?: any[]): string {
         console.log('📊 ========================================');
         console.log('📊 GENERATING COMPREHENSIVE SUMMARY PAGE');
         console.log('📊 ========================================');
@@ -533,20 +615,10 @@ export class PDFReportGenerator {
         console.log('  - Activities count:', activities.length);
         console.log('  - Labor data count:', laborData.length);
         console.log('  - Equipment data count:', equipmentData.length);
-        
-        // Log sample data for debugging
-        if (activities.length > 0) {
-            console.log('📊 Sample activity:', JSON.stringify(activities[0], null, 2));
-        }
-        if (laborData.length > 0) {
-            console.log('📊 Sample labor:', JSON.stringify(laborData[0], null, 2));
-        }
-        if (equipmentData.length > 0) {
-            console.log('📊 Sample equipment:', JSON.stringify(equipmentData[0], null, 2));
-        }
+        console.log('  - Other cost count:', otherCostData?.length || 0);
         
         // Aggregate materials by name
-        const materialMap = new Map<string, { quantity: number; unit: string; totalCost: number }>();
+        const materialMap = new Map<string, { quantity: number; unit: string; totalCost: number; vendor: string }>();
         
         console.log('📊 Processing materials...');
         activities.forEach((activity, idx) => {
@@ -555,7 +627,7 @@ export class PDFReportGenerator {
             // Include ALL materials (imported, used, transferred) for comprehensive summary
             activity.materials.forEach(material => {
                 const key = material.name;
-                const existing = materialMap.get(key) || { quantity: 0, unit: material.unit, totalCost: 0 };
+                const existing = materialMap.get(key) || { quantity: 0, unit: material.unit, totalCost: 0, vendor: '' };
                 
                 let materialCost = 0;
                 if (material.totalCost !== undefined) {
@@ -572,12 +644,28 @@ export class PDFReportGenerator {
                     }
                 }
                 
-                console.log(`    - ${material.name}: qty=${material.qnt}, cost=${materialCost}`);
+                let vendorName = existing.vendor;
+                if (activity.activity === 'imported') {
+                    // Check activity-level contractor_name first, then scan all materials
+                    const currentVendor = activity.contractor_name || 
+                        activity.materials.find(m => m.contractor_name)?.contractor_name || 
+                        material.contractor_name || '';
+                    if (currentVendor) {
+                        if (!vendorName) {
+                            vendorName = currentVendor;
+                        } else if (!vendorName.includes(currentVendor)) {
+                            vendorName = `${vendorName}, ${currentVendor}`;
+                        }
+                    }
+                }
+
+                console.log(`    - ${material.name}: qty=${material.qnt}, cost=${materialCost}, vendor=${vendorName}`);
                 
                 materialMap.set(key, {
                     quantity: existing.quantity + Number(material.qnt),
                     unit: material.unit,
-                    totalCost: existing.totalCost + materialCost
+                    totalCost: existing.totalCost + materialCost,
+                    vendor: vendorName
                 });
             });
         });
@@ -636,26 +724,51 @@ export class PDFReportGenerator {
         equipmentMap.forEach((data, name) => {
             console.log(`  - ${name}: ${data.quantity} units = ${this.formatCurrency(data.totalCost)}`);
         });
+
+        // Aggregate other costs by name/title
+        const otherCostMap = new Map<string, { totalCost: number }>();
+        
+        console.log('📊 Processing other costs...');
+        (otherCostData || []).forEach((oc, idx) => {
+            const key = oc.title || oc.name || 'Other Cost';
+            const existing = otherCostMap.get(key) || { totalCost: 0 };
+            const ocCost = Number(oc.amount ?? oc.totalCost) || 0;
+            
+            console.log(`  Other Cost ${idx + 1}: ${key}, cost=${ocCost}`);
+            
+            otherCostMap.set(key, {
+                totalCost: existing.totalCost + ocCost
+            });
+        });
+        
+        console.log('📊 Other cost aggregation complete:', otherCostMap.size, 'unique other costs');
+        otherCostMap.forEach((data, name) => {
+            console.log(`  - ${name} = ${this.formatCurrency(data.totalCost)}`);
+        });
         
         // Sort by cost (highest first)
         const sortedMaterials = Array.from(materialMap.entries()).sort((a, b) => b[1].totalCost - a[1].totalCost);
         const sortedLabor = Array.from(laborMap.entries()).sort((a, b) => b[1].totalCost - a[1].totalCost);
         const sortedEquipment = Array.from(equipmentMap.entries()).sort((a, b) => b[1].totalCost - a[1].totalCost);
+        const sortedOtherCosts = Array.from(otherCostMap.entries()).sort((a, b) => b[1].totalCost - a[1].totalCost);
         
         // Calculate totals
         const totalMaterialCost = Array.from(materialMap.values()).reduce((sum, m) => sum + m.totalCost, 0);
         const totalLaborCost = Array.from(laborMap.values()).reduce((sum, l) => sum + l.totalCost, 0);
         const totalEquipmentCost = Array.from(equipmentMap.values()).reduce((sum, e) => sum + e.totalCost, 0);
-        const grandTotal = totalMaterialCost + totalLaborCost + totalEquipmentCost;
+        const totalOtherCost = Array.from(otherCostMap.values()).reduce((sum, o) => sum + o.totalCost, 0);
+        const grandTotal = totalMaterialCost + totalLaborCost + totalEquipmentCost + totalOtherCost;
         
         console.log('📊 ========================================');
         console.log('📊 SUMMARY TOTALS:');
         console.log('  - Unique materials:', materialMap.size);
         console.log('  - Unique labor categories:', laborMap.size);
         console.log('  - Unique equipment types:', equipmentMap.size);
+        console.log('  - Unique other costs:', otherCostMap.size);
         console.log('  - Total material cost:', this.formatCurrency(totalMaterialCost));
         console.log('  - Total labor cost:', this.formatCurrency(totalLaborCost));
         console.log('  - Total equipment cost:', this.formatCurrency(totalEquipmentCost));
+        console.log('  - Total other cost:', this.formatCurrency(totalOtherCost));
         console.log('  - GRAND TOTAL:', this.formatCurrency(grandTotal));
         console.log('📊 ========================================');
         
@@ -670,7 +783,7 @@ export class PDFReportGenerator {
                 <div style="background: linear-gradient(135deg, #059669, #10B981); color: white; padding: 24px; border-radius: 12px; margin-bottom: 32px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
                     <div style="font-size: 16px; opacity: 0.9; margin-bottom: 8px;">Total Project Cost</div>
                     <div style="font-size: 42px; font-weight: 800; margin-bottom: 16px;">${this.formatCurrency(grandTotal)}</div>
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.2);">
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.2);">
                         <div>
                             <div style="font-size: 12px; opacity: 0.8;">Materials</div>
                             <div style="font-size: 18px; font-weight: 700;">${this.formatCurrency(totalMaterialCost)}</div>
@@ -685,6 +798,11 @@ export class PDFReportGenerator {
                             <div style="font-size: 12px; opacity: 0.8;">Equipment</div>
                             <div style="font-size: 18px; font-weight: 700;">${this.formatCurrency(totalEquipmentCost)}</div>
                             <div style="font-size: 11px; opacity: 0.7;">${grandTotal > 0 ? ((totalEquipmentCost / grandTotal) * 100).toFixed(1) : 0}% of total</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 12px; opacity: 0.8;">Other Cost</div>
+                            <div style="font-size: 18px; font-weight: 700;">${this.formatCurrency(totalOtherCost)}</div>
+                            <div style="font-size: 11px; opacity: 0.7;">${grandTotal > 0 ? ((totalOtherCost / grandTotal) * 100).toFixed(1) : 0}% of total</div>
                         </div>
                     </div>
                 </div>
@@ -705,7 +823,7 @@ export class PDFReportGenerator {
                                     <th style="padding: 12px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Material Name</th>
                                     <th style="padding: 12px; text-align: center; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Total Quantity</th>
                                     <th style="padding: 12px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Total Cost</th>
-                                    <th style="padding: 12px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">% of Material Cost</th>
+                                    <th style="padding: 12px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Vendor Name</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -724,8 +842,8 @@ export class PDFReportGenerator {
                                         <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 700; color: #059669;">
                                             ${this.formatCurrency(data.totalCost)}
                                         </td>
-                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; color: #6b7280;">
-                                            ${totalMaterialCost > 0 ? ((data.totalCost / totalMaterialCost) * 100).toFixed(1) : 0}%
+                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; color: #6b7280; font-size: 11px;">
+                                            ${data.vendor || '—'}
                                         </td>
                                     </tr>
                                 `).join('')}
@@ -739,7 +857,7 @@ export class PDFReportGenerator {
                                         ${this.formatCurrency(totalMaterialCost)}
                                     </td>
                                     <td style="padding: 12px; text-align: right; border-top: 2px solid #10B981; color: #059669;">
-                                        100%
+                                        
                                     </td>
                                 </tr>
                             </tfoot>
@@ -865,28 +983,83 @@ export class PDFReportGenerator {
                         </table>
                     </div>
                 ` : ''}
+
+                <!-- Other Costs Summary -->
+                ${sortedOtherCosts.length > 0 ? `
+                    <div style="margin-bottom: 32px;">
+                        <div style="background-color: #faf5ff; padding: 16px; border-radius: 8px 8px 0 0; border: 1px solid #8b5cf6; border-bottom: none;">
+                            <h2 style="margin: 0; color: #8b5cf6; font-size: 20px; display: flex; align-items: center;">
+                                <span style="margin-right: 8px;">💸</span> Other Costs Summary
+                            </h2>
+                            <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">Total: ${this.formatCurrency(totalOtherCost)} across ${sortedOtherCosts.length} types</p>
+                        </div>
+                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #8b5cf6; border-top: none;">
+                            <thead>
+                                <tr style="background-color: #f8fafc;">
+                                    <th style="padding: 12px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0; width: 50px;">#</th>
+                                    <th style="padding: 12px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Cost Name</th>
+                                    <th style="padding: 12px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Total Cost</th>
+                                    <th style="padding: 12px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">% of Other Cost</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${sortedOtherCosts.map(([name, data], index) => `
+                                    <tr style="${index % 2 === 0 ? 'background-color: #ffffff;' : 'background-color: #f9fafb;'}">
+                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-weight: 600; color: #6b7280;">${index + 1}</td>
+                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">
+                                            <div style="display: flex; align-items: center;">
+                                                <div style="width: 8px; height: 8px; background-color: #8b5cf6; border-radius: 50%; margin-right: 8px;"></div>
+                                                <strong style="color: #374151;">${name}</strong>
+                                            </div>
+                                        </td>
+                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 700; color: #8b5cf6;">
+                                            ${this.formatCurrency(data.totalCost)}
+                                        </td>
+                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; color: #6b7280;">
+                                            ${totalOtherCost > 0 ? ((data.totalCost / totalOtherCost) * 100).toFixed(1) : 0}%
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                            <tfoot>
+                                <tr style="background-color: #faf5ff; font-weight: bold;">
+                                    <td colspan="2" style="padding: 12px; border-top: 2px solid #8b5cf6; color: #8b5cf6;">
+                                        Total Other Cost
+                                    </td>
+                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #8b5cf6; color: #8b5cf6; font-size: 16px;">
+                                        ${this.formatCurrency(totalOtherCost)}
+                                    </td>
+                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #8b5cf6; color: #8b5cf6;">
+                                        100%
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                ` : ''}
             </div>
         `;
     }
 
     // Generate complete HTML for the PDF
-    private generateHTML(activities: MaterialActivity[], projectName?: string, laborData?: any[], equipmentData?: any[]): string {
+    private generateHTML(activities: MaterialActivity[], projectName?: string, laborData?: any[], equipmentData?: any[], otherCostData?: any[], startDate?: Date, endDate?: Date): string {
         console.log('🔍 PDF Generator - generateHTML called with:');
         console.log('  - Activities:', activities.length);
         console.log('  - Labor data:', laborData?.length || 0);
         console.log('  - Equipment data:', equipmentData?.length || 0);
-        console.log('  - Equipment data sample:', equipmentData?.slice(0, 2));
+        console.log('  - Other cost data:', otherCostData?.length || 0);
         
         const groupedActivities = this.groupActivitiesByDate(activities);
-        // ✅ NEW: Group labor and equipment by date
         const groupedLabor = this.groupLaborByDate(laborData || []);
         const groupedEquipment = this.groupEquipmentByDate(equipmentData || []);
+        const groupedOtherCosts = this.groupOtherCostsByDate(otherCostData || []);
         
-        // ✅ NEW: Get all unique dates from activities, labor, and equipment
+        // Get all unique dates from activities, labor, equipment, and other costs
         const allDates = new Set([
             ...Object.keys(groupedActivities),
             ...Object.keys(groupedLabor),
-            ...Object.keys(groupedEquipment)
+            ...Object.keys(groupedEquipment),
+            ...Object.keys(groupedOtherCosts)
         ]);
         const sortedDates = Array.from(allDates).sort((a, b) => b.localeCompare(a)); // Latest first
 
@@ -895,23 +1068,18 @@ export class PDFReportGenerator {
         const importedCount = activities.filter(a => a.activity === 'imported').length;
         const usedCount = activities.filter(a => a.activity === 'used').length;
         const transferredCount = activities.filter(a => a.activity === 'transferred').length;
-        // ✅ FIXED: Only include IMPORTED materials in total cost calculation
-        // Business Logic: We only spend money when importing materials, not when using them
-        // Transferred materials don't add to cost (they're just moved between projects)
+        
         const totalMaterialCost = activities.reduce((sum, activity) => {
-            // ✅ CRITICAL: Only count imported materials, skip used and transferred materials
             if (activity.activity !== 'imported') {
                 return sum; // Skip used and transferred materials - they don't add to total cost
             }
             
             return sum + activity.materials.reduce((matSum, material) => {
-                // Use totalCost if available, otherwise calculate from perUnitCost
                 if (material.totalCost !== undefined) {
                     return matSum + Number(material.totalCost);
                 } else if (material.perUnitCost !== undefined) {
                     return matSum + (Number(material.perUnitCost) * Number(material.qnt));
                 } else if (material.cost !== undefined) {
-                    // ✅ LEGACY: For imported materials, cost field contains per-unit cost
                     const costValue = Number(material.cost) || 0;
                     const quantity = Number(material.qnt) || 0;
                     return matSum + (costValue * quantity);
@@ -930,11 +1098,24 @@ export class PDFReportGenerator {
             return sum + (Number(equipment.totalCost) || 0);
         }, 0);
 
-        const totalCost = totalMaterialCost + totalLaborCost + totalEquipmentCost;
+        // Calculate other costs
+        const totalOtherCost = (otherCostData || []).reduce((sum, oc) => {
+            return sum + (Number(oc.amount ?? oc.totalCost) || 0);
+        }, 0);
 
-        const dateRangeHTML = sortedDates.length > 0 ? `
+        const totalCost = totalMaterialCost + totalLaborCost + totalEquipmentCost + totalOtherCost;
+
+        let periodStart = sortedDates.length > 0 ? sortedDates[sortedDates.length - 1] : '';
+        let periodEnd = sortedDates.length > 0 ? sortedDates[0] : '';
+        
+        if (startDate && endDate) {
+            periodStart = this.getLocalDateString(startDate);
+            periodEnd = this.getLocalDateString(endDate);
+        }
+
+        const dateRangeHTML = periodStart && periodEnd ? `
             <div style="background-color: #f0f9ff; padding: 12px; border-radius: 6px; margin-bottom: 20px;">
-                <strong>Report Period:</strong> ${this.formatDate(sortedDates[sortedDates.length - 1])} to ${this.formatDate(sortedDates[0])}
+                <strong>Report Period:</strong> ${this.formatDate(periodStart)} to ${this.formatDate(periodEnd)}
             </div>
         ` : '';
 
@@ -943,60 +1124,73 @@ export class PDFReportGenerator {
                 <h3 style="margin: 0 0 12px 0; color: #374151;">Summary</h3>
                 <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
                     <div>
-                        <div style="font-size: 24px; font-weight: bold; color: #3b82f6;">${totalActivities}</div>
-                        <div style="font-size: 12px; color: #6b7280;">Total Activities</div>
+                        <div style="font-size: 24px; font-weight: bold; color: #3b82f6;">${totalActivities + (laborData || []).length + (equipmentData || []).length + (otherCostData || []).length}</div>
+                        <div style="font-size: 12px; color: #6b7280;">Total Entries</div>
                     </div>
                     <div>
                         <div style="font-size: 24px; font-weight: bold; color: #059669;">${this.formatCurrency(totalCost)}</div>
                         <div style="font-size: 12px; color: #6b7280;">Total Project Cost</div>
                     </div>
+                </div>
+                
+                <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
                     <div>
-                        <div style="font-size: 20px; font-weight: bold; color: #10b981;">${this.formatCurrency(totalMaterialCost)}</div>
+                        <div style="font-size: 16px; font-weight: bold; color: #10b981;">${this.formatCurrency(totalMaterialCost)}</div>
                         <div style="font-size: 12px; color: #6b7280;">Materials Cost</div>
                     </div>
                     <div>
-                        <div style="font-size: 20px; font-weight: bold; color: #f59e0b;">${this.formatCurrency(totalLaborCost)}</div>
+                        <div style="font-size: 16px; font-weight: bold; color: #f59e0b;">${this.formatCurrency(totalLaborCost)}</div>
                         <div style="font-size: 12px; color: #6b7280;">Labor Cost</div>
                     </div>
+                    <div>
+                        <div style="font-size: 16px; font-weight: bold; color: #3b82f6;">${this.formatCurrency(totalEquipmentCost)}</div>
+                        <div style="font-size: 12px; color: #6b7280;">Equipment Cost</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 16px; font-weight: bold; color: #8b5cf6;">${this.formatCurrency(totalOtherCost)}</div>
+                        <div style="font-size: 12px; color: #6b7280;">Other Cost</div>
+                    </div>
                 </div>
+
                 <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
                         <div>
-                            <div style="font-size: 18px; font-weight: bold; color: #10b981;">${importedCount}</div>
+                            <div style="font-size: 16px; font-weight: bold; color: #10b981;">${importedCount}</div>
                             <div style="font-size: 12px; color: #6b7280;">Materials Imported</div>
                         </div>
                         <div>
-                            <div style="font-size: 18px; font-weight: bold; color: #ef4444;">${usedCount}</div>
+                            <div style="font-size: 16px; font-weight: bold; color: #ef4444;">${usedCount}</div>
                             <div style="font-size: 12px; color: #6b7280;">Materials Used</div>
                         </div>
                         <div>
-                            <div style="font-size: 18px; font-weight: bold; color: #3b82f6;">${transferredCount}</div>
+                            <div style="font-size: 16px; font-weight: bold; color: #3b82f6;">${transferredCount}</div>
                             <div style="font-size: 12px; color: #6b7280;">Materials Transferred</div>
                         </div>
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 12px;">
                         <div>
-                            <div style="font-size: 18px; font-weight: bold; color: #8b5cf6;">${(laborData || []).length}</div>
+                            <div style="font-size: 16px; font-weight: bold; color: #8b5cf6;">${(laborData || []).length}</div>
                             <div style="font-size: 12px; color: #6b7280;">Labor Entries</div>
                         </div>
                         <div>
-                            <div style="font-size: 18px; font-weight: bold; color: #f59e0b;">${(equipmentData || []).length}</div>
+                            <div style="font-size: 16px; font-weight: bold; color: #f59e0b;">${(equipmentData || []).length}</div>
                             <div style="font-size: 12px; color: #6b7280;">Equipment Entries</div>
                         </div>
                         <div>
-                            <div style="font-size: 18px; font-weight: bold; color: #059669;">${this.formatCurrency(totalEquipmentCost)}</div>
-                            <div style="font-size: 12px; color: #6b7280;">Equipment Cost</div>
+                            <div style="font-size: 16px; font-weight: bold; color: #8b5cf6;">${(otherCostData || []).length}</div>
+                            <div style="font-size: 12px; color: #6b7280;">Other Cost Entries</div>
                         </div>
                     </div>
                 </div>
             </div>
         `;
 
-        // ✅ UPDATED: Generate daily sections with materials, labor, and equipment integrated
+        // Generate daily sections with materials, labor, equipment, and other costs integrated
         const activitiesHTML = sortedDates.map(date => {
             const dayActivities = groupedActivities[date] || [];
             const dayLabor = groupedLabor[date] || [];
             const dayEquipment = groupedEquipment[date] || [];
+            const dayOtherCosts = groupedOtherCosts[date] || [];
             
             // Calculate day totals for all cost types
             const dayMaterialTotal = dayActivities.reduce((sum, activity) => {
@@ -1021,9 +1215,18 @@ export class PDFReportGenerator {
 
             const dayLaborTotal = dayLabor.reduce((sum, labor) => sum + (Number(labor.totalCost) || 0), 0);
             const dayEquipmentTotal = dayEquipment.reduce((sum, equipment) => sum + (Number(equipment.totalCost) || 0), 0);
-            const dayTotal = dayMaterialTotal + dayLaborTotal + dayEquipmentTotal;
+            const dayOtherCostTotal = dayOtherCosts.reduce((sum, oc) => sum + (Number(oc.amount ?? oc.totalCost) || 0), 0);
+            const dayTotal = dayMaterialTotal + dayLaborTotal + dayEquipmentTotal + dayOtherCostTotal;
 
-            const totalEntries = dayActivities.length + dayLabor.length + dayEquipment.length;
+            const totalEntries = dayActivities.length + dayLabor.length + dayEquipment.length + dayOtherCosts.length;
+
+            // Build entries summary string
+            const entryParts = [];
+            if (dayActivities.length > 0) entryParts.push(`${dayActivities.length} material`);
+            if (dayLabor.length > 0) entryParts.push(`${dayLabor.length} labor`);
+            if (dayEquipment.length > 0) entryParts.push(`${dayEquipment.length} equipment`);
+            if (dayOtherCosts.length > 0) entryParts.push(`${dayOtherCosts.length} other cost`);
+            const entrySummary = entryParts.length > 0 ? `(${entryParts.join(', ')})` : '';
 
             return `
                 <div style="page-break-inside: avoid; margin-bottom: 32px;">
@@ -1032,8 +1235,7 @@ export class PDFReportGenerator {
                             <h2 style="margin: 0; font-size: 18px;">${this.formatDate(date)}</h2>
                             <div style="text-align: right;">
                                 <div style="font-size: 14px; opacity: 0.9;">
-                                    ${totalEntries} ${totalEntries === 1 ? 'entry' : 'entries'} 
-                                    ${dayActivities.length > 0 ? `(${dayActivities.length} material` : ''}${dayActivities.length > 0 && (dayLabor.length > 0 || dayEquipment.length > 0) ? ', ' : ''}${dayLabor.length > 0 ? `${dayLabor.length} labor` : ''}${dayLabor.length > 0 && dayEquipment.length > 0 ? ', ' : ''}${dayEquipment.length > 0 ? `${dayEquipment.length} equipment` : ''}${dayActivities.length > 0 ? ')' : ''}
+                                    ${totalEntries} ${totalEntries === 1 ? 'entry' : 'entries'} ${entrySummary}
                                 </div>
                                 ${dayTotal > 0 ? `<div style="font-size: 16px; font-weight: bold;">${this.formatCurrency(dayTotal)}</div>` : ''}
                             </div>
@@ -1041,7 +1243,7 @@ export class PDFReportGenerator {
                     </div>
                     <div style="border: 1px solid #e2e8f0; border-top: none; padding: 16px; border-radius: 0 0 8px 8px;">
                         ${dayActivities.length > 0 ? `
-                            <div style="margin-bottom: ${dayLabor.length > 0 || dayEquipment.length > 0 ? '24px' : '0'};">
+                            <div style="margin-bottom: ${dayLabor.length > 0 || dayEquipment.length > 0 || dayOtherCosts.length > 0 ? '24px' : '0'};">
                                 <h3 style="color: #374151; font-size: 14px; margin: 0 0 12px 0; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
                                     📦 Material Activities (${dayActivities.length})
                                 </h3>
@@ -1050,7 +1252,7 @@ export class PDFReportGenerator {
                         ` : ''}
                         
                         ${dayLabor.length > 0 ? `
-                            <div style="margin-bottom: ${dayEquipment.length > 0 ? '24px' : '0'};">
+                            <div style="margin-bottom: ${dayEquipment.length > 0 || dayOtherCosts.length > 0 ? '24px' : '0'};">
                                 <h3 style="color: #374151; font-size: 14px; margin: 0 0 12px 0; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
                                     👷 Labor Costs (${dayLabor.length})
                                 </h3>
@@ -1059,11 +1261,20 @@ export class PDFReportGenerator {
                         ` : ''}
                         
                         ${dayEquipment.length > 0 ? `
-                            <div>
+                            <div style="margin-bottom: ${dayOtherCosts.length > 0 ? '24px' : '0'};">
                                 <h3 style="color: #374151; font-size: 14px; margin: 0 0 12px 0; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
                                     🚜 Equipment Costs (${dayEquipment.length})
                                 </h3>
                                 ${this.generateEquipmentHTML(dayEquipment)}
+                            </div>
+                        ` : ''}
+                        
+                        ${dayOtherCosts.length > 0 ? `
+                            <div>
+                                <h3 style="color: #374151; font-size: 14px; margin: 0 0 12px 0; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
+                                    💸 Other Costs (${dayOtherCosts.length})
+                                </h3>
+                                ${this.generateOtherCostsHTML(dayOtherCosts)}
                             </div>
                         ` : ''}
                         
@@ -1073,7 +1284,7 @@ export class PDFReportGenerator {
                                     <div>
                                         <div style="font-size: 14px; font-weight: 600; color: #374151;">Day Total</div>
                                         <div style="font-size: 11px; color: #6b7280; margin-top: 2px;">
-                                            ${dayMaterialTotal > 0 ? `Materials: ${this.formatCurrency(dayMaterialTotal)}` : ''}${dayMaterialTotal > 0 && (dayLaborTotal > 0 || dayEquipmentTotal > 0) ? ' • ' : ''}${dayLaborTotal > 0 ? `Labor: ${this.formatCurrency(dayLaborTotal)}` : ''}${dayLaborTotal > 0 && dayEquipmentTotal > 0 ? ' • ' : ''}${dayEquipmentTotal > 0 ? `Equipment: ${this.formatCurrency(dayEquipmentTotal)}` : ''}
+                                            ${dayMaterialTotal > 0 ? `Materials: ${this.formatCurrency(dayMaterialTotal)}` : ''}${dayMaterialTotal > 0 && (dayLaborTotal > 0 || dayEquipmentTotal > 0 || dayOtherCostTotal > 0) ? ' • ' : ''}${dayLaborTotal > 0 ? `Labor: ${this.formatCurrency(dayLaborTotal)}` : ''}${(dayLaborTotal > 0 && (dayEquipmentTotal > 0 || dayOtherCostTotal > 0)) ? ' • ' : ''}${dayEquipmentTotal > 0 ? `Equipment: ${this.formatCurrency(dayEquipmentTotal)}` : ''}${dayEquipmentTotal > 0 && dayOtherCostTotal > 0 ? ' • ' : ''}${dayOtherCostTotal > 0 ? `Other Cost: ${this.formatCurrency(dayOtherCostTotal)}` : ''}
                                         </div>
                                     </div>
                                     <div style="font-size: 20px; font-weight: bold; color: #3B82F6;">
@@ -1177,9 +1388,9 @@ export class PDFReportGenerator {
                 ${summaryHTML}
 
                 <!-- Comprehensive Project Cost Summary - Start on new page only if there's content -->
-                ${activities.length > 0 || (laborData && laborData.length > 0) || (equipmentData && equipmentData.length > 0) ? `
+                ${activities.length > 0 || (laborData && laborData.length > 0) || (equipmentData && equipmentData.length > 0) || (otherCostData && otherCostData.length > 0) ? `
                     <div class="page-break"></div>
-                    ${this.generateSummaryPage(activities, laborData || [], equipmentData || [])}
+                    ${this.generateSummaryPage(activities, laborData || [], equipmentData || [], otherCostData || [])}
                 ` : ''}
 
                 ${sortedDates.length > 0 ? `
@@ -1190,7 +1401,7 @@ export class PDFReportGenerator {
                 ` : `
                     <div style="text-align: center; padding: 40px; background-color: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
                         <h3 style="color: #6b7280; margin-bottom: 8px;">No Data Found</h3>
-                        <p style="color: #9ca3af; margin: 0;">No material activities, labor entries, or equipment entries were recorded during the selected period.</p>
+                        <p style="color: #9ca3af; margin: 0;">No material activities, labor entries, equipment entries, or other costs were recorded during the selected period.</p>
                     </div>
                 `}
 
@@ -1204,16 +1415,17 @@ export class PDFReportGenerator {
     }
 
     // Generate and download PDF
-    async generatePDF(activities: MaterialActivity[], projectName?: string, laborData?: any[], equipmentData?: any[]): Promise<void> {
+    async generatePDF(activities: MaterialActivity[], projectName?: string, laborData?: any[], equipmentData?: any[], otherCostData?: any[], startDate?: Date, endDate?: Date): Promise<void> {
         try {
             console.log('📄 Starting PDF generation...');
             console.log('📊 Activities to include:', activities.length);
             console.log('📊 Labor entries to include:', laborData?.length || 0);
             console.log('📊 Equipment entries to include:', equipmentData?.length || 0);
+            console.log('📊 Other costs to include:', otherCostData?.length || 0);
             console.log('📊 Project name:', projectName);
 
             // Generate HTML content
-            const htmlContent = this.generateHTML(activities, projectName, laborData, equipmentData);
+            const htmlContent = this.generateHTML(activities, projectName, laborData, equipmentData, otherCostData, startDate, endDate);
             console.log('📄 HTML content generated, length:', htmlContent.length);
             
             // Create custom filename: Company Name - Project Name - Date
@@ -1432,6 +1644,361 @@ export class PDFReportGenerator {
             Alert.alert(
                 'Error',
                 'Failed to generate PDF report. Please try again. Error: ' + (error instanceof Error ? error.message : String(error)),
+                [{ text: 'OK' }]
+            );
+        }
+    }
+
+    // ✅ NEW: Generate a clean vendor-focused material import report
+    // Each vendor gets its own page with all imported materials listed
+    async generateVendorPDF(activities: MaterialActivity[], vendors: string[]): Promise<void> {
+        try {
+            console.log('📄 Starting Vendor PDF generation...');
+            console.log('📊 Vendors:', vendors);
+            console.log('📊 Total activities:', activities.length);
+
+            const companyName = this.clientData?.companyName || this.userData?.company || 'Company';
+            const generatedOn = new Date().toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+
+            const formatCurrency = (amount: number) =>
+                `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+            const formatDate = (dateStr: string) => {
+                try {
+                    return new Date(dateStr).toLocaleDateString('en-US', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                    });
+                } catch { return dateStr; }
+            };
+
+            // Build one HTML "page" per vendor
+            const vendorPages = vendors.map((vendorName, vendorIdx) => {
+                // Filter activities for this specific vendor (only imported)
+                const vendorActivities = activities.filter(a =>
+                    a.activity === 'imported' &&
+                    (a.contractor_name === vendorName ||
+                        a.materials.some(m => m.contractor_name === vendorName))
+                );
+
+                if (vendorActivities.length === 0) return '';
+
+                // Flatten all materials across all activities for this vendor
+                interface MaterialRow {
+                    name: string;
+                    specs: Record<string, any>;
+                    unit: string;
+                    qnt: number;
+                    perUnitCost: number;
+                    totalCost: number;
+                    date: string;
+                    projectName: string;
+                    sectionName: string;
+                }
+                const allRows: MaterialRow[] = [];
+                vendorActivities.forEach(activity => {
+                    activity.materials.forEach(mat => {
+                        let perUnit = 0;
+                        let total = 0;
+                        if ((mat as any).perUnitCost !== undefined && (mat as any).totalCost !== undefined) {
+                            perUnit = Number((mat as any).perUnitCost);
+                            total = Number((mat as any).totalCost);
+                        } else if ((mat as any).perUnitCost !== undefined) {
+                            perUnit = Number((mat as any).perUnitCost);
+                            total = perUnit * Number(mat.qnt);
+                        } else if ((mat as any).totalCost !== undefined) {
+                            total = Number((mat as any).totalCost);
+                            perUnit = mat.qnt > 0 ? total / Number(mat.qnt) : 0;
+                        } else if ((mat as any).cost !== undefined) {
+                            perUnit = Number((mat as any).cost);
+                            total = perUnit * Number(mat.qnt);
+                        }
+                        allRows.push({
+                            name: mat.name,
+                            specs: mat.specs || {},
+                            unit: mat.unit,
+                            qnt: Number(mat.qnt),
+                            perUnitCost: perUnit,
+                            totalCost: total,
+                            date: activity.date || new Date().toISOString(),
+                            projectName: activity.projectName || '',
+                            sectionName: activity.sectionName || activity.miniSectionName || '',
+                        });
+                    });
+                });
+
+                const grandTotal = allRows.reduce((sum, r) => sum + r.totalCost, 0);
+                const totalQty = allRows.reduce((sum, r) => sum + r.qnt, 0);
+
+                // Build specs string for a material
+                const buildSpecsString = (specs: Record<string, any>): string => {
+                    if (!specs || Object.keys(specs).length === 0) return '—';
+                    return Object.entries(specs)
+                        .filter(([, v]) => v !== null && v !== undefined && v !== '')
+                        .map(([k, v]) => `${k}: ${v}`)
+                        .join(' | ');
+                };
+
+                const tableRows = allRows.map((row, idx) => `
+                    <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
+                        <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #374151; font-size: 12px; vertical-align: top;">
+                            ${idx + 1}
+                        </td>
+                        <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: top;">
+                            <div style="font-weight: 700; color: #1e293b; font-size: 13px;">${row.name}</div>
+                            ${buildSpecsString(row.specs) !== '—' ? `<div style="font-size: 11px; color: #64748b; margin-top: 3px;">${buildSpecsString(row.specs)}</div>` : ''}
+                            ${row.projectName ? `<div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">📁 ${row.projectName}${row.sectionName ? ' › ' + row.sectionName : ''}</div>` : ''}
+                        </td>
+                        <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: center; vertical-align: top; font-size: 12px; color: #475569;">
+                            ${formatDate(row.date)}
+                        </td>
+                        <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: center; vertical-align: top; font-weight: 600; color: #374151; font-size: 13px;">
+                            ${row.qnt.toLocaleString('en-IN')}
+                            <div style="font-size: 10px; color: #94a3b8; font-weight: 400;">${row.unit}</div>
+                        </td>
+                        <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: right; vertical-align: top; color: #475569; font-size: 13px;">
+                            ${formatCurrency(row.perUnitCost)}
+                        </td>
+                        <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: right; vertical-align: top; font-weight: 700; color: #059669; font-size: 13px;">
+                            ${formatCurrency(row.totalCost)}
+                        </td>
+                    </tr>
+                `).join('');
+
+                return `
+                    <div style="${vendorIdx > 0 ? 'page-break-before: always;' : ''} padding: 0;">
+                        
+                        <!-- Vendor Header Banner -->
+                        <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f4c81 100%); color: white; padding: 32px 36px; border-radius: 12px; margin-bottom: 0;">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                <div style="flex: 1;">
+                                    <div style="font-size: 11px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.6; margin-bottom: 8px; font-weight: 500;">
+                                        Material Import Report
+                                    </div>
+                                    <div style="font-size: 32px; font-weight: 800; margin-bottom: 4px; letter-spacing: -0.5px;">
+                                        ${vendorName}
+                                    </div>
+                                    <div style="font-size: 13px; opacity: 0.75; margin-top: 6px;">
+                                        🏢 Vendor / Contractor
+                                    </div>
+                                </div>
+                                <div style="text-align: right; flex-shrink: 0;">
+                                    <div style="background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; padding: 12px 18px; display: inline-block;">
+                                        <div style="font-size: 10px; opacity: 0.7; letter-spacing: 1px; text-transform: uppercase;">REPORT ID</div>
+                                        <div style="font-size: 14px; font-weight: 700; margin-top: 2px;">#${Date.now().toString().slice(-6)}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Meta Info Strip -->
+                        <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-top: none; border-radius: 0 0 12px 12px; padding: 14px 36px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px;">
+                            <div style="display: flex; gap: 32px;">
+                                <div>
+                                    <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Company</div>
+                                    <div style="font-size: 13px; color: #0f172a; font-weight: 700; margin-top: 2px;">${companyName}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Generated By</div>
+                                    <div style="font-size: 13px; color: #0f172a; font-weight: 700; margin-top: 2px;">${this.userData?.name || 'Admin'}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Total Entries</div>
+                                    <div style="font-size: 13px; color: #0f172a; font-weight: 700; margin-top: 2px;">${allRows.length} materials</div>
+                                </div>
+                            </div>
+                            <div style="font-size: 11px; color: #64748b;">
+                                ${generatedOn}
+                            </div>
+                        </div>
+
+                        <!-- Summary Cards -->
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px;">
+                            <div style="background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 20px 24px; border-radius: 10px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);">
+                                <div style="font-size: 11px; opacity: 0.85; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Total Import Value</div>
+                                <div style="font-size: 26px; font-weight: 800;">${formatCurrency(grandTotal)}</div>
+                            </div>
+                            <div style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; padding: 20px 24px; border-radius: 10px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);">
+                                <div style="font-size: 11px; opacity: 0.85; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Material Types</div>
+                                <div style="font-size: 26px; font-weight: 800;">${new Set(allRows.map(r => r.name)).size}</div>
+                            </div>
+                            <div style="background: linear-gradient(135deg, #8b5cf6, #6d28d9); color: white; padding: 20px 24px; border-radius: 10px; box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25);">
+                                <div style="font-size: 11px; opacity: 0.85; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Import Entries</div>
+                                <div style="font-size: 26px; font-weight: 800;">${vendorActivities.length}</div>
+                            </div>
+                        </div>
+
+                        <!-- Materials Table -->
+                        <div style="border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+                            <div style="background: linear-gradient(90deg, #1e293b, #334155); padding: 14px 20px;">
+                                <h2 style="margin: 0; color: white; font-size: 15px; font-weight: 700; letter-spacing: 0.3px;">
+                                    📦 Imported Materials — ${vendorName}
+                                </h2>
+                            </div>
+                            <table style="width: 100%; border-collapse: collapse; background: white;">
+                                <thead>
+                                    <tr style="background: #f8fafc;">
+                                        <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 40px;">#</th>
+                                        <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0;">Material / Specifications</th>
+                                        <th style="padding: 12px; text-align: center; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 100px;">Date</th>
+                                        <th style="padding: 12px; text-align: center; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 90px;">Quantity</th>
+                                        <th style="padding: 12px; text-align: right; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 110px;">Per Unit</th>
+                                        <th style="padding: 12px; text-align: right; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 120px;">Total Cost</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${tableRows}
+                                </tbody>
+                                <tfoot>
+                                    <tr style="background: linear-gradient(90deg, #f0fdf4, #dcfce7);">
+                                        <td colspan="3" style="padding: 14px 12px; border-top: 2px solid #10b981; font-weight: 700; font-size: 13px; color: #059669;">
+                                            GRAND TOTAL
+                                        </td>
+                                        <td style="padding: 14px 12px; border-top: 2px solid #10b981; text-align: center; font-weight: 700; font-size: 13px; color: #374151;">
+                                            ${totalQty.toLocaleString('en-IN')} items
+                                        </td>
+                                        <td style="padding: 14px 12px; border-top: 2px solid #10b981;"></td>
+                                        <td style="padding: 14px 12px; border-top: 2px solid #10b981; text-align: right; font-weight: 800; font-size: 16px; color: #059669;">
+                                            ${formatCurrency(grandTotal)}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+
+                        <!-- Footer -->
+                        <div style="margin-top: 28px; padding-top: 16px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                            <div style="font-size: 11px; color: #94a3b8;">
+                                Generated by Xsite Application · ${generatedOn}
+                            </div>
+                            <div style="font-size: 11px; color: #94a3b8;">
+                                ${vendorIdx + 1} of ${vendors.length} vendor${vendors.length > 1 ? 's' : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).filter(Boolean).join('');
+
+            const fullHTML = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <title>Vendor Material Report - ${vendors.join(', ')}</title>
+                    <style>
+                        * { box-sizing: border-box; }
+                        body {
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                            line-height: 1.5;
+                            color: #374151;
+                            margin: 0;
+                            padding: 24px;
+                            background: #ffffff;
+                        }
+                        @media print {
+                            body { margin: 0; padding: 16px; }
+                            .page-break { page-break-before: always; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    ${vendorPages}
+                </body>
+                </html>
+            `;
+
+            // Generate PDF
+            const { uri } = await Print.printToFileAsync({
+                html: fullHTML,
+                base64: false,
+                margins: { left: 16, top: 16, right: 16, bottom: 16 },
+            });
+
+            // Build custom filename
+            const sanitizedVendor = vendors.join('_').replace(/[^a-zA-Z0-9_\s]/g, '').trim().replace(/\s+/g, '_');
+            const currentDate = new Date().toISOString().split('T')[0];
+            const customFilename = `Vendor_Material_Report_${sanitizedVendor}_${currentDate}.pdf`;
+
+            // Try to copy with custom filename
+            let finalUri = uri;
+            try {
+                const documentDir = Paths.document;
+                if (documentDir) {
+                    const customFile = new File(documentDir, customFilename);
+                    if (customFile.exists) customFile.delete();
+                    const originalFile = new File(uri);
+                    originalFile.copy(customFile);
+                    if (customFile.exists) {
+                        finalUri = customFile.uri;
+                        try { originalFile.delete(); } catch (_) {}
+                    }
+                }
+            } catch (_) { /* use original uri */ }
+
+            // Show view/share dialog
+            setTimeout(() => {
+                Alert.alert(
+                    '✅ Vendor Report Ready',
+                    `Report generated for: ${vendors.join(', ')}\n\nFilename: ${customFilename}`,
+                    [
+                        {
+                            text: 'View PDF',
+                            onPress: async () => {
+                                try {
+                                    if (Platform.OS === 'android') {
+                                        const contentUri = await FileSystemLegacy.getContentUriAsync(finalUri);
+                                        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+                                            data: contentUri,
+                                            flags: 1,
+                                            type: 'application/pdf',
+                                        });
+                                    } else {
+                                        if (await Sharing.isAvailableAsync()) {
+                                            await Sharing.shareAsync(finalUri, {
+                                                mimeType: 'application/pdf',
+                                                dialogTitle: `View: ${customFilename}`,
+                                                UTI: 'com.adobe.pdf',
+                                            });
+                                        }
+                                    }
+                                } catch (e) {
+                                    if (await Sharing.isAvailableAsync()) {
+                                        await Sharing.shareAsync(finalUri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
+                                    }
+                                }
+                            },
+                        },
+                        {
+                            text: 'Share PDF',
+                            onPress: async () => {
+                                if (await Sharing.isAvailableAsync()) {
+                                    await Sharing.shareAsync(finalUri, {
+                                        mimeType: 'application/pdf',
+                                        dialogTitle: `Share: ${customFilename}`,
+                                        UTI: 'com.adobe.pdf',
+                                    });
+                                }
+                            },
+                        },
+                        { text: 'Cancel', style: 'cancel' },
+                    ],
+                    { cancelable: true }
+                );
+            }, 100);
+
+        } catch (error) {
+            console.error('❌ Vendor PDF generation error:', error);
+            Alert.alert(
+                'Error',
+                'Failed to generate vendor report. Please try again. Error: ' + (error instanceof Error ? error.message : String(error)),
                 [{ text: 'OK' }]
             );
         }

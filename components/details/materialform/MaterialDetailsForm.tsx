@@ -10,6 +10,7 @@ interface MaterialDetailsFormProps {
   onInputChange: (field: string, value: string) => void;
   showUnitDropdown: boolean;
   onToggleUnitDropdown: () => void;
+  vendorSuggestions?: string[];
 }
 
 const MaterialDetailsForm: React.FC<MaterialDetailsFormProps> = ({
@@ -17,9 +18,22 @@ const MaterialDetailsForm: React.FC<MaterialDetailsFormProps> = ({
   onInputChange,
   showUnitDropdown,
   onToggleUnitDropdown,
+  vendorSuggestions = [],
 }) => {
   const [isCustomUnit, setIsCustomUnit] = useState(false);
   const [customUnitValue, setCustomUnitValue] = useState('');
+  const [showVendorSuggestions, setShowVendorSuggestions] = useState(false);
+
+  // Filter existing vendors based on what's typed (case-insensitive), excluding an
+  // exact match, capped to a handful. Empty input shows the first few known vendors.
+  const currentVendor = (formData.contractor_name || '').trim().toLowerCase();
+  const filteredVendors = vendorSuggestions
+    .filter((v) => {
+      const lower = v.toLowerCase();
+      if (currentVendor === '') return true;
+      return lower.includes(currentVendor) && lower !== currentVendor;
+    })
+    .slice(0, 6);
 
   // Check if current unit is a custom value (not in predefined options)
   React.useEffect(() => {
@@ -212,11 +226,45 @@ const MaterialDetailsForm: React.FC<MaterialDetailsFormProps> = ({
           style={sharedStyles.input}
           placeholder="Enter contractor/vendor name"
           value={formData.contractor_name || ''}
-          onChangeText={(value) => onInputChange('contractor_name', value)}
+          onChangeText={(value) => {
+            onInputChange('contractor_name', value);
+            setShowVendorSuggestions(true);
+          }}
+          onFocus={() => setShowVendorSuggestions(true)}
           placeholderTextColor="#94A3B8"
           returnKeyType="done"
           autoCapitalize="words"
         />
+
+        {/* Existing-vendor suggestions */}
+        {showVendorSuggestions && filteredVendors.length > 0 && (
+          <View style={[sharedStyles.dropdown, styles.vendorDropdown]}>
+            <ScrollView
+              style={styles.dropdownScrollView}
+              nestedScrollEnabled={true}
+              showsVerticalScrollIndicator={true}
+              keyboardShouldPersistTaps="handled"
+            >
+              {filteredVendors.map((vendor) => (
+                <TouchableOpacity
+                  key={vendor}
+                  style={sharedStyles.dropdownItem}
+                  onPress={() => {
+                    onInputChange('contractor_name', vendor);
+                    setShowVendorSuggestions(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.vendorOptionContent}>
+                    <Ionicons name="person-outline" size={16} color="#64748B" />
+                    <Text style={sharedStyles.dropdownItemText}>{vendor}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         <Text style={{ fontSize: 12, color: '#64748B', marginTop: 4, fontStyle: 'italic' }}>
           💡 Track which contractor supplied this material
         </Text>
@@ -279,6 +327,14 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#E2E8F0',
     marginVertical: 4,
+  },
+  vendorDropdown: {
+    marginTop: 4,
+  },
+  vendorOptionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
 });
 

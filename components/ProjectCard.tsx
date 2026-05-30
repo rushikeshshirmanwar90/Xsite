@@ -168,7 +168,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userT
                                 <Ionicons name="checkmark-circle" size={20} color="#10B981" />
                             </View>
                         )}
-                        {projectPinned && (
+                        {projectPinned && userType === 'admin' && (
                             <View style={styles.pinnedIconContainer}>
                                 <Ionicons name="bookmark" size={16} color="#F59E0B" />
                             </View>

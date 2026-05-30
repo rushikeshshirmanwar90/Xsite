@@ -25,6 +25,8 @@ import CustomSpecModal from './CustomSpecModal';
 import ProgressIndicator from './ProgressIndicator';
 import ReviewPurposeStep from './ReviewPurposeStep';
 import { CustomSpec, InternalMaterial, MaterialFormData } from './types';
+import { getClientId } from '@/functions/clientId';
+import apiClient from '@/utils/axiosConfig';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -69,6 +71,9 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     perUnitCost: '', // ✅ UPDATED: Use perUnitCost instead of cost
     contractor_name: '', // ✅ NEW: Contractor name field
   });
+  // Vendor/contractor name suggestions (existing vendors from the DB)
+  const [vendorSuggestions, setVendorSuggestions] = useState<string[]>([]);
+
   const [customSpecs, setCustomSpecs] = useState<CustomSpec[]>([]);
   const [showAddSpecModal, setShowAddSpecModal] = useState(false);
   const [editingMaterialIndex, setEditingMaterialIndex] = useState<number | null>(null);
@@ -106,6 +111,27 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     loadingAnimation.setValue(0);
   };
   
+  // Fetch existing vendor/contractor names when the form opens (for suggestions).
+  // Reuses the same fast, indexed endpoint used by the notifications page.
+  useEffect(() => {
+    if (!visible) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const clientId = await getClientId();
+        if (!clientId) return;
+        const res = await apiClient.get(`/api/materialActivity/contractors?clientId=${clientId}`);
+        if (!cancelled && res.data && res.data.success !== false) {
+          setVendorSuggestions(res.data.data || []);
+        }
+      } catch (err: any) {
+        // 404 / no contractors yet → leave suggestions empty (graceful, like notification.tsx)
+        if (!cancelled) setVendorSuggestions([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [visible]);
+
   // Custom setter that updates both state and ref
   const updatePurposeMessage = (message: string) => {
     setPurposeMessage(message);
@@ -848,6 +874,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                 onShowAddForm={handleShowAddForm}
                 onCancelEdit={handleCancelEdit}
                 onClose={handleClose}
+                vendorSuggestions={vendorSuggestions}
               />
             </Animated.View>
 

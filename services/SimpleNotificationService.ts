@@ -71,8 +71,9 @@ export class SimpleNotificationService {
   private setupNotificationHandler() {
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
-        shouldShowBanner: true,
-        shouldShowList: true,
+        shouldShowAlert: true,   // iOS < 17 foreground display
+        shouldShowBanner: true,  // iOS 17+ / Android foreground display
+        shouldShowList: true,    // iOS 17+ / Android notification list
         shouldPlaySound: true,
         shouldSetBadge: true,
       }),
@@ -111,7 +112,9 @@ export class SimpleNotificationService {
       let finalStatus = existingStatus;
 
       if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
+        const { status } = await Notifications.requestPermissionsAsync({
+          ios: { allowAlert: true, allowBadge: true, allowSound: true, allowCriticalAlerts: false },
+        });
         finalStatus = status;
         console.log('🔐 New permission status:', finalStatus);
       }

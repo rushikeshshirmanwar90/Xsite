@@ -71,6 +71,7 @@ export type ActivityType =
   | "equipment_added"
   | "equipment_updated"
   | "equipment_removed"
+  | "other_cost_added"
   | "other";
 
 export type ActivityCategory =
@@ -82,6 +83,7 @@ export type ActivityCategory =
   | "other"
   | "labor"
   | "equipment"
+  | "other_cost"
   | "completion";
 
 export type ActivityAction =
@@ -562,6 +564,7 @@ export const logLaborAdded = async (
     count: number;
     perLaborCost: number;
     totalCost: number;
+    description?: string;
   }>,
   message?: string
 ) => {
@@ -857,8 +860,8 @@ export const logEquipmentAdded = async (
   projectName: string,
   sectionId: string,
   sectionName: string,
-  miniSectionId?: string,
-  miniSectionName?: string,
+  miniSectionId: string | undefined,
+  miniSectionName: string | undefined,
   equipmentEntries: Array<{
     type: string;
     category: string;
@@ -931,8 +934,8 @@ export const logEquipmentUpdated = async (
   projectName: string,
   sectionId: string,
   sectionName: string,
-  miniSectionId?: string,
-  miniSectionName?: string,
+  miniSectionId: string | undefined,
+  miniSectionName: string | undefined,
   equipmentType: string,
   equipmentCategory: string,
   oldQuantity: number,
@@ -991,8 +994,8 @@ export const logEquipmentRemoved = async (
   projectName: string,
   sectionId: string,
   sectionName: string,
-  miniSectionId?: string,
-  miniSectionName?: string,
+  miniSectionId: string | undefined,
+  miniSectionName: string | undefined,
   equipmentType: string,
   equipmentCategory: string,
   quantity: number,
@@ -1028,6 +1031,44 @@ export const logEquipmentRemoved = async (
         miniSectionName,
         fullPath: locationDescription
       }
+    },
+  });
+};
+export const logOtherCostAdded = async (
+  projectId: string,
+  projectName: string,
+  sectionId: string,
+  sectionName: string,
+  otherCostEntries: Array<{
+    name: string;
+    category: string;
+    unitCost: number;
+    totalCost: number;
+    description?: string;
+  }>,
+  message?: string
+) => {
+  const totalCost = otherCostEntries.reduce((sum, entry) => sum + entry.totalCost, 0);
+
+  const description =
+    otherCostEntries.length === 1
+      ? `Added other cost "${otherCostEntries[0].name}" (${otherCostEntries[0].category}) to ${projectName}`
+      : `Added ${otherCostEntries.length} other cost entries to ${projectName}`;
+
+  await logActivity({
+    activityType: "other_cost_added",
+    category: "other_cost",
+    action: "add",
+    description,
+    projectId,
+    projectName,
+    sectionId,
+    sectionName,
+    message,
+    metadata: {
+      otherCostEntries,
+      totalCost,
+      entriesCount: otherCostEntries.length,
     },
   });
 };

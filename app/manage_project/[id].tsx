@@ -57,20 +57,20 @@ const ManageProject = () => {
                 const parsedSections: ProjectSection[] = JSON.parse(
                     Array.isArray(sectionData) ? sectionData[0] : sectionData
                 );
-                
+
                 // If forceRefresh is true or sections are empty, always fetch from server
                 if (forceRefresh === 'true' || !parsedSections || parsedSections.length === 0) {
                     console.log('🔄 Force refresh requested or no sections found, fetching fresh data...');
                     setSections([]); // Start with empty array
-                    
+
                     // For newly created projects with buildings, try multiple times if needed
                     if (forceRefresh === 'true') {
                         let retryCount = 0;
                         const maxRetries = 3;
-                        
+
                         const fetchWithRetry = async () => {
                             await fetchSections(true);
-                            
+
                             // Check if we got sections, if not and we have retries left, try again
                             setTimeout(() => {
                                 if (sections.length === 0 && retryCount < maxRetries) {
@@ -80,7 +80,7 @@ const ManageProject = () => {
                                 }
                             }, 1500); // Wait 1.5 seconds between retries
                         };
-                        
+
                         fetchWithRetry();
                     } else {
                         fetchSections(true);
@@ -98,7 +98,7 @@ const ManageProject = () => {
                 fetchSections(true);
             }
         };
-        
+
         initializeAndFetch();
     }, [sectionData, forceRefresh]);
 
@@ -203,7 +203,7 @@ const ManageProject = () => {
             } else {
                 console.warn('Project not found (404), keeping existing sections');
             }
-            
+
             // Set loading to false even on error
             setLoading(false);
         } finally {
@@ -249,7 +249,7 @@ const ManageProject = () => {
                         let loadingToast: any = null;
                         // ✅ Use sectionId first (the actual building/rowhouse/other ID), fallback to _id
                         const sectionId = section.sectionId || section._id;
-                        
+
                         // ✅ FIXED: Extract projectId from array if needed
                         const projectId = Array.isArray(id) ? id[0] : id;
 
@@ -367,16 +367,16 @@ const ManageProject = () => {
     const handleSectionDetails = async (section: ProjectSection) => {
         console.log('🔍 DEBUG: Opening section details');
         console.log('Section data:', JSON.stringify(section, null, 2));
-        
+
         setSelectedSection(section);
         setIsEditMode(false); // Reset to view mode
-        
+
         // If it's a building, fetch existing details
         if (section.type === 'Buildings') {
             try {
                 // Use sectionId for buildings (this is the actual building ID)
                 const sectionId = section.sectionId || section._id;
-                
+
                 // ✅ Validate sectionId before making API call
                 if (!sectionId) {
                     console.error('❌ Building ID is undefined');
@@ -384,18 +384,18 @@ const ManageProject = () => {
                     toast.error('Building ID is missing. Cannot fetch building details.');
                     return;
                 }
-                
+
                 console.log('🔍 DEBUG: Fetching building details for ID:', sectionId);
                 console.log('🌐 API URL:', `/api/building?id=${sectionId}`);
-                
+
                 const response = await apiClient.get(`/api/building?id=${sectionId}`);
                 const responseData = response.data as any;
-                
+
                 console.log('📥 Building details response:', JSON.stringify(responseData, null, 2));
-                
+
                 if (responseData && responseData.success && responseData.data) {
                     const building = responseData.data;
-                    
+
                     // Calculate the correct totalFloors from the floors array
                     // totalFloors should only count upper floors (floorNumber > 0)
                     let calculatedTotalFloors = building.totalFloors || 0;
@@ -408,7 +408,7 @@ const ManageProject = () => {
                             calculatedTotalFloors = upperFloorsCount;
                         }
                     }
-                    
+
                     const details = {
                         totalFloors: calculatedTotalFloors,
                         totalBookedUnits: building.totalBookedUnits || 0,
@@ -417,17 +417,17 @@ const ManageProject = () => {
                         hasGroundFloor: building.hasGroundFloor !== undefined ? building.hasGroundFloor : true
                     };
                     setBuildingDetails(details);
-                    
+
                     console.log('✅ Building details loaded successfully');
                     console.log('📊 Calculated totalFloors:', calculatedTotalFloors);
                     console.log('📊 Has basement:', details.hasBasement);
                     console.log('📊 Has ground floor:', details.hasGroundFloor);
-                    
+
                     // Check if data exists (at least one meaningful value)
-                    const dataExists = details.totalFloors > 0 || details.description.trim() !== '' || 
-                                      details.hasBasement || !details.hasGroundFloor;
+                    const dataExists = details.totalFloors > 0 || details.description.trim() !== '' ||
+                        details.hasBasement || !details.hasGroundFloor;
                     setHasExistingData(dataExists);
-                    
+
                     console.log('Has existing data:', dataExists);
                 } else {
                     console.log('⚠️ No building data found, using defaults');
@@ -446,12 +446,12 @@ const ManageProject = () => {
                 console.error('❌ Error fetching building details:', error);
                 console.error('❌ Error response:', error?.response?.data);
                 console.error('❌ Error status:', error?.response?.status);
-                
+
                 if (error?.response?.status === 404) {
                     console.error('🔍 Building not found in database. This building section exists but the building record is missing.');
                     toast.warning('Building record not found. You can create it by adding details.');
                 }
-                
+
                 // Reset to defaults on error - the save function will create the building
                 setBuildingDetails({
                     totalFloors: 0,
@@ -464,7 +464,7 @@ const ManageProject = () => {
                 setIsEditMode(true); // Auto-enable edit mode on error
             }
         }
-        
+
         setShowDetailsModal(true);
     };
 
@@ -488,7 +488,7 @@ const ManageProject = () => {
         }
 
         const newName = editSectionName.trim();
-        
+
         // Check if name actually changed
         if (newName === editingSection.name) {
             toast.info('No changes made to section name');
@@ -507,7 +507,7 @@ const ManageProject = () => {
             toast.error('Section ID is missing. Cannot update section.');
             return;
         }
-        
+
         // ✅ Extract projectId from array if needed
         const projectId = Array.isArray(id) ? id[0] : id;
 
@@ -614,7 +614,7 @@ const ManageProject = () => {
             console.error('Error status:', error?.response?.status);
 
             let errorMessage = 'Failed to update section name';
-            
+
             if (error?.response?.status === 404) {
                 errorMessage = 'Section not found. It may have been deleted.';
             } else if (error?.response?.status === 400) {
@@ -641,7 +641,7 @@ const ManageProject = () => {
             loadingToast = toast.loading('Saving building details and creating floors...');
 
             const sectionId = selectedSection.sectionId || selectedSection._id;
-            
+
             // ✅ Validate sectionId before proceeding
             if (!sectionId) {
                 console.error('❌ Building ID is undefined');
@@ -650,12 +650,12 @@ const ManageProject = () => {
                 toast.error('Building ID is missing. Cannot save building details.');
                 return;
             }
-            
+
             console.log('🔍 DEBUG: Building save details');
             console.log('Selected section:', JSON.stringify(selectedSection, null, 2));
             console.log('Section ID:', sectionId);
             console.log('Building details:', JSON.stringify(buildingDetails, null, 2));
-            
+
             // First save the building details
             // ✅ FIXED: Include the building name in the payload so backend can update section name
             const payload = {
@@ -668,7 +668,7 @@ const ManageProject = () => {
             console.log('🌐 API URL:', `/api/building?id=${sectionId}&projectId=${id}`);
 
             let response;
-            
+
             try {
                 // ✅ FIXED: Pass projectId so backend can update section name in project
                 response = await apiClient.put(`/api/building?id=${sectionId}&projectId=${id}`, payload);
@@ -676,16 +676,16 @@ const ManageProject = () => {
             } catch (updateError: any) {
                 if (updateError?.response?.status === 404) {
                     console.log('🔄 Building not found, creating new building...');
-                    
+
                     const createPayload = {
                         ...payload,
                         _id: sectionId,
                         name: selectedSection.name,
                         projectId: id
                     };
-                    
+
                     console.log('📤 Create Payload:', JSON.stringify(createPayload, null, 2));
-                    
+
                     response = await apiClient.post(`/api/building`, createPayload);
                     console.log('✅ Building created successfully');
                 } else {
@@ -719,11 +719,11 @@ const ManageProject = () => {
             }
 
             for (let i = 1; i <= buildingDetails.totalFloors; i++) {
-                const floorName = i === 1 ? '1st Floor' : 
-                                 i === 2 ? '2nd Floor' : 
-                                 i === 3 ? '3rd Floor' : 
-                                 `${i}th Floor`;
-                
+                const floorName = i === 1 ? '1st Floor' :
+                    i === 2 ? '2nd Floor' :
+                        i === 3 ? '3rd Floor' :
+                            `${i}th Floor`;
+
                 floorsToCreate.push({
                     floorNumber: i,
                     floorName: floorName,
@@ -772,7 +772,7 @@ const ManageProject = () => {
                             buildingId: sectionId,
                             floors: newFloorsToCreate
                         });
-                        
+
                         console.log('✅ Bulk floor creation response:', bulkResponse.data);
                         const responseData = bulkResponse.data as any;
                         createdFloorsCount = responseData?.data?.createdCount || newFloorsToCreate.length;
@@ -797,7 +797,7 @@ const ManageProject = () => {
                 }
                 setIsEditMode(false);
                 setHasExistingData(true);
-                
+
                 // Optionally refresh
                 await fetchSections(false);
             }
@@ -831,7 +831,7 @@ const ManageProject = () => {
         if (!selectedSection) return;
 
         const sectionId = selectedSection.sectionId || selectedSection._id;
-        
+
         // ✅ Validate sectionId before proceeding
         if (!sectionId) {
             console.error('❌ Building ID is undefined');
@@ -863,23 +863,23 @@ const ManageProject = () => {
             if (buildingData) {
                 existingFloors = buildingData.floors || [];
                 console.log(`📋 Found ${existingFloors.length} existing floors`);
-                
+
                 // If floors already exist, just navigate without creating
                 if (existingFloors.length > 0) {
                     console.log('✅ Floors already exist, skipping creation');
                     console.log('Existing floors:', existingFloors.map((f: any) => `${f.floorName} (${f.floorNumber})`).join(', '));
-                    
+
                     toast.dismiss(loadingToast);
-                    
+
                     // Navigate directly to floors page
                     setShowDetailsModal(false);
                     setSelectedSection(null);
-                    
+
                     router.push({
                         pathname: '/building_floors/[id]',
-                        params: { 
+                        params: {
                             id: sectionId,
-                            buildingName: selectedSection.name 
+                            buildingName: selectedSection.name
                         }
                     });
                     return; // Exit early - don't create floors
@@ -891,7 +891,7 @@ const ManageProject = () => {
             // IMPORTANT: Always use buildingDetails from state if we're in edit mode or if building data is incomplete
             // This ensures we use the latest values entered by the user even if not saved yet
             let sourceData = buildingData;
-            
+
             // If building data doesn't have floor configuration, use current state
             if (!buildingData || (buildingData.totalFloors === 0 && !buildingData.hasBasement && buildingData.hasGroundFloor === undefined)) {
                 sourceData = buildingDetails;
@@ -934,11 +934,11 @@ const ManageProject = () => {
                 // Create upper floors
                 const totalFloors = sourceData.totalFloors || 0;
                 for (let i = 1; i <= totalFloors; i++) {
-                    const floorName = i === 1 ? '1st Floor' : 
-                                     i === 2 ? '2nd Floor' : 
-                                     i === 3 ? '3rd Floor' : 
-                                     `${i}th Floor`;
-                    
+                    const floorName = i === 1 ? '1st Floor' :
+                        i === 2 ? '2nd Floor' :
+                            i === 3 ? '3rd Floor' :
+                                `${i}th Floor`;
+
                     floorsToCreate.push({
                         floorNumber: i,
                         floorName: floorName,
@@ -967,22 +967,22 @@ const ManageProject = () => {
                             buildingId: sectionId,
                             floors: floorsToCreate
                         });
-                        
+
                         console.log('✅ Bulk floor creation response:', bulkResponse.data);
-                        
+
                         const responseData = bulkResponse.data as any;
                         const createdCount = responseData?.data?.createdCount || floorsToCreate.length;
-                        
+
                         toast.dismiss(loadingToast);
                         toast.success(`Created ${createdCount} floors automatically!`);
-                        
+
                         console.log(`📊 Floor creation summary: ${createdCount} created successfully`);
                     } catch (error: any) {
                         console.error('❌ Failed to create floors in bulk:', error);
                         console.error('Error details:', error?.response?.data);
                         console.error('Error status:', error?.response?.status);
                         console.error('Error message:', error?.message);
-                        
+
                         toast.dismiss(loadingToast);
                         toast.error('Failed to create floors. Please try again.');
                     }
@@ -1006,12 +1006,12 @@ const ManageProject = () => {
         // Navigate to floors management page
         setShowDetailsModal(false);
         setSelectedSection(null);
-        
+
         router.push({
             pathname: '/building_floors/[id]',
-            params: { 
+            params: {
                 id: sectionId,
-                buildingName: selectedSection.name 
+                buildingName: selectedSection.name
             }
         });
     };
@@ -1150,7 +1150,7 @@ const ManageProject = () => {
 
     // Render Building Details View Mode
     const renderBuildingDetailsView = () => (
-        <ScrollView 
+        <ScrollView
             contentContainerStyle={styles.modalScrollContent}
             showsVerticalScrollIndicator={true}
             style={{ flex: 1 }}
@@ -1182,7 +1182,7 @@ const ManageProject = () => {
                             </View>
                         </View>
                     )}
-                    {Array.from({length: buildingDetails.totalFloors}, (_, i) => {
+                    {Array.from({ length: buildingDetails.totalFloors }, (_, i) => {
                         const floorNum = i + 1;
                         const floorName = floorNum === 1 ? '1st' : floorNum === 2 ? '2nd' : floorNum === 3 ? '3rd' : `${floorNum}th`;
                         return (
@@ -1216,9 +1216,9 @@ const ManageProject = () => {
                 <View style={styles.statCard}>
                     <Ionicons name="layers-outline" size={24} color="#3B82F6" />
                     <Text style={styles.statValue}>
-                        {(buildingDetails.hasBasement ? 1 : 0) + 
-                         (buildingDetails.hasGroundFloor ? 1 : 0) + 
-                         buildingDetails.totalFloors}
+                        {(buildingDetails.hasBasement ? 1 : 0) +
+                            (buildingDetails.hasGroundFloor ? 1 : 0) +
+                            buildingDetails.totalFloors}
                     </Text>
                     <Text style={styles.statLabel}>Total Floors</Text>
                 </View>
@@ -1250,7 +1250,7 @@ const ManageProject = () => {
 
     // Render Building Details Edit Mode
     const renderBuildingDetailsEdit = () => (
-        <ScrollView 
+        <ScrollView
             contentContainerStyle={styles.modalScrollContent}
             showsVerticalScrollIndicator={true}
             style={{ flex: 1 }}
@@ -1269,7 +1269,7 @@ const ManageProject = () => {
             {/* Floor Configuration */}
             <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Floor Configuration</Text>
-                
+
                 {/* Basement Checkbox */}
                 <TouchableOpacity
                     style={styles.checkboxContainer}
@@ -1309,8 +1309,8 @@ const ManageProject = () => {
                     keyboardType="numeric"
                 />
                 <Text style={styles.inputHint}>
-                    This will create floors: {buildingDetails.totalFloors > 0 ? 
-                        Array.from({length: buildingDetails.totalFloors}, (_, i) => {
+                    This will create floors: {buildingDetails.totalFloors > 0 ?
+                        Array.from({ length: buildingDetails.totalFloors }, (_, i) => {
                             const floorNum = i + 1;
                             return floorNum === 1 ? '1st' : floorNum === 2 ? '2nd' : floorNum === 3 ? '3rd' : `${floorNum}th`;
                         }).join(', ') + ' Floor' + (buildingDetails.totalFloors > 1 ? 's' : '')
@@ -1335,7 +1335,7 @@ const ManageProject = () => {
                             <Text style={styles.floorSummaryText}>Ground Floor (Commercial)</Text>
                         </View>
                     )}
-                    {Array.from({length: buildingDetails.totalFloors}, (_, i) => {
+                    {Array.from({ length: buildingDetails.totalFloors }, (_, i) => {
                         const floorNum = i + 1;
                         const floorName = floorNum === 1 ? '1st' : floorNum === 2 ? '2nd' : floorNum === 3 ? '3rd' : `${floorNum}th`;
                         return (
@@ -1480,15 +1480,19 @@ const ManageProject = () => {
                                             <TouchableOpacity
                                                 style={styles.editButton}
                                                 onPress={() => handleEditSection(section)}
+                                                activeOpacity={0.7}
                                             >
-                                                <Ionicons name="create-outline" size={18} color="#F59E0B" />
+                                                <Ionicons name="create-outline" size={18} color="#D97706" />
+                                                <Text style={styles.editButtonText}>Edit</Text>
                                             </TouchableOpacity>
 
                                             <TouchableOpacity
                                                 style={styles.deleteButton}
                                                 onPress={() => handleDeleteSection(section)}
+                                                activeOpacity={0.7}
                                             >
-                                                <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                                                <Ionicons name="trash-outline" size={18} color="#DC2626" />
+                                                <Text style={styles.deleteButtonText}>Delete</Text>
                                             </TouchableOpacity>
                                         </View>
                                     </View>
@@ -1628,7 +1632,7 @@ const ManageProject = () => {
                                     {!isEditMode && hasExistingData ? renderBuildingDetailsView() : renderBuildingDetailsEdit()}
                                 </>
                             ) : (
-                                <ScrollView 
+                                <ScrollView
                                     contentContainerStyle={styles.modalScrollContent}
                                     showsVerticalScrollIndicator={true}
                                     style={{ flex: 1 }}
@@ -1843,27 +1847,38 @@ const styles = StyleSheet.create({
     },
     actionButtons: {
         flexDirection: 'row',
-        gap: 8,
+        gap: 10,
+        flex: 1,
     },
     editButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 8,
+        flex: 1,
+        flexDirection: 'row',
+        height: 42,
+        borderRadius: 10,
         backgroundColor: '#FFFBEB',
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#FEF3C7',
+        gap: 6,
+    },
+    editButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#D97706',
     },
     deleteButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 8,
+        flex: 1,
+        flexDirection: 'row',
+        height: 42,
+        borderRadius: 10,
         backgroundColor: '#FEF2F2',
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#FEE2E2',
+        gap: 6,
+    },
+    deleteButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#DC2626',
     },
     centered: {
         flex: 1,
@@ -2036,6 +2051,7 @@ const styles = StyleSheet.create({
         flex: 1,
         borderWidth: 1,
         borderColor: '#DBEAFE',
+        display: "none"
     },
     addDetailsText: {
         color: '#3B82F6',

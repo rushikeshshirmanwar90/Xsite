@@ -1,15 +1,3 @@
-/**
- * Project Sections Page
- * 
- * Features:
- * - Displays all sections within a project
- * - Shows completion status with green checkmark icons for completed sections
- * - Project-level completion toggle button
- * - Section completion status is fetched from the API and displayed with visual indicators
- * - Completed sections show green checkmark icon instead of type-specific icons
- * - Completed sections display a "Completed" badge next to the section name
- */
-
 import { domain } from '@/lib/domain';
 import { ProjectSection } from '@/types/project';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,7 +19,8 @@ import { toast } from 'sonner-native';
 
 const ProjectSections = () => {
   const params = useLocalSearchParams();
-  const { id, name, sectionData, materialAvailable, materialUsed } = params;
+  const { id, name, sectionData, materialAvailable, materialUsed, contractorId, contractorType, userId } = params;
+
 
   const [sections, setSections] = useState<ProjectSection[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -40,7 +29,7 @@ const ProjectSections = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [projectCompleted, setProjectCompleted] = useState(false);
   const [isUpdatingProjectCompletion, setIsUpdatingProjectCompletion] = useState(false);
-  const [sectionCompletions, setSectionCompletions] = useState<{[key: string]: boolean}>({});
+  const [sectionCompletions, setSectionCompletions] = useState<{ [key: string]: boolean }>({});
   const [isLoadingSectionCompletions, setIsLoadingSectionCompletions] = useState(false);
 
   // Debug state changes
@@ -93,7 +82,7 @@ const ProjectSections = () => {
     if (isCompleted) {
       return 'checkmark-circle';
     }
-    
+
     // Otherwise, show type-specific icon
     switch (type?.toLowerCase()) {
       case 'building':
@@ -111,7 +100,7 @@ const ProjectSections = () => {
     if (isCompleted) {
       return '#059669';
     }
-    
+
     // Otherwise, show default blue
     return '#0EA5E9';
   };
@@ -121,29 +110,44 @@ const ProjectSections = () => {
     if (isCompleted) {
       return '#ECFDF5';
     }
-    
+
     // Otherwise, show default light blue
     return '#E0F2FE';
   };
 
   const handleViewDetails = (section: ProjectSection) => {
-    console.log('Navigating to details with materials:', {
-      sectionId: section.sectionId || section._id,
-      passingMaterialsData: true
-    });
+    // If contractor params were passed from index.tsx, redirect to labor.tsx
+    if (contractorId && contractorType && userId) {
+      console.log(`🚀 Contractor selecting section '${section.name}' - routing to labor.tsx`);
+      router.push({
+        pathname: '../labor',
+        params: {
+          projectId: id as string,
+          projectName: name as string,
+          sectionId: section._id || section.sectionId,
+          sectionName: section.name,
+          contractorId: contractorId as string,
+          contractorType: contractorType as string,
+          userId: userId as string,
+        }
+      });
+      return;
+    }
 
+    // Standard navigation to details.tsx (non-contractors)
     router.push({
       pathname: '../details',
       params: {
         projectId: id as string,
         projectName: name as string,
-        sectionId: section._id || section.sectionId,  // ✅ FIXED: Use _id first (MongoDB document ID)
+        sectionId: section._id || section.sectionId,
         sectionName: section.name,
         materialAvailable: materialAvailable as string,
         materialUsed: materialUsed as string
       }
     });
   };
+
 
   const handleAddSection = async () => {
     if (!newSectionName.trim()) {
@@ -234,7 +238,7 @@ const ProjectSections = () => {
     console.log('Project ID:', id);
     console.log('Sections to check:', sections.length);
 
-    const completionStates: {[key: string]: boolean} = {};
+    const completionStates: { [key: string]: boolean } = {};
 
     for (const section of sections) {
       const sectionId = section.sectionId || section._id;
@@ -246,7 +250,7 @@ const ProjectSections = () => {
 
       try {
         console.log(`📡 Checking completion for section: ${section.name} (${sectionId})`);
-        
+
         const completionUrl = `${domain}/api/completion?updateType=project-section&id=${sectionId}&projectId=${id}`;
         const response = await apiClient.get(completionUrl, {
           timeout: 10000
@@ -282,13 +286,13 @@ const ProjectSections = () => {
   // Function to toggle project completion
   const toggleProjectCompletion = async () => {
     if (isUpdatingProjectCompletion) return;
-    
+
     // Validate project ID first
     if (!id || !isValidMongoId(id as string)) {
       toast.error('Invalid project ID. Please refresh the page and try again.');
       return;
     }
-    
+
     setIsUpdatingProjectCompletion(true);
     try {
       console.log('🎯 Toggling project completion (from project-sections)...');
@@ -296,14 +300,14 @@ const ProjectSections = () => {
       console.log('Project ID:', id);
       console.log('Project Name:', name);
       console.log('API URL:', `${domain}/api/completion`);
-      
+
       const payload = {
         updateType: 'project',
         id: id
       };
-      
+
       console.log('Payload:', JSON.stringify(payload, null, 2));
-      
+
       const response = await apiClient.patch(`/api/completion`, payload, {
         headers: {
           'Content-Type': 'application/json'
@@ -341,11 +345,11 @@ const ProjectSections = () => {
           method: error?.config?.method,
           data: error?.config?.data
         }
-      });x
-      
+      }); x
+
       // Handle specific error cases
       const errorMessage = error?.response?.data?.message || error?.message || 'Unknown error';
-      
+
       if (errorMessage.includes('not found')) {
         toast.error('Project not found. This project may not support completion tracking yet.');
       } else if (error?.code === 'ECONNABORTED') {
@@ -365,7 +369,7 @@ const ProjectSections = () => {
     console.log('🔍 [DEBUG] fetchProjectCompletionStatus called');
     console.log('🔍 [DEBUG] Project ID from params:', id);
     console.log('🔍 [DEBUG] Project Name from params:', name);
-    
+
     // Validate project ID first
     if (!id || !isValidMongoId(id as string)) {
       console.warn('⚠️ [DEBUG] Invalid project ID, skipping completion status fetch');
@@ -374,30 +378,30 @@ const ProjectSections = () => {
       setProjectCompleted(false);
       return;
     }
-    
+
     try {
       console.log('🔍 [DEBUG] Fetching project completion status (from project-sections)...');
       console.log('🔍 [DEBUG] Domain:', domain);
       console.log('🔍 [DEBUG] Project ID:', id);
-      
+
       const projectUrl = `${domain}/api/completion?updateType=project&id=${id}`;
       console.log('🔍 [DEBUG] Fetching from:', projectUrl);
-      
+
       const response = await apiClient.get(projectUrl, {
         timeout: 10000
       });
-      
+
       console.log('🔍 [DEBUG] Response status:', response.status);
       console.log('🔍 [DEBUG] Response data:', JSON.stringify(response.data, null, 2));
-      
+
       const responseData = response.data as { success?: boolean; data?: { isCompleted?: boolean } };
       if (responseData.success && responseData.data) {
         const completionStatus = responseData.data.isCompleted || false;
         console.log('🔍 [DEBUG] Extracted completion status:', completionStatus);
         console.log('🔍 [DEBUG] Setting projectCompleted to:', completionStatus);
-        
+
         setProjectCompleted(completionStatus);
-        
+
         console.log('✅ [DEBUG] Project completion status set to:', completionStatus);
         console.log('✅ [DEBUG] UI should now show:', completionStatus ? 'COMPLETED (green)' : 'COMPLETE BUTTON (gray)');
       } else {
@@ -417,14 +421,14 @@ const ProjectSections = () => {
         url: error?.config?.url,
         method: error?.config?.method
       });
-      
+
       // Handle specific error cases gracefully
       if (error?.response?.status === 404) {
         console.log('ℹ️ [DEBUG] Project completion status not available yet (404) - defaulting to false');
       } else if (error?.code === 'ECONNABORTED') {
         console.log('⏰ [DEBUG] Request timeout - defaulting to false');
       }
-      
+
       setProjectCompleted(false);
     }
   };
@@ -434,7 +438,7 @@ const ProjectSections = () => {
     console.log('🔍 [DEBUG] useEffect triggered for fetchProjectCompletionStatus');
     console.log('🔍 [DEBUG] Project ID dependency:', id);
     console.log('🔍 [DEBUG] Project Name dependency:', name);
-    
+
     if (id) {
       console.log('🔍 [DEBUG] Calling fetchProjectCompletionStatus...');
       fetchProjectCompletionStatus();
@@ -459,40 +463,8 @@ const ProjectSections = () => {
             <Text style={styles.projectSubtitle}>Project Sections</Text>
           </View>
         </View>
-        
-        {/* Project Completion Button */}
-        {(() => {
-          // Debug button rendering
-          console.log('🔍 [DEBUG] Rendering project completion button:');
-          console.log('🔍 [DEBUG] - projectCompleted:', projectCompleted);
-          console.log('🔍 [DEBUG] - isUpdatingProjectCompletion:', isUpdatingProjectCompletion);
-          console.log('🔍 [DEBUG] - name:', name);
-          console.log('🔍 [DEBUG] - Button text will be:', isUpdatingProjectCompletion ? 'Updating...' : `${name} Work ${projectCompleted ? 'Completed' : 'Complete'}`);
-          console.log('🔍 [DEBUG] - Icon will be:', projectCompleted ? "checkmark-circle (green)" : "ellipse-outline (gray)");
-          console.log('🔍 [DEBUG] - Style will be:', projectCompleted ? 'COMPLETED (green background)' : 'INCOMPLETE (gray background)');
-          return null; // This is just for debugging, doesn't render anything
-        })()}
-        <TouchableOpacity
-          style={[
-            styles.projectCompletionButton,
-            projectCompleted && styles.projectCompletionButtonCompleted,
-            isUpdatingProjectCompletion && styles.projectCompletionButtonDisabled
-          ]}
-          onPress={toggleProjectCompletion}
-          disabled={isUpdatingProjectCompletion}
-        >
-          <Ionicons 
-            name={projectCompleted ? "checkmark-circle" : "ellipse-outline"} 
-            size={20} 
-            color={projectCompleted ? "#059669" : "#6B7280"} 
-          />
-          <Text style={[
-            styles.projectCompletionButtonText,
-            projectCompleted && styles.projectCompletionButtonTextCompleted
-          ]}>
-            {isUpdatingProjectCompletion ? 'Updating...' : `${name} Work ${projectCompleted ? 'Completed' : 'Complete'}`}
-          </Text>
-        </TouchableOpacity>
+
+
       </View>
 
       {/* Sections List */}
@@ -506,7 +478,7 @@ const ProjectSections = () => {
             const sectionId = section.sectionId || section._id;
             const isCompleted = sectionCompletions[sectionId] || false;
             const isLoadingCompletion = isLoadingSectionCompletions && !sectionCompletions.hasOwnProperty(sectionId);
-            
+
             return (
               <View key={section._id || index} style={styles.sectionCard}>
                 <View style={styles.sectionContent}>

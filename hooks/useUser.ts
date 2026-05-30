@@ -24,6 +24,7 @@ export interface StaffUser {
     clientId: string;
     clientName: string;
     assignedAt?: Date;
+    isContractor?: boolean;
   }>; // Changed from clientIds to clients array with client details
   role: 'site-engineer' | 'supervisor' | 'manager';
   assignedProjects?: Array<{

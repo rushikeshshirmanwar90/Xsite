@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Alert,
   Animated,
@@ -27,6 +28,9 @@ interface LaborFormModalProps {
   projectName?: string;
   sectionName?: string;
   miniSections?: any[];
+  contractorId?: string;
+  contractorType?: string;
+  contractorContracts?: any[];
 }
 
 interface LaborCategory {
@@ -181,46 +185,126 @@ const laborCategories: LaborCategory[] = [
     ]
   },
   {
-    id: 'multitask',
-    name: 'Multitask Labor',
-    icon: 'layers-outline',
-    color: '#8B5CF6',
+    id: 'rcc',
+    name: 'RCC contractor',
+    icon: 'grid-outline',
+    color: '#475569',
     types: [
-      'General Multitask Worker',
-      'Skilled Multitask Labor',
-      'Semi-Skilled Multitask Labor',
-      'Multitask Helper',
-      'Versatile Construction Worker',
-      'All-Round Technician',
-      'Multi-Trade Specialist',
-      'Flexible Labor (Civil + Electrical)',
-      'Flexible Labor (Plumbing + Finishing)',
-      'Cross-Trained Worker'
+      'RCC Mason',
+      'RCC Helper',
+      'RCC Shuttering Worker',
+      'Bar Bender (RCC)',
+      'Concrete Mixer (RCC)'
+    ]
+  },
+  {
+    id: 'other',
+    name: 'Other Works',
+    icon: 'ellipsis-horizontal-outline',
+    color: '#6B7280',
+    types: [
+      'Custom Labor Type',
+      'Specialized Worker',
+      'Temporary Worker',
+      'Consultant',
+      'Other'
     ]
   }
 ];
+
+const getBasicTypesForCategory = (catId: string, types: string[]): string[] => {
+  switch (catId) {
+    case 'civil':
+      return ['Mason (Raj Mistri)', 'Helper / Unskilled Labour'];
+    case 'electrical':
+      return ['Electrician', 'Electrician Helper'];
+    case 'plumbing':
+      return ['Plumber', 'Plumber Helper'];
+    case 'finishing':
+      return ['Painter', 'Polish Worker'];
+    case 'hvac':
+      return ['AC Technician', 'Duct Fabricator'];
+    case 'firefighting':
+      return ['Fire Pipe Fitter', 'Sprinkler Technician'];
+    case 'external':
+      return ['Compound Wall Mason', 'Paver Block Labour'];
+    case 'waterproofing':
+      return ['Waterproofing Applicator', 'Basement Treatment Labour'];
+    case 'management':
+      return ['Site Engineer', 'Site Supervisor / Foreman'];
+    case 'equipment':
+      return ['Excavator / JCB Operator', 'Concrete Mixer Operator'];
+    case 'security':
+      return ['Security Guard', 'Housekeeping Labour'];
+    case 'rcc':
+      return ['RCC Mason', 'RCC Helper'];
+    case 'other':
+      return ['Custom Labor Type', 'Other'];
+    default:
+      const filtered = types.filter(t => !t.toLowerCase().includes('engineer') && !t.toLowerCase().includes('supervisor'));
+      if (filtered.length >= 2) {
+        return [filtered[0], filtered[1]];
+      }
+      return types.slice(0, 2);
+  }
+};
 
 const LaborFormModal: React.FC<LaborFormModalProps> = ({
   visible,
   onClose,
   onSubmit,
-  miniSections = []
+  miniSections = [],
+  contractorId,
+  contractorType,
+  contractorContracts
 }) => {
+  const allowedCategories = React.useMemo(() => {
+    if (contractorContracts && contractorContracts.length > 0) {
+      // Filter out completed contracts - only show active contracts
+      const activeContracts = contractorContracts.filter((c: any) => c.status !== 'completed');
+      const allowedNames = activeContracts.map((c: any) => c.contractType.toLowerCase());
+      
+      // Find matching categories for predefined contract types
+      const matchingCategories = laborCategories.filter(cat => allowedNames.includes(cat.name.toLowerCase()));
+      
+      // Check if there are any custom contract types (not in predefined categories)
+      const hasCustomContractTypes = activeContracts.some((c: any) => {
+        const contractType = c.contractType.toLowerCase();
+        return !laborCategories.some(cat => cat.name.toLowerCase() === contractType);
+      });
+      
+      // If there are custom contract types, include "Other Works" category
+      if (hasCustomContractTypes) {
+        const otherWorksCategory = laborCategories.find(cat => cat.id === 'other');
+        if (otherWorksCategory && !matchingCategories.some(cat => cat.id === 'other')) {
+          matchingCategories.push(otherWorksCategory);
+        }
+      }
+      
+      return matchingCategories;
+    }
+    return laborCategories;
+  }, [contractorContracts]);
+
   // Get screen dimensions and calculate safe bottom padding
   const { height: screenHeight } = Dimensions.get('window');
   const safeBottomPadding = Platform.OS === 'ios' ? 34 : 20; // iOS has home indicator, Android has navigation bar
-  
+
+  const { user } = useAuth();
+  const isStaffLogin = !!user?.role;
+
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedType, setSelectedType] = useState<string>('');
   const [count, setCount] = useState<string>('');
   const [perLaborCost, setPerLaborCost] = useState<string>('');
+  const [description, setDescription] = useState<string>('');
   const [selectedMiniSection, setSelectedMiniSection] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [laborEntries, setLaborEntries] = useState<any[]>([]);
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
   const [editingEntry, setEditingEntry] = useState<any | null>(null);
   const laborEntriesRef = useRef<any[]>([]);
-  
+
   // State for showing advanced options
   const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
 
@@ -231,6 +315,49 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
   const [progressText, setProgressText] = useState('Swipe to Submit All');
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const shimmerAnim = useRef(new Animated.Value(0)).current;
+
+  // If contractorType is passed, find and set the category (only if there are not multiple contracts)
+  useEffect(() => {
+    // Filter out completed contracts when checking for multiple contracts
+    const activeContracts = contractorContracts ? contractorContracts.filter((c: any) => c.status !== 'completed') : [];
+    const hasMultipleContracts = activeContracts && activeContracts.length > 1;
+    if (visible && contractorType && !hasMultipleContracts) {
+      const matchingCat = laborCategories.find(
+        cat => cat.name.toLowerCase() === contractorType.toLowerCase()
+      );
+      if (matchingCat) {
+        setSelectedCategory(matchingCat.id);
+        setShowAdvancedOptions(false);
+        // Show types section with animation
+        typesSectionOpacity.setValue(1);
+        typesSectionHeight.setValue(1);
+      }
+    }
+  }, [visible, contractorType, contractorContracts]);
+
+  // If contractorContracts has active contracts, handle auto-selection and advanced options
+  useEffect(() => {
+    if (visible && contractorContracts && contractorContracts.length > 0) {
+      // Filter out completed contracts - only consider active contracts
+      const activeContracts = contractorContracts.filter((c: any) => c.status !== 'completed');
+      
+      if (activeContracts.length === 1) {
+        const firstContractType = activeContracts[0].contractType;
+        const matchingCat = laborCategories.find(
+          cat => cat.name.toLowerCase() === firstContractType.toLowerCase()
+        );
+        if (matchingCat) {
+          setSelectedCategory(matchingCat.id);
+          setShowAdvancedOptions(false);
+          typesSectionOpacity.setValue(1);
+          typesSectionHeight.setValue(1);
+        }
+      } else if (activeContracts.length > 1) {
+        setSelectedCategory('');
+        setShowAdvancedOptions(false);
+      }
+    }
+  }, [visible, contractorContracts]);
 
   // Calculate max swipe distance based on screen width
   const BUTTON_SIZE = 54;
@@ -297,10 +424,10 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
   const handleSwipeMove = (gestureState: any) => {
     const { dx } = gestureState;
     const progress = Math.max(0, Math.min(dx / maxSwipeDistance, 1));
-    
+
     setSwipeProgress(progress);
     swipeAnimation.setValue(progress);
-    
+
     // Update progress text based on swipe progress
     if (progress < 0.3) {
       setProgressText('Swipe to Submit All');
@@ -325,13 +452,13 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
   const handleSwipeEnd = (gestureState: any) => {
     const { dx } = gestureState;
     const progress = dx / maxSwipeDistance;
-    
+
     console.log('Swipe ended, progress:', progress, 'laborEntries.length:', laborEntries.length);
-    
+
     if (progress >= 0.7) {
       // Success haptic feedback on completion
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      
+
       // Complete the swipe — snap to end
       Animated.spring(swipeAnimation, {
         toValue: 1,
@@ -345,7 +472,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
     } else {
       // Light haptic feedback on reset
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      
+
       // Animate back to start with spring physics
       Animated.spring(swipeAnimation, {
         toValue: 0,
@@ -377,6 +504,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
     setSelectedType('');
     setCount('');
     setPerLaborCost('');
+    setDescription('');
     setSelectedMiniSection('');
     setSearchQuery('');
     setLaborEntries([]);
@@ -388,7 +516,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
     setProgressText('Swipe to Submit All');
     swipeAnimation.setValue(0);
     setShowAdvancedOptions(false); // Reset advanced options
-    
+
     // Reset types section animations
     typesSectionOpacity.setValue(0);
     typesSectionHeight.setValue(0);
@@ -396,7 +524,8 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
 
   const handleCategorySelect = (category: LaborCategory) => {
     setSelectedCategory(category.id);
-    
+    setShowAdvancedOptions(false);
+
     // Show types section with animation
     const showTypesAnimations = [
       Animated.timing(typesSectionOpacity, {
@@ -421,12 +550,12 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
 
   const handleTypeSelect = (type: string) => {
     setSelectedType(type);
-    
+
     // If category is not set (quick selection), set it to 'civil' for Mistri and Labor
     if (!selectedCategory && (type === 'Mason (Raj Mistri)' || type === 'Helper / Unskilled Labour')) {
       setSelectedCategory('civil');
     }
-    
+
     // Auto scroll to mini-section selection
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
@@ -446,21 +575,22 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
     setSelectedType('');
     setCount('');
     setPerLaborCost('');
+    setDescription('');
     setSelectedMiniSection('');
     setSearchQuery('');
     setEditingEntry(null);
     setShowAdvancedOptions(false); // Reset advanced options
-    
+
     // Reset types section animations
     typesSectionOpacity.setValue(0);
     typesSectionHeight.setValue(0);
-    
+
     // Scroll back to top
     scrollViewRef.current?.scrollTo({ y: 0, animated: true });
   };
 
   const handleAddLabor = () => {
-    if (!selectedCategory || !selectedType || !count || !perLaborCost) {
+    if (!selectedCategory || !selectedType || !count || !perLaborCost || !description.trim()) {
       Alert.alert('Error', 'Please fill all required fields');
       return;
     }
@@ -486,17 +616,17 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
     const selectedCategoryData = laborCategories.find(cat => cat.id === selectedCategory);
     let selectedMiniSectionData;
     let miniSectionName;
-    
+
     if (selectedMiniSection === 'no-mini-section') {
       miniSectionName = 'General Building Labor';
     } else {
       selectedMiniSectionData = miniSections.find(s => s._id === selectedMiniSection);
       miniSectionName = selectedMiniSectionData?.name || '';
     }
-    
+
     // Create LaborEntry format
     const laborEntry: any = {
-      type: selectedType,
+      type: selectedType.trim(),
       category: selectedCategoryData?.name || '',
       count: countNum,
       perLaborCost: costNum,
@@ -505,6 +635,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
       miniSectionName: miniSectionName,
       icon: selectedCategoryData?.icon || 'people',
       color: selectedCategoryData?.color || '#3B82F6',
+      description: description || '',
     };
 
     // Add to entries list
@@ -515,11 +646,11 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
       console.log('New entry:', laborEntry);
       return newEntries;
     });
-    
+
     // Reset current entry form and hide form
     resetCurrentEntry();
     setShowAddForm(false);
-    
+
     // Scroll to top to show the summary
     scrollViewRef.current?.scrollTo({ y: 0, animated: true });
   };
@@ -530,11 +661,19 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
   };
 
   const goBackToCategories = () => {
+    // Filter out completed contracts when checking for multiple contracts
+    const activeContracts = contractorContracts ? contractorContracts.filter((c: any) => c.status !== 'completed') : [];
+    const hasMultipleContracts = activeContracts && activeContracts.length > 1;
+    if (contractorType && !hasMultipleContracts) {
+      setShowAdvancedOptions(false);
+      return;
+    }
+    if (isStaffLogin && (!activeContracts || activeContracts.length <= 1)) return; // Prevent clearing for regular staff unless they have multiple active contracts
     setSelectedCategory('');
     setSelectedType('');
     setSelectedMiniSection('');
     setSearchQuery('');
-    
+
     // Hide types section
     Animated.parallel([
       Animated.timing(typesSectionOpacity, {
@@ -556,6 +695,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
   const goBackToTypes = () => {
     setSelectedType('');
     setSelectedMiniSection('');
+    setShowAdvancedOptions(false);
     // Scroll to types section
     setTimeout(() => {
       scrollViewRef.current?.scrollTo({ y: 200, animated: true });
@@ -575,7 +715,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
     console.log('handleFinalSubmit called, currentEntries.length:', currentEntries.length);
     console.log('currentEntries:', currentEntries);
     console.log('laborEntries state:', laborEntries.length); // Compare with state
-    
+
     if (currentEntries.length === 0) {
       Alert.alert('Error', 'Please add at least one labor entry');
       return;
@@ -617,10 +757,10 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
 
   const editLaborEntry = (index: number) => {
     const entry = laborEntries[index];
-    
+
     // Set editing entry for display
     setEditingEntry(entry);
-    
+
     // Set form values to the entry being edited
     const categoryData = laborCategories.find(cat => cat.name === entry.category);
     if (categoryData) {
@@ -630,17 +770,18 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
     setCount(entry.count.toString());
     setPerLaborCost(entry.perLaborCost.toString());
     setSelectedMiniSection(entry.miniSectionId);
-    
+    setDescription(entry.description || '');
+
     // Remove the entry being edited
     removeLaborEntry(index);
-    
+
     // Show the add form
     setShowAddForm(true);
-    
+
     // Show the form sections
     typesSectionOpacity.setValue(1);
     typesSectionHeight.setValue(1);
-    
+
     // Scroll to the form
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
@@ -656,8 +797,8 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
           {/* Header */}
           <View style={styles.modalHeader}>
             <View style={styles.headerLeft}>
-              {selectedCategory && (
-                <TouchableOpacity 
+              {selectedCategory && (!isStaffLogin || contractorType || (contractorContracts && contractorContracts.filter((c: any) => c.status !== 'completed').length > 1)) && (
+                <TouchableOpacity
                   onPress={goBackToCategories}
                   style={styles.backButton}
                 >
@@ -671,9 +812,9 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          <ScrollView 
+          <ScrollView
             ref={scrollViewRef}
-            style={styles.scrollContent} 
+            style={styles.scrollContent}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={[
               styles.scrollContentContainer,
@@ -684,7 +825,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
             {laborEntries.length > 0 && (
               <View style={[styles.sectionContainer, styles.firstSectionContainer]}>
                 <Text style={styles.sectionTitle}>Added Labor Entries ({laborEntries.length})</Text>
-                
+
                 <View style={styles.compactLaborEntriesList}>
                   {laborEntries.map((entry, index) => (
                     <View key={index} style={styles.compactLaborEntryCard}>
@@ -703,14 +844,14 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                           </View>
                         </View>
                         <View style={styles.compactCardActions}>
-                          <TouchableOpacity 
+                          <TouchableOpacity
                             style={styles.compactEditButton}
                             onPress={() => editLaborEntry(index)}
                             activeOpacity={0.7}
                           >
                             <Ionicons name="pencil" size={14} color="#3B82F6" />
                           </TouchableOpacity>
-                          <TouchableOpacity 
+                          <TouchableOpacity
                             style={styles.compactRemoveButton}
                             onPress={() => confirmRemoveLaborEntry(index, entry.type)}
                             activeOpacity={0.7}
@@ -719,7 +860,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                           </TouchableOpacity>
                         </View>
                       </View>
-                      
+
                       <View style={styles.compactLaborMetrics}>
                         <View style={styles.compactMetricItem}>
                           <Ionicons name="people" size={14} color="#64748B" />
@@ -736,6 +877,13 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                           <Text style={styles.compactTotalValue}>₹{entry.totalCost.toLocaleString()}</Text>
                         </View>
                       </View>
+
+                      {entry.description ? (
+                        <View style={styles.compactDescriptionContainer}>
+                          <Ionicons name="document-text-outline" size={14} color="#64748B" style={{ marginRight: 4 }} />
+                          <Text style={styles.compactDescriptionText} numberOfLines={2}>{entry.description}</Text>
+                        </View>
+                      ) : null}
                     </View>
                   ))}
                 </View>
@@ -745,7 +893,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
             {/* Add Labor Button - Only show when there are existing entries */}
             {laborEntries.length > 0 && !showAddForm && (
               <View style={styles.addLaborButtonContainer}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.addLaborButton}
                   onPress={() => {
                     setShowAddForm(true);
@@ -785,7 +933,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                             </Text>
                           </View>
                         </View>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                           style={styles.editingBannerClose}
                           onPress={() => {
                             // Restore the entry back to the list
@@ -802,7 +950,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                           <Ionicons name="close" size={18} color="#6B7280" />
                         </TouchableOpacity>
                       </View>
-                      
+
                       <View style={styles.editingBannerDetails}>
                         <View style={styles.editingBannerMetric}>
                           <Ionicons name="people" size={14} color="#64748B" />
@@ -823,54 +971,34 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                   </View>
                 )}
 
-                {/* Step 1: Category Selection - Only show if advanced options are enabled */}
-                {showAdvancedOptions && (
-                  <View style={[styles.sectionContainer, styles.firstSectionContainer]}>
-                    {!selectedCategory ? (
-                      <>
-                        <View style={styles.searchContainer}>
-                          <View style={styles.searchInputWrapper}>
-                            <Ionicons name="search" size={20} color="#9CA3AF" />
-                            <TextInput
-                              style={styles.searchInput}
-                              value={searchQuery}
-                              onChangeText={setSearchQuery}
-                              placeholder="Search labor categories..."
-                              placeholderTextColor="#9CA3AF"
-                              returnKeyType="search"
-                            />
-                            {searchQuery.length > 0 && (
-                              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                                <Ionicons name="close-circle" size={20} color="#9CA3AF" />
-                              </TouchableOpacity>
-                            )}
-                          </View>
+                {/* Step 1: Category Selection */}
+                <View style={[styles.sectionContainer, styles.firstSectionContainer]}>
+                  {!selectedCategory ? (
+                    <>
+                      <View style={styles.searchContainer}>
+                        <View style={styles.searchInputWrapper}>
+                          <Ionicons name="search" size={20} color="#9CA3AF" />
+                          <TextInput
+                            style={styles.searchInput}
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            placeholder="Search labor categories..."
+                            placeholderTextColor="#9CA3AF"
+                            returnKeyType="search"
+                          />
+                          {searchQuery.length > 0 && (
+                            <TouchableOpacity onPress={() => setSearchQuery('')}>
+                              <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+                            </TouchableOpacity>
+                          )}
                         </View>
-                        
-                        {/* Hide Advanced Options Button */}
+                      </View>
+                    </>
+                  ) : (
+                    <View style={styles.sectionHeader}>
+                      <Text style={styles.sectionTitle}>Selected Category</Text>
+                      {(!isStaffLogin || (contractorContracts && contractorContracts.filter((c: any) => c.status !== 'completed').length > 1)) && (
                         <TouchableOpacity
-                          style={styles.hideAdvancedButton}
-                          onPress={() => {
-                            setShowAdvancedOptions(false);
-                            setSelectedCategory('');
-                            setSearchQuery('');
-                            // Scroll back to top
-                            setTimeout(() => {
-                              scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-                            }, 100);
-                          }}
-                          activeOpacity={0.7}
-                        >
-                          <View style={styles.hideAdvancedButtonContent}>
-                            <Ionicons name="chevron-up" size={18} color="#64748B" />
-                            <Text style={styles.hideAdvancedButtonText}>Hide Advanced Options</Text>
-                          </View>
-                        </TouchableOpacity>
-                      </>
-                    ) : (
-                      <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Selected Category</Text>
-                        <TouchableOpacity 
                           style={styles.undoButton}
                           onPress={goBackToCategories}
                           activeOpacity={0.7}
@@ -878,636 +1006,493 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                           <Ionicons name="arrow-undo-outline" size={16} color="#EA580C" />
                           <Text style={styles.undoButtonText}>Undo</Text>
                         </TouchableOpacity>
-                      </View>
-                    )}
-              
-              <View style={styles.categoriesContainer}>
-                {!selectedCategory && (() => {
-                  const filteredCategories = laborCategories.filter(category =>
-                    category.name.toLowerCase().includes(searchQuery.toLowerCase())
-                  );
-                  
-                  return filteredCategories.map((category) => (
-                    <TouchableOpacity
-                      key={category.id}
-                      style={styles.categoryCard}
-                      onPress={() => handleCategorySelect(category)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
-                        <Ionicons name={category.icon} size={24} color={category.color} />
-                      </View>
-                      <View style={styles.categoryInfo}>
-                        <Text style={styles.categoryName}>{category.name}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  ));
-                })()}
+                      )}
+                    </View>
+                  )}
 
-                {selectedCategory && (() => {
-                  const category = laborCategories.find(cat => cat.id === selectedCategory);
-                  return category ? (
-                    <View style={styles.selectedCategoryWrapper}>
-                      <View style={styles.selectedCategoryContainer}>
-                        <View style={[styles.categoryCard, styles.categoryCardSelected]}>
+                  <View style={styles.categoriesContainer}>
+                    {!selectedCategory && (() => {
+                      const filteredCategories = allowedCategories.filter(category =>
+                        category.name.toLowerCase().includes(searchQuery.toLowerCase())
+                      );
+
+                      return filteredCategories.map((category) => (
+                        <TouchableOpacity
+                          key={category.id}
+                          style={styles.categoryCard}
+                          onPress={() => handleCategorySelect(category)}
+                          activeOpacity={0.7}
+                        >
                           <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
                             <Ionicons name={category.icon} size={24} color={category.color} />
                           </View>
                           <View style={styles.categoryInfo}>
-                            <Text style={[styles.categoryName, styles.categoryNameSelected]}>
-                              {category.name}
-                            </Text>
+                            <Text style={styles.categoryName}>{category.name}</Text>
                           </View>
-                        </View>
-                      </View>
-                    </View>
-                  ) : null;
-                })()}
-              </View>
-            </View>
-                )}
+                        </TouchableOpacity>
+                      ));
+                    })()}
 
-            {/* Quick Labor Selection - Show when advanced options are NOT enabled */}
-            {!showAdvancedOptions && (
-              <View style={[styles.sectionContainer, styles.firstSectionContainer]}>
-                <View style={styles.quickLaborHeader}>
-                  <Ionicons name="people-circle-outline" size={24} color="#3B82F6" />
-                  <Text style={styles.quickLaborTitle}>Select Labor Type</Text>
-                </View>
-                
-                {!selectedType ? (
-                  <View style={styles.quickLaborOptions}>
-                    {/* Mistri Option */}
-                    <TouchableOpacity
-                      style={styles.quickLaborCard}
-                      onPress={() => {
-                        setSelectedCategory('civil'); // Set to Civil category
-                        handleTypeSelect('Mason (Raj Mistri)');
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.quickLaborCardContent}>
-                        <View style={[styles.quickLaborIcon, { backgroundColor: '#EFF6FF' }]}>
-                          <Ionicons name="hammer-outline" size={32} color="#3B82F6" />
-                        </View>
-                        <View style={styles.quickLaborInfo}>
-                          <Text style={styles.quickLaborName}>Mistri</Text>
-                          <Text style={styles.quickLaborSubtext}>Skilled mason worker</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={24} color="#3B82F6" />
-                      </View>
-                    </TouchableOpacity>
-
-                    {/* Labor Option */}
-                    <TouchableOpacity
-                      style={styles.quickLaborCard}
-                      onPress={() => {
-                        setSelectedCategory('civil'); // Set to Civil category
-                        handleTypeSelect('Helper / Unskilled Labour');
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.quickLaborCardContent}>
-                        <View style={[styles.quickLaborIcon, { backgroundColor: '#F0FDF4' }]}>
-                          <Ionicons name="people-outline" size={32} color="#10B981" />
-                        </View>
-                        <View style={styles.quickLaborInfo}>
-                          <Text style={styles.quickLaborName}>Labor</Text>
-                          <Text style={styles.quickLaborSubtext}>General helper</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={24} color="#10B981" />
-                      </View>
-                    </TouchableOpacity>
-
-                    {/* Show Advanced Options Button */}
-                    <TouchableOpacity
-                      style={styles.showAdvancedButton}
-                      onPress={() => {
-                        setShowAdvancedOptions(true);
-                        // Scroll to show the advanced options
-                        setTimeout(() => {
-                          scrollViewRef.current?.scrollTo({ y: 100, animated: true });
-                        }, 100);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.showAdvancedButtonContent}>
-                        <Ionicons name="options-outline" size={20} color="#7C3AED" />
-                        <Text style={styles.showAdvancedButtonText}>Show Advanced Options</Text>
-                        <Ionicons name="chevron-down" size={18} color="#7C3AED" />
-                      </View>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <View style={styles.selectedQuickLaborWrapper}>
-                    <View style={styles.selectedQuickLaborCard}>
-                      <View style={styles.selectedQuickLaborContent}>
-                        <View style={[styles.quickLaborIcon, { 
-                          backgroundColor: selectedType === 'Mason (Raj Mistri)' ? '#EFF6FF' : '#F0FDF4' 
-                        }]}>
-                          <Ionicons 
-                            name={selectedType === 'Mason (Raj Mistri)' ? 'hammer' : 'people'} 
-                            size={28} 
-                            color={selectedType === 'Mason (Raj Mistri)' ? '#3B82F6' : '#10B981'} 
-                          />
-                        </View>
-                        <View style={styles.quickLaborInfo}>
-                          <Text style={styles.selectedQuickLaborName}>
-                            {selectedType === 'Mason (Raj Mistri)' ? 'Mistri' : 'Labor'}
-                          </Text>
-                          <Text style={styles.quickLaborSubtext}>
-                            {selectedType === 'Mason (Raj Mistri)' ? 'Skilled mason worker' : 'General helper'}
-                          </Text>
-                        </View>
-                        <View style={styles.selectedQuickLaborActions}>
-                          <TouchableOpacity 
-                            style={styles.undoButton}
-                            onPress={() => {
-                              setSelectedType('');
-                              setSelectedCategory('');
-                            }}
-                            activeOpacity={0.7}
-                          >
-                            <Ionicons name="arrow-undo-outline" size={16} color="#EA580C" />
-                            <Text style={styles.undoButtonText}>Change</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    </View>
-                  </View>
-                )}
-              </View>
-            )}
-
-            {/* Step 2: Type Selection - Only show if advanced options are enabled */}
-            {showAdvancedOptions && selectedCategory && (
-              <Animated.View 
-                style={[
-                  styles.sectionContainer,
-                  {
-                    opacity: typesSectionOpacity,
-                    transform: [{
-                      scaleY: typesSectionHeight
-                    }]
-                  }
-                ]}
-              >
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Select Labor Type</Text>
-                  {selectedType && (
-                    <TouchableOpacity 
-                      style={styles.undoButton}
-                      onPress={goBackToTypes}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="arrow-undo-outline" size={16} color="#EA580C" />
-                      <Text style={styles.undoButtonText}>Undo</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-                
-                <View style={styles.typesContainer}>
-                  {(() => {
-                    const categoryTypes = laborCategories.find(cat => cat.id === selectedCategory)?.types || [];
-                    const displayTypes = selectedType ? categoryTypes.filter(type => type === selectedType) : categoryTypes;
-                    
-                    // Define basic labor types
-                    const basicLaborTypes = ['Mason (Raj Mistri)', 'Helper / Unskilled Labour'];
-                    
-                    // Filter types based on showAdvancedOptions
-                    const filteredTypes = showAdvancedOptions 
-                      ? displayTypes 
-                      : displayTypes.filter(type => basicLaborTypes.includes(type));
-                    
-                    return (
-                      <>
-                        {!selectedType && displayTypes.length > 0 && (
-                          <View style={styles.laborTypesContainer}>
-                            {/* Basic Labor Types - Mistri and Labor */}
-                            <View style={styles.basicTypesGroup}>
-                              <View style={styles.basicTypesHeader}>
-                                <Ionicons name="people-circle-outline" size={20} color="#3B82F6" />
-                                <Text style={styles.basicTypesHeaderText}>Quick Add</Text>
+                    {selectedCategory && (() => {
+                      const category = laborCategories.find(cat => cat.id === selectedCategory);
+                      return category ? (
+                        <View style={styles.selectedCategoryWrapper}>
+                          <View style={styles.selectedCategoryContainer}>
+                            <View style={[styles.categoryCard, styles.categoryCardSelected]}>
+                              <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
+                                <Ionicons name={category.icon} size={24} color={category.color} />
                               </View>
-                              
-                              <View style={styles.typesList}>
-                                {filteredTypes.map((type, index) => (
-                                  <TouchableOpacity
-                                    key={index}
-                                    style={[
-                                      styles.typeCard,
-                                      styles.basicTypeCard,
-                                      index === filteredTypes.length - 1 && !showAdvancedOptions && styles.typeCardLast
-                                    ]}
-                                    onPress={() => handleTypeSelect(type)}
-                                    activeOpacity={0.7}
-                                  >
-                                    <View style={styles.typeCardLeft}>
-                                      <View style={[styles.typeIconBadge, styles.basicTypeIconBadge]}>
-                                        <Ionicons name="person-outline" size={18} color="#3B82F6" />
-                                      </View>
-                                      <View style={styles.basicTypeInfo}>
-                                        <Text style={styles.typeCardName}>{type}</Text>
-                                        <Text style={styles.basicTypeSubtext}>
-                                          {type === 'Mason (Raj Mistri)' ? 'Skilled mason worker' : 'General helper'}
-                                        </Text>
-                                      </View>
-                                    </View>
-                                    <Ionicons name="chevron-forward" size={20} color="#3B82F6" />
-                                  </TouchableOpacity>
-                                ))}
-                              </View>
-                            </View>
-
-                            {/* Advanced Options - Show when toggled */}
-                            {showAdvancedOptions && (
-                              <>
-                                {/* Multitask Labor Option */}
-                                <TouchableOpacity
-                                  style={styles.multitaskLaborCard}
-                                  onPress={() => handleTypeSelect('Multitask Labor')}
-                                  activeOpacity={0.7}
-                                >
-                                  <View style={styles.multitaskLaborContent}>
-                                    <View style={styles.multitaskLaborIconContainer}>
-                                      <View style={styles.multitaskLaborIconBadge}>
-                                        <Ionicons name="people" size={20} color="#7C3AED" />
-                                      </View>
-                                      <View style={styles.multitaskLaborIconOverlay}>
-                                        <Ionicons name="star" size={14} color="#7C3AED" />
-                                      </View>
-                                    </View>
-                                    <View style={styles.multitaskLaborInfo}>
-                                      <Text style={styles.multitaskLaborTitle}>Multitask Labor</Text>
-                                      <Text style={styles.multitaskLaborSubtitle}>
-                                        Workers who can handle multiple tasks in this category
-                                      </Text>
-                                      <View style={styles.multitaskLaborBadge}>
-                                        <Ionicons name="flash" size={12} color="#7C3AED" />
-                                        <Text style={styles.multitaskLaborBadgeText}>Versatile</Text>
-                                      </View>
-                                    </View>
-                                    <View style={styles.multitaskLaborArrow}>
-                                      <Ionicons name="chevron-forward" size={20} color="#7C3AED" />
-                                    </View>
-                                  </View>
-                                </TouchableOpacity>
-
-                                {/* Specific Labor Types */}
-                                <View style={styles.specificTypesGroup}>
-                                  <View style={styles.specificTypesHeader}>
-                                    <View style={styles.specificTypesHeaderLine} />
-                                    <Text style={styles.specificTypesHeaderText}>All Labor Types</Text>
-                                    <View style={styles.specificTypesHeaderLine} />
-                                  </View>
-                                  
-                                  <View style={styles.typesList}>
-                                    {displayTypes.map((type, index) => (
-                                      <TouchableOpacity
-                                        key={index}
-                                        style={[
-                                          styles.typeCard,
-                                          index === displayTypes.length - 1 && styles.typeCardLast
-                                        ]}
-                                        onPress={() => handleTypeSelect(type)}
-                                        activeOpacity={0.7}
-                                      >
-                                        <View style={styles.typeCardLeft}>
-                                          <View style={styles.typeIconBadge}>
-                                            <Ionicons name="person-outline" size={18} color="#3B82F6" />
-                                          </View>
-                                          <Text style={styles.typeCardName}>{type}</Text>
-                                        </View>
-                                        <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-                                      </TouchableOpacity>
-                                    ))}
-                                  </View>
-                                </View>
-                              </>
-                            )}
-                          </View>
-                        )}
-
-                        {selectedType && (
-                          <View style={styles.selectedTypeWrapper}>
-                            <View style={styles.selectedTypeContainer}>
-                              {selectedType === 'Multitask Labor' ? (
-                                <View style={styles.selectedMultitaskLaborCard}>
-                                  <View style={styles.selectedMultitaskLaborContent}>
-                                    <View style={styles.selectedMultitaskLaborIconContainer}>
-                                      <View style={styles.selectedMultitaskLaborIconBadge}>
-                                        <Ionicons name="people" size={20} color="#7C3AED" />
-                                      </View>
-                                      <View style={styles.selectedMultitaskLaborIconOverlay}>
-                                        <Ionicons name="star" size={14} color="#7C3AED" />
-                                      </View>
-                                    </View>
-                                    <View style={styles.selectedMultitaskLaborInfo}>
-                                      <Text style={styles.selectedMultitaskLaborTitle}>Multitask Labor</Text>
-                                      <Text style={styles.selectedMultitaskLaborSubtitle}>
-                                        Versatile workers for multiple tasks
-                                      </Text>
-                                    </View>
-                                    <Ionicons name="checkmark-circle" size={22} color="#7C3AED" />
-                                  </View>
-                                </View>
-                              ) : (
-                                <View style={[styles.typeCard, styles.typeCardSelected]}>
-                                  <View style={styles.typeCardLeft}>
-                                    <View style={styles.typeIconBadge}>
-                                      <Ionicons name="person-outline" size={18} color="#3B82F6" />
-                                    </View>
-                                    <Text style={[styles.typeCardName, styles.typeCardNameSelected]}>
-                                      {selectedType}
-                                    </Text>
-                                  </View>
-                                  <Ionicons name="checkmark-circle" size={22} color="#3B82F6" />
-                                </View>
-                              )}
-                            </View>
-                          </View>
-                        )}
-                      </>
-                    );
-                  })()}
-                </View>
-              </Animated.View>
-            )}
-
-            {/* Step 3: Mini-Section Selection */}
-            {selectedType && (
-              <View style={styles.sectionContainer}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Select Work Area</Text>
-                  {selectedMiniSection && (
-                    <TouchableOpacity 
-                      style={styles.undoButton}
-                      onPress={goBackToMiniSections}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="arrow-undo-outline" size={16} color="#EA580C" />
-                      <Text style={styles.undoButtonText}>Undo</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-                
-                {/* Mini-Section Selection */}
-                <View style={styles.miniSectionFieldContainer}>
-                  <View style={styles.labelWithHelper}>
-                    <Text style={styles.miniSectionLabel}>
-                      Where is this labor being used? <Text style={styles.required}>*</Text>
-                    </Text>
-                    <Text style={styles.labelHelper}>Select the specific work area or choose general labor</Text>
-                  </View>
-                  
-                  {!selectedMiniSection && (
-                    <View style={styles.workAreaContainer}>
-                      {/* No Mini-Section Option */}
-                      <TouchableOpacity
-                        style={styles.noMiniSectionCard}
-                        onPress={() => handleMiniSectionSelect('no-mini-section')}
-                        activeOpacity={0.7}
-                      >
-                        <View style={styles.noMiniSectionContent}>
-                          <View style={styles.noMiniSectionIconContainer}>
-                            <View style={styles.noMiniSectionIconBadge}>
-                              <Ionicons name="business-outline" size={24} color="#7C3AED" />
-                            </View>
-                            <View style={styles.noMiniSectionIconOverlay}>
-                              <Ionicons name="globe-outline" size={16} color="#7C3AED" />
-                            </View>
-                          </View>
-                          <View style={styles.noMiniSectionInfo}>
-                            <Text style={styles.noMiniSectionTitle}>General Building Labor</Text>
-                            <Text style={styles.noMiniSectionSubtitle}>
-                              For labor that works across the entire building
-                            </Text>
-                            <View style={styles.noMiniSectionBadge}>
-                              <Ionicons name="checkmark-circle" size={14} color="#7C3AED" />
-                              <Text style={styles.noMiniSectionBadgeText}>No specific area</Text>
-                            </View>
-                          </View>
-                          <View style={styles.noMiniSectionArrow}>
-                            <Ionicons name="chevron-forward" size={20} color="#7C3AED" />
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-
-                      {/* Mini-Sections List */}
-                      {miniSections.length > 0 && (
-                        <View style={styles.miniSectionsGroup}>
-                          <View style={styles.miniSectionsHeader}>
-                            <View style={styles.miniSectionsHeaderLine} />
-                            <Text style={styles.miniSectionsHeaderText}>Specific Work Areas</Text>
-                            <View style={styles.miniSectionsHeaderLine} />
-                          </View>
-                          
-                          <View style={styles.miniSectionsList}>
-                            {miniSections.map((section: any, index: number) => (
-                              <TouchableOpacity
-                                key={section._id}
-                                style={[
-                                  styles.miniSectionCard,
-                                  index === miniSections.length - 1 && styles.miniSectionCardLast
-                                ]}
-                                onPress={() => handleMiniSectionSelect(section._id)}
-                                activeOpacity={0.7}
-                              >
-                                <View style={styles.miniSectionCardContent}>
-                                  <View style={styles.miniSectionIconBadge}>
-                                    <Ionicons name="layers-outline" size={20} color="#3B82F6" />
-                                  </View>
-                                  <View style={styles.miniSectionInfo}>
-                                    <Text style={styles.miniSectionName}>{section.name}</Text>
-                                    <Text style={styles.miniSectionDescription}>Specific area work</Text>
-                                  </View>
-                                  <View style={styles.miniSectionArrow}>
-                                    <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-                                  </View>
-                                </View>
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        </View>
-                      )}
-
-                      {miniSections.length === 0 && (
-                        <View style={styles.noSectionsInfo}>
-                          <View style={styles.noSectionsIconContainer}>
-                            <Ionicons name="information-circle-outline" size={24} color="#6B7280" />
-                          </View>
-                          <Text style={styles.noSectionsInfoText}>
-                            No specific work areas available. You can still add general building labor above.
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  )}
-
-                  {selectedMiniSection && (() => {
-                    if (selectedMiniSection === 'no-mini-section') {
-                      return (
-                        <View style={styles.selectedWorkAreaWrapper}>
-                          <View style={styles.selectedNoMiniSectionContainer}>
-                            <View style={styles.selectedNoMiniSectionCard}>
-                              <View style={styles.selectedNoMiniSectionContent}>
-                                <View style={styles.selectedNoMiniSectionIconContainer}>
-                                  <View style={styles.selectedNoMiniSectionIconBadge}>
-                                    <Ionicons name="business" size={24} color="#7C3AED" />
-                                  </View>
-                                  <View style={styles.selectedNoMiniSectionIconOverlay}>
-                                    <Ionicons name="globe" size={16} color="#7C3AED" />
-                                  </View>
-                                </View>
-                                <View style={styles.selectedNoMiniSectionInfo}>
-                                  <Text style={styles.selectedNoMiniSectionTitle}>General Building Labor</Text>
-                                  <Text style={styles.selectedNoMiniSectionSubtitle}>
-                                    Works across the entire building
-                                  </Text>
-                                </View>
-                                <Ionicons name="checkmark-circle" size={24} color="#7C3AED" />
-                              </View>
-                            </View>
-                          </View>
-                        </View>
-                      );
-                    } else {
-                      const section = miniSections.find(s => s._id === selectedMiniSection);
-                      return section ? (
-                        <View style={styles.selectedWorkAreaWrapper}>
-                          <View style={styles.selectedMiniSectionContainer}>
-                            <View style={styles.selectedMiniSectionCard}>
-                              <View style={styles.selectedMiniSectionContent}>
-                                <View style={styles.selectedMiniSectionIconBadge}>
-                                  <Ionicons name="layers" size={20} color="#3B82F6" />
-                                </View>
-                                <View style={styles.selectedMiniSectionInfo}>
-                                  <Text style={styles.selectedMiniSectionTitle}>{section.name}</Text>
-                                  <Text style={styles.selectedMiniSectionSubtitle}>Specific work area</Text>
-                                </View>
-                                <Ionicons name="checkmark-circle" size={22} color="#3B82F6" />
+                              <View style={styles.categoryInfo}>
+                                <Text style={[styles.categoryName, styles.categoryNameSelected]}>
+                                  {category.name}
+                                </Text>
                               </View>
                             </View>
                           </View>
                         </View>
                       ) : null;
-                    }
-                  })()}
-                </View>
-              </View>
-            )}
-
-            {/* Step 4: Labor Details */}
-            {selectedType && selectedMiniSection && (
-              <View style={styles.sectionContainer}>
-                <Text style={styles.sectionTitle}>Enter Labor Details</Text>
-                
-                {/* Labor Details Card */}
-                <View style={styles.laborDetailsCard}>
-                  <View style={styles.laborDetailsHeader}>
-                    <Text style={styles.laborDetailsTitle}>Labor Information</Text>
-                    <Text style={styles.laborDetailsSubtitle}>
-                      Specify the number of laborers and cost details
-                    </Text>
+                    })()}
                   </View>
+                </View>
 
-                  <View style={styles.laborDetailsSection}>
-                    <View style={styles.laborDetailsInputCard}>
-                      <View style={styles.laborDetailsCardHeader}>
-                        <View style={styles.laborSummaryContainer}>
-                          <View style={styles.laborSummaryHeader}>
-                            <View style={[styles.laborDetailsIconBadge, { backgroundColor: selectedCategoryData?.color + '20' }]}>
-                              <Ionicons name={selectedCategoryData?.icon || 'person-outline'} size={24} color={selectedCategoryData?.color || '#6B7280'} />
+                {/* Step 2: Type Selection */}
+                {selectedCategory && (
+                  <Animated.View
+                    style={[
+                      styles.sectionContainer,
+                      {
+                        opacity: typesSectionOpacity,
+                        transform: [{
+                          scaleY: typesSectionHeight
+                        }]
+                      }
+                    ]}
+                  >
+                    <View style={styles.sectionHeader}>
+                      <Text style={styles.sectionTitle}>
+                        {selectedType ? 'Selected Labor Type' : 'Select Labor Type'}
+                      </Text>
+                      {selectedType && (
+                        <TouchableOpacity
+                          style={styles.undoButton}
+                          onPress={goBackToTypes}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="arrow-undo-outline" size={16} color="#EA580C" />
+                          <Text style={styles.undoButtonText}>Clear</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    {!selectedType ? (
+                      <>
+                        {/* Basic Types — Labor & Mistri equivalent for this category */}
+                        <View style={styles.basicTypesGroup}>
+                          {getBasicTypesForCategory(selectedCategory, selectedCategoryData?.types || []).map((type, index) => (
+                            <TouchableOpacity
+                              key={index}
+                              style={[styles.typeCard, styles.basicTypeCard]}
+                              onPress={() => handleTypeSelect(type)}
+                              activeOpacity={0.7}
+                            >
+                              <View style={styles.typeCardLeft}>
+                                <View style={[styles.typeIconBadge, styles.basicTypeIconBadge]}>
+                                  <Ionicons
+                                    name={selectedCategoryData?.icon || 'person-outline'}
+                                    size={18}
+                                    color={selectedCategoryData?.color || '#3B82F6'}
+                                  />
+                                </View>
+                                <View style={styles.basicTypeInfo}>
+                                  <Text style={styles.typeCardName}>{type}</Text>
+                                  <Text style={styles.basicTypeSubtext}>Tap to select</Text>
+                                </View>
+                              </View>
+                              <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+
+                        {/* Advance Options Button */}
+                        {!showAdvancedOptions && (
+                          <TouchableOpacity
+                            style={styles.showAdvancedButton}
+                            onPress={() => {
+                              setShowAdvancedOptions(true);
+                              setTimeout(() => {
+                                scrollViewRef.current?.scrollToEnd({ animated: true });
+                              }, 100);
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <View style={styles.showAdvancedButtonContent}>
+                              <Ionicons name="options-outline" size={20} color="#7C3AED" />
+                              <Text style={styles.showAdvancedButtonText}>Advance Options</Text>
+                              <Ionicons name="chevron-down" size={18} color="#7C3AED" />
                             </View>
-                            <View style={styles.laborDetailsCardInfo}>
-                              <Text style={styles.laborDetailsCardName}>{selectedType}</Text>
-                              <Text style={styles.laborDetailsCardCategory}>
-                                {selectedCategoryData?.name}
+                          </TouchableOpacity>
+                        )}
+
+                        {/* Advanced Options — all types for this category */}
+                        {showAdvancedOptions && (
+                          <View style={styles.specificTypesGroup}>
+                            <View style={styles.specificTypesHeader}>
+                              <View style={styles.specificTypesHeaderLine} />
+                              <Text style={styles.specificTypesHeaderText}>All Labor Types</Text>
+                              <View style={styles.specificTypesHeaderLine} />
+                            </View>
+                            <View style={styles.typesList}>
+                              {(selectedCategoryData?.types || []).map((type, index) => (
+                                <TouchableOpacity
+                                  key={index}
+                                  style={[
+                                    styles.typeCard,
+                                    index === (selectedCategoryData!.types.length - 1) && styles.typeCardLast
+                                  ]}
+                                  onPress={() => handleTypeSelect(type)}
+                                  activeOpacity={0.7}
+                                >
+                                  <View style={styles.typeCardLeft}>
+                                    <View style={styles.typeIconBadge}>
+                                      <Ionicons
+                                        name={selectedCategoryData!.icon}
+                                        size={18}
+                                        color={selectedCategoryData!.color}
+                                      />
+                                    </View>
+                                    <Text style={styles.typeCardName}>{type}</Text>
+                                  </View>
+                                  <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                            <TouchableOpacity
+                              style={styles.hideAdvancedButton}
+                              onPress={() => setShowAdvancedOptions(false)}
+                              activeOpacity={0.7}
+                            >
+                              <View style={styles.hideAdvancedButtonContent}>
+                                <Ionicons name="chevron-up" size={16} color="#64748B" />
+                                <Text style={styles.hideAdvancedButtonText}>Hide Advanced Options</Text>
+                              </View>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </>
+                    ) : (
+                      /* Selected type — collapsed display card */
+                      <View style={styles.selectedTypeWrapper}>
+                        <View style={styles.selectedTypeContainer}>
+                          <View style={[styles.typeCard, styles.typeCardSelected]}>
+                            <View style={styles.typeCardLeft}>
+                              <View style={[styles.typeIconBadge, { backgroundColor: (selectedCategoryData?.color || '#3B82F6') + '20' }]}>
+                                <Ionicons
+                                  name={selectedCategoryData?.icon || 'person-outline'}
+                                  size={18}
+                                  color={selectedCategoryData?.color || '#3B82F6'}
+                                />
+                              </View>
+                              <Text style={[styles.typeCardName, styles.typeCardNameSelected]}>{selectedType}</Text>
+                            </View>
+                            <Ionicons name="checkmark-circle" size={22} color="#3B82F6" />
+                          </View>
+                        </View>
+                      </View>
+                    )}
+                  </Animated.View>
+                )}
+
+                {/* Step 3: Mini-Section Selection */}
+                {selectedType && (
+                  <View style={styles.sectionContainer}>
+                    <View style={styles.sectionHeader}>
+                      <Text style={styles.sectionTitle}>Select Work Area</Text>
+                      {selectedMiniSection && (
+                        <TouchableOpacity
+                          style={styles.undoButton}
+                          onPress={goBackToMiniSections}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="arrow-undo-outline" size={16} color="#EA580C" />
+                          <Text style={styles.undoButtonText}>Undo</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    {/* Mini-Section Selection */}
+                    <View style={styles.miniSectionFieldContainer}>
+                      <View style={styles.labelWithHelper}>
+                        <Text style={styles.miniSectionLabel}>
+                          Where is this labor being used? <Text style={styles.required}>*</Text>
+                        </Text>
+                        <Text style={styles.labelHelper}>Select the specific work area or choose general labor</Text>
+                      </View>
+
+                      {!selectedMiniSection && (
+                        <View style={styles.workAreaContainer}>
+                          {/* No Mini-Section Option */}
+                          <TouchableOpacity
+                            style={styles.noMiniSectionCard}
+                            onPress={() => handleMiniSectionSelect('no-mini-section')}
+                            activeOpacity={0.7}
+                          >
+                            <View style={styles.noMiniSectionContent}>
+                              <View style={styles.noMiniSectionIconContainer}>
+                                <View style={styles.noMiniSectionIconBadge}>
+                                  <Ionicons name="business-outline" size={24} color="#7C3AED" />
+                                </View>
+                                <View style={styles.noMiniSectionIconOverlay}>
+                                  <Ionicons name="globe-outline" size={16} color="#7C3AED" />
+                                </View>
+                              </View>
+                              <View style={styles.noMiniSectionInfo}>
+                                <Text style={styles.noMiniSectionTitle}>General Building Labor</Text>
+                                <Text style={styles.noMiniSectionSubtitle}>
+                                  For labor that works across the entire building
+                                </Text>
+                                <View style={styles.noMiniSectionBadge}>
+                                  <Ionicons name="checkmark-circle" size={14} color="#7C3AED" />
+                                  <Text style={styles.noMiniSectionBadgeText}>No specific area</Text>
+                                </View>
+                              </View>
+                              <View style={styles.noMiniSectionArrow}>
+                                <Ionicons name="chevron-forward" size={20} color="#7C3AED" />
+                              </View>
+                            </View>
+                          </TouchableOpacity>
+
+                          {/* Mini-Sections List */}
+                          {miniSections.length > 0 && (
+                            <View style={styles.miniSectionsGroup}>
+                              <View style={styles.miniSectionsHeader}>
+                                <View style={styles.miniSectionsHeaderLine} />
+                                <Text style={styles.miniSectionsHeaderText}>Specific Work Areas</Text>
+                                <View style={styles.miniSectionsHeaderLine} />
+                              </View>
+
+                              <View style={styles.miniSectionsList}>
+                                {miniSections.map((section: any, index: number) => (
+                                  <TouchableOpacity
+                                    key={section._id}
+                                    style={[
+                                      styles.miniSectionCard,
+                                      index === miniSections.length - 1 && styles.miniSectionCardLast
+                                    ]}
+                                    onPress={() => handleMiniSectionSelect(section._id)}
+                                    activeOpacity={0.7}
+                                  >
+                                    <View style={styles.miniSectionCardContent}>
+                                      <View style={styles.miniSectionIconBadge}>
+                                        <Ionicons name="layers-outline" size={20} color="#3B82F6" />
+                                      </View>
+                                      <View style={styles.miniSectionInfo}>
+                                        <Text style={styles.miniSectionName}>{section.name}</Text>
+                                        <Text style={styles.miniSectionDescription}>Specific area work</Text>
+                                      </View>
+                                      <View style={styles.miniSectionArrow}>
+                                        <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+                                      </View>
+                                    </View>
+                                  </TouchableOpacity>
+                                ))}
+                              </View>
+                            </View>
+                          )}
+
+                          {miniSections.length === 0 && (
+                            <View style={styles.noSectionsInfo}>
+                              <View style={styles.noSectionsIconContainer}>
+                                <Ionicons name="information-circle-outline" size={24} color="#6B7280" />
+                              </View>
+                              <Text style={styles.noSectionsInfoText}>
+                                No specific work areas available. You can still add general building labor above.
                               </Text>
                             </View>
-                          </View>
+                          )}
                         </View>
-                      </View>
-                      
-                      <View style={styles.laborInputSection}>
-                        <Text style={styles.laborInputLabel}>Number of laborers:</Text>
-                        <View style={styles.laborInputWrapper}>
-                          <TextInput
-                            style={styles.laborInputLarge}
-                            value={count}
-                            onChangeText={setCount}
-                            placeholder="Enter number of laborers"
-                            keyboardType="numeric"
-                            returnKeyType="next"
-                            placeholderTextColor="#94A3B8"
-                          />
-                          <Text style={styles.laborUnitLarge}>laborers</Text>
-                        </View>
-                        
-                        {count && parseInt(count) <= 0 && (
-                          <View style={styles.laborError}>
-                            <Ionicons name="warning" size={16} color="#EF4444" />
-                            <Text style={styles.laborErrorText}>
-                              Please enter a valid number of laborers
-                            </Text>
-                          </View>
-                        )}
-                        
-                        {!count && (
-                          <View style={styles.laborHint}>
-                            <Ionicons name="information-circle-outline" size={16} color="#3B82F6" />
-                            <Text style={styles.laborHintText}>
-                              Enter the number of laborers needed
-                            </Text>
-                          </View>
-                        )}
+                      )}
+
+                      {selectedMiniSection && (() => {
+                        if (selectedMiniSection === 'no-mini-section') {
+                          return (
+                            <View style={styles.selectedWorkAreaWrapper}>
+                              <View style={styles.selectedNoMiniSectionContainer}>
+                                <View style={styles.selectedNoMiniSectionCard}>
+                                  <View style={styles.selectedNoMiniSectionContent}>
+                                    <View style={styles.selectedNoMiniSectionIconContainer}>
+                                      <View style={styles.selectedNoMiniSectionIconBadge}>
+                                        <Ionicons name="business" size={24} color="#7C3AED" />
+                                      </View>
+                                      <View style={styles.selectedNoMiniSectionIconOverlay}>
+                                        <Ionicons name="globe" size={16} color="#7C3AED" />
+                                      </View>
+                                    </View>
+                                    <View style={styles.selectedNoMiniSectionInfo}>
+                                      <Text style={styles.selectedNoMiniSectionTitle}>General Building Labor</Text>
+                                      <Text style={styles.selectedNoMiniSectionSubtitle}>
+                                        Works across the entire building
+                                      </Text>
+                                    </View>
+                                    <Ionicons name="checkmark-circle" size={24} color="#7C3AED" />
+                                  </View>
+                                </View>
+                              </View>
+                            </View>
+                          );
+                        } else {
+                          const section = miniSections.find(s => s._id === selectedMiniSection);
+                          return section ? (
+                            <View style={styles.selectedWorkAreaWrapper}>
+                              <View style={styles.selectedMiniSectionContainer}>
+                                <View style={styles.selectedMiniSectionCard}>
+                                  <View style={styles.selectedMiniSectionContent}>
+                                    <View style={styles.selectedMiniSectionIconBadge}>
+                                      <Ionicons name="layers" size={20} color="#3B82F6" />
+                                    </View>
+                                    <View style={styles.selectedMiniSectionInfo}>
+                                      <Text style={styles.selectedMiniSectionTitle}>{section.name}</Text>
+                                      <Text style={styles.selectedMiniSectionSubtitle}>Specific work area</Text>
+                                    </View>
+                                    <Ionicons name="checkmark-circle" size={22} color="#3B82F6" />
+                                  </View>
+                                </View>
+                              </View>
+                            </View>
+                          ) : null;
+                        }
+                      })()}
+                    </View>
+                  </View>
+                )}
+
+                {/* Step 4: Labor Details */}
+                {selectedType && selectedMiniSection && (
+                  <View style={styles.sectionContainer}>
+                    <Text style={styles.sectionTitle}>Enter Labor Details</Text>
+
+                    {/* Labor Details Card */}
+                    <View style={styles.laborDetailsCard}>
+                      <View style={styles.laborDetailsHeader}>
+                        <Text style={styles.laborDetailsTitle}>Labor Information</Text>
+                        <Text style={styles.laborDetailsSubtitle}>
+                          Specify the number of laborers and cost details
+                        </Text>
                       </View>
 
-                      <View style={styles.laborInputSection}>
-                        <Text style={styles.laborInputLabel}>Cost per laborer:</Text>
-                        <View style={styles.laborInputWrapper}>
-                          <Text style={styles.laborCurrencySymbol}>₹</Text>
-                          <TextInput
-                            style={styles.laborInputLarge}
-                            value={perLaborCost}
-                            onChangeText={setPerLaborCost}
-                            placeholder="Enter cost per laborer"
-                            keyboardType="numeric"
-                            returnKeyType="done"
-                            placeholderTextColor="#94A3B8"
-                          />
+                      <View style={styles.laborDetailsSection}>
+                        <View style={styles.laborDetailsInputCard}>
+                          <View style={styles.laborDetailsCardHeader}>
+                            <View style={styles.laborSummaryContainer}>
+                              <View style={styles.laborSummaryHeader}>
+                                <View style={[styles.laborDetailsIconBadge, { backgroundColor: selectedCategoryData?.color + '20' }]}>
+                                  <Ionicons name={selectedCategoryData?.icon || 'person-outline'} size={24} color={selectedCategoryData?.color || '#6B7280'} />
+                                </View>
+                                <View style={styles.laborDetailsCardInfo}>
+                                  <Text style={styles.laborDetailsCardName}>
+                                    {selectedType}
+                                  </Text>
+                                  <Text style={styles.laborDetailsCardCategory}>
+                                    {selectedCategoryData?.name}
+                                  </Text>
+                                </View>
+                              </View>
+                            </View>
+                          </View>
+
+                          <View style={styles.laborInputSection}>
+                            <Text style={styles.laborInputLabel}>Number of laborers:</Text>
+                            <View style={styles.laborInputWrapper}>
+                              <TextInput
+                                style={styles.laborInputLarge}
+                                value={count}
+                                onChangeText={setCount}
+                                placeholder="Enter number of laborers"
+                                keyboardType="numeric"
+                                returnKeyType="next"
+                                placeholderTextColor="#94A3B8"
+                              />
+                              <Text style={styles.laborUnitLarge}>laborers</Text>
+                            </View>
+
+                            {count && parseInt(count) <= 0 && (
+                              <View style={styles.laborError}>
+                                <Ionicons name="warning" size={16} color="#EF4444" />
+                                <Text style={styles.laborErrorText}>
+                                  Please enter a valid number of laborers
+                                </Text>
+                              </View>
+                            )}
+
+                            {!count && (
+                              <View style={styles.laborHint}>
+                                <Ionicons name="information-circle-outline" size={16} color="#3B82F6" />
+                                <Text style={styles.laborHintText}>
+                                  Enter the number of laborers needed
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+
+                          <View style={styles.laborInputSection}>
+                            <Text style={styles.laborInputLabel}>Cost per laborer:</Text>
+                            <View style={styles.laborInputWrapper}>
+                              <Text style={styles.laborCurrencySymbol}>₹</Text>
+                              <TextInput
+                                style={styles.laborInputLarge}
+                                value={perLaborCost}
+                                onChangeText={setPerLaborCost}
+                                placeholder="Enter cost per laborer"
+                                keyboardType="numeric"
+                                returnKeyType="next"
+                                placeholderTextColor="#94A3B8"
+                              />
+                            </View>
+
+                            {perLaborCost && parseFloat(perLaborCost) <= 0 && (
+                              <View style={styles.laborError}>
+                                <Ionicons name="warning" size={16} color="#EF4444" />
+                                <Text style={styles.laborErrorText}>
+                                  Please enter a valid cost per laborer
+                                </Text>
+                              </View>
+                            )}
+
+                            {!perLaborCost && (
+                              <View style={styles.laborHint}>
+                                <Ionicons name="information-circle-outline" size={16} color="#3B82F6" />
+                                <Text style={styles.laborHintText}>
+                                  Enter the cost for each laborer
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+
+                          <View style={styles.laborInputSection}>
+                            <Text style={styles.laborInputLabel}>Description of work done:</Text>
+                            <View style={[styles.laborInputWrapper, { minHeight: 80, alignItems: 'flex-start', paddingTop: 6 }]}>
+                              <TextInput
+                                style={[styles.laborInputLarge, { textAlignVertical: 'top', paddingVertical: 4 }]}
+                                value={description}
+                                onChangeText={setDescription}
+                                placeholder="Enter details of work completed..."
+                                placeholderTextColor="#94A3B8"
+                                multiline={true}
+                                numberOfLines={3}
+                              />
+                            </View>
+                          </View>
                         </View>
-                        
-                        {perLaborCost && parseFloat(perLaborCost) <= 0 && (
-                          <View style={styles.laborError}>
-                            <Ionicons name="warning" size={16} color="#EF4444" />
-                            <Text style={styles.laborErrorText}>
-                              Please enter a valid cost per laborer
-                            </Text>
-                          </View>
-                        )}
-                        
-                        {!perLaborCost && (
-                          <View style={styles.laborHint}>
-                            <Ionicons name="information-circle-outline" size={16} color="#3B82F6" />
-                            <Text style={styles.laborHintText}>
-                              Enter the cost for each laborer
-                            </Text>
-                          </View>
-                        )}
                       </View>
                     </View>
                   </View>
-                </View>
-              </View>
-            )}
-            </>
+                )}
+              </>
             )}
 
             {/* Cancel Add Form Button - Only show when there are existing entries */}
             {laborEntries.length > 0 && showAddForm && (
               <View style={styles.cancelAddFormContainer}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.cancelAddFormButton}
                   onPress={() => {
                     // If editing, restore the entry back to the list
@@ -1521,7 +1506,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                     resetCurrentEntry();
                     setShowAddForm(false);
                   }}
-                  activeOpacity={0.7} 
+                  activeOpacity={0.7}
                 >
                   <Ionicons name="close" size={16} color="#6B7280" />
                   <Text style={styles.cancelAddFormText}>
@@ -1613,7 +1598,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                   </Animated.View>
 
                   {/* Swipe button with pulsing chevrons */}
-                  <Animated.View 
+                  <Animated.View
                     style={[
                       styles.swipeButton,
                       {
@@ -1672,10 +1657,10 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                       </Animated.View>
                     </Animated.View>
                   </Animated.View>
-                  
+
                   {/* Text */}
                   <View style={styles.swipeTextContainer}>
-                    <Animated.Text 
+                    <Animated.Text
                       style={[
                         styles.swipeText,
                         {
@@ -3515,6 +3500,58 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.7)',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
+  },
+  compactDescriptionContainer: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  compactDescriptionText: {
+    fontSize: 13,
+    color: '#475569',
+    lineHeight: 18,
+    fontStyle: 'italic',
+    flex: 1,
+  },
+  laborTypeInputContainer: {
+    marginTop: 16,
+  },
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 15,
+    color: '#0F172A',
+    paddingVertical: 14,
+    fontWeight: '500',
+  },
+  hintContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 6,
+  },
+  hintText: {
+    fontSize: 12,
+    color: '#3B82F6',
+    flex: 1,
   },
 });
 

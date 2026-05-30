@@ -50,6 +50,7 @@ interface MaterialCardEnhancedProps {
     currentProjectId?: string;
     userType?: string; // Add userType prop to control transfer button visibility
     onRefresh?: () => void; // Add refresh callback
+    canEdit?: boolean; // Admin-only edit, allowed only when material is unused
 }
 
 const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
@@ -63,6 +64,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
     currentProjectId,
     userType = 'staff', // Default to 'staff' if not provided
     onRefresh, // Add refresh callback
+    canEdit = false, // Admin-only edit, allowed only when material is unused
 }) => {
     // ✅ DEBUG: Log material values being passed to component
     console.log(`\n🎯 MATERIAL CARD DEBUG: ${material.name}`);
@@ -115,14 +117,25 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const [availableProjects, setAvailableProjects] = useState<Project[]>([]);
     const [loadingProjects, setLoadingProjects] = useState(false);
-    const [variantSelectionMode, setVariantSelectionMode] = useState<'usage' | 'transfer' | 'addStock'>('usage');
-    
+    const [variantSelectionMode, setVariantSelectionMode] = useState<'usage' | 'transfer' | 'addStock' | 'edit'>('usage');
+
     // Add Stock functionality states
     const [showAddStockModal, setShowAddStockModal] = useState(false);
     const [selectedStockVariant, setSelectedStockVariant] = useState<MaterialVariant | null>(null);
     const [addStockQuantity, setAddStockQuantity] = useState('');
     const [addStockCost, setAddStockCost] = useState('');
     const [addStockVendor, setAddStockVendor] = useState('');
+
+    // Edit Stock functionality states (admin-only, unused materials)
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [selectedEditVariant, setSelectedEditVariant] = useState<MaterialVariant | null>(null);
+    const [editName, setEditName] = useState('');
+    const [editUnit, setEditUnit] = useState('');
+    const [editQuantity, setEditQuantity] = useState('');
+    const [editCost, setEditCost] = useState('');
+    const [editVendor, setEditVendor] = useState('');
+    const [editSpecs, setEditSpecs] = useState<Record<string, string>>({});
+    const [savingEdit, setSavingEdit] = useState(false);
 
     // Transfer functionality functions
     const fetchAvailableProjects = async () => {
@@ -334,6 +347,112 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
             setAddStockVendor(variant.contractor_name || '');
             setShowVariantSelector(false);
             setShowAddStockModal(true);
+        } else if (variantSelectionMode === 'edit') {
+            openEditModalForVariant(variant);
+            setShowVariantSelector(false);
+        }
+    };
+
+    // Edit Stock: pre-fill the edit modal from the chosen variant
+    const openEditModalForVariant = (variant: MaterialVariant) => {
+        setSelectedEditVariant(variant);
+        setEditName(material.name);
+        setEditUnit(material.unit);
+        setEditQuantity(String(variant.quantity ?? ''));
+        setEditCost(String(variant.cost ?? ''));
+        setEditVendor(variant.contractor_name || '');
+        const specEntries: Record<string, string> = {};
+        Object.entries(variant.specs || {}).forEach(([key, value]) => {
+            specEntries[key] = value === undefined || value === null ? '' : String(value);
+        });
+        setEditSpecs(specEntries);
+        setShowEditModal(true);
+    };
+
+    const handleOpenEditModal = () => {
+        setShowOptionsMenu(false);
+
+        if (material.variants.length === 1) {
+            openEditModalForVariant(material.variants[0]);
+        } else {
+            setVariantSelectionMode('edit');
+            setShowVariantSelector(true);
+        }
+    };
+
+    const handleSaveEdit = async () => {
+        if (!selectedEditVariant) return;
+
+        const quantity = parseFloat(editQuantity);
+        const perUnitCost = editCost === '' ? 0 : parseFloat(editCost);
+
+        if (!editName.trim()) {
+            Alert.alert('Error', 'Material name cannot be empty');
+            return;
+        }
+        if (!editUnit.trim()) {
+            Alert.alert('Error', 'Unit cannot be empty');
+            return;
+        }
+        if (Number.isNaN(quantity) || quantity <= 0) {
+            Alert.alert('Error', 'Please enter a valid quantity (greater than 0)');
+            return;
+        }
+        if (Number.isNaN(perUnitCost) || perUnitCost < 0) {
+            Alert.alert('Error', 'Cost cannot be negative');
+            return;
+        }
+
+        try {
+            setSavingEdit(true);
+
+            // Preserve original spec value types where possible (numbers stay numbers)
+            const originalSpecs = selectedEditVariant.specs || {};
+            const updatedSpecs: Record<string, any> = {};
+            Object.entries(editSpecs).forEach(([key, value]) => {
+                const original = (originalSpecs as Record<string, any>)[key];
+                if (typeof original === 'number' && value.trim() !== '' && !Number.isNaN(Number(value))) {
+                    updatedSpecs[key] = Number(value);
+                } else {
+                    updatedSpecs[key] = value;
+                }
+            });
+
+            const response = await apiClient.patch(
+                `/api/material?projectId=${currentProjectId}&materialId=${selectedEditVariant._id}`,
+                {
+                    name: editName.trim(),
+                    unit: editUnit.trim(),
+                    qnt: quantity,
+                    perUnitCost: perUnitCost,
+                    specs: updatedSpecs,
+                    contractor_name: editVendor.trim() || undefined,
+                }
+            );
+
+            if (response.data?.success) {
+                Alert.alert('Success', 'Stock updated successfully');
+                setShowEditModal(false);
+                setSelectedEditVariant(null);
+                if (onRefresh) {
+                    onRefresh();
+                }
+            } else {
+                throw new Error(response.data?.message || response.data?.error || 'Failed to update stock');
+            }
+        } catch (error: any) {
+            const status = error?.response?.status;
+            const serverMessage = error?.response?.data?.message;
+            if (status === 409) {
+                Alert.alert(
+                    'Cannot Edit',
+                    serverMessage || 'This stock has already been used and can no longer be edited.'
+                );
+            } else {
+                Alert.alert('Error', serverMessage || error?.message || 'Failed to update stock');
+            }
+        } finally {
+            setSavingEdit(false);
         }
     };
 
@@ -542,12 +661,14 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                             <View style={styles.dateContainer}>
                                 <Text style={styles.dateText}>{formatDate(material.date)}</Text>
                             </View>
-                            {/* Three-dot menu - Only show for imported materials and non-staff users */}
-                            {activeTab === 'imported' && onTransferMaterial && !['staff', 'users'].includes(userType) && (
+                            {/* Three-dot menu - Show for imported materials when the user can
+                                add stock/transfer OR can edit (admin on unused material).
+                                Staff can open the menu for Add Stock & Transfer; Edit Stock
+                                stays hidden for them via the canEdit gate inside the menu. */}
+                            {activeTab === 'imported' && (onTransferMaterial || canEdit) && (
                                 <TouchableOpacity
                                     style={styles.optionsButton}
                                     onPress={() => {
-                                        console.log('🔍 Transfer button clicked - User type:', userType);
                                         setShowOptionsMenu(true);
                                     }}
                                     activeOpacity={0.7}
@@ -715,16 +836,26 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                             <Ionicons name="close" size={24} color="#374151" />
                         </TouchableOpacity>
                         <Text style={styles.modalTitle}>
-                            {variantSelectionMode === 'usage' ? 'Select Specification' : 'Select Material to Transfer'}
+                            {variantSelectionMode === 'usage'
+                                ? 'Select Specification'
+                                : variantSelectionMode === 'edit'
+                                    ? 'Select Stock to Edit'
+                                    : variantSelectionMode === 'addStock'
+                                        ? 'Select Stock to Add To'
+                                        : 'Select Material to Transfer'}
                         </Text>
                         <View style={{ width: 24 }} />
                     </View>
 
                     <ScrollView style={styles.modalContent}>
                         <Text style={styles.modalSubtitle}>
-                            {variantSelectionMode === 'usage' 
+                            {variantSelectionMode === 'usage'
                                 ? `Choose the specification of ${material.name} you want to use:`
-                                : `Choose the specification of ${material.name} you want to transfer:`
+                                : variantSelectionMode === 'edit'
+                                    ? `Choose the specification of ${material.name} you want to edit:`
+                                    : variantSelectionMode === 'addStock'
+                                        ? `Choose the specification of ${material.name} you want to add to:`
+                                        : `Choose the specification of ${material.name} you want to transfer:`
                             }
                         </Text>
                         {material.variants.map((variant, index) => (
@@ -856,6 +987,22 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                     onPress={() => setShowOptionsMenu(false)}
                 >
                     <View style={styles.optionsMenu}>
+                        {canEdit && (
+                            <>
+                                <TouchableOpacity
+                                    style={styles.optionItem}
+                                    onPress={handleOpenEditModal}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="create-outline" size={20} color="#3B82F6" />
+                                    <Text style={styles.optionText}>Edit Stock</Text>
+                                    <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+                                </TouchableOpacity>
+
+                                <View style={styles.optionDivider} />
+                            </>
+                        )}
+
                         <TouchableOpacity
                             style={styles.optionItem}
                             onPress={handleOpenAddStockModal}
@@ -865,7 +1012,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                             <Text style={styles.optionText}>Add Stock</Text>
                             <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
                         </TouchableOpacity>
-                        
+
                         <View style={styles.optionDivider} />
                         
                         <TouchableOpacity
@@ -1209,6 +1356,159 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 (!addStockQuantity || parseFloat(addStockQuantity) <= 0) && styles.confirmButtonTextDisabled
                             ]}>
                                 Add to Stock
+                            </Text>
+                        </TouchableOpacity>
+                    </ScrollView>
+                </View>
+            </Modal>
+
+            {/* Edit Stock Modal (admin-only, unused materials) */}
+            <Modal
+                visible={showEditModal}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setShowEditModal(false)}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalHeader}>
+                        <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                            <Ionicons name="close" size={24} color="#374151" />
+                        </TouchableOpacity>
+                        <Text style={styles.modalTitle}>Edit Stock</Text>
+                        <View style={{ width: 24 }} />
+                    </View>
+
+                    <ScrollView style={styles.modalContent}>
+                        {/* Material Info */}
+                        <View style={styles.usageMaterialInfo}>
+                            <View style={[styles.iconContainerLarge, { backgroundColor: material.color + '20' }]}>
+                                <Ionicons name={material.icon} size={32} color={material.color} />
+                            </View>
+                            <View style={styles.usageMaterialDetails}>
+                                <Text style={styles.usageMaterialName}>{material.name}</Text>
+                                <Text style={styles.usageMaterialAvailable}>
+                                    Current Stock: {selectedEditVariant?.quantity || 0} {material.unit}
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* Name */}
+                        <View style={styles.inputSection}>
+                            <Text style={styles.inputLabel}>Material Name *</Text>
+                            <TextInput
+                                style={styles.quantityInput}
+                                value={editName}
+                                onChangeText={setEditName}
+                                placeholder="Enter material name"
+                                placeholderTextColor="#9CA3AF"
+                            />
+                        </View>
+
+                        {/* Unit */}
+                        <View style={styles.inputSection}>
+                            <Text style={styles.inputLabel}>Unit *</Text>
+                            <TextInput
+                                style={styles.quantityInput}
+                                value={editUnit}
+                                onChangeText={setEditUnit}
+                                placeholder="e.g. bags, kg, pieces"
+                                placeholderTextColor="#9CA3AF"
+                            />
+                        </View>
+
+                        {/* Quantity */}
+                        <View style={styles.inputSection}>
+                            <Text style={styles.inputLabel}>Quantity ({editUnit || material.unit}) *</Text>
+                            <TextInput
+                                style={styles.quantityInput}
+                                value={editQuantity}
+                                onChangeText={setEditQuantity}
+                                keyboardType="decimal-pad"
+                                placeholder="Enter quantity"
+                                placeholderTextColor="#9CA3AF"
+                            />
+                        </View>
+
+                        {/* Per Unit Cost */}
+                        <View style={styles.inputSection}>
+                            <Text style={styles.inputLabel}>Per Unit Cost (₹/{editUnit || material.unit})</Text>
+                            <TextInput
+                                style={styles.quantityInput}
+                                value={editCost}
+                                onChangeText={setEditCost}
+                                keyboardType="decimal-pad"
+                                placeholder="Enter cost per unit"
+                                placeholderTextColor="#9CA3AF"
+                            />
+                        </View>
+
+                        {/* Vendor / Contractor */}
+                        <View style={styles.inputSection}>
+                            <Text style={styles.inputLabel}>Vendor / Contractor</Text>
+                            <TextInput
+                                style={styles.quantityInput}
+                                value={editVendor}
+                                onChangeText={setEditVendor}
+                                placeholder="Enter vendor or contractor name"
+                                placeholderTextColor="#9CA3AF"
+                                autoCapitalize="words"
+                            />
+                        </View>
+
+                        {/* Specifications */}
+                        {Object.keys(editSpecs).length > 0 && (
+                            <View style={styles.inputSection}>
+                                <Text style={styles.inputLabel}>Specifications</Text>
+                                {Object.keys(editSpecs).map((key) => (
+                                    <View key={key} style={styles.editSpecRow}>
+                                        <Text style={styles.editSpecKey}>{key}</Text>
+                                        <TextInput
+                                            style={[styles.quantityInput, styles.editSpecInput]}
+                                            value={editSpecs[key]}
+                                            onChangeText={(text) =>
+                                                setEditSpecs((prev) => ({ ...prev, [key]: text }))
+                                            }
+                                            placeholder={`Enter ${key}`}
+                                            placeholderTextColor="#9CA3AF"
+                                        />
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+
+                        {/* Summary */}
+                        {editQuantity !== '' && parseFloat(editQuantity) > 0 && (
+                            <View style={styles.addStockSummary}>
+                                <View style={styles.summaryRow}>
+                                    <Text style={styles.summaryLabel}>Total Cost:</Text>
+                                    <Text style={styles.summaryValue}>
+                                        ₹{(parseFloat(editQuantity) * (editCost === '' ? 0 : parseFloat(editCost) || 0)).toLocaleString('en-IN')}
+                                    </Text>
+                                </View>
+                            </View>
+                        )}
+
+                        {/* Save Button */}
+                        <TouchableOpacity
+                            style={[
+                                styles.confirmButton,
+                                { backgroundColor: '#3B82F6' },
+                                (savingEdit || !editQuantity || parseFloat(editQuantity) <= 0) && styles.confirmButtonDisabled
+                            ]}
+                            onPress={handleSaveEdit}
+                            activeOpacity={0.8}
+                            disabled={savingEdit || !editQuantity || parseFloat(editQuantity) <= 0}
+                        >
+                            <Ionicons
+                                name="save-outline"
+                                size={20}
+                                color={!savingEdit && editQuantity && parseFloat(editQuantity) > 0 ? "#FFFFFF" : "#9CA3AF"}
+                            />
+                            <Text style={[
+                                styles.confirmButtonText,
+                                (savingEdit || !editQuantity || parseFloat(editQuantity) <= 0) && styles.confirmButtonTextDisabled
+                            ]}>
+                                {savingEdit ? 'Saving...' : 'Save Changes'}
                             </Text>
                         </TouchableOpacity>
                     </ScrollView>
@@ -1655,7 +1955,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
         borderRadius: 12,
         padding: 8,
-        minWidth: 200,
+        minWidth: 260,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.25,
@@ -1850,6 +2150,19 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#92400E',
         lineHeight: 16,
+    },
+    editSpecRow: {
+        marginBottom: 12,
+    },
+    editSpecKey: {
+        fontSize: 13,
+        color: '#6B7280',
+        fontWeight: '500',
+        textTransform: 'capitalize',
+        marginBottom: 6,
+    },
+    editSpecInput: {
+        marginBottom: 0,
     },
 
 });

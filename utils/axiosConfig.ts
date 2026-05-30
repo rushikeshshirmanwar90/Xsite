@@ -58,11 +58,22 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error: any) => {
-    console.error(`❌ API Error: ${error.response?.status} ${error.config?.url}`, error.response?.data);
+    const status = error.response?.status;
+    const url = error.config?.url;
     
-    // Handle 401 Unauthorized errors
-    if (error.response?.status === 401) {
+    // Handle different error types with appropriate logging levels
+    if (status === 404) {
+      // 404 errors are often expected (e.g., checking if contractor exists)
+      console.log(`📝 API Not Found (404): ${url}`, error.response?.data?.message || 'Resource not found');
+    } else if (status === 401) {
       console.error('🚫 Unauthorized access - Bearer token may be invalid');
+      console.error(`❌ API Error: ${status} ${url}`, error.response?.data);
+    } else if (status >= 500) {
+      // Server errors are more critical
+      console.error(`🔥 Server Error (${status}): ${url}`, error.response?.data);
+    } else {
+      // Other client errors (400, 403, etc.)
+      console.warn(`⚠️ API Error: ${status} ${url}`, error.response?.data);
     }
     
     return Promise.reject(error);

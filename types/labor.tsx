@@ -16,6 +16,7 @@ export interface Labor {
   addedAt?: string;
   createdAt?: string;
   updatedAt?: string;
+  description?: string;
 }
 
 export interface LaborEntry {
@@ -23,6 +24,7 @@ export interface LaborEntry {
   category: string;
   count: number;
   perLaborCost: number;
+  description?: string;
 }
 
 export interface LaborCategory {

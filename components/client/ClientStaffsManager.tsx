@@ -69,7 +69,7 @@ const ClientStaffsManager: React.FC<ClientStaffsManagerProps> = ({
   const handleRemoveStaff = async (staffId: string, staffName: string) => {
     Alert.alert(
       'Remove Staff Member',
-      `Are you sure you want to remove ${staffName} from ${clientName}?`,
+      `Are you sure you want to remove ${staffName} from the organization?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
