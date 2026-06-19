@@ -32,6 +32,9 @@ interface HeaderProps {
     onOtherCostPress?: () => void;
     onLaborPress?: () => void;
     hideMenu?: boolean;
+    // Report generation button — only passed (and shown) when a mini-section is selected
+    onReportPress?: () => void;
+    isGeneratingReport?: boolean;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -59,6 +62,8 @@ const Header: React.FC<HeaderProps> = ({
     onOtherCostPress,
     onLaborPress,
     hideMenu = false,
+    onReportPress,
+    isGeneratingReport = false,
 }) => {
     // State to store fetched sections
     const [sections, setSections] = useState<Section[]>([]);
@@ -180,6 +185,25 @@ const Header: React.FC<HeaderProps> = ({
                                 <Ionicons name="sync" size={18} color="#FFFFFF" />
                             ) : (
                                 <Ionicons name="add" size={20} color="#FFFFFF" />
+                            )}
+                        </TouchableOpacity>
+                    )}
+
+                    {/* Report Generation Button — only shown when a mini-section is selected */}
+                    {onReportPress && (
+                        <TouchableOpacity
+                            style={[
+                                menuStyles.menuButton,
+                                isGeneratingReport && { opacity: 0.6 },
+                            ]}
+                            onPress={onReportPress}
+                            disabled={isGeneratingReport}
+                            activeOpacity={0.7}
+                        >
+                            {isGeneratingReport ? (
+                                <Ionicons name="sync" size={18} color="#3B82F6" />
+                            ) : (
+                                <Ionicons name="document-text-outline" size={20} color="#3B82F6" />
                             )}
                         </TouchableOpacity>
                     )}

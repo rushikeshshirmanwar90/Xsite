@@ -48,6 +48,7 @@ export interface Section {
   createdAt: string;
   updatedAt: string;
   __v: number;
+  activePhaseId?: string;
 }
 
 export interface MaterialTemplate {

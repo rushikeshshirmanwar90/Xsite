@@ -2,8 +2,8 @@ import PieChart, { PieChartColors20 } from '@/components/PieChart';
 import PieChartLegend, { LegendItem } from '@/components/PieChartLegend';
 import { getClientId } from '@/functions/clientId';
 import { getProjectData } from '@/functions/project';
+import { getSection } from '@/functions/details';
 import { useUser } from '@/hooks/useUser';
-import { domain } from '@/lib/domain';
 import { Project } from '@/types/project';
 import { formatCurrency, transformProjectDataToPieSlices } from '@/utils/analytics';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,6 +33,18 @@ const AnalyticsDashboard: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCompletedProjects, setShowCompletedProjects] = useState(false); // Toggle between ongoing and completed
+
+  // Segmented Tab and 3-page phases flow states
+  const [activeTab, setActiveTab] = useState<'cost' | 'phases'>('cost');
+  const [phasesSubPage, setPhasesSubPage] = useState<'projects' | 'sections' | 'phases'>('projects');
+  const [phasesProjectId, setPhasesProjectId] = useState<string | null>(null);
+  const [phasesSectionId, setPhasesSectionId] = useState<string | null>(null);
+  const [phasesSectionName, setPhasesSectionName] = useState<string | null>(null);
+  
+  const [miniSections, setMiniSections] = useState<any[]>([]);
+  const [trackers, setTrackers] = useState<any[]>([]);
+  const [loadingPhases, setLoadingPhases] = useState(false);
+  const [expandedMiniSectionId, setExpandedMiniSectionId] = useState<string | null>(null);
 
   // Performance optimization
   const isLoadingRef = React.useRef(false);
@@ -299,6 +311,128 @@ const AnalyticsDashboard: React.FC = () => {
     }
   };
 
+  // Construction Phase Constants
+  const SLAB_WORK_SUB_PHASES = [
+    "Shuttering", "Reinforcement", "Electrical Conduits", "Plumbing Sleeves",
+    "Inspection", "Concreting", "Curing", "De-shuttering", "Completed"
+  ];
+  const FLOOR_PHASES = [
+    "Column Work", "Slab Work", "Brickwork", "Electrical Concealed", "Plumbing Concealed",
+    "Plastering", "Waterproofing", "Flooring", "Putty", "Painting",
+    "Doors & Windows", "Electrical Fixtures", "Plumbing Fixtures", "Finishing", "Completed"
+  ];
+  const FOUNDATION_PHASES = [
+    "Excavation", "PCC", "Footing Reinforcement", "Footing Concrete", "Column Starter",
+    "Plinth Beam", "Backfilling", "Compaction", "Foundation Complete"
+  ];
+  const TERRACE_PHASES = [
+    "Slab Work", "Waterproofing", "Parapet Wall", "Water Tank Work", "Solar Installation",
+    "Terrace Finishing", "Completed"
+  ];
+
+  const getPhaseNamesForSection = (sectionName: string): string[] => {
+    const lower = (sectionName || '').toLowerCase();
+    if (lower.includes("foundation")) return FOUNDATION_PHASES;
+    if (lower.includes("terrace")) return TERRACE_PHASES;
+    return FLOOR_PHASES;
+  };
+
+  const handleProjectSelect = (project: Project) => {
+    if (!project._id) return;
+    
+    setPhasesProjectId(project._id);
+    const sections = project.section || [];
+    
+    if (sections.length === 1) {
+      // Direct redirection to the 3rd page if only 1 section exists
+      const singleSection = sections[0];
+      setPhasesSectionId(singleSection._id || singleSection.sectionId);
+      setPhasesSectionName(singleSection.name);
+      setPhasesSubPage('phases');
+    } else {
+      setPhasesSubPage('sections');
+    }
+  };
+
+  const handleSectionSelect = (sectionId: string, sectionName: string) => {
+    setPhasesSectionId(sectionId);
+    setPhasesSectionName(sectionName);
+    setPhasesSubPage('phases');
+  };
+
+  const handlePhasesBackPress = () => {
+    if (phasesSubPage === 'phases') {
+      // Find the selected project to check section count
+      const project = projects.find(p => p._id === phasesProjectId);
+      const sections = project?.section || [];
+      if (sections.length === 1) {
+        // Go back directly to projects list if it has only 1 section
+        setPhasesProjectId(null);
+        setPhasesSectionId(null);
+        setPhasesSectionName(null);
+        setPhasesSubPage('projects');
+      } else {
+        // Go back to sections list
+        setPhasesSectionId(null);
+        setPhasesSectionName(null);
+        setPhasesSubPage('sections');
+      }
+    } else if (phasesSubPage === 'sections') {
+      setPhasesProjectId(null);
+      setPhasesSubPage('projects');
+    }
+  };
+
+  const loadPhases = async (projectId: string, sectionId: string) => {
+    if (!projectId || !sectionId) {
+      setMiniSections([]);
+      setTrackers([]);
+      return;
+    }
+
+    setLoadingPhases(true);
+    try {
+      const project = projects.find(p => p._id === projectId);
+      const section = project?.section?.find(s => s._id === sectionId || s.sectionId === sectionId);
+      const sectionName = section?.name || phasesSectionName || '';
+
+      console.log(`🔍 Dashboard loading phases for Project: ${project?.name}, Section: ${sectionName}`);
+
+      // 1. Fetch mini-sections
+      const miniSecs = await getSection(sectionId);
+      setMiniSections(miniSecs);
+
+      // 2. Fetch trackers for this section
+      if (project?._id && sectionName) {
+        const response = await apiClient.get(`/api/construction-tracker?projectId=${project._id}&sectionName=${encodeURIComponent(sectionName)}`);
+        const responseData = response.data as any;
+        if (responseData.success && Array.isArray(responseData.data)) {
+          setTrackers(responseData.data);
+          console.log(`✅ Loaded ${responseData.data.length} trackers for section ${sectionName}`);
+        } else {
+          setTrackers([]);
+        }
+      } else {
+        setTrackers([]);
+      }
+    } catch (err) {
+      console.error('❌ Failed to load building phases:', err);
+      setTrackers([]);
+      setMiniSections([]);
+    } finally {
+      setLoadingPhases(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'phases' && phasesProjectId && phasesSectionId) {
+      loadPhases(phasesProjectId, phasesSectionId);
+    } else {
+      setMiniSections([]);
+      setTrackers([]);
+    }
+  }, [activeTab, phasesProjectId, phasesSectionId]);
+
   // Pull to refresh handler
   const onRefresh = async () => {
     // Prevent multiple refresh calls
@@ -309,6 +443,9 @@ const AnalyticsDashboard: React.FC = () => {
     setRefreshing(true);
     try {
       await fetchProjects(false);
+      if (activeTab === 'phases' && phasesProjectId && phasesSectionId) {
+        await loadPhases(phasesProjectId, phasesSectionId);
+      }
     } finally {
       setRefreshing(false);
     }
@@ -418,7 +555,359 @@ const AnalyticsDashboard: React.FC = () => {
     fetchProjects();
   }, []);
 
-  // Initialize fade animation
+  const renderCostingPieChart = () => {
+    return (
+      <Animated.View style={[styles.card, { opacity: fadeAnim }]}>
+        <View style={styles.heading}>
+          <Text style={styles.title}>
+            {showCompletedProjects ? 'Completed Projects' : 'Ongoing Projects'}
+          </Text>
+          <Text style={styles.subtitle}>
+            {showCompletedProjects ? 'Completed Project Costs' : 'Active Project Costs'}
+          </Text>
+        </View>
+
+        <View style={styles.chartContainer}>
+          <PieChart
+            data={pieData}
+            colors={colors}
+            size={280}
+            enableAnimation={true}
+            enableHover={true}
+            labelType="amount"
+            onSlicePress={handlePress}
+            centerContent={{
+              label: showCompletedProjects ? 'COMPLETED EXPENSES' : 'ONGOING EXPENSES',
+              value: formatCurrency(totalBudget),
+              subtitle: `${activeProjects.length} Project${activeProjects.length > 1 ? 's' : ''}`
+            }}
+          />
+        </View>
+
+        <PieChartLegend
+          items={legendData}
+          onItemClick={handlePress}
+          showPercentage={true}
+          showDescription={false}
+          layout="vertical"
+        />
+      </Animated.View>
+    );
+  };
+
+  const renderPhasesProjectsList = () => {
+    return (
+      <View style={styles.phaseTrackerContainer}>
+        <Text style={styles.sectionSubtitleHeader}>Select a Project</Text>
+        {projects.map((project) => {
+          const sections = project.section || [];
+          return (
+            <TouchableOpacity
+              key={project._id}
+              activeOpacity={0.7}
+              onPress={() => handleProjectSelect(project)}
+              style={styles.projectListCard}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.projectListName}>{project.name}</Text>
+                <Text style={styles.projectListAddress} numberOfLines={1}>
+                  {project.address || 'No address specified'}
+                </Text>
+                <Text style={styles.projectListSubText}>
+                  {sections.length} {sections.length === 1 ? 'Section' : 'Sections'}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    );
+  };
+
+  const renderPhasesSectionsList = () => {
+    const project = projects.find(p => p._id === phasesProjectId);
+    const sections = project?.section || [];
+
+    return (
+      <View style={styles.phaseTrackerContainer}>
+        {/* Back Button */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={handlePhasesBackPress}
+          style={styles.backButton}
+        >
+          <Ionicons name="arrow-back" size={18} color="#3B82F6" />
+          <Text style={styles.backButtonText}>Back to Projects</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.sectionSubtitleHeader}>Select a Section ({project?.name})</Text>
+        {sections.map((section) => (
+          <TouchableOpacity
+            key={section._id || section.sectionId}
+            activeOpacity={0.7}
+            onPress={() => handleSectionSelect(section._id || section.sectionId, section.name)}
+            style={styles.projectListCard}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.projectListName}>{section.name}</Text>
+              <Text style={styles.projectListSubText}>
+                Type: {section.type || 'Standard'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+
+  const renderBuildingPhasesTracker = () => {
+    const project = projects.find(p => p._id === phasesProjectId);
+    const sections = project?.section || [];
+    const section = sections.find(s => s._id === phasesSectionId || s.sectionId === phasesSectionId);
+    const sectionName = section?.name || phasesSectionName || 'Section';
+    const isSingleSectionProject = sections.length === 1;
+
+    if (loadingPhases) {
+      return (
+        <View style={styles.phaseTrackerContainer}>
+          {/* Back Button */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handlePhasesBackPress}
+            style={styles.backButton}
+          >
+            <Ionicons name="arrow-back" size={18} color="#3B82F6" />
+            <Text style={styles.backButtonText}>
+              {isSingleSectionProject ? "Back to Projects" : "Back to Sections"}
+            </Text>
+          </TouchableOpacity>
+          <View style={styles.loadingContainer}>
+            <Ionicons name="sync" size={36} color="#3B82F6" />
+            <Text style={styles.loadingText}>Loading building phases...</Text>
+          </View>
+        </View>
+      );
+    }
+
+    if (miniSections.length === 0) {
+      return (
+        <View style={styles.phaseTrackerContainer}>
+          {/* Back Button */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handlePhasesBackPress}
+            style={styles.backButton}
+          >
+            <Ionicons name="arrow-back" size={18} color="#3B82F6" />
+            <Text style={styles.backButtonText}>
+              {isSingleSectionProject ? "Back to Projects" : "Back to Sections"}
+            </Text>
+          </TouchableOpacity>
+          <View style={styles.emptyContainer}>
+            <Ionicons name="construct-outline" size={64} color="#CBD5E1" />
+            <Text style={styles.emptyTitle}>No Mini-sections Found</Text>
+            <Text style={styles.emptySubtitle}>
+              Go to the project details page to create and configure mini-sections for this section.
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    // Calculate section-wide average progress
+    const activeTrackers = trackers.filter(t => miniSections.some(ms => ms._id === t.miniSectionId));
+    const sectionAverageProgress = miniSections.length > 0
+      ? Math.round(miniSections.reduce((sum, ms) => {
+          const t = trackers.find(track => track.miniSectionId === ms._id);
+          return sum + (t?.overallProgress || 0);
+        }, 0) / miniSections.length)
+      : 0;
+
+    return (
+      <View style={styles.phaseTrackerContainer}>
+        {/* Back Button */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={handlePhasesBackPress}
+          style={styles.backButton}
+        >
+          <Ionicons name="arrow-back" size={18} color="#3B82F6" />
+          <Text style={styles.backButtonText}>
+            {isSingleSectionProject ? "Back to Projects" : "Back to Sections"}
+          </Text>
+        </TouchableOpacity>
+        {/* Section overall progress card */}
+        <View style={styles.sectionProgressCard}>
+          <View style={styles.sectionHeaderRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.sectionProgressTitle}>{sectionName} Progress</Text>
+              <Text style={styles.sectionProgressSubtitle}>Average completion across all floors/parts</Text>
+            </View>
+            <View style={styles.sectionPercentageBadge}>
+              <Text style={styles.sectionPercentageText}>{sectionAverageProgress}%</Text>
+            </View>
+          </View>
+          <View style={styles.progressBarBackground}>
+            <View style={[styles.progressBarFill, { width: `${sectionAverageProgress}%` }]} />
+          </View>
+          <View style={styles.sectionStatsRow}>
+            <Text style={styles.sectionStatText}>
+              Total Mini-sections: <Text style={{ fontWeight: '700', color: '#1E293B' }}>{miniSections.length}</Text>
+            </Text>
+            <Text style={styles.sectionStatText}>
+              Tracked: <Text style={{ fontWeight: '700', color: '#3B82F6' }}>{activeTrackers.length}</Text>
+            </Text>
+          </View>
+        </View>
+
+        {/* Mini-section accordion card list */}
+        <Text style={styles.sectionSubtitleHeader}>Mini-Sections & Phases</Text>
+        {miniSections.map((miniSec) => {
+          const tracker = trackers.find(t => t.miniSectionId === miniSec._id);
+          const isExpanded = expandedMiniSectionId === miniSec._id;
+          const progress = tracker?.overallProgress ?? 0;
+          
+          // Get the active phase
+          let activePhaseName = 'Column Work';
+          let activePhaseStatus = 'NOT_STARTED';
+
+          if (tracker && tracker.phases.length > 0) {
+            const linkedPhase = tracker.phases.find((p: any) => p._id === miniSec.activePhaseId);
+            const activePhase = linkedPhase || tracker.phases.find((p: any) => p.name.toLowerCase().includes('column')) || tracker.phases[0];
+            if (activePhase) {
+              activePhaseName = activePhase.name;
+              activePhaseStatus = activePhase.status;
+            }
+          }
+
+          const STATUS_META: Record<string, { label: string; color: string }> = {
+            NOT_STARTED: { label: 'Not Started', color: '#64748B' },
+            IN_PROGRESS:  { label: 'In Progress',  color: '#2563EB' },
+            ON_HOLD:      { label: 'On Hold',      color: '#D97706' },
+            COMPLETED:    { label: 'Completed',    color: '#059669' },
+          };
+
+          const statusInfo = STATUS_META[activePhaseStatus] || STATUS_META.NOT_STARTED;
+
+          // Default phases for display if tracker is not initialized in DB yet
+          const phaseNames = tracker?.phases ? tracker.phases.map((p: any) => p.name) : getPhaseNamesForSection(sectionName);
+          const phasesList = tracker?.phases || phaseNames.map((name: string, index: number) => ({
+            _id: `default-${index}`,
+            name,
+            status: 'NOT_STARTED',
+            progress: 0
+          }));
+
+          return (
+            <View key={miniSec._id} style={styles.miniSecCard}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setExpandedMiniSectionId(isExpanded ? null : miniSec._id)}
+                style={styles.miniSecHeader}
+              >
+                <View style={{ flex: 1, paddingRight: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
+                    <Text style={styles.miniSecName}>{miniSec.name}</Text>
+                    {miniSec.isCompleted && (
+                      <View style={styles.completedBadge}>
+                        <Ionicons name="checkmark-circle" size={12} color="#059669" />
+                        <Text style={styles.completedBadgeText}>Finished</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.activePhaseSubtitle} numberOfLines={1}>
+                    Phase: <Text style={{ fontWeight: '700', color: '#334155' }}>{activePhaseName}</Text> ({statusInfo.label})
+                  </Text>
+                </View>
+                
+                <View style={{ alignItems: 'flex-end', marginRight: 10 }}>
+                  <Text style={styles.miniSecProgressValue}>{progress}%</Text>
+                  <Text style={styles.miniSecProgressLabel}>Overall Progress</Text>
+                </View>
+
+                <Ionicons
+                  name={isExpanded ? "chevron-up" : "chevron-down"}
+                  size={20}
+                  color="#64748B"
+                />
+              </TouchableOpacity>
+
+              {/* Progress bar under the header */}
+              <View style={styles.miniSecProgressBarBg}>
+                <View style={[styles.miniSecProgressBarFill, { width: `${progress}%` }]} />
+              </View>
+
+              {isExpanded && (
+                <View style={styles.miniSecBody}>
+                  <Text style={styles.phaseTimelineTitle}>Construction Timeline</Text>
+                  <View style={styles.timelineContainer}>
+                    {phasesList.map((phase: any, index: number) => {
+                      const phaseStatus = phase.status || 'NOT_STARTED';
+                      const phaseProgress = phase.progress || 0;
+                      const phaseMeta = STATUS_META[phaseStatus] || STATUS_META.NOT_STARTED;
+                      
+                      const isPhaseCompleted = phaseStatus === 'COMPLETED';
+                      const isPhaseInProgress = phaseStatus === 'IN_PROGRESS';
+                      const isLastItem = index === phasesList.length - 1;
+
+                      return (
+                        <View key={phase._id || index} style={styles.timelineItem}>
+                          {/* Left dot/line */}
+                          <View style={styles.timelineLeftColumn}>
+                            <View style={[
+                              styles.timelineDot,
+                              isPhaseCompleted && styles.timelineDotCompleted,
+                              isPhaseInProgress && styles.timelineDotInProgress
+                            ]}>
+                              {isPhaseCompleted ? (
+                                <Ionicons name="checkmark" size={10} color="#FFFFFF" />
+                              ) : isPhaseInProgress ? (
+                                <View style={styles.innerDotInProgress} />
+                              ) : null}
+                            </View>
+                            {!isLastItem && (
+                              <View style={[
+                                styles.timelineLine,
+                                isPhaseCompleted && styles.timelineLineCompleted
+                              ]} />
+                            )}
+                          </View>
+
+                          {/* Right content */}
+                          <View style={styles.timelineContent}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                              <Text style={[
+                                styles.timelinePhaseName,
+                                isPhaseCompleted && styles.timelinePhaseNameCompleted,
+                                isPhaseInProgress && styles.timelinePhaseNameInProgress
+                              ]}>
+                                {phase.name}
+                              </Text>
+                              <View style={[
+                                styles.phaseStatusPill,
+                                { backgroundColor: phaseMeta.color + '15' }
+                              ]}>
+                                <Text style={[styles.phaseStatusText, { color: phaseMeta.color }]}>
+                                  {isPhaseInProgress ? `${phaseProgress}% In Progress` : phaseMeta.label}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+            </View>
+          );
+        })}
+      </View>
+    );
+  };
+
   useEffect(() => {
     if (!loading && projects.length > 0) {
       Animated.timing(fadeAnim, {
@@ -450,7 +939,9 @@ const AnalyticsDashboard: React.FC = () => {
           <View style={styles.headerLeft}>
             <View style={styles.projectInfo}>
               <Text style={styles.projectName}>Analysis Dashboard</Text>
-              <Text style={styles.projectSubtitle}>Financial Overview</Text>
+              <Text style={styles.projectSubtitle}>
+                {activeTab === 'phases' ? 'Building Phases' : 'Financial Overview'}
+              </Text>
             </View>
           </View>
           <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -490,45 +981,25 @@ const AnalyticsDashboard: React.FC = () => {
           </View>
         </View>
 
-        {/* Stats Section - Simplified */}
-        <View style={styles.statsSection}>
-          <TouchableOpacity 
-            style={[
-              styles.statBox, 
-              styles.statBoxPrimary,
-              !showCompletedProjects && styles.statBoxActive
-            ]}
-            onPress={() => setShowCompletedProjects(false)}
-            activeOpacity={0.7}
+        {/* Segmented Tab Selector */}
+        <View style={styles.tabHeader}>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'cost' && styles.activeTabButton]}
+            onPress={() => setActiveTab('cost')}
           >
-            <Text style={styles.statValue}>{projectsWithExpenses}</Text>
-            <Text style={styles.statLabel}>Ongoing Projects</Text>
-            {!showCompletedProjects && (
-              <View style={styles.activeIndicator} />
-            )}
+            <Ionicons name="pie-chart" size={16} color={activeTab === 'cost' ? '#FFFFFF' : '#64748B'} />
+            <Text style={[styles.tabText, activeTab === 'cost' && styles.activeTabText]}>Cost Analysis</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={[
-              styles.statBox, 
-              styles.statBoxSecondary,
-              showCompletedProjects && styles.statBoxActive
-            ]}
-            onPress={() => setShowCompletedProjects(true)}
-            activeOpacity={0.7}
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'phases' && styles.activeTabButton]}
+            onPress={() => setActiveTab('phases')}
           >
-            <Text style={styles.statValue}>{projectsWithoutExpenses}</Text>
-            <Text style={styles.statLabel}>Completed Projects</Text>
-            {showCompletedProjects && (
-              <View style={styles.activeIndicator} />
-            )}
+            <Ionicons name="construct" size={16} color={activeTab === 'phases' ? '#FFFFFF' : '#64748B'} />
+            <Text style={[styles.tabText, activeTab === 'phases' && styles.activeTabText]}>Project Phases</Text>
           </TouchableOpacity>
-          <View style={[styles.statBox, styles.statBoxTertiary]}>
-            <Text style={styles.statValue}>{totalProjects}</Text>
-            <Text style={styles.statLabel}>Total Projects</Text>
-          </View>
         </View>
 
-        {/* Content */}
+        {/* Content Display */}
         {loading ? (
           <View style={styles.loadingContainer}>
             <Animated.View style={{
@@ -541,7 +1012,7 @@ const AnalyticsDashboard: React.FC = () => {
             }}>
               <Ionicons name="sync" size={48} color="#3B82F6" />
             </Animated.View>
-            <Text style={styles.loadingText}>Loading projects...</Text>
+            <Text style={styles.loadingText}>Loading data...</Text>
             <Text style={[styles.loadingText, { fontSize: 12, marginTop: 4 }]}>Please wait...</Text>
           </View>
         ) : error ? (
@@ -558,54 +1029,72 @@ const AnalyticsDashboard: React.FC = () => {
               </Text>
             </TouchableOpacity>
           </View>
-        ) : activeProjects.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="pie-chart-outline" size={64} color="#CBD5E1" />
-            <Text style={styles.emptyTitle}>
-              {showCompletedProjects ? 'No Completed Projects' : 'No Ongoing Projects'}
-            </Text>
-            <Text style={styles.emptySubtitle}>
-              {showCompletedProjects 
-                ? 'Mark projects as complete to see their analytics here'
-                : 'Add materials and labor to your projects to see budget analytics'}
-            </Text>
-          </View>
+        ) : activeTab === 'phases' ? (
+          // RENDER PHASES 3-PAGES FLOW
+          phasesSubPage === 'projects' ? (
+            renderPhasesProjectsList()
+          ) : phasesSubPage === 'sections' ? (
+            renderPhasesSectionsList()
+          ) : (
+            renderBuildingPhasesTracker()
+          )
         ) : (
-          <Animated.View style={[styles.card, { opacity: fadeAnim }]}>
-            <View style={styles.heading}>
-              <Text style={styles.title}>
-                {showCompletedProjects ? 'Completed Projects' : 'Ongoing Projects'}
-              </Text>
-              <Text style={styles.subtitle}>
-                {showCompletedProjects ? 'Completed Project Costs' : 'Active Project Costs'}
-              </Text>
+          // RENDER DEFAULT COST ANALYSIS
+          <>
+            {/* Stats Section - Simplified */}
+            <View style={styles.statsSection}>
+              <TouchableOpacity 
+                style={[
+                  styles.statBox, 
+                  styles.statBoxPrimary,
+                  !showCompletedProjects && styles.statBoxActive
+                ]}
+                onPress={() => setShowCompletedProjects(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.statValue}>{projectsWithExpenses}</Text>
+                <Text style={styles.statLabel}>Ongoing Projects</Text>
+                {!showCompletedProjects && (
+                  <View style={styles.activeIndicator} />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[
+                  styles.statBox, 
+                  styles.statBoxSecondary,
+                  showCompletedProjects && styles.statBoxActive
+                ]}
+                onPress={() => setShowCompletedProjects(true)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.statValue}>{projectsWithoutExpenses}</Text>
+                <Text style={styles.statLabel}>Completed Projects</Text>
+                {showCompletedProjects && (
+                  <View style={styles.activeIndicator} />
+                )}
+              </TouchableOpacity>
+              <View style={[styles.statBox, styles.statBoxTertiary]}>
+                <Text style={styles.statValue}>{totalProjects}</Text>
+                <Text style={styles.statLabel}>Total Projects</Text>
+              </View>
             </View>
 
-            <View style={styles.chartContainer}>
-              <PieChart
-                data={pieData}
-                colors={colors}
-                size={280}
-                enableAnimation={true}
-                enableHover={true}
-                labelType="amount"
-                onSlicePress={handlePress}
-                centerContent={{
-                  label: showCompletedProjects ? 'COMPLETED EXPENSES' : 'ONGOING EXPENSES',
-                  value: formatCurrency(totalBudget),
-                  subtitle: `${activeProjects.length} Project${activeProjects.length > 1 ? 's' : ''}`
-                }}
-              />
-            </View>
-
-            <PieChartLegend
-              items={legendData}
-              onItemClick={handlePress}
-              showPercentage={true}
-              showDescription={false}
-              layout="vertical"
-            />
-          </Animated.View>
+            {activeProjects.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="pie-chart-outline" size={64} color="#CBD5E1" />
+                <Text style={styles.emptyTitle}>
+                  {showCompletedProjects ? 'No Completed Projects' : 'No Ongoing Projects'}
+                </Text>
+                <Text style={styles.emptySubtitle}>
+                  {showCompletedProjects 
+                    ? 'Mark projects as complete to see their analytics here'
+                    : 'Add materials and labor to your projects to see budget analytics'}
+                </Text>
+              </View>
+            ) : (
+              renderCostingPieChart()
+            )}
+          </>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -810,5 +1299,348 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     textAlign: 'center',
+  },
+  selectorBar: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  selectorWrapper: {
+    flex: 1,
+  },
+  selectorLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  pickerContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+  },
+  dropdownPicker: {
+    height: 48,
+    color: '#1E293B',
+  },
+  phaseTrackerContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  sectionProgressCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionProgressTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  sectionProgressSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  sectionPercentageBadge: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  sectionPercentageText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 15,
+  },
+  progressBarBackground: {
+    height: 10,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 5,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#3B82F6',
+    borderRadius: 5,
+  },
+  sectionStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  sectionStatText: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  sectionSubtitleHeader: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1E293B',
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  miniSecCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    marginBottom: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+  },
+  miniSecHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  miniSecName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  completedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#D1FAE5',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    gap: 3,
+  },
+  completedBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#065F46',
+  },
+  activePhaseSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  miniSecProgressValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1E293B',
+  },
+  miniSecProgressLabel: {
+    fontSize: 10,
+    color: '#94A3B8',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  miniSecProgressBarBg: {
+    height: 4,
+    backgroundColor: '#F1F5F9',
+    width: '100%',
+  },
+  miniSecProgressBarFill: {
+    height: '100%',
+    backgroundColor: '#10B981',
+  },
+  miniSecBody: {
+    padding: 16,
+    backgroundColor: '#FAFBFD',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  phaseTimelineTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 16,
+  },
+  timelineContainer: {
+    paddingLeft: 4,
+  },
+  timelineItem: {
+    flexDirection: 'row',
+    minHeight: 50,
+  },
+  timelineLeftColumn: {
+    alignItems: 'center',
+    marginRight: 12,
+    width: 16,
+  },
+  timelineDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  timelineDotCompleted: {
+    backgroundColor: '#10B981',
+  },
+  timelineDotInProgress: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 2,
+    borderColor: '#3B82F6',
+  },
+  innerDotInProgress: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#3B82F6',
+  },
+  timelineLine: {
+    width: 2,
+    flex: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 2,
+    zIndex: 1,
+  },
+  timelineLineCompleted: {
+    backgroundColor: '#10B981',
+  },
+  timelineContent: {
+    flex: 1,
+    paddingBottom: 16,
+  },
+  timelinePhaseName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  timelinePhaseNameCompleted: {
+    color: '#0F172A',
+    fontWeight: '700',
+  },
+  timelinePhaseNameInProgress: {
+    color: '#3B82F6',
+    fontWeight: '700',
+  },
+  phaseStatusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  phaseStatusText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
+  // ── Segmented Tab Header ─────────────────────────────────────────────
+  tabHeader: {
+    flexDirection: 'row',
+    marginHorizontal: 20,
+    marginBottom: 14,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 14,
+    padding: 4,
+  },
+  tabButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 11,
+    gap: 6,
+  },
+  activeTabButton: {
+    backgroundColor: '#3B82F6',
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  tabText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  activeTabText: {
+    color: '#FFFFFF',
+  },
+
+  // ── Back Button ──────────────────────────────────────────────────────
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 10,
+    alignSelf: 'flex-start',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  backButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#3B82F6',
+  },
+
+  // ── Project / Section List Cards ────────────────────────────────────
+  projectListCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  projectListName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 3,
+  },
+  projectListAddress: {
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 4,
+  },
+  projectListSubText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
 });

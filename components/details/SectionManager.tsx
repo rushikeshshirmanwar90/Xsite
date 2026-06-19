@@ -395,13 +395,13 @@ const SectionManager: React.FC<SectionManagerProps> = ({
                 style={[styles.iconButton, compact && styles.compactIconButton]}
                 onPress={() => handleEditSection(currentSection)}
               >
-                <MaterialIcons name="edit" size={compact ? 18 : 20} color="#3B82F6" />
+                <MaterialIcons name="edit" size={compact ? 13 : 20} color="#3B82F6" />
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.iconButton, compact && styles.compactIconButton]}
                 onPress={() => handleDeleteSection(currentSection)}
               >
-                <MaterialIcons name="delete" size={compact ? 18 : 20} color="#EF4444" />
+                <MaterialIcons name="delete" size={compact ? 13 : 20} color="#EF4444" />
               </TouchableOpacity>
             </>
           )}
@@ -409,7 +409,7 @@ const SectionManager: React.FC<SectionManagerProps> = ({
             style={[styles.addSectionButton, compact && styles.compactAddButton]}
             onPress={() => setShowAddSectionModal(true)}
           >
-            <MaterialIcons name="add" size={compact ? 20 : 24} color="#fff" />
+            <MaterialIcons name="add" size={compact ? 15 : 24} color="#fff" />
           </TouchableOpacity>
         </View>
       </View>
@@ -601,15 +601,15 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   compactPicker: {
-    height: 48,
+    height: 34,
     color: '#1F2937',
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '600',
   },
   actionButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
   iconButton: {
     height: 40,
@@ -620,10 +620,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
   },
   compactIconButton: {
-    height: 36,
-    width: 36,
-    borderRadius: 8,
-    margin: 2,
+    height: 26,
+    width: 26,
+    borderRadius: 6,
+    margin: 1,
   },
   addSectionButton: {
     backgroundColor: '#3B82F6',
@@ -634,10 +634,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   compactAddButton: {
-    height: 36,
-    width: 36,
-    borderRadius: 8,
-    margin: 2,
+    height: 26,
+    width: 26,
+    borderRadius: 6,
+    margin: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#3B82F6',
@@ -734,12 +734,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F3F4F6',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#D1D5DB',
-    marginTop: 8,
+    marginTop: 6,
   },
   miniSectionCompletionButtonCompleted: {
     backgroundColor: '#ECFDF5',
