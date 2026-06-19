@@ -1,7 +1,10 @@
 import { domain } from '@/lib/domain';
+import { getClientId } from '@/functions/clientId';
 import { ProjectSection } from '@/types/project';
 import { Ionicons } from '@expo/vector-icons';
 import apiClient from '@/utils/axiosConfig';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { PDFReportGenerator } from '@/utils/pdfReportGenerator';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -31,6 +34,7 @@ const ProjectSections = () => {
   const [isUpdatingProjectCompletion, setIsUpdatingProjectCompletion] = useState(false);
   const [sectionCompletions, setSectionCompletions] = useState<{ [key: string]: boolean }>({});
   const [isLoadingSectionCompletions, setIsLoadingSectionCompletions] = useState(false);
+  const [generatingStockReport, setGeneratingStockReport] = useState(false);
 
   // Debug state changes
   useEffect(() => {
@@ -283,6 +287,134 @@ const ProjectSections = () => {
     return /^[0-9a-fA-F]{24}$/.test(id);
   };
 
+  // Builds a readable key from a material's specs so entries sharing a name but with
+  // different specs (e.g. different grade/size/brand) are grouped into separate rows.
+  const buildSpecsKey = (specs: any) => {
+    if (!specs || typeof specs !== 'object' || Object.keys(specs).length === 0) return '';
+    return Object.keys(specs)
+      .sort()
+      .filter(k => specs[k] !== null && specs[k] !== undefined && specs[k] !== '')
+      .map(k => `${k}:${specs[k]}`)
+      .join('|');
+  };
+
+  // Fetches the project's full available + used material lists directly from the API
+  // (NOT the materialAvailable/materialUsed route params — those are only populated on
+  // some navigation paths into this screen and are empty on the common ones, e.g. from
+  // the project list), and groups them by name/unit/specs into stock rows. totalImported =
+  // currentlyAvailable + totalUsed, with the actual cost summed from both lists.
+  const fetchMaterialStockRows = async () => {
+    const clientId = await getClientId();
+    const projectId = id as string;
+    if (!clientId || !projectId) {
+      throw new Error('Missing project or client information');
+    }
+
+    const REPORT_LIMIT = 5000;
+    const buildQueryString = () => {
+      const queryParams = { projectId, clientId, page: 1, limit: REPORT_LIMIT, sortBy: 'createdAt', sortOrder: 'desc' };
+      return Object.entries(queryParams)
+        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+        .join('&');
+    };
+
+    const [availableResponse, usedResponse] = await Promise.all([
+      apiClient.get(`/api/material?${buildQueryString()}`),
+      apiClient.get(`/api/material-usage?${buildQueryString()}`),
+    ]);
+
+    const availableData = availableResponse.data as any;
+    const usedData = usedResponse.data as any;
+    const availableList = availableData.MaterialAvailable || availableData.materials || [];
+    const usedList = usedData.MaterialUsed || usedData.materials || [];
+
+    const grouped: { [key: string]: { name: string; unit: string; specs: Record<string, any>; currentlyAvailable: number; totalUsed: number; importedCost: number } } = {};
+
+    const getGroup = (entryName: string, entryUnit: string, entrySpecs: any) => {
+      const key = `${entryName}-${entryUnit}-${buildSpecsKey(entrySpecs)}`;
+      if (!grouped[key]) {
+        grouped[key] = { name: entryName, unit: entryUnit, specs: entrySpecs || {}, currentlyAvailable: 0, totalUsed: 0, importedCost: 0 };
+      }
+      return grouped[key];
+    };
+
+    const resolveCost = (m: any, qty: number) => {
+      if (m.totalCost !== undefined && m.totalCost !== null) return Number(m.totalCost);
+      return Number(m.perUnitCost ?? m.cost ?? 0) * qty;
+    };
+
+    availableList.forEach((m: any) => {
+      const qty = Number(m.qnt || 0);
+      const group = getGroup(m.name, m.unit, m.specs);
+      group.currentlyAvailable += qty;
+      group.importedCost += resolveCost(m, qty);
+    });
+
+    usedList.forEach((m: any) => {
+      const qty = Number(m.qnt || 0);
+      const group = getGroup(m.name, m.unit, m.specs);
+      group.totalUsed += qty;
+      group.importedCost += resolveCost(m, qty);
+    });
+
+    return Object.values(grouped).map(group => {
+      const totalImported = group.currentlyAvailable + group.totalUsed;
+      const perUnitCost = totalImported > 0 ? group.importedCost / totalImported : 0;
+      return {
+        name: group.name,
+        specs: group.specs,
+        unit: group.unit,
+        totalImported,
+        totalUsed: group.totalUsed,
+        currentlyAvailable: group.currentlyAvailable,
+        perUnitCost,
+        totalCost: group.importedCost,
+      };
+    });
+  };
+
+  // Generates a project-wide current material stock report — Sr No, Material Name,
+  // Total Imported (qty + per-unit price + total cost), Total Used, Total Available.
+  const handleGenerateStockReport = async () => {
+    if (generatingStockReport) return;
+    setGeneratingStockReport(true);
+    try {
+      const rows = await fetchMaterialStockRows();
+
+      if (rows.length === 0) {
+        toast.error('No materials found to generate a stock report');
+        return;
+      }
+
+      let userName = 'Admin';
+      try {
+        const userDetailsString = await AsyncStorage.getItem('user');
+        if (userDetailsString) {
+          const userData = JSON.parse(userDetailsString);
+          if (userData.firstName && userData.lastName) {
+            userName = `${userData.firstName} ${userData.lastName}`;
+          } else if (userData.firstName) {
+            userName = userData.firstName;
+          } else if (userData.name) {
+            userName = userData.name;
+          } else if (userData.username) {
+            userName = userData.username;
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error getting user data:', error);
+      }
+
+      const pdfGenerator = new PDFReportGenerator({}, { name: userName });
+      await pdfGenerator.generateMaterialStockReport(rows, (name as string) || 'Project');
+    } catch (error: any) {
+      console.error('❌ Error generating material stock report:', error);
+      toast.error(error?.message || 'Failed to generate stock report. Please try again.');
+    } finally {
+      setGeneratingStockReport(false);
+    }
+  };
+
   // Function to toggle project completion
   const toggleProjectCompletion = async () => {
     if (isUpdatingProjectCompletion) return;
@@ -345,7 +477,7 @@ const ProjectSections = () => {
           method: error?.config?.method,
           data: error?.config?.data
         }
-      }); x
+      });
 
       // Handle specific error cases
       const errorMessage = error?.response?.data?.message || error?.message || 'Unknown error';
@@ -464,7 +596,18 @@ const ProjectSections = () => {
           </View>
         </View>
 
-
+        <TouchableOpacity
+          onPress={handleGenerateStockReport}
+          style={styles.stockReportButton}
+          disabled={generatingStockReport}
+          activeOpacity={0.7}
+        >
+          {generatingStockReport ? (
+            <ActivityIndicator size="small" color="#0EA5E9" />
+          ) : (
+            <Ionicons name="stats-chart-outline" size={20} color="#0EA5E9" />
+          )}
+        </TouchableOpacity>
       </View>
 
       {/* Sections List */}
@@ -687,6 +830,11 @@ const styles = StyleSheet.create({
   },
   backButton: {
     marginRight: 12,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+  },
+  stockReportButton: {
     padding: 8,
     borderRadius: 8,
     backgroundColor: '#F1F5F9',

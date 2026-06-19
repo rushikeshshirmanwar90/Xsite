@@ -113,7 +113,7 @@ const NotificationPage: React.FC = () => {
         console.log('🎬 Initializing activities state to empty array');
         return [];
     });
-    
+
     // ✅ NEW: Vendor filter state - Changed to array for multiple selection
     const [selectedVendors, setSelectedVendors] = useState<string[]>([]);
     const [showVendorModal, setShowVendorModal] = useState(false);
@@ -133,18 +133,18 @@ const NotificationPage: React.FC = () => {
         // If activitiesRaw is the API response object (has 'activities' property), extract it
         if (activitiesRaw && typeof activitiesRaw === 'object') {
             const anyActivities = activitiesRaw as any;
-            
+
             // Try different possible response structures
             if (anyActivities.data?.activities && Array.isArray(anyActivities.data.activities)) {
                 console.log('   ⚠️ WARNING: State contains nested API response, extracting activities array');
                 return anyActivities.data.activities as Activity[];
             }
-            
+
             if (anyActivities.activities && Array.isArray(anyActivities.activities)) {
                 console.log('   ⚠️ WARNING: State contains API response object, extracting activities array');
                 return anyActivities.activities as Activity[];
             }
-            
+
             if (anyActivities.data && Array.isArray(anyActivities.data)) {
                 console.log('   ⚠️ WARNING: State contains data array, extracting it');
                 return anyActivities.data as Activity[];
@@ -172,7 +172,7 @@ const NotificationPage: React.FC = () => {
     // Animation
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(50)).current;
-    
+
     // ScrollView reference for scroll-to-top functionality
     const scrollViewRef = useRef<ScrollView>(null);
 
@@ -234,7 +234,7 @@ const NotificationPage: React.FC = () => {
     }, []);
 
     // State for date-based pagination
-    const [dateGroups, setDateGroups] = useState<{date: string, activities: any[], count: number}[]>([]);
+    const [dateGroups, setDateGroups] = useState<{ date: string, activities: any[], count: number }[]>([]);
     const [hasMoreDates, setHasMoreDates] = useState(false);
     const [nextDate, setNextDate] = useState<string | null>(null);
     const [loadingMore, setLoadingMore] = useState(false);
@@ -247,7 +247,7 @@ const NotificationPage: React.FC = () => {
     const [availableDates, setAvailableDates] = useState<string[]>([]);
     const [hasNextDate, setHasNextDate] = useState(false);
     const [hasPrevDate, setHasPrevDate] = useState(false);
-    
+
     // Date picker state
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [selectedDate, setSelectedDate] = useState(new Date());
@@ -256,7 +256,7 @@ const NotificationPage: React.FC = () => {
         console.log('🚀 fetchActivities CALLED');
         console.log('   - targetDate:', targetDate);
         console.log('   - currentDate:', currentDate);
-        
+
         // Prevent duplicate calls
         if (isLoadingRef.current) {
             console.log('⏸️ Skipping fetch - already loading');
@@ -299,13 +299,13 @@ const NotificationPage: React.FC = () => {
             const dateToFetch = targetDate || currentDate;
             // If contractor filter is active, do NOT filter by date on the backend so we fetch all materials!
             const shouldFilterByDate = selectedVendors.length === 0;
-            
+
             // Simplified API parameters - the API doesn't support date-based pagination
             const activityParams = new URLSearchParams({
                 clientId,
                 ...(shouldFilterByDate && targetDate && { targetDate: dateToFetch }) // Only add targetDate if specified
             });
-            
+
             const materialParams = new URLSearchParams({
                 clientId,
                 ...(shouldFilterByDate && targetDate && { targetDate: dateToFetch }) // Only add targetDate if specified
@@ -335,12 +335,12 @@ const NotificationPage: React.FC = () => {
                         console.error('   - Error Message:', err.message);
                         console.error('   - Error Code:', err.code);
                         // Return structure that matches successful response but indicates failure
-                        return { 
-                            data: { 
-                                success: false, 
+                        return {
+                            data: {
+                                success: false,
                                 error: err?.response?.data?.message || err.message,
                                 data: { dateGroups: [], hasMoreDates: false, nextDate: null }
-                            } 
+                            }
                         };
                     }),
                 apiClient.get(`/api/materialActivity?${materialParams.toString()}`)
@@ -384,7 +384,7 @@ const NotificationPage: React.FC = () => {
             console.log('\n--- API RESPONSES ---');
             console.log('Activity Response Success:', activityRes.data.success !== false);
             console.log('Material Activity Response Success:', materialActivityRes.data.success !== false);
-            
+
             // DEBUG: Log full response structure
             console.log('\n--- FULL API RESPONSE DEBUG ---');
             console.log('Activity Response Structure:');
@@ -393,14 +393,14 @@ const NotificationPage: React.FC = () => {
             console.log('  - Success field:', activityRes.data.success);
             console.log('  - Message field:', (activityRes.data as any).message);
             console.log('  - Data field keys:', Object.keys(activityRes.data.data || {}));
-            
+
             console.log('Material Activity Response Structure:');
             console.log('  - Status:', (materialActivityRes as any).status);
             console.log('  - Data keys:', Object.keys(materialActivityRes.data || {}));
             console.log('  - Success field:', materialActivityRes.data.success);
             console.log('  - Message field:', (materialActivityRes.data as any).message);
             console.log('  - Data field keys:', Object.keys(materialActivityRes.data.data || {}));
-            
+
             // Check if both APIs failed
             if ((activityRes.data as any).success === false && (materialActivityRes.data as any).success === false) {
                 console.error('❌ Both APIs failed, throwing error');
@@ -426,7 +426,7 @@ const NotificationPage: React.FC = () => {
             console.log('Target Date:', targetDate || currentDate);
             console.log('Activity List Length:', activityList.length);
             console.log('Material List Length:', materialList.length);
-            
+
             // DEBUG: Log the actual activities content
             console.log('\n--- ACTIVITIES CONTENT DEBUG ---');
             console.log('Activity List Sample:');
@@ -447,7 +447,7 @@ const NotificationPage: React.FC = () => {
                 const rawDate = activity.date || activity.createdAt;
                 return rawDate ? new Date(rawDate).toLocaleDateString('en-CA') : null;
             }).filter(Boolean);
-            
+
             const materialDates = materialList.map((material: any) => {
                 const rawDate = material.date || material.createdAt;
                 return rawDate ? new Date(rawDate).toLocaleDateString('en-CA') : null;
@@ -474,10 +474,10 @@ const NotificationPage: React.FC = () => {
             const [year, month, day] = finalDateToUse.split('-').map(Number);
             const currentDateObj = new Date(year, month - 1, day);
             const todayObj = new Date(today);
-            
+
             // Allow navigation to previous dates (older dates)
             setHasPrevDate(true); // Always allow going to previous dates
-            
+
             // Only allow navigation to future dates if there are activities on future dates, or if we're not on today
             if (finalDateToUse === today) {
                 // If we're on today, only allow next if there are future dates with activities
@@ -513,7 +513,7 @@ const NotificationPage: React.FC = () => {
                     const activityLocalDate = new Date(rawDate).toLocaleDateString('en-CA');
                     return activityLocalDate === finalDateToUse;
                 });
-            
+
             const filteredMaterials = skipDayFilter
                 ? materialList
                 : materialList.filter((material: any) => {
@@ -582,7 +582,7 @@ const NotificationPage: React.FC = () => {
             const sortedDates = Object.keys(allDateGroups).sort((a, b) => b.localeCompare(a));
             const newDateGroups = sortedDates.map(date => ({
                 date,
-                activities: allDateGroups[date].sort((a, b) => 
+                activities: allDateGroups[date].sort((a, b) =>
                     new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
                 ),
                 count: allDateGroups[date].length
@@ -590,7 +590,7 @@ const NotificationPage: React.FC = () => {
 
             // Always replace date groups for single date navigation
             setDateGroups(newDateGroups);
-            
+
             // Also update legacy state for backward compatibility
             setActivitiesRaw(filteredActivities);
             setMaterialActivities(filteredMaterials);
@@ -627,7 +627,7 @@ const NotificationPage: React.FC = () => {
             const nextFromMaterial = materialData.data?.nextDate || materialData.nextDate;
 
             setHasMoreDates(hasMoreFromActivity || hasMoreFromMaterial);
-            
+
             // Use the earliest next date
             let earliestNextDate = null;
             if (nextFromActivity && nextFromMaterial) {
@@ -691,15 +691,15 @@ const NotificationPage: React.FC = () => {
             const currentDateObj = new Date(year, month - 1, day);
             currentDateObj.setDate(currentDateObj.getDate() - 1);
             const previousDate = currentDateObj.toLocaleDateString('en-CA');
-            
+
             console.log('📅 Navigating to previous day:', previousDate);
-            
+
             // Set loading state
             setLoading(true);
-            
+
             try {
                 await fetchActivities(false, false, previousDate);
-                
+
                 // Scroll to top AFTER content has loaded
                 setTimeout(() => {
                     scrollViewRef.current?.scrollTo({
@@ -720,15 +720,15 @@ const NotificationPage: React.FC = () => {
             const currentDateObj = new Date(year, month - 1, day);
             currentDateObj.setDate(currentDateObj.getDate() + 1);
             const nextDate = currentDateObj.toLocaleDateString('en-CA');
-            
+
             console.log('📅 Navigating to next day:', nextDate);
-            
+
             // Set loading state
             setLoading(true);
-            
+
             try {
                 await fetchActivities(false, false, nextDate);
-                
+
                 // Scroll to top AFTER content has loaded
                 setTimeout(() => {
                     scrollViewRef.current?.scrollTo({
@@ -763,7 +763,7 @@ const NotificationPage: React.FC = () => {
                 const dateString = date.toLocaleDateString('en-CA');
                 console.log('📅 Date selected from picker:', dateString);
                 setShowDatePicker(false);
-                
+
                 // Fetch activities for selected date
                 setLoading(true);
                 fetchActivities(false, false, dateString).finally(() => {
@@ -834,6 +834,7 @@ const NotificationPage: React.FC = () => {
         if (category === 'project') return { name: 'folder', color: '#3B82F6' };
         if (category === 'section') return { name: 'layers', color: '#8B5CF6' };
         if (category === 'mini_section') return { name: 'grid', color: '#10B981' };
+        if (category === 'phase') return { name: 'git-branch', color: '#1E293B' };
         if (category === 'staff') return { name: 'people', color: '#EF4444' };
         if (category === 'labor') return { name: 'hammer', color: '#F59E0B' };
         if (category === 'material') return { name: 'cube', color: '#06B6D4' };
@@ -898,6 +899,7 @@ const NotificationPage: React.FC = () => {
         // Check if this is a labor or equipment activity
         const isLaborActivity = activity.category === 'labor';
         const isEquipmentActivity = activity.category === 'equipment';
+        const isPhaseActivity = activity.category === 'phase';
 
         // Enhanced message for project updates with change details
         let enhancedMessage = activity.message;
@@ -918,7 +920,7 @@ const NotificationPage: React.FC = () => {
                             return `${change.field} changed`;
                     }
                 }).join(' • ');
-                
+
                 enhancedMessage = `Changes: ${changeDetails}`;
             }
         }
@@ -990,51 +992,51 @@ const NotificationPage: React.FC = () => {
                             <View style={styles.materialsList}>
                                 {entries.map((entry: any, index: number) => (
                                     <React.Fragment key={index}>
-                                    <View style={styles.materialItem}>
-                                        <View style={[
-                                            styles.materialIconSmall,
-                                            { backgroundColor: `${icon.color}15` }
-                                        ]}>
-                                            <Ionicons
-                                                name={isLaborActivity ? 'person-outline' : 'construct-outline'}
-                                                size={18}
-                                                color={icon.color}
-                                            />
-                                        </View>
-                                        <View style={styles.materialDetails}>
-                                            <Text style={styles.materialName}>
-                                                {entry.type || entry.name}
-                                            </Text>
-                                            <Text style={styles.materialQuantity}>
-                                                {isLaborActivity 
-                                                    ? `${entry.count} laborers • ₹${entry.perLaborCost?.toLocaleString('en-IN')}/laborer`
-                                                    : `${entry.quantity || 1} ${entry.unit || 'unit'}`
-                                                }
-                                                {entry.totalCost > 0 && (
-                                                    <Text style={styles.materialCost}>
-                                                        {' '}• ₹{entry.totalCost.toLocaleString('en-IN')}
+                                        <View style={styles.materialItem}>
+                                            <View style={[
+                                                styles.materialIconSmall,
+                                                { backgroundColor: `${icon.color}15` }
+                                            ]}>
+                                                <Ionicons
+                                                    name={isLaborActivity ? 'person-outline' : 'construct-outline'}
+                                                    size={18}
+                                                    color={icon.color}
+                                                />
+                                            </View>
+                                            <View style={styles.materialDetails}>
+                                                <Text style={styles.materialName}>
+                                                    {entry.type || entry.name}
+                                                </Text>
+                                                <Text style={styles.materialQuantity}>
+                                                    {isLaborActivity
+                                                        ? `${entry.count} laborers • ₹${entry.perLaborCost?.toLocaleString('en-IN')}/laborer`
+                                                        : `${entry.quantity || 1} ${entry.unit || 'unit'}`
+                                                    }
+                                                    {entry.totalCost > 0 && (
+                                                        <Text style={styles.materialCost}>
+                                                            {' '}• ₹{entry.totalCost.toLocaleString('en-IN')}
+                                                        </Text>
+                                                    )}
+                                                </Text>
+                                                {entry.category && (
+                                                    <Text style={styles.laborCategory}>
+                                                        {entry.category}
                                                     </Text>
                                                 )}
-                                            </Text>
-                                            {entry.category && (
-                                                <Text style={styles.laborCategory}>
-                                                    {entry.category}
-                                                </Text>
-                                            )}
-                                        </View>
-                                    </View>
-                                    {entry.description ? (
-                                        <View style={styles.laborDescriptionCard}>
-                                            <View style={styles.laborDescriptionAccent} />
-                                            <View style={styles.laborDescriptionContent}>
-                                                <Ionicons name="document-text-outline" size={14} color="#F59E0B" style={{ marginTop: 1 }} />
-                                                <View style={{ flex: 1 }}>
-                                                    <Text style={styles.laborDescriptionLabel}>Work Done</Text>
-                                                    <Text style={styles.laborDescriptionText} numberOfLines={3}>{entry.description}</Text>
-                                                </View>
                                             </View>
                                         </View>
-                                    ) : null}
+                                        {entry.description ? (
+                                            <View style={styles.laborDescriptionCard}>
+                                                <View style={styles.laborDescriptionAccent} />
+                                                <View style={styles.laborDescriptionContent}>
+                                                    <Ionicons name="document-text-outline" size={14} color="#F59E0B" style={{ marginTop: 1 }} />
+                                                    <View style={{ flex: 1 }}>
+                                                        <Text style={styles.laborDescriptionLabel}>Work Done</Text>
+                                                        <Text style={styles.laborDescriptionText} numberOfLines={3}>{entry.description}</Text>
+                                                    </View>
+                                                </View>
+                                            </View>
+                                        ) : null}
                                     </React.Fragment>
                                 ))}
                             </View>
@@ -1063,6 +1065,134 @@ const NotificationPage: React.FC = () => {
                             <View style={styles.userInfo}>
                                 <View style={[styles.userAvatar, { backgroundColor: icon.color }]}>
                                     <Text style={styles.userAvatarText}>
+                                        {displayUser.fullName.charAt(0).toUpperCase()}
+                                    </Text>
+                                </View>
+                                <Text style={styles.userName}>{displayUser.fullName}</Text>
+                            </View>
+                            <Text style={styles.activityTimeNew}>
+                                {formatTimeAgo(activity.createdAt)}
+                            </Text>
+                        </View>
+                    </View>
+                </View>
+            );
+        }
+
+        // Render phase activities (active phase switch / phase / sub-phase progress) with an
+        // enhanced card, matching the visual treatment material/labor/equipment activities get.
+        if (isPhaseActivity) {
+            const meta = (activity as any).metadata || {};
+            const isPhaseChange = activity.activityType === 'phase_changed';
+            const isSubPhaseProgress = activity.activityType === 'sub_phase_progress_updated';
+            const badgeIcon = isPhaseChange ? 'git-branch' : 'trending-up';
+            const badgeLabel = isPhaseChange
+                ? 'PHASE CHANGED'
+                : isSubPhaseProgress
+                    ? 'SUB-PHASE PROGRESS'
+                    : 'PHASE PROGRESS';
+            const progressLabel = isSubPhaseProgress && meta.subPhaseName
+                ? `${meta.phaseName} → ${meta.subPhaseName}`
+                : meta.phaseName;
+            const isProgressComplete = meta.newProgress === 100;
+            // Light, flat (non-gradient) accent colors per element so the card has variety
+            // without looking loud.
+            const badgeBg = isPhaseChange ? '#EDE9FE' : '#FEF3C7';
+            const badgeColor = isPhaseChange ? '#7C3AED' : '#D97706';
+            const fromColor = '#94A3B8';
+            const toColor = '#34D399';
+            const progressValueColor = isProgressComplete ? '#34D399' : '#D97706';
+            const progressBarColor = '#FCD34D';
+            const avatarColor = '#E0E7FF';
+
+            return (
+                <View key={activity._id} style={styles.materialActivityCard}>
+                    <View style={styles.materialActivityGradient}>
+                        <View style={styles.materialActivityHeader}>
+                            <View style={[
+                                styles.activityBadge,
+                                { backgroundColor: badgeBg }
+                            ]}>
+                                <Ionicons name={badgeIcon as any} size={16} color={badgeColor} />
+                                <Text style={[styles.activityBadgeText, { color: badgeColor }]}>
+                                    {badgeLabel}
+                                </Text>
+                            </View>
+                        </View>
+
+                        {(activity.projectName || activity.sectionName || activity.miniSectionName) && (
+                            <View style={styles.projectInfo}>
+                                {activity.projectName && (
+                                    <View style={styles.projectInfoItem}>
+                                        <Ionicons name="folder-outline" size={14} color="#64748B" />
+                                        <Text style={styles.projectInfoText}>{activity.projectName}</Text>
+                                    </View>
+                                )}
+                                {activity.sectionName && (
+                                    <View style={styles.projectInfoItem}>
+                                        <Ionicons name="layers-outline" size={14} color="#64748B" />
+                                        <Text style={styles.projectInfoText}>{activity.sectionName}</Text>
+                                    </View>
+                                )}
+                                {activity.miniSectionName && (
+                                    <View style={styles.projectInfoItem}>
+                                        <Ionicons name="grid-outline" size={14} color="#64748B" />
+                                        <Text style={styles.projectInfoText}>{activity.miniSectionName}</Text>
+                                    </View>
+                                )}
+                            </View>
+                        )}
+
+                        {isPhaseChange ? (
+                            <View style={styles.transferDetailsContainer}>
+                                <View style={styles.transferRoute}>
+                                    <View style={styles.transferProject}>
+                                        <Ionicons name="ellipse-outline" size={16} color={fromColor} />
+                                        <Text style={styles.transferProjectName}>
+                                            {meta.fromPhaseName || 'None'}
+                                        </Text>
+                                    </View>
+                                    <Ionicons name="arrow-forward" size={16} color="#64748B" />
+                                    <View style={styles.transferProject}>
+                                        <Ionicons name="checkmark-circle" size={16} color={toColor} />
+                                        <Text style={styles.transferProjectName}>
+                                            {meta.toPhaseName || 'Unlinked'}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+                        ) : (
+                            <>
+                                <View style={styles.phaseProgressContainer}>
+                                    <Text style={styles.phaseProgressLabel} numberOfLines={1}>
+                                        {progressLabel}
+                                    </Text>
+                                    <Text style={[styles.phaseProgressValue, { color: progressValueColor }]}>
+                                        {meta.oldProgress}% → {meta.newProgress}%
+                                    </Text>
+                                </View>
+                                <View style={styles.phaseProgressBarTrack}>
+                                    <View style={[
+                                        styles.phaseProgressBarFill,
+                                        { width: `${meta.newProgress || 0}%` as any, backgroundColor: progressBarColor }
+                                    ]} />
+                                </View>
+                            </>
+                        )}
+
+                        {/* Message */}
+                        {activity.message && (
+                            <View style={styles.messageContainer}>
+                                <Ionicons name="chatbox-outline" size={14} color="#64748B" />
+                                <Text style={styles.messageText}>{activity.message}</Text>
+                            </View>
+                        )}
+
+                        {/* Footer with user info and time ago */}
+                        <View style={styles.materialActivityFooter}>
+                            <View style={styles.userInfo}>
+                                <View style={[styles.userAvatar, { backgroundColor: avatarColor }]}>
+                                    <Text style={[styles.userAvatarText, { color: '#4F46E5' }]}>
                                         {displayUser.fullName.charAt(0).toUpperCase()}
                                     </Text>
                                 </View>
@@ -1520,7 +1650,7 @@ const NotificationPage: React.FC = () => {
         console.log('🔍 getFilteredActivities called with activeTab:', activeTab);
         console.log('🔍 activities array length:', activities.length);
         console.log('🔍 selectedVendors:', selectedVendors);
-        
+
         if (activeTab === 'all') {
             const combined = getCombinedActivities();
             // ✅ NEW: Filter by vendors if selected (multiple vendors)
@@ -1537,7 +1667,7 @@ const NotificationPage: React.FC = () => {
         } else if (activeTab === 'project') {
             if (Array.isArray(activities)) {
                 const projectActivities = activities.filter(a => {
-                    const isProjectCategory = a.category === 'project' || a.category === 'section' || a.category === 'mini_section' || a.category === 'equipment';
+                    const isProjectCategory = a.category === 'project' || a.category === 'section' || a.category === 'mini_section' || a.category === 'equipment' || a.category === 'phase';
                     if (isProjectCategory) {
                         console.log('✅ Found project activity:', a.category, a.action, a.description?.substring(0, 30));
                     }
@@ -1624,7 +1754,7 @@ const NotificationPage: React.FC = () => {
             return dateGroups.map(group => {
                 // Filter activities based on active tab AND vendor filter
                 let filteredGroupActivities = group.activities;
-                
+
                 // ✅ FIRST: Apply vendor filter if selected (multiple vendors)
                 if (selectedVendors.length > 0) {
                     filteredGroupActivities = filteredGroupActivities.filter(item => {
@@ -1635,18 +1765,18 @@ const NotificationPage: React.FC = () => {
                         return false; // Hide non-material activities when vendor filter is active
                     });
                 }
-                
+
                 // ✅ THEN: Apply tab filter
                 if (activeTab === 'project') {
                     // Only show regular activities (not material activities) - include project, section, mini-section, and equipment activities
-                    filteredGroupActivities = filteredGroupActivities.filter(item => 
-                        item.type === 'activity' && 
+                    filteredGroupActivities = filteredGroupActivities.filter(item =>
+                        item.type === 'activity' &&
                         ['project', 'section', 'mini_section', 'equipment'].includes((item.data as Activity).category)
                     );
                 } else if (activeTab === 'labor') {
                     // Only show labor activities
-                    filteredGroupActivities = filteredGroupActivities.filter(item => 
-                        item.type === 'activity' && 
+                    filteredGroupActivities = filteredGroupActivities.filter(item =>
+                        item.type === 'activity' &&
                         (item.data as Activity).category === 'labor'
                     );
                 } else if (activeTab === 'material') {
@@ -1672,7 +1802,7 @@ const NotificationPage: React.FC = () => {
                     // 'all' tab - show everything (already filtered by vendor if applicable)
                     filteredGroupActivities = filteredGroupActivities;
                 }
-                
+
                 return {
                     date: group.date,
                     activities: filteredGroupActivities
@@ -1801,26 +1931,26 @@ const NotificationPage: React.FC = () => {
     console.log('- Available Dates:', availableDates.length);
     console.log('- Should show empty state?', !loading && !error && filteredActivities.length === 0);
     console.log('- Should show activities?', !loading && !error && filteredActivities.length > 0);
-    
+
     // Debug tab filtering
     if (dateGroups.length > 0) {
         console.log('🔍 TAB FILTERING DEBUG:');
         dateGroups.forEach((group, index) => {
             const totalInGroup = group.activities.length;
             const activityCount = group.activities.filter(item => item.type === 'activity').length;
-            const laborCount = group.activities.filter(item => 
+            const laborCount = group.activities.filter(item =>
                 item.type === 'activity' && (item.data as Activity).category === 'labor'
             ).length;
-            const projectCount = group.activities.filter(item => 
+            const projectCount = group.activities.filter(item =>
                 item.type === 'activity' && ['project', 'section', 'mini_section', 'equipment'].includes((item.data as Activity).category)
             ).length;
-            const materialImportedCount = group.activities.filter(item => 
+            const materialImportedCount = group.activities.filter(item =>
                 item.type === 'material' && (item.data as MaterialActivity).activity === 'imported'
             ).length;
-            const materialUsedCount = group.activities.filter(item => 
+            const materialUsedCount = group.activities.filter(item =>
                 item.type === 'material' && (item.data as MaterialActivity).activity === 'used'
             ).length;
-            
+
             console.log(`   Date ${group.date}:`);
             console.log(`     - Total: ${totalInGroup}`);
             console.log(`     - Activities: ${activityCount}`);
@@ -1828,7 +1958,7 @@ const NotificationPage: React.FC = () => {
             console.log(`     - Project Activities (includes sections & equipment): ${projectCount}`);
             console.log(`     - Materials (imported): ${materialImportedCount}`);
             console.log(`     - Materials (used): ${materialUsedCount}`);
-            
+
             // Log individual activities for debugging
             group.activities.forEach((item, actIndex) => {
                 if (item.type === 'activity') {
@@ -1857,12 +1987,12 @@ const NotificationPage: React.FC = () => {
                         }
                     </Text>
                 </View>
-                
+
                 {/* Header Actions */}
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     {/* ✅ NEW: Generate Report Button */}
                     {selectedVendors.length > 0 && (activeTab === 'material' || activeTab === 'all') && (
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             onPress={generateVendorReport}
                             disabled={isGeneratingReport}
                             style={[styles.vendorFilterButton, { marginRight: 8, backgroundColor: '#10B981', borderColor: '#10B981' }]}
@@ -1876,8 +2006,8 @@ const NotificationPage: React.FC = () => {
                     )}
 
                     {/* ✅ NEW: Vendor Filter Button (replaces refresh button) */}
-                    <TouchableOpacity 
-                        onPress={() => setShowVendorModal(true)} 
+                    <TouchableOpacity
+                        onPress={() => setShowVendorModal(true)}
                         style={[styles.vendorFilterButton, selectedVendors.length > 0 && styles.vendorFilterButtonActive]}
                     >
                         <Ionicons
@@ -1949,8 +2079,8 @@ const NotificationPage: React.FC = () => {
 
             {/* Material Sub-Tabs - Only show when Materials tab is active */}
             {activeTab === 'material' && (
-                <ScrollView 
-                    horizontal 
+                <ScrollView
+                    horizontal
                     showsHorizontalScrollIndicator={false}
                     style={styles.subTabsContainer}
                     contentContainerStyle={styles.subTabsContentContainer}
@@ -2076,8 +2206,8 @@ const NotificationPage: React.FC = () => {
                                     <Text style={styles.simpleEmptyTitle}>
                                         To see {activeTab === 'project' ? 'Project' : 'Labor'} activities, please remove the vendor filter.
                                     </Text>
-                                    <TouchableOpacity 
-                                        style={styles.removeFilterButton} 
+                                    <TouchableOpacity
+                                        style={styles.removeFilterButton}
                                         onPress={() => setSelectedVendors([])}
                                         activeOpacity={0.8}
                                     >
@@ -2104,7 +2234,7 @@ const NotificationPage: React.FC = () => {
                                 </View>
                             )}
                         </View>
-                        
+
                         {/* Show Date Navigation Controls even when no activities */}
                         {selectedVendors.length === 0 && (
                             <View style={styles.compactDateNavigation}>
@@ -2121,15 +2251,15 @@ const NotificationPage: React.FC = () => {
                                         disabled={!hasPrevDate || loading}
                                         activeOpacity={0.7}
                                     >
-                                        <Ionicons 
-                                            name="chevron-back" 
-                                            size={20} 
-                                            color={(!hasPrevDate || loading) ? '#9CA3AF' : '#10B981'} 
+                                        <Ionicons
+                                            name="chevron-back"
+                                            size={20}
+                                            color={(!hasPrevDate || loading) ? '#9CA3AF' : '#10B981'}
                                         />
                                     </TouchableOpacity>
 
                                     {/* Current Date Display - Compact - Clickable */}
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         style={styles.compactDateDisplay}
                                         onPress={handleDatePickerOpen}
                                         activeOpacity={0.7}
@@ -2156,10 +2286,10 @@ const NotificationPage: React.FC = () => {
                                         disabled={!hasNextDate || loading}
                                         activeOpacity={0.7}
                                     >
-                                        <Ionicons 
-                                            name="chevron-forward" 
-                                            size={20} 
-                                            color={(!hasNextDate || loading) ? '#9CA3AF' : '#10B981'} 
+                                        <Ionicons
+                                            name="chevron-forward"
+                                            size={20}
+                                            color={(!hasNextDate || loading) ? '#9CA3AF' : '#10B981'}
                                         />
                                     </TouchableOpacity>
                                 </View>
@@ -2226,8 +2356,8 @@ const NotificationPage: React.FC = () => {
                                                     {item.type === 'activity'
                                                         ? renderActivityItem(item.data as Activity)
                                                         : item.type === 'material'
-                                                        ? renderMaterialActivityItem(item.data as MaterialActivity)
-                                                        : renderOtherCostActivityItem(item.data as OtherCostActivity)
+                                                            ? renderMaterialActivityItem(item.data as MaterialActivity)
+                                                            : renderOtherCostActivityItem(item.data as OtherCostActivity)
                                                     }
                                                 </React.Fragment>
                                             );
@@ -2235,7 +2365,7 @@ const NotificationPage: React.FC = () => {
                                     </View>
                                 );
                             })}
-                            
+
                             {/* Load More Button for Date Mode */}
                             {hasMoreDates && (
                                 <View style={styles.loadMoreContainer}>
@@ -2262,7 +2392,7 @@ const NotificationPage: React.FC = () => {
                                     </Text>
                                 </View>
                             )}
-                            
+
                             {/* Date Navigation Controls */}
                             {selectedVendors.length === 0 && (
                                 <View style={styles.compactDateNavigation}>
@@ -2279,10 +2409,10 @@ const NotificationPage: React.FC = () => {
                                             disabled={!hasPrevDate || loading}
                                             activeOpacity={0.7}
                                         >
-                                            <Ionicons 
-                                                name="chevron-back" 
-                                                size={20} 
-                                                color={(!hasPrevDate || loading) ? '#9CA3AF' : '#10B981'} 
+                                            <Ionicons
+                                                name="chevron-back"
+                                                size={20}
+                                                color={(!hasPrevDate || loading) ? '#9CA3AF' : '#10B981'}
                                             />
                                         </TouchableOpacity>
 
@@ -2310,10 +2440,10 @@ const NotificationPage: React.FC = () => {
                                             disabled={!hasNextDate || loading}
                                             activeOpacity={0.7}
                                         >
-                                            <Ionicons 
-                                                name="chevron-forward" 
-                                                size={20} 
-                                                color={(!hasNextDate || loading) ? '#9CA3AF' : '#10B981'} 
+                                            <Ionicons
+                                                name="chevron-forward"
+                                                size={20}
+                                                color={(!hasNextDate || loading) ? '#9CA3AF' : '#10B981'}
                                             />
                                         </TouchableOpacity>
                                     </View>
@@ -2371,7 +2501,7 @@ const NotificationPage: React.FC = () => {
                                     </Text>
                                 )}
                             </View>
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 onPress={() => setShowVendorModal(false)}
                                 style={styles.modalCloseButton}
                             >
@@ -2400,10 +2530,10 @@ const NotificationPage: React.FC = () => {
                                             <Ionicons name="checkmark" size={16} color="#FFFFFF" />
                                         )}
                                     </View>
-                                    <Ionicons 
-                                        name="apps-outline" 
-                                        size={20} 
-                                        color={selectedVendors.length === 0 ? "#3B82F6" : "#64748B"} 
+                                    <Ionicons
+                                        name="apps-outline"
+                                        size={20}
+                                        color={selectedVendors.length === 0 ? "#3B82F6" : "#64748B"}
                                     />
                                     <Text style={[
                                         styles.vendorItemText,
@@ -2449,10 +2579,10 @@ const NotificationPage: React.FC = () => {
                                                         <Ionicons name="checkmark" size={16} color="#FFFFFF" />
                                                     )}
                                                 </View>
-                                                <Ionicons 
-                                                    name="person-outline" 
-                                                    size={20} 
-                                                    color={isSelected ? "#8B5CF6" : "#64748B"} 
+                                                <Ionicons
+                                                    name="person-outline"
+                                                    size={20}
+                                                    color={isSelected ? "#8B5CF6" : "#64748B"}
                                                 />
                                                 <Text style={[
                                                     styles.vendorItemText,
@@ -3083,6 +3213,35 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '700',
         color: '#15803D',
+    },
+    phaseProgressContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    phaseProgressLabel: {
+        flex: 1,
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#334155',
+        marginRight: 8,
+    },
+    phaseProgressValue: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#1E293B',
+    },
+    phaseProgressBarTrack: {
+        height: 6,
+        backgroundColor: '#E2E8F0',
+        borderRadius: 3,
+        overflow: 'hidden',
+        marginBottom: 12,
+    },
+    phaseProgressBarFill: {
+        height: '100%',
+        borderRadius: 3,
     },
     messageContainer: {
         flexDirection: 'row',

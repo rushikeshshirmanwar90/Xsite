@@ -9,7 +9,7 @@ import { getSection } from '@/functions/details';
 import { getClientId } from '@/functions/clientId';
 import { styles } from '@/style/details';
 import { Material, MaterialEntry, Section } from '@/types/details';
-import { logSectionCompleted, logSectionReopened } from '@/utils/activityLogger';
+import { logSectionCompleted, logSectionReopened, logPhaseChanged, logPhaseProgressUpdated, logSubPhaseProgressUpdated } from '@/utils/activityLogger';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -437,6 +437,7 @@ const Details = () => {
     const [miniSectionCompletions, setMiniSectionCompletions] = useState<{[key: string]: boolean}>({});
     const [isUpdatingCompletion, setIsUpdatingCompletion] = useState(false);
     const [generatingReport, setGeneratingReport] = useState(false);
+    const [generatingStockReport, setGeneratingStockReport] = useState(false);
     const [currentUserType, setCurrentUserType] = useState<string>('staff'); // Track current user type
     const [showCompletionConfirmModal, setShowCompletionConfirmModal] = useState(false);
     
@@ -1064,6 +1065,8 @@ const Details = () => {
             return;
         }
 
+        const previousActivePhase = getActivePhaseForMiniSection();
+
         try {
             await persistMiniSectionPhaseLink(miniSec._id, phaseId);
             // Update local miniSections state
@@ -1103,6 +1106,18 @@ const Details = () => {
             } else {
                 toast.success('Phase unlinked');
             }
+
+            logPhaseChanged(
+                projectId,
+                projectName,
+                sectionId,
+                sectionName,
+                miniSec._id,
+                miniSec.name,
+                previousActivePhase?.name || null,
+                targetPhase?.name || null
+            ).catch(() => { });
+
             setShowPhaseSelectorModal(false);
         } catch (err: any) {
             console.error('❌ Error linking phase:', err);
@@ -1161,6 +1176,21 @@ const Details = () => {
                 };
             });
 
+            const progressMiniSec = getActiveMiniSection();
+            if (progressMiniSec) {
+                logPhaseProgressUpdated(
+                    projectId,
+                    projectName,
+                    sectionId,
+                    sectionName,
+                    progressMiniSec._id,
+                    progressMiniSec.name,
+                    phase.name,
+                    phase.progress,
+                    newProgress
+                ).catch(() => { });
+            }
+
             if (newProgress === 100 && !wasCompleted) {
                 // Reaching 100% for the first time hands off to the Next Phase modal —
                 // that's already a celebration animation, so skip the quick toast here.
@@ -1206,6 +1236,22 @@ const Details = () => {
                     phases: prev.phases.map(ph => ph._id === phase._id ? result.phase : ph),
                 };
             });
+            const subPhaseMiniSec = getActiveMiniSection();
+            if (subPhaseMiniSec) {
+                logSubPhaseProgressUpdated(
+                    projectId,
+                    projectName,
+                    sectionId,
+                    sectionName,
+                    subPhaseMiniSec._id,
+                    subPhaseMiniSec.name,
+                    phase.name,
+                    subPhase.name,
+                    subPhase.progress,
+                    newProgress
+                ).catch(() => { });
+            }
+
             setProgressToast({
                 message: newProgress === 100 ? `${subPhase.name} completed!` : `${subPhase.name} updated to ${newProgress}%`,
             });
@@ -1625,6 +1671,172 @@ const Details = () => {
         } finally {
             setGeneratingReport(false);
         }
+    };
+
+    // Fetches the COMPLETE project-wide material lists directly from the API (not the
+    // paginated `materials.available`/`materials.used` state, which only ever holds one
+    // page — e.g. 10 items — at a time) and groups them by name/unit for the stock report.
+    const fetchAllMaterialsForStockReport = async (): Promise<Array<{
+        name: string;
+        unit: string;
+        specs?: Record<string, any>;
+        totalImported: number;
+        totalUsed: number;
+        currentlyAvailable: number;
+        perUnitCost: number;
+        totalCost: number;
+    }>> => {
+        const clientId = await getClientId();
+        if (!clientId || !projectId) {
+            throw new Error('Missing project or client information');
+        }
+
+        const { domain } = await import('@/lib/domain');
+        const { getAuthHeaders } = await import('@/utils/axiosConfig');
+
+        // API caps `limit` at 5000 server-side — large enough to cover a project's full
+        // material list in a single request instead of paging through it.
+        const REPORT_LIMIT = 5000;
+        const buildQueryString = (extra: Record<string, any> = {}) => {
+            const queryParams = { projectId, clientId, page: 1, limit: REPORT_LIMIT, sortBy: 'createdAt', sortOrder: 'desc', ...extra };
+            return Object.entries(queryParams)
+                .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+                .join('&');
+        };
+
+        const [availableResponse, usedResponse] = await Promise.all([
+            fetch(`${domain}/api/material?${buildQueryString()}`, { method: 'GET', headers: { ...getAuthHeaders() } }),
+            fetch(`${domain}/api/material-usage?${buildQueryString()}`, { method: 'GET', headers: { ...getAuthHeaders() } }),
+        ]);
+
+        if (!availableResponse.ok) {
+            throw new Error(`Available materials API failed: ${availableResponse.status}`);
+        }
+        if (!usedResponse.ok) {
+            throw new Error(`Used materials API failed: ${usedResponse.status}`);
+        }
+
+        const availableData = await availableResponse.json();
+        const usedData = await usedResponse.json();
+
+        const availableList = availableData.MaterialAvailable || availableData.materials || [];
+        const usedList = usedData.MaterialUsed || usedData.materials || [];
+
+        // Key on name + unit + specs — so materials sharing a name but with different
+        // specs (e.g. different grade/size/brand) get their own row instead of being merged.
+        const buildSpecsKey = (specs: any) => {
+            if (!specs || typeof specs !== 'object' || Object.keys(specs).length === 0) return '';
+            return Object.keys(specs)
+                .sort()
+                .filter(k => specs[k] !== null && specs[k] !== undefined && specs[k] !== '')
+                .map(k => `${k}:${specs[k]}`)
+                .join('|');
+        };
+
+        const grouped: { [key: string]: { name: string; unit: string; specs: Record<string, any>; currentlyAvailable: number; totalUsed: number; importedCost: number } } = {};
+
+        const getGroup = (entryName: string, entryUnit: string, entrySpecs: any) => {
+            const specsKey = buildSpecsKey(entrySpecs);
+            const key = `${entryName}-${entryUnit}-${specsKey}`;
+            if (!grouped[key]) {
+                grouped[key] = { name: entryName, unit: entryUnit, specs: entrySpecs || {}, currentlyAvailable: 0, totalUsed: 0, importedCost: 0 };
+            }
+            return grouped[key];
+        };
+
+        const resolveCost = (m: any, qty: number) => {
+            if (m.totalCost !== undefined && m.totalCost !== null) return Number(m.totalCost);
+            return Number(m.perUnitCost ?? m.cost ?? 0) * qty;
+        };
+
+        availableList.forEach((m: any) => {
+            const qty = Number(m.qnt || 0);
+            const group = getGroup(m.name, m.unit, m.specs);
+            group.currentlyAvailable += qty;
+            group.importedCost += resolveCost(m, qty);
+        });
+
+        usedList.forEach((m: any) => {
+            const qty = Number(m.qnt || 0);
+            const group = getGroup(m.name, m.unit, m.specs);
+            group.totalUsed += qty;
+            group.importedCost += resolveCost(m, qty);
+        });
+
+        return Object.values(grouped).map(group => {
+            const totalImported = group.currentlyAvailable + group.totalUsed;
+            const perUnitCost = totalImported > 0 ? group.importedCost / totalImported : 0;
+            return {
+                name: group.name,
+                unit: group.unit,
+                specs: group.specs,
+                totalImported,
+                totalUsed: group.totalUsed,
+                currentlyAvailable: group.currentlyAvailable,
+                perUnitCost,
+                totalCost: group.importedCost,
+            };
+        });
+    };
+
+    // Generates a project-wide current material stock report — Sr No, Material Name,
+    // Total Imported (qty + per-unit price + total cost), Total Used, Total Available.
+    const handleGenerateStockReport = async () => {
+        setGeneratingStockReport(true);
+        try {
+            const rows = await fetchAllMaterialsForStockReport();
+
+            if (!rows || rows.length === 0) {
+                toast.error('No materials found to generate a stock report');
+                return;
+            }
+
+            const currentUser = await getUserData();
+            const pdfGenerator = new PDFReportGenerator({}, { name: currentUser.fullName });
+            await pdfGenerator.generateMaterialStockReport(rows, projectName || 'Project');
+        } catch (error: any) {
+            console.error('❌ Error generating material stock report:', error);
+            toast.error(error?.message || 'Failed to generate stock report. Please try again.');
+        } finally {
+            setGeneratingStockReport(false);
+        }
+    };
+
+    // Navigates to the Material Analysis page (pie-chart cost breakdown) for the
+    // currently selected mini-section's used materials.
+    const handleMaterialAnalysisPress = () => {
+        if (!selectedMiniSection) {
+            toast.error('Please select a mini-section first');
+            return;
+        }
+        const miniSec = getActiveMiniSection();
+
+        // materials-analytics.tsx expects the raw project MaterialUsed shape (qnt/totalCost),
+        // not the client-normalized Material type (quantity/perUnitCost) used elsewhere here.
+        const rawMaterialUsed = (materials.used || []).map(m => ({
+            _id: m._id,
+            name: m.name,
+            unit: m.unit,
+            qnt: m.quantity,
+            totalCost: m.totalCost ?? (m.perUnitCost || m.price || 0) * m.quantity,
+            specs: m.specs || {},
+            miniSectionId: m.miniSectionId,
+            addedAt: m.addedAt,
+            createdAt: m.createdAt,
+        }));
+
+        router.push({
+            pathname: '/analytics/materials-analytics',
+            params: {
+                projectId: projectId || '',
+                projectName: projectName || '',
+                sectionId: sectionId || '',
+                sectionName: sectionName || '',
+                miniSectionId: selectedMiniSection,
+                miniSectionName: miniSec?.name || '',
+                materialUsed: JSON.stringify(rawMaterialUsed),
+            },
+        });
     };
 
     const handleOtherCostPress = () => {
@@ -4030,6 +4242,9 @@ const Details = () => {
                 onLaborPress={handleLaborPress}
                 onReportPress={selectedMiniSection ? handleGenerateReport : undefined}
                 isGeneratingReport={generatingReport}
+                onStockReportPress={handleGenerateStockReport}
+                isGeneratingStockReport={generatingStockReport}
+                onMaterialAnalysisPress={selectedMiniSection ? handleMaterialAnalysisPress : undefined}
             />
 
             {/* Action Buttons - Sticky at top, visible to everyone in "imported" tab */}

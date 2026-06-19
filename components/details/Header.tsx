@@ -35,6 +35,11 @@ interface HeaderProps {
     // Report generation button — only passed (and shown) when a mini-section is selected
     onReportPress?: () => void;
     isGeneratingReport?: boolean;
+    // Project-wide current material stock report (Sr No, Material Name, Total Imported/Used/Available)
+    onStockReportPress?: () => void;
+    isGeneratingStockReport?: boolean;
+    // Material analysis (cost breakdown pie chart) for the selected mini-section
+    onMaterialAnalysisPress?: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -64,13 +69,16 @@ const Header: React.FC<HeaderProps> = ({
     hideMenu = false,
     onReportPress,
     isGeneratingReport = false,
+    onStockReportPress,
+    isGeneratingStockReport = false,
+    onMaterialAnalysisPress,
 }) => {
     // State to store fetched sections
     const [sections, setSections] = useState<Section[]>([]);
     // State for menu visibility
     const [showMenu, setShowMenu] = useState(false);
 
-    const hasMenuItems = !!(onContractorPress || onLaborPress || onEquipmentPress || onOtherCostPress || onToggleSectionCompletion);
+    const hasMenuItems = !!(onContractorPress || onLaborPress || onEquipmentPress || onOtherCostPress || onToggleSectionCompletion || onStockReportPress || onMaterialAnalysisPress);
 
     // Get the building/main section name from selectedSection
     const getBuildingName = () => {
@@ -294,8 +302,44 @@ const Header: React.FC<HeaderProps> = ({
                             </TouchableOpacity>
                         )}
 
+                        {/* Material Stock Report Option */}
+                        {onStockReportPress && (
+                            <TouchableOpacity
+                                style={[
+                                    menuStyles.menuItem,
+                                    isGeneratingStockReport && menuStyles.menuItemDisabled
+                                ]}
+                                onPress={() => {
+                                    setShowMenu(false);
+                                    onStockReportPress();
+                                }}
+                                disabled={isGeneratingStockReport}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="stats-chart-outline" size={20} color="#374151" />
+                                <Text style={menuStyles.menuItemText}>
+                                    {isGeneratingStockReport ? 'Generating Report...' : 'Material Stock Report'}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+
+                        {/* Material Analysis Option */}
+                        {onMaterialAnalysisPress && (
+                            <TouchableOpacity
+                                style={menuStyles.menuItem}
+                                onPress={() => {
+                                    setShowMenu(false);
+                                    onMaterialAnalysisPress();
+                                }}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="pie-chart-outline" size={20} color="#374151" />
+                                <Text style={menuStyles.menuItemText}>Material Analysis</Text>
+                            </TouchableOpacity>
+                        )}
+
                         {/* Divider */}
-                        {onToggleSectionCompletion && (onContractorPress || onEquipmentPress || onOtherCostPress) && (
+                        {onToggleSectionCompletion && (onContractorPress || onEquipmentPress || onOtherCostPress || onStockReportPress || onMaterialAnalysisPress) && (
                             <View style={menuStyles.divider} />
                         )}
 

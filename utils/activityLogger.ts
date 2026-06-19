@@ -72,6 +72,9 @@ export type ActivityType =
   | "equipment_updated"
   | "equipment_removed"
   | "other_cost_added"
+  | "phase_changed"
+  | "phase_progress_updated"
+  | "sub_phase_progress_updated"
   | "other";
 
 export type ActivityCategory =
@@ -84,6 +87,7 @@ export type ActivityCategory =
   | "labor"
   | "equipment"
   | "other_cost"
+  | "phase"
   | "completion";
 
 export type ActivityAction =
@@ -1069,6 +1073,159 @@ export const logOtherCostAdded = async (
       otherCostEntries,
       totalCost,
       entriesCount: otherCostEntries.length,
+    },
+  });
+};
+
+// ============================================
+// PHASE ACTIVITIES (construction tracker)
+// ============================================
+
+export const logPhaseChanged = async (
+  projectId: string,
+  projectName: string,
+  sectionId: string,
+  sectionName: string,
+  miniSectionId: string,
+  miniSectionName: string,
+  fromPhaseName: string | null,
+  toPhaseName: string | null,
+  message?: string
+) => {
+  const locationDescription = `${projectName} → ${sectionName} → ${miniSectionName}`;
+
+  const description = toPhaseName
+    ? fromPhaseName
+      ? `Switched active phase from "${fromPhaseName}" to "${toPhaseName}" in ${locationDescription}`
+      : `Set active phase to "${toPhaseName}" in ${locationDescription}`
+    : `Unlinked active phase in ${locationDescription}`;
+
+  await logActivity({
+    activityType: "phase_changed",
+    category: "phase",
+    action: "update",
+    description,
+    projectId,
+    projectName,
+    sectionId,
+    sectionName,
+    miniSectionId,
+    miniSectionName,
+    message,
+    changedData: [
+      {
+        field: "activePhase",
+        oldValue: fromPhaseName,
+        newValue: toPhaseName,
+      },
+    ],
+    metadata: {
+      fromPhaseName,
+      toPhaseName,
+      locationHierarchy: {
+        projectName,
+        sectionName,
+        miniSectionName,
+        fullPath: locationDescription,
+      },
+    },
+  });
+};
+
+export const logPhaseProgressUpdated = async (
+  projectId: string,
+  projectName: string,
+  sectionId: string,
+  sectionName: string,
+  miniSectionId: string,
+  miniSectionName: string,
+  phaseName: string,
+  oldProgress: number,
+  newProgress: number,
+  message?: string
+) => {
+  const locationDescription = `${projectName} → ${sectionName} → ${miniSectionName}`;
+
+  await logActivity({
+    activityType: "phase_progress_updated",
+    category: "phase",
+    action: "update",
+    description: `Updated "${phaseName}" progress from ${oldProgress}% to ${newProgress}% in ${locationDescription}`,
+    projectId,
+    projectName,
+    sectionId,
+    sectionName,
+    miniSectionId,
+    miniSectionName,
+    message,
+    changedData: [
+      {
+        field: "progress",
+        oldValue: oldProgress,
+        newValue: newProgress,
+      },
+    ],
+    metadata: {
+      phaseName,
+      oldProgress,
+      newProgress,
+      completed: newProgress === 100,
+      locationHierarchy: {
+        projectName,
+        sectionName,
+        miniSectionName,
+        fullPath: locationDescription,
+      },
+    },
+  });
+};
+
+export const logSubPhaseProgressUpdated = async (
+  projectId: string,
+  projectName: string,
+  sectionId: string,
+  sectionName: string,
+  miniSectionId: string,
+  miniSectionName: string,
+  phaseName: string,
+  subPhaseName: string,
+  oldProgress: number,
+  newProgress: number,
+  message?: string
+) => {
+  const locationDescription = `${projectName} → ${sectionName} → ${miniSectionName}`;
+
+  await logActivity({
+    activityType: "sub_phase_progress_updated",
+    category: "phase",
+    action: "update",
+    description: `Updated "${phaseName} → ${subPhaseName}" progress from ${oldProgress}% to ${newProgress}% in ${locationDescription}`,
+    projectId,
+    projectName,
+    sectionId,
+    sectionName,
+    miniSectionId,
+    miniSectionName,
+    message,
+    changedData: [
+      {
+        field: "progress",
+        oldValue: oldProgress,
+        newValue: newProgress,
+      },
+    ],
+    metadata: {
+      phaseName,
+      subPhaseName,
+      oldProgress,
+      newProgress,
+      completed: newProgress === 100,
+      locationHierarchy: {
+        projectName,
+        sectionName,
+        miniSectionName,
+        fullPath: locationDescription,
+      },
     },
   });
 };

@@ -2003,4 +2003,293 @@ export class PDFReportGenerator {
             );
         }
     }
+
+    // ✅ NEW: Generate a current material stock report — Sr No, Material Name,
+    // Total Imported (qty + per-unit price + total cost), Total Used, Total Available.
+    async generateMaterialStockReport(
+        materials: Array<{
+            name: string;
+            unit: string;
+            specs?: Record<string, any>;
+            totalImported: number;
+            totalUsed: number;
+            currentlyAvailable: number;
+            perUnitCost: number;
+            totalCost: number;
+        }>,
+        reportTitle: string
+    ): Promise<void> {
+        try {
+            console.log('📄 Starting Material Stock Report generation...');
+            console.log('📊 Materials to include:', materials.length);
+
+            const companyName = this.clientData?.companyName || this.userData?.company || 'Company';
+            const generatedOn = new Date().toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+
+            const formatCurrency = (amount: number) =>
+                `₹${(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+            // Build a readable "key: value | key: value" string for a material's specs —
+            // shown under the name so same-named materials with different specs (e.g.
+            // different grades/sizes) are still distinguishable in the report.
+            const buildSpecsString = (specs?: Record<string, any>): string => {
+                if (!specs || Object.keys(specs).length === 0) return '';
+                return Object.entries(specs)
+                    .filter(([, v]) => v !== null && v !== undefined && v !== '')
+                    .map(([k, v]) => `${k}: ${v}`)
+                    .join(' | ');
+            };
+
+            const sortedMaterials = [...materials].sort((a, b) => {
+                const nameCompare = a.name.localeCompare(b.name);
+                if (nameCompare !== 0) return nameCompare;
+                return buildSpecsString(a.specs).localeCompare(buildSpecsString(b.specs));
+            });
+
+            const grandTotalImportValue = sortedMaterials.reduce((sum, m) => sum + (m.totalCost || 0), 0);
+            const totalImportedQty = sortedMaterials.reduce((sum, m) => sum + (m.totalImported || 0), 0);
+            const totalUsedQty = sortedMaterials.reduce((sum, m) => sum + (m.totalUsed || 0), 0);
+            const totalAvailableQty = sortedMaterials.reduce((sum, m) => sum + (m.currentlyAvailable || 0), 0);
+
+            const tableRows = sortedMaterials.map((m, idx) => {
+                const specsString = buildSpecsString(m.specs);
+                return `
+                <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
+                    <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #374151; font-size: 12px; vertical-align: top;">
+                        ${idx + 1}
+                    </td>
+                    <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: top;">
+                        <div style="font-weight: 700; color: #1e293b; font-size: 13px;">${m.name}</div>
+                        ${specsString ? `<div style="font-size: 11px; color: #64748b; margin-top: 2px;">${specsString}</div>` : ''}
+                        <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Unit: ${m.unit}</div>
+                    </td>
+                    <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: center; vertical-align: top;">
+                        <div style="font-weight: 700; color: #374151; font-size: 13px;">${(m.totalImported || 0).toLocaleString('en-IN')} ${m.unit}</div>
+                        <div style="font-size: 11px; color: #64748b; margin-top: 3px;">@ ${formatCurrency(m.perUnitCost)} / unit</div>
+                        <div style="font-size: 12px; font-weight: 700; color: #059669; margin-top: 2px;">${formatCurrency(m.totalCost)}</div>
+                    </td>
+                    <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: center; vertical-align: top; font-weight: 600; color: #b45309; font-size: 13px;">
+                        ${(m.totalUsed || 0).toLocaleString('en-IN')}
+                        <div style="font-size: 10px; color: #94a3b8; font-weight: 400;">${m.unit}</div>
+                    </td>
+                    <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: center; vertical-align: top; font-weight: 700; color: #1d4ed8; font-size: 13px;">
+                        ${(m.currentlyAvailable || 0).toLocaleString('en-IN')}
+                        <div style="font-size: 10px; color: #94a3b8; font-weight: 400;">${m.unit}</div>
+                    </td>
+                </tr>
+            `;
+            }).join('');
+
+            const fullHTML = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <title>Material Stock Report - ${reportTitle}</title>
+                    <style>
+                        * { box-sizing: border-box; }
+                        body {
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                            line-height: 1.5;
+                            color: #374151;
+                            margin: 0;
+                            padding: 24px;
+                            background: #ffffff;
+                        }
+                        @media print {
+                            body { margin: 0; padding: 16px; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <!-- Header Banner -->
+                    <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f4c81 100%); color: white; padding: 32px 36px; border-radius: 12px; margin-bottom: 0;">
+                        <div style="font-size: 11px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.6; margin-bottom: 8px; font-weight: 500;">
+                            Material Stock Report
+                        </div>
+                        <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px; letter-spacing: -0.5px;">
+                            ${reportTitle}
+                        </div>
+                    </div>
+
+                    <!-- Meta Info Strip -->
+                    <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-top: none; border-radius: 0 0 12px 12px; padding: 14px 36px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px;">
+                        <div style="display: flex; gap: 32px;">
+                            <div>
+                                <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Company</div>
+                                <div style="font-size: 13px; color: #0f172a; font-weight: 700; margin-top: 2px;">${companyName}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Generated By</div>
+                                <div style="font-size: 13px; color: #0f172a; font-weight: 700; margin-top: 2px;">${this.userData?.name || 'Admin'}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Material Types</div>
+                                <div style="font-size: 13px; color: #0f172a; font-weight: 700; margin-top: 2px;">${sortedMaterials.length}</div>
+                            </div>
+                        </div>
+                        <div style="font-size: 11px; color: #64748b;">
+                            ${generatedOn}
+                        </div>
+                    </div>
+
+                    <!-- Summary Cards -->
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px;">
+                        <div style="background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 20px 24px; border-radius: 10px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);">
+                            <div style="font-size: 11px; opacity: 0.85; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Total Import Value</div>
+                            <div style="font-size: 24px; font-weight: 800;">${formatCurrency(grandTotalImportValue)}</div>
+                        </div>
+                        <div style="background: linear-gradient(135deg, #f59e0b, #b45309); color: white; padding: 20px 24px; border-radius: 10px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);">
+                            <div style="font-size: 11px; opacity: 0.85; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Total Used Qty</div>
+                            <div style="font-size: 24px; font-weight: 800;">${totalUsedQty.toLocaleString('en-IN')}</div>
+                        </div>
+                        <div style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; padding: 20px 24px; border-radius: 10px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);">
+                            <div style="font-size: 11px; opacity: 0.85; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Total Available Qty</div>
+                            <div style="font-size: 24px; font-weight: 800;">${totalAvailableQty.toLocaleString('en-IN')}</div>
+                        </div>
+                    </div>
+
+                    <!-- Stock Table -->
+                    <div style="border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+                        <div style="background: linear-gradient(90deg, #1e293b, #334155); padding: 14px 20px;">
+                            <h2 style="margin: 0; color: white; font-size: 15px; font-weight: 700; letter-spacing: 0.3px;">
+                                📦 Current Material Stock
+                            </h2>
+                        </div>
+                        <table style="width: 100%; border-collapse: collapse; background: white;">
+                            <thead>
+                                <tr style="background: #f8fafc;">
+                                    <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 40px;">Sr No</th>
+                                    <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0;">Material Name</th>
+                                    <th style="padding: 12px; text-align: center; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 150px;">Total Imported</th>
+                                    <th style="padding: 12px; text-align: center; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 100px;">Total Used</th>
+                                    <th style="padding: 12px; text-align: center; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 100px;">Total Available</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${tableRows}
+                            </tbody>
+                            <tfoot>
+                                <tr style="background: linear-gradient(90deg, #f0fdf4, #dcfce7);">
+                                    <td colspan="2" style="padding: 14px 12px; border-top: 2px solid #10b981; font-weight: 700; font-size: 13px; color: #059669;">
+                                        GRAND TOTAL
+                                    </td>
+                                    <td style="padding: 14px 12px; border-top: 2px solid #10b981; text-align: center; font-weight: 800; font-size: 14px; color: #059669;">
+                                        ${totalImportedQty.toLocaleString('en-IN')}
+                                        <div style="font-size: 11px; font-weight: 700; color: #059669;">${formatCurrency(grandTotalImportValue)}</div>
+                                    </td>
+                                    <td style="padding: 14px 12px; border-top: 2px solid #10b981; text-align: center; font-weight: 700; font-size: 13px; color: #374151;">
+                                        ${totalUsedQty.toLocaleString('en-IN')}
+                                    </td>
+                                    <td style="padding: 14px 12px; border-top: 2px solid #10b981; text-align: center; font-weight: 700; font-size: 13px; color: #374151;">
+                                        ${totalAvailableQty.toLocaleString('en-IN')}
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <!-- Footer -->
+                    <div style="margin-top: 28px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8;">
+                        Generated by Xsite Application · ${generatedOn}
+                    </div>
+                </body>
+                </html>
+            `;
+
+            // Generate PDF
+            const { uri } = await Print.printToFileAsync({
+                html: fullHTML,
+                base64: false,
+                margins: { left: 16, top: 16, right: 16, bottom: 16 },
+            });
+
+            // Build custom filename
+            const sanitizedTitle = reportTitle.replace(/[^a-zA-Z0-9_\s]/g, '').trim().replace(/\s+/g, '_');
+            const currentDate = new Date().toISOString().split('T')[0];
+            const customFilename = `Material_Stock_Report_${sanitizedTitle}_${currentDate}.pdf`;
+
+            // Try to copy with custom filename
+            let finalUri = uri;
+            try {
+                const documentDir = Paths.document;
+                if (documentDir) {
+                    const customFile = new File(documentDir, customFilename);
+                    if (customFile.exists) customFile.delete();
+                    const originalFile = new File(uri);
+                    originalFile.copy(customFile);
+                    if (customFile.exists) {
+                        finalUri = customFile.uri;
+                        try { originalFile.delete(); } catch (_) { }
+                    }
+                }
+            } catch (_) { /* use original uri */ }
+
+            // Show view/share dialog
+            setTimeout(() => {
+                Alert.alert(
+                    '✅ Stock Report Ready',
+                    `Material stock report has been generated.\n\nFilename: ${customFilename}`,
+                    [
+                        {
+                            text: 'View PDF',
+                            onPress: async () => {
+                                try {
+                                    if (Platform.OS === 'android') {
+                                        const contentUri = await FileSystemLegacy.getContentUriAsync(finalUri);
+                                        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+                                            data: contentUri,
+                                            flags: 1,
+                                            type: 'application/pdf',
+                                        });
+                                    } else {
+                                        if (await Sharing.isAvailableAsync()) {
+                                            await Sharing.shareAsync(finalUri, {
+                                                mimeType: 'application/pdf',
+                                                dialogTitle: `View: ${customFilename}`,
+                                                UTI: 'com.adobe.pdf',
+                                            });
+                                        }
+                                    }
+                                } catch (e) {
+                                    if (await Sharing.isAvailableAsync()) {
+                                        await Sharing.shareAsync(finalUri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
+                                    }
+                                }
+                            },
+                        },
+                        {
+                            text: 'Share PDF',
+                            onPress: async () => {
+                                if (await Sharing.isAvailableAsync()) {
+                                    await Sharing.shareAsync(finalUri, {
+                                        mimeType: 'application/pdf',
+                                        dialogTitle: `Share: ${customFilename}`,
+                                        UTI: 'com.adobe.pdf',
+                                    });
+                                }
+                            },
+                        },
+                        { text: 'Cancel', style: 'cancel' },
+                    ],
+                    { cancelable: true }
+                );
+            }, 100);
+
+        } catch (error) {
+            console.error('❌ Material Stock Report generation error:', error);
+            Alert.alert(
+                'Error',
+                'Failed to generate material stock report. Please try again. Error: ' + (error instanceof Error ? error.message : String(error)),
+                [{ text: 'OK' }]
+            );
+        }
+    }
 }

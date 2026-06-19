@@ -50,10 +50,10 @@ const Index: React.FC = () => {
     // Get user role for access control
     const { user, refreshUser } = useUser();
     const userIsAdmin = isAdmin(user);
-    
+
     // Check if user is staff (has role field)
     const isStaff = user && 'role' in user;
-    
+
     // Get user name from user data
     const userName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'User';
 
@@ -114,17 +114,17 @@ const Index: React.FC = () => {
             // Check if user is staff and handle assigned projects
             if (isStaff && user) {
                 console.log('👤 Staff user detected - fetching staff data with populated projects');
-                
+
                 try {
                     // Fetch staff data with populated projects in one API call
                     // Use skipCache=true to ensure fresh data with license status
                     const response = await apiClient.get(`/api/users/staff?id=${user._id}&getAllProjects=true&skipCache=true`);
                     const responseData = response.data as any;
-                    
+
                     if (responseData.success && responseData.data) {
                         const staffData = responseData.data;
                         console.log('✅ Staff data fetched:', staffData);
-                        
+
                         // Extract populated project data from assignedProjects
                         if (staffData.assignedProjects && Array.isArray(staffData.assignedProjects) && staffData.assignedProjects.length > 0) {
                             const populatedProjects = staffData.assignedProjects
@@ -145,9 +145,9 @@ const Index: React.FC = () => {
                                     return null;
                                 })
                                 .filter((project: any) => project !== null);
-                            
+
                             console.log(`📊 Found ${populatedProjects.length} populated projects for staff user`);
-                            
+
                             // ✅ Load completion status for all staff projects
                             const projectsWithCompletion = await Promise.all(
                                 populatedProjects.map(async (project: any) => {
@@ -171,17 +171,17 @@ const Index: React.FC = () => {
                                     return { ...project, isCompleted: false };
                                 })
                             );
-                            
+
                             // Load pinned projects and merge with project data
                             const savedPinnedProjects = await loadPinnedProjects();
                             const projectsWithPinStatus = projectsWithCompletion.map(project => ({
                                 ...project,
                                 isPinned: savedPinnedProjects.has(project._id)
                             }));
-                            
+
                             console.log('✅ Staff projects with completion and pin status loaded:', projectsWithPinStatus.length);
                             console.log('📊 Completion status summary:', projectsWithPinStatus.map(p => `${p.name}: completed=${p.isCompleted}, pinned=${p.isPinned}`).join(', '));
-                            
+
                             setProjects(projectsWithPinStatus);
                             return;
                         } else {
@@ -194,18 +194,18 @@ const Index: React.FC = () => {
                     console.error('❌ Error fetching staff data:', error);
                     setError('Failed to fetch assigned projects');
                 }
-                
+
                 // If we reach here, no projects were found for staff
                 setProjects([]);
-                
+
             } else if (clientId) {
                 // For non-staff users (admin/client), fetch all client projects
                 console.log('👔 Admin/Client user detected - fetching all client projects');
-                
+
                 const userRole = user && 'role' in user ? 'staff' : 'admin';
                 const projectData = await getProjectData(clientId, undefined, true, userRole);
                 const projectsArray = Array.isArray(projectData) ? projectData : [];
-                
+
                 // ✅ Load completion status for all projects
                 const projectsWithCompletion = await Promise.all(
                     projectsArray.map(async (project) => {
@@ -229,17 +229,17 @@ const Index: React.FC = () => {
                         return { ...project, isCompleted: false };
                     })
                 );
-                
+
                 // Load pinned projects and merge with project data
                 const savedPinnedProjects = await loadPinnedProjects();
                 const projectsWithPinStatus = projectsWithCompletion.map(project => ({
                     ...project,
                     isPinned: savedPinnedProjects.has(project._id)
                 }));
-                
+
                 console.log('✅ Projects with completion and pin status loaded:', projectsWithPinStatus.length);
                 console.log('📊 Status summary:', projectsWithPinStatus.map(p => `${p.name}: completed=${p.isCompleted}, pinned=${p.isPinned}`).join(', '));
-                
+
                 setProjects(projectsWithPinStatus);
             } else {
                 // No clientId - staff without clients
@@ -260,12 +260,12 @@ const Index: React.FC = () => {
         const fetchClientData = async () => {
             try {
                 const clientId = await getClientId();
-                
+
                 if (!clientId) {
                     console.log('⚠️ No clientId - skipping client data fetch');
                     return;
                 }
-                
+
                 console.log('📝 Fetching client data for:', clientId);
                 // Add cache-busting parameter to ensure fresh data
                 const response = await apiClient.get(`/api/clients?id=${clientId}&_t=${Date.now()}`);
@@ -281,9 +281,9 @@ const Index: React.FC = () => {
                         hasLogo: !!client.logo,
                         logoUrl: client.logo
                     });
-                    
+
                     setCompanyName(client.companyName || client.name || 'Company Name');
-                    
+
                     if (client.logo) {
                         console.log('🖼️ Setting company logo:', client.logo);
                         setCompanyLogo(client.logo);
@@ -301,9 +301,9 @@ const Index: React.FC = () => {
                         hasLogo: !!client.logo,
                         logoUrl: client.logo
                     });
-                    
+
                     setCompanyName(client.companyName || client.name || 'Company Name');
-                    
+
                     if (client.logo) {
                         console.log('🖼️ Setting company logo:', client.logo);
                         setCompanyLogo(client.logo);
@@ -335,16 +335,16 @@ const Index: React.FC = () => {
                 console.log('⏸️ Already initialized, skipping...');
                 return;
             }
-            
+
             // Wait for user data to be available before fetching projects
             if (!user) {
                 console.log('⏳ User data not available yet, waiting...');
                 return;
             }
-            
+
             console.log('🚀 Initializing data with user:', user);
             isInitializedRef.current = true;
-            
+
             // For staff users, refresh user data first to ensure we have latest assignedProjects
             if (user && 'role' in user) {
                 console.log('🔄 Staff user detected - refreshing user data');
@@ -355,11 +355,11 @@ const Index: React.FC = () => {
                     console.error('❌ Failed to refresh user data:', error);
                 }
             }
-            
+
             // Then fetch project data
             fetchProjectData();
         };
-        
+
         initializeData();
     }, [user?._id]);
 
@@ -387,7 +387,7 @@ const Index: React.FC = () => {
                 console.log('⚠️ No clientId - skipping staff fetch');
                 return;
             }
-            
+
             try {
                 const res = await apiClient.get(`/api/staff?clientId=${clientId}`);
                 const data = (res.data as any)?.data || [];
@@ -482,12 +482,12 @@ const Index: React.FC = () => {
                     name: s.name
                 }))
             });
-            
+
             apiClient.get(`/api/contractor?projectId=${project._id}&staffId=${user._id}`)
                 .then((res: any) => {
                     if (res.data?.success && res.data?.data) {
                         const contractor = res.data.data;
-                        
+
                         console.log(`🔍 [DEBUG] Contractor data:`, {
                             contractorId: contractor._id,
                             contractorSectionId: contractor.sectionId,
@@ -553,7 +553,7 @@ const Index: React.FC = () => {
     // Handle pin toggle for projects
     const handlePinToggle = async (projectId: string, isPinned: boolean) => {
         console.log(`📌 ${isPinned ? 'Pinning' : 'Unpinning'} project:`, projectId);
-        
+
         // Update the pinned projects set
         setPinnedProjects(prev => {
             const newSet = new Set(prev);
@@ -562,18 +562,18 @@ const Index: React.FC = () => {
             } else {
                 newSet.delete(projectId);
             }
-            
+
             // Persist to AsyncStorage
             AsyncStorage.setItem('pinnedProjects', JSON.stringify(Array.from(newSet)))
                 .catch(error => console.error('Failed to save pinned projects:', error));
-            
+
             return newSet;
         });
 
         // Update the projects array to reflect the pin status
-        setProjects(prevProjects => 
-            prevProjects.map(project => 
-                project._id === projectId 
+        setProjects(prevProjects =>
+            prevProjects.map(project =>
+                project._id === projectId
                     ? { ...project, isPinned: isPinned }
                     : project
             )
@@ -591,7 +591,7 @@ const Index: React.FC = () => {
         setIsSharing(true);
         try {
             console.log('📱 Starting QR code sharing process...');
-            
+
             const isAvailable = await Sharing.isAvailableAsync();
             if (!isAvailable) {
                 Alert.alert(
@@ -634,7 +634,7 @@ const Index: React.FC = () => {
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-            
+
             {/* Header - Show only for admin users */}
             {userIsAdmin && (
                 <View style={styles.fixedHeader}>
@@ -688,7 +688,7 @@ const Index: React.FC = () => {
 
             {/* QR Code Section - Priority for unassigned staff */}
             {isStaff && user && !clientId && (
-                <View style={styles.section}>  
+                <View style={styles.section}>
                     <View style={[styles.qrCodeCard, styles.shareCard]}>
                         <View style={styles.shareHeader}>
                             <View style={styles.shareIconContainer}>
@@ -701,7 +701,7 @@ const Index: React.FC = () => {
                                 </Text>
                             </View>
                         </View>
-                        
+
                         {/* QR Code displayed directly */}
                         <ViewShot ref={embeddedQRRef} options={{ format: 'png', quality: 1.0 }}>
                             <View style={styles.embeddedQrContainer}>
@@ -728,7 +728,7 @@ const Index: React.FC = () => {
                                 </View>
                             </View>
                         </ViewShot>
-                        
+
                         <View style={styles.embeddedQrInfo}>
                             <Text style={styles.embeddedQrTitle}>Staff Assignment QR Code</Text>
                             <Text style={styles.embeddedQrId}>{user._id}</Text>
@@ -744,16 +744,16 @@ const Index: React.FC = () => {
                             activeOpacity={0.7}
                             disabled={isSharing}
                         >
-                            <Ionicons 
-                                name={isSharing ? "hourglass-outline" : "share-outline"} 
-                                size={20} 
-                                color="#FFFFFF" 
+                            <Ionicons
+                                name={isSharing ? "hourglass-outline" : "share-outline"}
+                                size={20}
+                                color="#FFFFFF"
                             />
                             <Text style={styles.shareButtonText}>
                                 {isSharing ? 'Sharing...' : 'Share QR Code'}
                             </Text>
                         </TouchableOpacity>
-                        
+
                         {/* Push Token Status for Staff */}
                         <PushTokenStatusIndicator showDetails={true} />
                     </View>
@@ -768,7 +768,7 @@ const Index: React.FC = () => {
                     </Text>
                     {userIsAdmin && <View style={styles.sectionDivider} />}
                 </View>
-                
+
                 {/* Toggle Button - Only for non-staff users */}
                 {!isStaff && (
                     <TouchableOpacity
@@ -779,10 +779,10 @@ const Index: React.FC = () => {
                         onPress={() => setShowCompletedProjects(!showCompletedProjects)}
                         activeOpacity={0.7}
                     >
-                        <Ionicons 
-                            name={showCompletedProjects ? "list" : "checkmark-done"} 
-                            size={18} 
-                            color={showCompletedProjects ? "#0EA5E9" : "#6B7280"} 
+                        <Ionicons
+                            name={showCompletedProjects ? "list" : "checkmark-done"}
+                            size={18}
+                            color={showCompletedProjects ? "#0EA5E9" : "#6B7280"}
                         />
                         <Text style={[
                             styles.toggleButtonText,
@@ -844,25 +844,25 @@ const Index: React.FC = () => {
                                             isPinned: p.isPinned
                                         }))
                                     });
-                                    
+
                                     // For staff users, always show only ongoing projects (not completed)
                                     // For non-staff users, respect the toggle state
-                                    const filteredProjects = isStaff 
+                                    const filteredProjects = isStaff
                                         ? projects.filter(p => p.isCompleted === false)
                                         : showCompletedProjects
                                             ? projects.filter(p => p.isCompleted === true)
                                             : projects.filter(p => p.isCompleted === false);
-                                    
+
                                     // Sort projects: pinned projects first, then by name
                                     const sortedProjects = filteredProjects.sort((a, b) => {
                                         // First, sort by pin status (pinned projects first)
                                         if (a.isPinned && !b.isPinned) return -1;
                                         if (!a.isPinned && b.isPinned) return 1;
-                                        
+
                                         // Then sort by name alphabetically
                                         return a.name.localeCompare(b.name);
                                     });
-                                    
+
                                     console.log('✅ Filtered and sorted result:', {
                                         filteredCount: sortedProjects.length,
                                         sortedProjects: sortedProjects.map(p => ({
@@ -871,7 +871,7 @@ const Index: React.FC = () => {
                                             isPinned: p.isPinned
                                         }))
                                     });
-                                    
+
                                     return sortedProjects.length > 0 ? (
                                         sortedProjects.map((project, index) => (
                                             <View key={index} style={{ marginBottom: 10 }}>
@@ -886,16 +886,16 @@ const Index: React.FC = () => {
                                         ))
                                     ) : (
                                         <View style={styles.centerContainer}>
-                                            <Ionicons 
-                                                name={isStaff ? "folder-open-outline" : (showCompletedProjects ? "checkmark-done-circle-outline" : "folder-open-outline")} 
-                                                size={64} 
-                                                color="#CBD5E1" 
+                                            <Ionicons
+                                                name={isStaff ? "folder-open-outline" : (showCompletedProjects ? "checkmark-done-circle-outline" : "folder-open-outline")}
+                                                size={64}
+                                                color="#CBD5E1"
                                             />
                                             <Text style={styles.emptyText}>
                                                 {isStaff ? 'No ongoing projects' : (showCompletedProjects ? 'No completed projects' : 'No ongoing projects')}
                                             </Text>
                                             <Text style={styles.emptySubText}>
-                                                {isStaff 
+                                                {isStaff
                                                     ? 'Contact your admin to assign projects to you'
                                                     : showCompletedProjects
                                                         ? 'Mark projects as complete to see them here'
