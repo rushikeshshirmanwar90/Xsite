@@ -25,8 +25,6 @@ const OtherCostPage = () => {
 
   const projectId = params.projectId as string;
   const projectName = params.projectName as string;
-  const sectionId = params.sectionId as string;
-  const sectionName = params.sectionName as string;
 
   const [costEntries, setCostEntries] = useState<OtherCost[]>([]);
   const [loading, setLoading] = useState(false);
@@ -157,11 +155,12 @@ const OtherCostPage = () => {
         status: 'pending',
       }));
 
+      // Other Cost applies to the whole project — no sectionId is stamped on the
+      // entries, so it isn't tied to (or hidden from) any particular section.
       const requestData = {
         otherCostEntries,
         entityType: 'project',
         entityId: projectId,
-        sectionId: sectionId || undefined,
         clientId,
         addedBy: user?._id,
         user: user
@@ -188,8 +187,6 @@ const OtherCostPage = () => {
         await logOtherCostAdded(
           projectId,
           projectName || '',
-          sectionId || '',
-          sectionName || '',
           otherCostEntries,
           `Added ${entries.length} other cost ${entries.length === 1 ? 'entry' : 'entries'}`
         );
@@ -220,11 +217,10 @@ const OtherCostPage = () => {
         onSectionSelect={() => {}}
         totalCost={totalCost}
         formatPrice={formatPrice}
-        getSectionName={() => sectionName || 'Unknown Section'}
+        getSectionName={() => 'Other Costs'}
         projectName={projectName || 'Unknown Project'}
-        sectionName={`${sectionName || 'Unknown Section'} - Other Costs`}
+        sectionName="Other Costs"
         projectId={projectId || ''}
-        sectionId={sectionId || ''}
         onShowSectionPrompt={() => {}}
         hideSection={true}
         hideMenu={true}

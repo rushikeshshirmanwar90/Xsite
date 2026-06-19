@@ -1841,13 +1841,13 @@ const Details = () => {
 
     const handleOtherCostPress = () => {
         console.log('Other Cost button pressed - navigating to other-cost.tsx');
+        // Other Cost applies to the whole project, not the section currently being
+        // viewed — so only projectId/projectName are passed, no section context.
         router.push({
             pathname: '/other-cost',
             params: {
                 projectId: projectId || '',
                 projectName: projectName || '',
-                sectionId: sectionId || '',
-                sectionName: sectionName || '',
             }
         });
     };

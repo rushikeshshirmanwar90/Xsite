@@ -10,7 +10,7 @@ import {
     View,
 } from 'react-native';
 
-const StaffCard: React.FC<StaffCardProps> = ({ staff, onPress, onRemove, showRemoveButton = false }) => {
+const StaffCard: React.FC<StaffCardProps> = ({ staff, onPress, onRemove, showRemoveButton = false, onManagePayment }) => {
     const getInitials = (firstName: string, lastName: string): string => {
         return (firstName[0] + lastName[0]).toUpperCase();
     };
@@ -99,6 +99,11 @@ const StaffCard: React.FC<StaffCardProps> = ({ staff, onPress, onRemove, showRem
                                     <Text style={styles.projectTagText} numberOfLines={1}>
                                         {project.projectName}
                                     </Text>
+                                    {!!project.monthlyPayment && (
+                                        <Text style={styles.projectTagPayment}>
+                                            ₹{project.monthlyPayment.toLocaleString('en-IN')}/mo
+                                        </Text>
+                                    )}
                                 </View>
                             ))}
                             {staff.assignedProjects.length > 2 && (
@@ -112,7 +117,28 @@ const StaffCard: React.FC<StaffCardProps> = ({ staff, onPress, onRemove, showRem
                     ) : (
                         <Text style={styles.noProjectsText}>No projects assigned</Text>
                     )}
+                    {staff.assignedProjects.some(p => !!p.monthlyPayment) && (
+                        <Text style={styles.totalPaymentText}>
+                            Total monthly: ₹{staff.assignedProjects
+                                .reduce((sum, p) => sum + (p.monthlyPayment || 0), 0)
+                                .toLocaleString('en-IN')}
+                        </Text>
+                    )}
                 </View>
+
+                {onManagePayment && staff.assignedProjects.length > 0 && (
+                    <TouchableOpacity
+                        style={styles.managePaymentButton}
+                        onPress={(e) => {
+                            e.stopPropagation();
+                            onManagePayment(staff);
+                        }}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons name="cash-outline" size={16} color="#059669" />
+                        <Text style={styles.managePaymentButtonText}>Manage Payment</Text>
+                    </TouchableOpacity>
+                )}
             </View>
 
             <View style={styles.cardAction}>
@@ -240,6 +266,23 @@ const styles = StyleSheet.create({
         borderTopColor: '#F3F4F6',
         paddingTop: 12,
     },
+    managePaymentButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        marginTop: 12,
+        paddingVertical: 9,
+        borderRadius: 8,
+        backgroundColor: '#ECFDF5',
+        borderWidth: 1,
+        borderColor: '#A7F3D0',
+    },
+    managePaymentButtonText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#059669',
+    },
     projectsLabel: {
         fontSize: 12,
         fontWeight: '600',
@@ -262,6 +305,18 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: '#1E40AF',
         fontWeight: '500',
+    },
+    projectTagPayment: {
+        fontSize: 10,
+        color: '#059669',
+        fontWeight: '700',
+        marginTop: 2,
+    },
+    totalPaymentText: {
+        fontSize: 12,
+        color: '#059669',
+        fontWeight: '700',
+        marginTop: 8,
     },
     moreProjectsTag: {
         backgroundColor: '#F3F4F6',

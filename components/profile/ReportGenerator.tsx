@@ -435,11 +435,14 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                         };
                     });
 
-                    // Filter other cost data by selected sections only if there are multiple sections
+                    // Filter other cost data by selected sections only if there are multiple sections.
+                    // Project-wide entries (no sectionId — the normal case now that Other Cost
+                    // isn't tied to a section) are always kept regardless of section selection;
+                    // only entries explicitly stamped with a section not in the selection are dropped.
                     if (projectSections.length > 1 && selectedSections.length > 0 && selectedSections.length < projectSections.length && otherCostData.length > 0) {
                         const beforeFilterCount = otherCostData.length;
-                        otherCostData = otherCostData.filter((oc: any) => 
-                            selectedSections.includes(oc.sectionId)
+                        otherCostData = otherCostData.filter((oc: any) =>
+                            !oc.sectionId || selectedSections.includes(oc.sectionId)
                         );
                         console.log(`✅ Other cost filtered by sections: ${beforeFilterCount} → ${otherCostData.length} entries`);
                     }

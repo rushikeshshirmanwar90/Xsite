@@ -6,6 +6,7 @@ import StaffEmptyState from '@/components/staff/StaffEmptyState';
 import AdminCard from '@/components/staff/AdminCard';
 import StaffQRScannerModal from '@/components/staff/StaffQRScannerModal';
 import ManualStaffAssignModal from '@/components/staff/ManualStaffAssignModal';
+import ManagePaymentModal from '@/components/staff/ManagePaymentModal';
 import { getClientId } from '@/functions/clientId';
 import { addStaff, removeStaff } from '@/functions/staff';
 import { isAdmin, useUser } from '@/hooks/useUser';
@@ -55,6 +56,8 @@ const StaffManagement: React.FC = () => {
     const [adminList, setAdminList] = useState<Admin[]>([]);
     const [showAddModal, setShowAddModal] = useState(false);
     const [showQRScanner, setShowQRScanner] = useState(false);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [paymentStaff, setPaymentStaff] = useState<Staff | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [clientId, setClientId] = useState('');
     const [clientData, setClientData] = useState<ClientData | null>(null);
@@ -444,10 +447,42 @@ const StaffManagement: React.FC = () => {
         }
     };
 
+    const handleManagePayment = (staff: Staff) => {
+        // staff.assignedProjects is already filtered to the current client by the
+        // time StaffCard hands it back to us (see the 'staff' case in renderItem).
+        setPaymentStaff(staff);
+        setShowPaymentModal(true);
+    };
+
+    const handlePaymentUpdated = (staffId: string, projectId: string, monthlyPayment: number) => {
+        // Patch local state so the card + modal reflect the new amount immediately,
+        // without waiting on a full refetch (and the staff-list cache's TTL).
+        const applyUpdate = (list: Staff[]) => list.map(s => {
+            if (s._id !== staffId) return s;
+            return {
+                ...s,
+                assignedProjects: (s.assignedProjects || []).map(p =>
+                    p.projectId === projectId ? { ...p, monthlyPayment } : p
+                ),
+            };
+        });
+
+        setStaffList(prev => applyUpdate(prev));
+        setPaymentStaff(prev => {
+            if (!prev || prev._id !== staffId) return prev;
+            return {
+                ...prev,
+                assignedProjects: (prev.assignedProjects || []).map(p =>
+                    p.projectId === projectId ? { ...p, monthlyPayment } : p
+                ),
+            };
+        });
+    };
+
     const handleStaffPress = (staff: Staff) => {
         // Navigate to staff detail page with staff data
         console.log('Staff selected:', `${staff.firstName} ${staff.lastName}`);
-        
+
         // Navigate to staff detail screen with staff data as params
         router.push({
             pathname: '/staff-detail',
@@ -723,6 +758,7 @@ const StaffManagement: React.FC = () => {
                             onPress={() => handleStaffPress(item.data)}
                             onRemove={handleRemoveStaff}
                             showRemoveButton={userIsAdmin}
+                            onManagePayment={userIsAdmin ? handleManagePayment : undefined}
                         />
                     </View>
                 );
@@ -800,6 +836,13 @@ const StaffManagement: React.FC = () => {
                         console.error('Error refreshing staff list:', error);
                     }
                 }}
+            />
+
+            <ManagePaymentModal
+                visible={showPaymentModal}
+                onClose={() => setShowPaymentModal(false)}
+                staff={paymentStaff}
+                onPaymentUpdated={handlePaymentUpdated}
             />
         </SafeAreaView>
     );

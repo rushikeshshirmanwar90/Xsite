@@ -99,6 +99,29 @@ export const updateStaff = async (staffId: string, staffData: Partial<Staff>, no
   }
 };
 
+export const updateStaffProjectPayment = async (
+  staffId: string,
+  projectId: string,
+  monthlyPayment: number
+): Promise<any | null> => {
+  try {
+    console.log('📤 Updating staff project payment via API:', `/api/users/staff/project-payment`, { staffId, projectId, monthlyPayment });
+
+    const res = await apiClient.patch(`/api/users/staff/project-payment`, {
+      staffId,
+      projectId,
+      monthlyPayment,
+    });
+
+    console.log('✅ Staff project payment API response:', res.data);
+    return (res.data as any)?.data ?? null;
+  } catch (error: any) {
+    console.error('❌ Error in updateStaffProjectPayment function:', error);
+    console.error('❌ Error response:', error.response?.data);
+    throw error;
+  }
+};
+
 export const removeStaff = async (staffId: string, staffName?: string, notificationCallback?: (data: any) => Promise<boolean>, clientId?: string): Promise<any | null> => {
   try {
     console.log('📤 Removing staff from client via API:', `/api/clients/staff/remove?staffId=${staffId}&clientId=${clientId}`);

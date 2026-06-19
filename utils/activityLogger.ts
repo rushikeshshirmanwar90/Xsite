@@ -1038,11 +1038,11 @@ export const logEquipmentRemoved = async (
     },
   });
 };
+// Other Cost is a project-wide expense, not tied to any particular section —
+// no sectionId/sectionName is logged.
 export const logOtherCostAdded = async (
   projectId: string,
   projectName: string,
-  sectionId: string,
-  sectionName: string,
   otherCostEntries: Array<{
     name: string;
     category: string;
@@ -1066,8 +1066,6 @@ export const logOtherCostAdded = async (
     description,
     projectId,
     projectName,
-    sectionId,
-    sectionName,
     message,
     metadata: {
       otherCostEntries,

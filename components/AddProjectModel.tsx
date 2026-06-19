@@ -11,6 +11,7 @@ import {
     Animated,
     Modal,
     ScrollView,
+    StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
@@ -55,13 +56,25 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
             // Remove staff member
             setAssignedTo(assignedTo.filter(member => member._id !== staff._id));
         } else {
-            // Add staff member
-            setAssignedTo([...assignedTo, staff]);
+            // Add staff member (monthly payment starts at 0, set via the input once selected)
+            setAssignedTo([...assignedTo, { ...staff, monthlyPayment: 0 }]);
         }
     };
 
     const isStaffSelected = (staff: StaffMembers) => {
         return assignedTo.some(member => member._id === staff._id);
+    };
+
+    const handleMonthlyPaymentChange = (staffId: string | undefined, value: string) => {
+        const amount = value === '' ? 0 : Number(value.replace(/[^0-9.]/g, ''));
+        setAssignedTo(prev => prev.map(member =>
+            member._id === staffId ? { ...member, monthlyPayment: isNaN(amount) ? 0 : amount } : member
+        ));
+    };
+
+    const getMonthlyPayment = (staffId: string | undefined): string => {
+        const member = assignedTo.find(m => m._id === staffId);
+        return member?.monthlyPayment ? String(member.monthlyPayment) : '';
     };
 
     const handleSubmit = async () => {
@@ -169,41 +182,56 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                                 nestedScrollEnabled={true}
                             >
                                 {staffMembers.map((staff: StaffMembers) => (
-                                    <TouchableOpacity
-                                        key={staff._id}
-                                        style={styles.staffItem}
-                                        onPress={() => handleStaffSelection(staff)}
-                                        activeOpacity={0.7}
-                                    >
-                                        <View style={styles.staffItemContent}>
-                                            <View style={[
-                                                styles.checkbox,
-                                                isStaffSelected(staff) && styles.checkboxSelected
-                                            ]}>
-                                                {isStaffSelected(staff) && (
-                                                    <Ionicons name="checkmark" size={18} color="#fff" />
-                                                )}
+                                    <View key={staff._id}>
+                                        <TouchableOpacity
+                                            style={styles.staffItem}
+                                            onPress={() => handleStaffSelection(staff)}
+                                            activeOpacity={0.7}
+                                        >
+                                            <View style={styles.staffItemContent}>
+                                                <View style={[
+                                                    styles.checkbox,
+                                                    isStaffSelected(staff) && styles.checkboxSelected
+                                                ]}>
+                                                    {isStaffSelected(staff) && (
+                                                        <Ionicons name="checkmark" size={18} color="#fff" />
+                                                    )}
+                                                </View>
+                                                <View style={styles.staffInfo}>
+                                                    <Text style={styles.staffName}>
+                                                        {staff.fullName}
+                                                    </Text>
+                                                    <Text style={styles.staffStatus}>
+                                                        {isStaffSelected(staff) ? 'Assigned' : 'Available'}
+                                                    </Text>
+                                                </View>
+                                                <View style={[
+                                                    styles.selectionIndicator,
+                                                    isStaffSelected(staff) && styles.selectionIndicatorSelected
+                                                ]}>
+                                                    <Ionicons
+                                                        name={isStaffSelected(staff) ? "checkmark-circle" : "ellipse-outline"}
+                                                        size={24}
+                                                        color={isStaffSelected(staff) ? "#10B981" : "#D1D5DB"}
+                                                    />
+                                                </View>
                                             </View>
-                                            <View style={styles.staffInfo}>
-                                                <Text style={styles.staffName}>
-                                                    {staff.fullName}
-                                                </Text>
-                                                <Text style={styles.staffStatus}>
-                                                    {isStaffSelected(staff) ? 'Assigned' : 'Available'}
-                                                </Text>
-                                            </View>
-                                            <View style={[
-                                                styles.selectionIndicator,
-                                                isStaffSelected(staff) && styles.selectionIndicatorSelected
-                                            ]}>
-                                                <Ionicons
-                                                    name={isStaffSelected(staff) ? "checkmark-circle" : "ellipse-outline"}
-                                                    size={24}
-                                                    color={isStaffSelected(staff) ? "#10B981" : "#D1D5DB"}
+                                        </TouchableOpacity>
+                                        {isStaffSelected(staff) && (
+                                            <View style={localStyles.paymentRow}>
+                                                <Ionicons name="cash-outline" size={16} color="#059669" />
+                                                <Text style={localStyles.paymentLabel}>Monthly Payment (₹)</Text>
+                                                <TextInput
+                                                    style={localStyles.paymentInput}
+                                                    value={getMonthlyPayment(staff._id)}
+                                                    onChangeText={(value) => handleMonthlyPaymentChange(staff._id, value)}
+                                                    placeholder="0"
+                                                    placeholderTextColor="#9CA3AF"
+                                                    keyboardType="numeric"
                                                 />
                                             </View>
-                                        </View>
-                                    </TouchableOpacity>
+                                        )}
+                                    </View>
                                 ))}
                                 {staffMembers.length === 0 && (
                                     <View style={styles.noStaffContainer}>
@@ -283,5 +311,39 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
         </Modal>
     );
 };
+
+const localStyles = StyleSheet.create({
+    paymentRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#ECFDF5',
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        marginTop: -4,
+        marginBottom: 8,
+        marginHorizontal: 4,
+    },
+    paymentLabel: {
+        flex: 1,
+        fontSize: 13,
+        color: '#065F46',
+        fontWeight: '500',
+    },
+    paymentInput: {
+        minWidth: 80,
+        textAlign: 'right',
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#065F46',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#A7F3D0',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+    },
+});
 
 export default AddProjectModal;

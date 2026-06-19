@@ -8,6 +8,7 @@ export interface ProjectAssignment {
   clientName: string;
   assignedAt: string;
   status: "active" | "completed" | "paused";
+  monthlyPayment?: number;
 }
 
 // types/Staff.ts
@@ -27,6 +28,7 @@ export interface Staff {
 export interface StaffMembers {
   fullName: string;
   _id?: string;
+  monthlyPayment?: number;
 }
 
 export interface AddStaffModalProps {
@@ -41,6 +43,7 @@ export interface StaffCardProps {
   onPress?: () => void;
   onRemove?: (staff: Staff) => void;
   showRemoveButton?: boolean;
+  onManagePayment?: (staff: Staff) => void;
 }
 
 export interface AddProjectModalProps {

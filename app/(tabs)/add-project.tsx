@@ -1050,13 +1050,25 @@ const ProjectScreen: React.FC = () => {
             // Remove staff member
             setEditAssignedStaff(editAssignedStaff.filter(member => member._id !== staff._id));
         } else {
-            // Add staff member
-            setEditAssignedStaff([...editAssignedStaff, staff]);
+            // Add staff member, preserving any existing monthly payment from the project
+            setEditAssignedStaff([...editAssignedStaff, { ...staff, monthlyPayment: staff.monthlyPayment || 0 }]);
         }
     };
 
     const isEditStaffSelected = (staff: StaffMembers) => {
         return editAssignedStaff.some(member => member._id === staff._id);
+    };
+
+    const handleEditMonthlyPaymentChange = (staffId: string | undefined, value: string) => {
+        const amount = value === '' ? 0 : Number(value.replace(/[^0-9.]/g, ''));
+        setEditAssignedStaff(prev => prev.map(member =>
+            member._id === staffId ? { ...member, monthlyPayment: isNaN(amount) ? 0 : amount } : member
+        ));
+    };
+
+    const getEditMonthlyPayment = (staffId: string | undefined): string => {
+        const member = editAssignedStaff.find(m => m._id === staffId);
+        return member?.monthlyPayment ? String(member.monthlyPayment) : '';
     };
 
     return (
@@ -1292,41 +1304,56 @@ const ProjectScreen: React.FC = () => {
                                 >
                                     {staffMembers.length > 0 ? (
                                         staffMembers.map((staff, index) => (
-                                            <TouchableOpacity
-                                                key={`${staff._id}-${index}`}
-                                                style={styles.staffItem}
-                                                onPress={() => handleEditStaffSelection(staff)}
-                                                activeOpacity={0.7}
-                                            >
-                                                <View style={styles.staffItemContent}>
-                                                    <View style={[
-                                                        styles.checkbox,
-                                                        isEditStaffSelected(staff) && styles.checkboxSelected
-                                                    ]}>
-                                                        {isEditStaffSelected(staff) && (
-                                                            <Ionicons name="checkmark" size={18} color="#fff" />
-                                                        )}
+                                            <View key={`${staff._id}-${index}`}>
+                                                <TouchableOpacity
+                                                    style={styles.staffItem}
+                                                    onPress={() => handleEditStaffSelection(staff)}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <View style={styles.staffItemContent}>
+                                                        <View style={[
+                                                            styles.checkbox,
+                                                            isEditStaffSelected(staff) && styles.checkboxSelected
+                                                        ]}>
+                                                            {isEditStaffSelected(staff) && (
+                                                                <Ionicons name="checkmark" size={18} color="#fff" />
+                                                            )}
+                                                        </View>
+                                                        <View style={styles.staffInfo}>
+                                                            <Text style={styles.staffName}>
+                                                                {staff.fullName}
+                                                            </Text>
+                                                            <Text style={styles.staffStatus}>
+                                                                {isEditStaffSelected(staff) ? 'Assigned' : 'Available'}
+                                                            </Text>
+                                                        </View>
+                                                        <View style={[
+                                                            styles.selectionIndicator,
+                                                            isEditStaffSelected(staff) && styles.selectionIndicatorSelected
+                                                        ]}>
+                                                            <Ionicons
+                                                                name={isEditStaffSelected(staff) ? "checkmark-circle" : "ellipse-outline"}
+                                                                size={24}
+                                                                color={isEditStaffSelected(staff) ? "#10B981" : "#D1D5DB"}
+                                                            />
+                                                        </View>
                                                     </View>
-                                                    <View style={styles.staffInfo}>
-                                                        <Text style={styles.staffName}>
-                                                            {staff.fullName}
-                                                        </Text>
-                                                        <Text style={styles.staffStatus}>
-                                                            {isEditStaffSelected(staff) ? 'Assigned' : 'Available'}
-                                                        </Text>
-                                                    </View>
-                                                    <View style={[
-                                                        styles.selectionIndicator,
-                                                        isEditStaffSelected(staff) && styles.selectionIndicatorSelected
-                                                    ]}>
-                                                        <Ionicons
-                                                            name={isEditStaffSelected(staff) ? "checkmark-circle" : "ellipse-outline"}
-                                                            size={24}
-                                                            color={isEditStaffSelected(staff) ? "#10B981" : "#D1D5DB"}
+                                                </TouchableOpacity>
+                                                {isEditStaffSelected(staff) && (
+                                                    <View style={styles.paymentRow}>
+                                                        <Ionicons name="cash-outline" size={16} color="#059669" />
+                                                        <Text style={styles.paymentLabel}>Monthly Payment (₹)</Text>
+                                                        <TextInput
+                                                            style={styles.paymentInput}
+                                                            value={getEditMonthlyPayment(staff._id)}
+                                                            onChangeText={(value) => handleEditMonthlyPaymentChange(staff._id, value)}
+                                                            placeholder="0"
+                                                            placeholderTextColor="#9CA3AF"
+                                                            keyboardType="numeric"
                                                         />
                                                     </View>
-                                                </View>
-                                            </TouchableOpacity>
+                                                )}
+                                            </View>
                                         ))
                                     ) : (
                                         <View style={styles.noStaffContainer}>
@@ -1722,6 +1749,37 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginTop: 8,
         fontStyle: 'italic',
+    },
+    paymentRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#ECFDF5',
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        marginTop: -4,
+        marginBottom: 8,
+        marginHorizontal: 4,
+    },
+    paymentLabel: {
+        flex: 1,
+        fontSize: 13,
+        color: '#065F46',
+        fontWeight: '500',
+    },
+    paymentInput: {
+        minWidth: 80,
+        textAlign: 'right',
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#065F46',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#A7F3D0',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
     },
 });
 
