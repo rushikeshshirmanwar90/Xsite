@@ -1,9 +1,9 @@
 import ProjectCard from '@/components/ProjectCard';
+import FloatingStatsButton from '@/components/FloatingStatsButton';
 import { getClientId } from '@/functions/clientId';
 import { getProjectData } from '@/functions/project';
 import { isAdmin, useUser } from '@/hooks/useUser';
 import { domain } from '@/lib/domain';
-import { generateInitials } from '@/lib/functions';
 import { styles } from "@/style/adminHome";
 import { Project } from '@/types/project';
 import { StaffMembers } from '@/types/staff';
@@ -18,10 +18,10 @@ import PushTokenStatusIndicator from '@/components/PushTokenStatusIndicator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     Alert,
-    Image,
     RefreshControl,
     ScrollView,
     StatusBar,
+    StyleSheet,
     Text,
     TouchableOpacity,
     View
@@ -43,6 +43,7 @@ const Index: React.FC = () => {
     const [isSharing, setIsSharing] = useState(false);
     const [showCompletedProjects, setShowCompletedProjects] = useState(false); // Toggle for completed projects
     const [pinnedProjects, setPinnedProjects] = useState<Set<string>>(new Set()); // Track pinned projects
+    const [featuredProjects, setFeaturedProjects] = useState<Set<string>>(new Set()); // Track featured projects
 
     // Refs for capturing QR code views
     const embeddedQRRef = useRef<ViewShot | null>(null);
@@ -53,9 +54,6 @@ const Index: React.FC = () => {
 
     // Check if user is staff (has role field)
     const isStaff = user && 'role' in user;
-
-    // Get user name from user data
-    const userName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'User';
 
     // Performance optimization
     const isLoadingRef = React.useRef(false);
@@ -75,6 +73,21 @@ const Index: React.FC = () => {
             }
         } catch (error) {
             console.error('Failed to load pinned projects:', error);
+        }
+        return new Set<string>();
+    };
+
+    // Load featured projects from AsyncStorage
+    const loadFeaturedProjects = async () => {
+        try {
+            const savedFeaturedProjects = await AsyncStorage.getItem('featuredProjects');
+            if (savedFeaturedProjects) {
+                const featuredProjectIds = JSON.parse(savedFeaturedProjects) as string[];
+                setFeaturedProjects(new Set(featuredProjectIds));
+                return new Set(featuredProjectIds);
+            }
+        } catch (error) {
+            console.error('Failed to load featured projects:', error);
         }
         return new Set<string>();
     };
@@ -172,11 +185,13 @@ const Index: React.FC = () => {
                                 })
                             );
 
-                            // Load pinned projects and merge with project data
+                            // Load pinned/featured projects and merge with project data
                             const savedPinnedProjects = await loadPinnedProjects();
+                            const savedFeaturedProjects = await loadFeaturedProjects();
                             const projectsWithPinStatus = projectsWithCompletion.map(project => ({
                                 ...project,
-                                isPinned: savedPinnedProjects.has(project._id)
+                                isPinned: savedPinnedProjects.has(project._id),
+                                isFeatured: savedFeaturedProjects.has(project._id)
                             }));
 
                             console.log('✅ Staff projects with completion and pin status loaded:', projectsWithPinStatus.length);
@@ -230,11 +245,13 @@ const Index: React.FC = () => {
                     })
                 );
 
-                // Load pinned projects and merge with project data
+                // Load pinned/featured projects and merge with project data
                 const savedPinnedProjects = await loadPinnedProjects();
+                const savedFeaturedProjects = await loadFeaturedProjects();
                 const projectsWithPinStatus = projectsWithCompletion.map(project => ({
                     ...project,
-                    isPinned: savedPinnedProjects.has(project._id)
+                    isPinned: savedPinnedProjects.has(project._id),
+                    isFeatured: savedFeaturedProjects.has(project._id)
                 }));
 
                 console.log('✅ Projects with completion and pin status loaded:', projectsWithPinStatus.length);
@@ -580,7 +597,30 @@ const Index: React.FC = () => {
         );
     };
 
-    const companyInitials = generateInitials(companyName);
+    // Handle featured toggle for projects
+    const handleFeaturedToggle = async (projectId: string, isFeatured: boolean) => {
+        setFeaturedProjects(prev => {
+            const newSet = new Set(prev);
+            if (isFeatured) {
+                newSet.add(projectId);
+            } else {
+                newSet.delete(projectId);
+            }
+
+            AsyncStorage.setItem('featuredProjects', JSON.stringify(Array.from(newSet)))
+                .catch(error => console.error('Failed to save featured projects:', error));
+
+            return newSet;
+        });
+
+        setProjects(prevProjects =>
+            prevProjects.map(project =>
+                project._id === projectId
+                    ? { ...project, isFeatured: isFeatured }
+                    : project
+            )
+        );
+    };
 
     const shareQRCode = async (viewShotRef: React.RefObject<ViewShot | null>) => {
         if (!viewShotRef.current || !user) {
@@ -631,60 +671,37 @@ const Index: React.FC = () => {
         }
     };
 
+    const greetingHour = new Date().getHours();
+    const timeGreeting = greetingHour < 12 ? 'Good Morning' : greetingHour < 17 ? 'Good Afternoon' : 'Good Evening';
+    const firstName = user?.firstName || 'there';
+
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
-            {/* Header - Show only for admin users */}
-            {userIsAdmin && (
-                <View style={styles.fixedHeader}>
-                    <View style={styles.userInfo}>
-                        {companyLogo && !logoError ? (
-                            <Image
-                                source={{ uri: companyLogo }}
-                                style={styles.companyLogo}
-                                resizeMode="contain"
-                                onError={(error) => {
-                                    console.error('❌ Error loading company logo:', error.nativeEvent.error);
-                                    console.log('Logo URL that failed:', companyLogo);
-                                    setLogoError(true);
-                                }}
-                                onLoad={() => {
-                                    console.log('✅ Company logo loaded successfully');
-                                }}
-                            />
-                        ) : (
-                            <View style={styles.avatarContainer}>
-                                <Text style={styles.avatarText}>{companyInitials}</Text>
-                            </View>
-                        )}
-                        <View style={styles.userDetails}>
-                            <Text style={styles.userName}>{companyName}</Text>
-                            <Text style={styles.userSubtitle}>Project Management Dashboard</Text>
-                        </View>
+            {/* Header - static Exponentor app branding, shown to every signed-in user */}
+            <View style={homeStyles.brandHeader}>
+                <View style={homeStyles.brandLeft}>
+                    <View style={homeStyles.brandLogo}>
+                        <Text style={homeStyles.brandLogoText}>EX</Text>
                     </View>
-                    <TouchableOpacity style={styles.notificationButton}
-                        onPress={() => router.push('/notification' as any)}
-                    >
-                        <Ionicons name="notifications" size={22} color="#1F2937" />
-                    </TouchableOpacity>
+                    <View style={homeStyles.brandTextBlock}>
+                        <Text style={homeStyles.brandTitle} numberOfLines={1}>Exponentor</Text>
+                        <Text style={homeStyles.brandSubtitle} numberOfLines={1}>Project Management Dashboard</Text>
+                    </View>
                 </View>
-            )}
+                <TouchableOpacity style={homeStyles.heroNotifButton}
+                    onPress={() => router.push('/notification' as any)}
+                >
+                    <Ionicons name="notifications-outline" size={20} color="#1F2937" />
+                </TouchableOpacity>
+            </View>
 
-            {/* Header - Show for staff users */}
-            {isStaff && (
-                <View style={styles.fixedHeader}>
-                    <View style={styles.userInfo}>
-                        <View style={styles.avatarContainer}>
-                            <Text style={styles.avatarText}>{generateInitials(userName)}</Text>
-                        </View>
-                        <View style={styles.userDetails}>
-                            <Text style={styles.userName}>{userName}</Text>
-                            <Text style={styles.userSubtitle}>Staff Portal</Text>
-                        </View>
-                    </View>
-                </View>
-            )}
+            {/* Greeting section */}
+            <View style={homeStyles.greetingSection}>
+                <Text style={homeStyles.greetingTitle}>{timeGreeting}, {firstName} 👋</Text>
+                <Text style={homeStyles.greetingSubtitle}>Here's what's happening with your projects today.</Text>
+            </View>
 
             {/* QR Code Section - Priority for unassigned staff */}
             {isStaff && user && !clientId && (
@@ -761,33 +778,22 @@ const Index: React.FC = () => {
             )}
 
             {/* Section Header */}
-            <View style={styles.sectionHeader}>
-                <View>
-                    <Text style={styles.sectionTitle}>
-                        {isStaff ? 'My Projects' : (showCompletedProjects ? 'Completed Projects' : 'My Projects')}
-                    </Text>
-                    {userIsAdmin && <View style={styles.sectionDivider} />}
-                </View>
+            <View style={homeStyles.sectionHeader}>
+                <Text style={homeStyles.sectionTitle}>Projects</Text>
 
                 {/* Toggle Button - Only for non-staff users */}
                 {!isStaff && (
                     <TouchableOpacity
-                        style={[
-                            styles.toggleButton,
-                            showCompletedProjects && styles.toggleButtonActive
-                        ]}
+                        style={[homeStyles.viewCompletedButton, showCompletedProjects && homeStyles.viewCompletedButtonActive]}
                         onPress={() => setShowCompletedProjects(!showCompletedProjects)}
                         activeOpacity={0.7}
                     >
                         <Ionicons
-                            name={showCompletedProjects ? "list" : "checkmark-done"}
-                            size={18}
-                            color={showCompletedProjects ? "#0EA5E9" : "#6B7280"}
+                            name={showCompletedProjects ? "list-outline" : "checkmark-done-outline"}
+                            size={14}
+                            color="#3B82F6"
                         />
-                        <Text style={[
-                            styles.toggleButtonText,
-                            showCompletedProjects && styles.toggleButtonTextActive
-                        ]}>
+                        <Text style={homeStyles.viewCompletedButtonText} numberOfLines={1}>
                             {showCompletedProjects ? 'View Ongoing' : 'View Completed'}
                         </Text>
                     </TouchableOpacity>
@@ -809,14 +815,17 @@ const Index: React.FC = () => {
             >
                 {loading ? (
                     <View style={styles.centerContainer}>
-                        <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                            <Ionicons name="sync" size={48} color="#3B82F6" />
+                        <View style={homeStyles.stateIconBadge}>
+                            <Ionicons name="sync" size={40} color="#3B82F6" />
                         </View>
                         <Text style={styles.loadingText}>Loading projects...</Text>
                         <Text style={[styles.loadingText, { fontSize: 12, marginTop: 4, color: '#94A3B8' }]}>Please wait...</Text>
                     </View>
                 ) : error ? (
                     <View style={styles.centerContainer}>
+                        <View style={[homeStyles.stateIconBadge, { backgroundColor: 'rgba(239,68,68,0.08)' }]}>
+                            <Ionicons name="alert-circle" size={40} color="#EF4444" />
+                        </View>
                         <Text style={styles.errorText}>{error}</Text>
                         <TouchableOpacity
                             style={[styles.retryButton, loading && { opacity: 0.5 }]}
@@ -872,25 +881,32 @@ const Index: React.FC = () => {
                                         }))
                                     });
 
+                                    // If nothing has been explicitly featured yet, default the first card to featured
+                                    const anyFeatured = sortedProjects.some(p => p.isFeatured);
+
                                     return sortedProjects.length > 0 ? (
                                         sortedProjects.map((project, index) => (
-                                            <View key={index} style={{ marginBottom: 10 }}>
+                                            <View key={index} style={{ marginBottom: 18 }}>
                                                 <ProjectCard
                                                     key={project._id}
                                                     project={project}
                                                     onViewDetails={handleViewDetails}
                                                     onPinToggle={handlePinToggle}
+                                                    onFeaturedToggle={handleFeaturedToggle}
                                                     userType={userIsAdmin ? 'admin' : (isStaff ? 'staff' : 'client')}
+                                                    featured={project.isFeatured || (index === 0 && !anyFeatured)}
                                                 />
                                             </View>
                                         ))
                                     ) : (
                                         <View style={styles.centerContainer}>
-                                            <Ionicons
-                                                name={isStaff ? "folder-open-outline" : (showCompletedProjects ? "checkmark-done-circle-outline" : "folder-open-outline")}
-                                                size={64}
-                                                color="#CBD5E1"
-                                            />
+                                            <View style={homeStyles.stateIconBadge}>
+                                                <Ionicons
+                                                    name={isStaff ? "folder-open-outline" : (showCompletedProjects ? "checkmark-done-circle-outline" : "folder-open-outline")}
+                                                    size={40}
+                                                    color="#3B82F6"
+                                                />
+                                            </View>
                                             <Text style={styles.emptyText}>
                                                 {isStaff ? 'No ongoing projects' : (showCompletedProjects ? 'No completed projects' : 'No ongoing projects')}
                                             </Text>
@@ -907,6 +923,9 @@ const Index: React.FC = () => {
                             </>
                         ) : (
                             <View style={styles.centerContainer}>
+                                <View style={homeStyles.stateIconBadge}>
+                                    <Ionicons name="folder-open-outline" size={40} color="#3B82F6" />
+                                </View>
                                 <Text style={styles.emptyText}>No projects found</Text>
                                 <Text style={styles.emptySubText}>
                                     {userIsAdmin
@@ -918,8 +937,144 @@ const Index: React.FC = () => {
                     </View>
                 )}
             </ScrollView>
+
+            {/* Floating stats button - admin only, mirrors where the old top stats strip lived */}
+            {userIsAdmin && (
+                <FloatingStatsButton
+                    stats={[
+                        { icon: 'briefcase', color: '#3B82F6', value: projects.length, label: 'Total Projects' },
+                        { icon: 'pulse', color: '#F59E0B', value: projects.filter((p) => !p.isCompleted).length, label: 'Active Projects' },
+                        { icon: 'checkmark-done', color: '#10B981', value: projects.filter((p) => p.isCompleted).length, label: 'Completed' },
+                    ]}
+                />
+            )}
         </SafeAreaView>
     );
 };
 
 export default Index;
+
+// Local, UI-only styles for the redesigned brand header/greeting/section/state badges.
+// Kept local to this file so the shared `@/style/adminHome` stylesheet stays untouched.
+const homeStyles = StyleSheet.create({
+    brandHeader: {
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 20,
+        paddingTop: 12,
+        paddingBottom: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    brandLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        gap: 12,
+    },
+    brandLogo: {
+        width: 42,
+        height: 42,
+        borderRadius: 12,
+        backgroundColor: '#3B82F6',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#3B82F6',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        elevation: 3,
+    },
+    brandLogoText: {
+        color: '#FFFFFF',
+        fontSize: 15,
+        fontWeight: '800',
+        letterSpacing: 0.3,
+    },
+    brandTextBlock: {
+        flex: 1,
+    },
+    brandTitle: {
+        fontSize: 17,
+        fontWeight: '800',
+        color: '#0F172A',
+        letterSpacing: -0.3,
+    },
+    brandSubtitle: {
+        fontSize: 11.5,
+        color: '#94A3B8',
+        fontWeight: '500',
+        marginTop: 1,
+    },
+    heroNotifButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 13,
+        backgroundColor: '#F8FAFC',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    greetingSection: {
+        paddingHorizontal: 20,
+        paddingTop: 4,
+        paddingBottom: 10,
+        backgroundColor: '#FFFFFF',
+    },
+    greetingTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#0F172A',
+        letterSpacing: -0.2,
+        marginBottom: 2,
+    },
+    greetingSubtitle: {
+        fontSize: 12,
+        color: '#94A3B8',
+        fontWeight: '500',
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingTop: 18,
+        paddingBottom: 14,
+    },
+    sectionTitle: {
+        fontSize: 19,
+        fontWeight: '800',
+        color: '#0F172A',
+        letterSpacing: -0.3,
+    },
+    viewCompletedButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+        borderRadius: 999,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+    },
+    viewCompletedButtonActive: {
+        backgroundColor: '#EFF6FF',
+    },
+    viewCompletedButtonText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#3B82F6',
+    },
+    stateIconBadge: {
+        width: 84,
+        height: 84,
+        borderRadius: 42,
+        backgroundColor: 'rgba(59,130,246,0.08)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+        alignSelf: 'center',
+    },
+});

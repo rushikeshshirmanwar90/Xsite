@@ -22,6 +22,10 @@ export interface Project {
   blockReason?: string; // Added for license control - reason why project is blocked
   isCompleted?: boolean; // Added for project completion tracking
   isPinned?: boolean; // Added for project pinning functionality
+  isFeatured?: boolean; // Added for project featured toggle (shows the budget ring)
+  startDate?: string; // Added for project setup step (ISO date string)
+  projectType?: string; // Added for project setup step
+  notes?: string; // Added for project setup step
 }
 
 export interface MaterialItem {
