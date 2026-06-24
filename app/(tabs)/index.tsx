@@ -687,7 +687,7 @@ const Index: React.FC = () => {
                     </View>
                     <View style={homeStyles.brandTextBlock}>
                         <Text style={homeStyles.brandTitle} numberOfLines={1}>Exponentor</Text>
-                        <Text style={homeStyles.brandSubtitle} numberOfLines={1}>Project Management Dashboard</Text>
+                        <Text style={homeStyles.brandSubtitle} numberOfLines={1}>{timeGreeting}, {firstName} 👋</Text>
                     </View>
                 </View>
                 <TouchableOpacity style={homeStyles.heroNotifButton}
@@ -695,12 +695,6 @@ const Index: React.FC = () => {
                 >
                     <Ionicons name="notifications-outline" size={20} color="#1F2937" />
                 </TouchableOpacity>
-            </View>
-
-            {/* Greeting section */}
-            <View style={homeStyles.greetingSection}>
-                <Text style={homeStyles.greetingTitle}>{timeGreeting}, {firstName} 👋</Text>
-                <Text style={homeStyles.greetingSubtitle}>Here's what's happening with your projects today.</Text>
             </View>
 
             {/* QR Code Section - Priority for unassigned staff */}

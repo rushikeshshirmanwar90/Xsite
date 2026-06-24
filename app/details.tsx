@@ -336,7 +336,10 @@ const SwipeToConfirmBar = ({
     );
 };
 
-const Details = () => {
+// `lockedTab` locks this screen to a single materials view (available/used) and hides
+// the in-screen tab switcher — used by the dedicated material-available / material-used
+// routes that the Project Sections dropdown navigates to.
+const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     const params = useLocalSearchParams();
     const router = useRouter();
     const { user, clientId } = useAuth();
@@ -359,7 +362,9 @@ const Details = () => {
     console.log('🚀 ========== END COMPONENT MOUNT ==========\n');
     let consoleLogCount = 0;
     const MAX_CONSOLE_LOGS = 50;
-    const [activeTab, setActiveTab] = useState<'imported' | 'used'>('imported');
+    const [activeTab, setActiveTab] = useState<'imported' | 'used'>(
+        lockedTab ?? ((params.initialTab as string) === 'used' ? 'used' : 'imported')
+    );
     const [selectedPeriod, setSelectedPeriod] = useState('All');
     const [showMaterialForm, setShowMaterialForm] = useState(false);
     const [showUsageForm, setShowUsageForm] = useState(false);
@@ -4247,8 +4252,8 @@ const Details = () => {
                 onMaterialAnalysisPress={selectedMiniSection ? handleMaterialAnalysisPress : undefined}
             />
 
-            {/* Action Buttons - Sticky at top, visible to everyone in "imported" tab */}
-            {activeTab === 'imported' && (
+            {/* Action Buttons - Sticky at top, visible to everyone in both materials views */}
+            {(
                 <View style={{ marginHorizontal: 16, marginTop: 6, marginBottom: 6 }}>
                     {/* Section Completed Info Banner */}
                     {sectionCompleted && (
@@ -4410,10 +4415,12 @@ const Details = () => {
                 contentContainerStyle={styles.scrollContent}
             >
 
-                <TabSelector 
-                    activeTab={activeTab} 
-                    onSelectTab={setActiveTab}
-                />
+                {!lockedTab && (
+                    <TabSelector
+                        activeTab={activeTab}
+                        onSelectTab={setActiveTab}
+                    />
+                )}
 
                 {/* Compact Filters - Only visible in "Used Materials" tab */}
                 {activeTab === 'used' && (
@@ -6857,4 +6864,5 @@ const confirmModalStyles = StyleSheet.create({
     },
 });
 
+export { Details };
 export default Details;

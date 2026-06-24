@@ -6,19 +6,139 @@ import apiClient from '@/utils/axiosConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PDFReportGenerator } from '@/utils/pdfReportGenerator';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
+  LayoutAnimation,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  UIManager,
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
+
+// Enable LayoutAnimation on Android (no-op on the new architecture, harmless otherwise).
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+const getSectionIcon = (type: string, isCompleted: boolean = false) => {
+  if (isCompleted) return 'checkmark-circle';
+  switch (type?.toLowerCase()) {
+    case 'building':
+    case 'buildings':
+      return 'business';
+    case 'rowhouse':
+      return 'home';
+    default:
+      return 'grid';
+  }
+};
+
+const getSectionIconColor = (_type: string, isCompleted: boolean = false) =>
+  isCompleted ? '#059669' : '#0EA5E9';
+
+const getSectionIconBackgroundColor = (_type: string, isCompleted: boolean = false) =>
+  isCompleted ? '#ECFDF5' : '#E0F2FE';
+
+type SectionOption = {
+  key: string;
+  label: string;
+  icon: string;
+  onPress: () => void;
+};
+
+// A single FAQ-style accordion row for a project section. The options panel expands /
+// collapses with a smooth LayoutAnimation while the chevron rotates via Animated.
+const SectionAccordionItem: React.FC<{
+  section: ProjectSection;
+  isExpanded: boolean;
+  isCompleted: boolean;
+  isLoadingCompletion: boolean;
+  options: SectionOption[];
+  onToggle: () => void;
+}> = ({ section, isExpanded, isCompleted, isLoadingCompletion, options, onToggle }) => {
+  const chevron = useRef(new Animated.Value(isExpanded ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(chevron, {
+      toValue: isExpanded ? 1 : 0,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [isExpanded, chevron]);
+
+  const rotate = chevron.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
+
+  return (
+    <View style={[styles.sectionCard, isExpanded && styles.sectionCardExpanded]}>
+      <TouchableOpacity
+        style={styles.sectionHeaderRow}
+        activeOpacity={0.7}
+        onPress={onToggle}
+      >
+        <View style={styles.sectionContent}>
+          <View style={[
+            styles.sectionIconContainer,
+            { backgroundColor: getSectionIconBackgroundColor(section.type, isCompleted) }
+          ]}>
+            {isLoadingCompletion ? (
+              <ActivityIndicator size="small" color="#94A3B8" />
+            ) : (
+              <Ionicons
+                name={getSectionIcon(section.type, isCompleted) as any}
+                size={24}
+                color={getSectionIconColor(section.type, isCompleted)}
+              />
+            )}
+          </View>
+          <View style={styles.sectionInfo}>
+            <Text style={styles.sectionName}>{section.name}</Text>
+            <Text style={styles.sectionHint}>
+              {isExpanded ? 'Tap to collapse' : 'Tap to view details'}
+            </Text>
+          </View>
+        </View>
+        <Animated.View style={[styles.chevronWrap, { transform: [{ rotate }] }]}>
+          <Ionicons name="chevron-down" size={18} color="#0EA5E9" />
+        </Animated.View>
+      </TouchableOpacity>
+
+      {isExpanded && (
+        <View style={styles.optionsContainer}>
+          {options.map((option, idx) => (
+            <TouchableOpacity
+              key={option.key}
+              style={[styles.optionRow, idx === options.length - 1 && styles.optionRowLast]}
+              activeOpacity={0.7}
+              onPress={option.onPress}
+            >
+              <View style={styles.optionLeft}>
+                <View style={styles.optionIconChip}>
+                  <Ionicons name={option.icon as any} size={16} color="#0EA5E9" />
+                </View>
+                <Text style={styles.optionLabel}>{option.label}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+};
 
 const ProjectSections = () => {
   const params = useLocalSearchParams();
@@ -35,6 +155,21 @@ const ProjectSections = () => {
   const [sectionCompletions, setSectionCompletions] = useState<{ [key: string]: boolean }>({});
   const [isLoadingSectionCompletions, setIsLoadingSectionCompletions] = useState(false);
   const [generatingStockReport, setGeneratingStockReport] = useState(false);
+  // Tracks which section's FAQ-style options panel is currently expanded (only one at a time).
+  const [expandedSectionId, setExpandedSectionId] = useState<string | null>(null);
+  const [resolvedClientId, setResolvedClientId] = useState<string>('');
+
+  // Resolve the current client id once so the Contractor option can pass it along.
+  useEffect(() => {
+    (async () => {
+      try {
+        const cid = (await getClientId()) || '';
+        setResolvedClientId(cid);
+      } catch {
+        setResolvedClientId('');
+      }
+    })();
+  }, []);
 
   // Debug state changes
   useEffect(() => {
@@ -81,48 +216,25 @@ const ProjectSections = () => {
     });
   }, [materialAvailable, materialUsed]);
 
-  const getSectionIcon = (type: string, isCompleted: boolean = false) => {
-    // If section is completed, always show checkmark
-    if (isCompleted) {
-      return 'checkmark-circle';
-    }
-
-    // Otherwise, show type-specific icon
-    switch (type?.toLowerCase()) {
-      case 'building':
-      case 'buildings':
-        return 'business';
-      case 'rowhouse':
-        return 'home';
-      default:
-        return 'grid';
-    }
+  // Navigates to the dedicated materials screen for a section — separate routes for
+  // the available and used views (Material Available / Material Used options).
+  const goToMaterials = (section: ProjectSection, tab: 'imported' | 'used') => {
+    router.push({
+      pathname: tab === 'used' ? '../material-used' : '../material-available',
+      params: {
+        projectId: id as string,
+        projectName: name as string,
+        sectionId: section._id || section.sectionId,
+        sectionName: section.name,
+        materialAvailable: materialAvailable as string,
+        materialUsed: materialUsed as string,
+      },
+    });
   };
 
-  const getSectionIconColor = (type: string, isCompleted: boolean = false) => {
-    // If section is completed, always show green
-    if (isCompleted) {
-      return '#059669';
-    }
-
-    // Otherwise, show default blue
-    return '#0EA5E9';
-  };
-
-  const getSectionIconBackgroundColor = (type: string, isCompleted: boolean = false) => {
-    // If section is completed, show light green background
-    if (isCompleted) {
-      return '#ECFDF5';
-    }
-
-    // Otherwise, show default light blue
-    return '#E0F2FE';
-  };
-
-  const handleViewDetails = (section: ProjectSection) => {
-    // If contractor params were passed from index.tsx, redirect to labor.tsx
+  const goToContractor = (section: ProjectSection) => {
+    // Contractor users coming from index.tsx are routed straight to labor.tsx.
     if (contractorId && contractorType && userId) {
-      console.log(`🚀 Contractor selecting section '${section.name}' - routing to labor.tsx`);
       router.push({
         pathname: '../labor',
         params: {
@@ -133,25 +245,63 @@ const ProjectSections = () => {
           contractorId: contractorId as string,
           contractorType: contractorType as string,
           userId: userId as string,
-        }
+        },
       });
       return;
     }
-
-    // Standard navigation to details.tsx (non-contractors)
     router.push({
-      pathname: '../details',
+      pathname: '../contractor',
       params: {
         projectId: id as string,
         projectName: name as string,
         sectionId: section._id || section.sectionId,
         sectionName: section.name,
-        materialAvailable: materialAvailable as string,
-        materialUsed: materialUsed as string
-      }
+        clientId: resolvedClientId,
+      },
     });
   };
 
+  const goToEquipment = (section: ProjectSection) => {
+    router.push({
+      pathname: '../equipment',
+      params: {
+        projectId: id as string,
+        projectName: name as string,
+        sectionId: section._id || section.sectionId,
+        sectionName: section.name,
+      },
+    });
+  };
+
+  const goToOtherCost = () => {
+    // Other Cost applies to the whole project, not a specific section.
+    router.push({
+      pathname: '../other-cost',
+      params: {
+        projectId: id as string,
+        projectName: name as string,
+      },
+    });
+  };
+
+  // The 5 segmented options shown as an FAQ-style accordion under each section.
+  const getSectionOptions = (section: ProjectSection): SectionOption[] => [
+    { key: 'materialAvailable', label: 'Material Available', icon: 'cube-outline', onPress: () => goToMaterials(section, 'imported') },
+    { key: 'materialUsed', label: 'Material Used', icon: 'construct-outline', onPress: () => goToMaterials(section, 'used') },
+    { key: 'contractor', label: 'Contractor', icon: 'people-outline', onPress: () => goToContractor(section) },
+    { key: 'equipmentCost', label: 'Equipment Cost', icon: 'hammer-outline', onPress: () => goToEquipment(section) },
+    { key: 'otherCost', label: 'Other Cost', icon: 'cash-outline', onPress: () => goToOtherCost() },
+  ];
+
+  // Smoothly animate the open/close of a section's options panel.
+  const toggleSection = (sectionKey: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.create(
+      220,
+      LayoutAnimation.Types.easeInEaseOut,
+      LayoutAnimation.Properties.opacity,
+    ));
+    setExpandedSectionId(prev => (prev === sectionKey ? null : sectionKey));
+  };
 
   const handleAddSection = async () => {
     if (!newSectionName.trim()) {
@@ -622,34 +772,19 @@ const ProjectSections = () => {
             const isCompleted = sectionCompletions[sectionId] || false;
             const isLoadingCompletion = isLoadingSectionCompletions && !sectionCompletions.hasOwnProperty(sectionId);
 
+            const sectionKey = sectionId || String(index);
+            const isExpanded = expandedSectionId === sectionKey;
+
             return (
-              <View key={section._id || index} style={styles.sectionCard}>
-                <View style={styles.sectionContent}>
-                  <View style={[
-                    styles.sectionIconContainer,
-                    { backgroundColor: getSectionIconBackgroundColor(section.type, isCompleted) }
-                  ]}>
-                    {isLoadingCompletion ? (
-                      <ActivityIndicator size="small" color="#94A3B8" />
-                    ) : (
-                      <Ionicons
-                        name={getSectionIcon(section.type, isCompleted)}
-                        size={24}
-                        color={getSectionIconColor(section.type, isCompleted)}
-                      />
-                    )}
-                  </View>
-                  <View style={styles.sectionInfo}>
-                    <Text style={styles.sectionName}>{section.name}</Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  style={styles.viewButton}
-                  onPress={() => handleViewDetails(section)}
-                >
-                  <Text style={styles.viewButtonText}>View Details</Text>
-                </TouchableOpacity>
-              </View>
+              <SectionAccordionItem
+                key={section._id || index}
+                section={section}
+                isExpanded={isExpanded}
+                isCompleted={isCompleted}
+                isLoadingCompletion={isLoadingCompletion}
+                options={getSectionOptions(section)}
+                onToggle={() => toggleSection(sectionKey)}
+              />
             );
           })
         ) : (
@@ -857,17 +992,74 @@ const styles = StyleSheet.create({
   },
   sectionCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
     marginBottom: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#EEF2F7',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  sectionCardExpanded: {
+    borderColor: '#BAE6FD',
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    padding: 16,
+  },
+  chevronWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F0F9FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sectionHint: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  optionsContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 6,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 13,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  optionRowLast: {
+    borderBottomWidth: 0,
+  },
+  optionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  optionIconChip: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    backgroundColor: '#F0F9FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  optionLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#334155',
   },
   sectionContent: {
     flexDirection: 'row',
@@ -876,9 +1068,9 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   sectionIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     backgroundColor: '#E0F2FE',
     justifyContent: 'center',
     alignItems: 'center',
@@ -893,18 +1085,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1E293B',
     flexShrink: 1,
-  },
-  viewButton: {
-    backgroundColor: '#0EA5E9',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-    flexShrink: 0,
-  },
-  viewButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '500',
   },
   emptyContainer: {
     alignItems: 'center',

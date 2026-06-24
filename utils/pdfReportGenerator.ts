@@ -39,6 +39,17 @@ interface GroupedActivities {
     [date: string]: MaterialActivity[];
 }
 
+// Report generation options chosen by the user in the Report Generator UI.
+// `mode` controls the level of detail; the include* flags control which report
+// types (sections) are present in the generated PDF.
+export interface ReportOptions {
+    mode?: 'summary' | 'detailed';
+    includeMaterial?: boolean;   // Material report
+    includeContractor?: boolean; // Contractor / labor report
+    includeEquipment?: boolean;  // Equipment report
+    includeOther?: boolean;      // Other cost report
+}
+
 export class PDFReportGenerator {
     private clientData: any;
     private userData: any;
@@ -618,16 +629,16 @@ export class PDFReportGenerator {
         console.log('  - Other cost count:', otherCostData?.length || 0);
         
         // Aggregate materials by name
-        const materialMap = new Map<string, { quantity: number; unit: string; totalCost: number; vendor: string }>();
-        
+        const materialMap = new Map<string, { quantity: number; unit: string; totalCost: number; vendor: string; importedBy: string }>();
+
         console.log('📊 Processing materials...');
         activities.forEach((activity, idx) => {
             console.log(`  Activity ${idx + 1}: ${activity.activity} - ${activity.materials.length} materials`);
-            
+
             // Include ALL materials (imported, used, transferred) for comprehensive summary
             activity.materials.forEach(material => {
                 const key = material.name;
-                const existing = materialMap.get(key) || { quantity: 0, unit: material.unit, totalCost: 0, vendor: '' };
+                const existing = materialMap.get(key) || { quantity: 0, unit: material.unit, totalCost: 0, vendor: '', importedBy: '' };
                 
                 let materialCost = 0;
                 if (material.totalCost !== undefined) {
@@ -659,13 +670,25 @@ export class PDFReportGenerator {
                     }
                 }
 
-                console.log(`    - ${material.name}: qty=${material.qnt}, cost=${materialCost}, vendor=${vendorName}`);
-                
+                // Track who imported this material (only meaningful for imports).
+                let importedByName = existing.importedBy;
+                if (activity.activity === 'imported' && activity.user?.fullName) {
+                    const currentImporter = activity.user.fullName;
+                    if (!importedByName) {
+                        importedByName = currentImporter;
+                    } else if (!importedByName.includes(currentImporter)) {
+                        importedByName = `${importedByName}, ${currentImporter}`;
+                    }
+                }
+
+                console.log(`    - ${material.name}: qty=${material.qnt}, cost=${materialCost}, vendor=${vendorName}, importedBy=${importedByName}`);
+
                 materialMap.set(key, {
                     quantity: existing.quantity + Number(material.qnt),
                     unit: material.unit,
                     totalCost: existing.totalCost + materialCost,
-                    vendor: vendorName
+                    vendor: vendorName,
+                    importedBy: importedByName
                 });
             });
         });
@@ -823,6 +846,7 @@ export class PDFReportGenerator {
                                     <th style="padding: 12px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Material Name</th>
                                     <th style="padding: 12px; text-align: center; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Total Quantity</th>
                                     <th style="padding: 12px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Total Cost</th>
+                                    <th style="padding: 12px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Imported By</th>
                                     <th style="padding: 12px; text-align: right; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0;">Vendor Name</th>
                                 </tr>
                             </thead>
@@ -843,6 +867,9 @@ export class PDFReportGenerator {
                                             ${this.formatCurrency(data.totalCost)}
                                         </td>
                                         <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; color: #6b7280; font-size: 11px;">
+                                            ${data.importedBy || '—'}
+                                        </td>
+                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; color: #6b7280; font-size: 11px;">
                                             ${data.vendor || '—'}
                                         </td>
                                     </tr>
@@ -857,7 +884,10 @@ export class PDFReportGenerator {
                                         ${this.formatCurrency(totalMaterialCost)}
                                     </td>
                                     <td style="padding: 12px; text-align: right; border-top: 2px solid #10B981; color: #059669;">
-                                        
+
+                                    </td>
+                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #10B981; color: #059669;">
+
                                     </td>
                                 </tr>
                             </tfoot>
@@ -1042,13 +1072,30 @@ export class PDFReportGenerator {
     }
 
     // Generate complete HTML for the PDF
-    private generateHTML(activities: MaterialActivity[], projectName?: string, laborData?: any[], equipmentData?: any[], otherCostData?: any[], startDate?: Date, endDate?: Date): string {
+    private generateHTML(activities: MaterialActivity[], projectName?: string, laborData?: any[], equipmentData?: any[], otherCostData?: any[], startDate?: Date, endDate?: Date, options?: ReportOptions): string {
+        // Resolve report options with sensible defaults: detailed mode and all
+        // four report types included unless the caller explicitly deselects them.
+        const reportMode: 'summary' | 'detailed' = options?.mode ?? 'detailed';
+        const includeMaterial = options?.includeMaterial ?? true;
+        const includeContractor = options?.includeContractor ?? true;
+        const includeEquipment = options?.includeEquipment ?? true;
+        const includeOther = options?.includeOther ?? true;
+
+        // Honor report-type selection by dropping deselected data up front. Empty
+        // arrays naturally produce no sections, costs, or summary rows downstream.
+        activities = includeMaterial ? activities : [];
+        laborData = includeContractor ? (laborData || []) : [];
+        equipmentData = includeEquipment ? (equipmentData || []) : [];
+        otherCostData = includeOther ? (otherCostData || []) : [];
+
         console.log('🔍 PDF Generator - generateHTML called with:');
+        console.log('  - Report mode:', reportMode);
+        console.log('  - Included types:', { includeMaterial, includeContractor, includeEquipment, includeOther });
         console.log('  - Activities:', activities.length);
         console.log('  - Labor data:', laborData?.length || 0);
         console.log('  - Equipment data:', equipmentData?.length || 0);
         console.log('  - Other cost data:', otherCostData?.length || 0);
-        
+
         const groupedActivities = this.groupActivitiesByDate(activities);
         const groupedLabor = this.groupLaborByDate(laborData || []);
         const groupedEquipment = this.groupEquipmentByDate(equipmentData || []);
@@ -1345,7 +1392,17 @@ export class PDFReportGenerator {
                         <div style="flex: 1; text-align: center; margin: 0 20px;">
                             <h1 style="margin: 0 0 8px 0; color: #1e293b; font-size: 32px; font-weight: 800;">${projectName || 'Project Cost Report'}</h1>
                             <div style="background: linear-gradient(90deg, #3B82F6, #1E40AF); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 16px; font-weight: 600; margin-bottom: 8px;">
-                                Material, Labor & Equipment Report
+                                ${(() => {
+                                    const parts = [];
+                                    if (includeMaterial) parts.push('Material');
+                                    if (includeContractor) parts.push('Contractor');
+                                    if (includeEquipment) parts.push('Equipment');
+                                    if (includeOther) parts.push('Other');
+                                    const typeLabel = parts.length === 4 ? 'Material, Labor & Equipment'
+                                        : parts.length > 0 ? parts.join(', ')
+                                        : 'Cost';
+                                    return `${reportMode === 'summary' ? 'Summary' : 'Detailed'} ${typeLabel} Report`;
+                                })()}
                             </div>
                             <p style="margin: 0; color: #6b7280; font-size: 13px;">Generated on ${new Date().toLocaleDateString('en-US', { 
                                 weekday: 'long', 
@@ -1393,12 +1450,12 @@ export class PDFReportGenerator {
                     ${this.generateSummaryPage(activities, laborData || [], equipmentData || [], otherCostData || [])}
                 ` : ''}
 
-                ${sortedDates.length > 0 ? `
+                ${reportMode === 'detailed' && sortedDates.length > 0 ? `
                     <h2 style="color: #1e293b; margin-top: 32px; margin-bottom: 20px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
                         Daily Activity Details
                     </h2>
                     ${activitiesHTML}
-                ` : `
+                ` : reportMode === 'summary' ? `` : `
                     <div style="text-align: center; padding: 40px; background-color: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
                         <h3 style="color: #6b7280; margin-bottom: 8px;">No Data Found</h3>
                         <p style="color: #9ca3af; margin: 0;">No material activities, labor entries, equipment entries, or other costs were recorded during the selected period.</p>
@@ -1415,7 +1472,7 @@ export class PDFReportGenerator {
     }
 
     // Generate and download PDF
-    async generatePDF(activities: MaterialActivity[], projectName?: string, laborData?: any[], equipmentData?: any[], otherCostData?: any[], startDate?: Date, endDate?: Date): Promise<void> {
+    async generatePDF(activities: MaterialActivity[], projectName?: string, laborData?: any[], equipmentData?: any[], otherCostData?: any[], startDate?: Date, endDate?: Date, options?: ReportOptions): Promise<void> {
         try {
             console.log('📄 Starting PDF generation...');
             console.log('📊 Activities to include:', activities.length);
@@ -1425,7 +1482,7 @@ export class PDFReportGenerator {
             console.log('📊 Project name:', projectName);
 
             // Generate HTML content
-            const htmlContent = this.generateHTML(activities, projectName, laborData, equipmentData, otherCostData, startDate, endDate);
+            const htmlContent = this.generateHTML(activities, projectName, laborData, equipmentData, otherCostData, startDate, endDate, options);
             console.log('📄 HTML content generated, length:', htmlContent.length);
             
             // Create custom filename: Company Name - Project Name - Date

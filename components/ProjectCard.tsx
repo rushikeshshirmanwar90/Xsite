@@ -3,7 +3,6 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, Alert, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Circle } from 'react-native-svg';
 import { domain } from '@/lib/domain';
 import apiClient from '@/utils/axiosConfig';
 import { toast } from 'sonner-native';
@@ -17,57 +16,12 @@ interface ProjectCardProps {
     featured?: boolean; // Initial featured state, toggleable from the options menu
 }
 
-// Small circular "budget utilized" ring, rendered with react-native-svg (no images).
-const RING_SIZE = 60;
-const RING_STROKE = 5;
-const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
-const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
-
-const BudgetRing: React.FC<{ percent: number; color: string }> = ({ percent, color }) => {
-    const clamped = Math.max(0, Math.min(percent, 100));
-    const dashOffset = RING_CIRCUMFERENCE - (clamped / 100) * RING_CIRCUMFERENCE;
-
-    return (
-        <View style={styles.ringWrap}>
-            <Svg width={RING_SIZE} height={RING_SIZE}>
-                <Circle
-                    cx={RING_SIZE / 2}
-                    cy={RING_SIZE / 2}
-                    r={RING_RADIUS}
-                    stroke="#E2E8F0"
-                    strokeWidth={RING_STROKE}
-                    fill="none"
-                />
-                <Circle
-                    cx={RING_SIZE / 2}
-                    cy={RING_SIZE / 2}
-                    r={RING_RADIUS}
-                    stroke={color}
-                    strokeWidth={RING_STROKE}
-                    fill="none"
-                    strokeDasharray={`${RING_CIRCUMFERENCE} ${RING_CIRCUMFERENCE}`}
-                    strokeDashoffset={dashOffset}
-                    strokeLinecap="round"
-                    rotation={-90}
-                    originX={RING_SIZE / 2}
-                    originY={RING_SIZE / 2}
-                />
-            </Svg>
-            <View style={styles.ringTextOverlay}>
-                <Text style={styles.ringPercentText} numberOfLines={1}>{clamped.toFixed(1)}%</Text>
-            </View>
-        </View>
-    );
-};
-
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userType = 'admin', onPinToggle, onFeaturedToggle, featured = false }) => {
     const [projectCompleted, setProjectCompleted] = useState(false);
     const [isUpdatingCompletion, setIsUpdatingCompletion] = useState(false);
     const [showOptionsMenu, setShowOptionsMenu] = useState(false);
     const [projectPinned, setProjectPinned] = useState(project.isPinned || false);
     const [isUpdatingPin, setIsUpdatingPin] = useState(false);
-    const [projectFeatured, setProjectFeatured] = useState(featured);
-    const [isUpdatingFeatured, setIsUpdatingFeatured] = useState(false);
 
     // Debug: Log project license status
     useEffect(() => {
@@ -199,30 +153,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userT
         }
     };
 
-    // Function to toggle project featured status
-    const toggleProjectFeatured = async () => {
-        if (isUpdatingFeatured || !project._id) return;
-
-        setIsUpdatingFeatured(true);
-        try {
-            const newFeaturedStatus = !projectFeatured;
-            setProjectFeatured(newFeaturedStatus);
-
-            if (onFeaturedToggle) {
-                onFeaturedToggle(project._id, newFeaturedStatus);
-            }
-
-            toast.success(`Project ${newFeaturedStatus ? 'marked as featured' : 'removed from featured'}`);
-        } catch (error: any) {
-            console.error('❌ Error updating project featured status:', error);
-            setProjectFeatured(projectFeatured);
-            toast.error('Failed to update featured status');
-        } finally {
-            setIsUpdatingFeatured(false);
-            setShowOptionsMenu(false);
-        }
-    };
-
     // const statusColor = getStatusColor(project.status);
 
     const statusColor = project.isAccessible === false ? '#EF4444' : projectCompleted ? '#10B981' : '#3B82F6';
@@ -243,29 +173,21 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userT
     const managerCaption = staffCount > 1 ? 'Team Members' : staffCount === 1 ? 'Project Manager' : 'Unassigned';
 
     return (
-        <View style={[styles.cardShadowWrap, projectFeatured && styles.cardShadowWrapFeatured]}>
-            <View style={[styles.card, projectFeatured && styles.cardFeatured]}>
-                {projectFeatured && (
-                    <LinearGradient
-                        colors={['#3B82F6', '#4F46E5']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.featuredBar}
-                    />
-                )}
+        <View style={styles.cardShadowWrap}>
+            <View style={styles.card}>
+                {/* Blue accent bar across the top of every card */}
+                <LinearGradient
+                    colors={['#3B82F6', '#4F46E5']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.topAccentBar}
+                />
 
-                {/* Corner badge: featured ribbon or status pill, anchored top-right; options button sits below it */}
-                {projectFeatured ? (
-                    <View style={styles.cornerBadge}>
-                        <Ionicons name="star" size={10} color="#FFFFFF" />
-                        <Text style={styles.priorityPillText}>Featured</Text>
-                    </View>
-                ) : (
-                    <View style={[styles.cornerBadge, statusPillBg]}>
-                        <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-                        <Text style={[styles.statusPillText, { color: statusColor }]} numberOfLines={1}>{statusLabel}</Text>
-                    </View>
-                )}
+                {/* Corner badge: project status pill, anchored top-right; options button sits below it */}
+                <View style={[styles.cornerBadge, statusPillBg]}>
+                    <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+                    <Text style={[styles.statusPillText, { color: statusColor }]} numberOfLines={1}>{statusLabel}</Text>
+                </View>
                 {userType === 'admin' && (
                     <TouchableOpacity
                         style={styles.cornerOptionsButton}
@@ -310,12 +232,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userT
                             </View>
                         </View>
 
-                        {projectFeatured && (
-                            <View style={styles.headerRingCol}>
-                                <BudgetRing percent={budgetProgress} color={progressColor} />
-                                <Text style={styles.ringCaption}>Budget Utilized</Text>
-                            </View>
-                        )}
                     </View>
 
                     {/* Row 3 (optional): client */}
@@ -463,28 +379,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userT
                                     {isUpdatingCompletion ? 'Updating...' : (projectCompleted ? 'Mark as Incomplete' : 'Mark as Complete')}
                                 </Text>
                             </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[
-                                    styles.optionItem,
-                                    isUpdatingFeatured && styles.optionItemDisabled
-                                ]}
-                                onPress={toggleProjectFeatured}
-                                disabled={isUpdatingFeatured}
-                                activeOpacity={0.7}
-                            >
-                                <Ionicons
-                                    name={projectFeatured ? "star" : "star-outline"}
-                                    size={20}
-                                    color={projectFeatured ? "#3B82F6" : "#6B7280"}
-                                />
-                                <Text style={[
-                                    styles.optionText,
-                                    projectFeatured && styles.optionTextFeatured,
-                                    isUpdatingFeatured && styles.optionTextDisabled
-                                ]}>
-                                    {isUpdatingFeatured ? 'Updating...' : (projectFeatured ? 'Remove from Featured' : 'Mark as Featured')}
-                                </Text>
-                            </TouchableOpacity>
                         </View>
                     </TouchableOpacity>
                 </Modal>
@@ -498,30 +392,21 @@ const styles = StyleSheet.create({
     cardShadowWrap: {
         borderRadius: 24,
         backgroundColor: '#FFFFFF',
+        marginBottom: 4,
         shadowColor: '#1E293B',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-        elevation: 2,
-    },
-    cardShadowWrapFeatured: {
-        shadowColor: '#3B82F6',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.16,
-        shadowRadius: 20,
-        elevation: 6,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.12,
+        shadowRadius: 22,
+        elevation: 8,
     },
     card: {
         borderRadius: 24,
         overflow: 'hidden',
         backgroundColor: '#FFFFFF',
         borderWidth: 1,
-        borderColor: '#F1F5F9',
+        borderColor: '#EEF2F8',
     },
-    cardFeatured: {
-        borderColor: '#DBEAFE',
-    },
-    featuredBar: {
+    topAccentBar: {
         height: 4,
         width: '100%',
     },
@@ -595,13 +480,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    priorityPillText: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: '#FFFFFF',
-        textTransform: 'uppercase',
-        letterSpacing: 0.4,
-    },
     statusPillOngoing: {
         backgroundColor: 'rgba(59,130,246,0.10)',
     },
@@ -627,10 +505,6 @@ const styles = StyleSheet.create({
     },
     headerLeftCol: {
         flex: 1,
-    },
-    headerRingCol: {
-        alignItems: 'center',
-        marginLeft: 14,
     },
     progressPanel: {
         marginBottom: 16,
@@ -701,36 +575,6 @@ const styles = StyleSheet.create({
     },
     progressFooterValueDanger: {
         color: '#EF4444',
-    },
-    ringWrap: {
-        width: RING_SIZE,
-        height: RING_SIZE,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    ringTextOverlay: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    ringPercentText: {
-        fontSize: 14,
-        fontWeight: '800',
-        color: '#0F172A',
-    },
-    ringCaption: {
-        fontSize: 9.5,
-        fontWeight: '600',
-        color: '#94A3B8',
-        textTransform: 'uppercase',
-        letterSpacing: 0.3,
-        textAlign: 'center',
-        marginTop: 6,
-        lineHeight: 12,
     },
     ctaButton: {
         flexDirection: 'row',

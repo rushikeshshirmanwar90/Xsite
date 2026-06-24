@@ -97,6 +97,22 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
     const [showSectionSelector, setShowSectionSelector] = useState(false);
     const [projectSections, setProjectSections] = useState<Section[]>([]);
 
+    // Report mode: summary vs detailed
+    const [reportMode, setReportMode] = useState<'summary' | 'detailed'>('detailed');
+
+    // Advanced: which report types to include. All selected by default.
+    const [showAdvanced, setShowAdvanced] = useState(false);
+    const [includedReports, setIncludedReports] = useState({
+        material: true,
+        contractor: true,
+        equipment: true,
+        other: true,
+    });
+
+    const toggleReportType = (key: 'material' | 'contractor' | 'equipment' | 'other') => {
+        setIncludedReports(prev => ({ ...prev, [key]: !prev[key] }));
+    };
+
     // Fetch projects when modal opens
     useEffect(() => {
         if (visible) {
@@ -209,6 +225,12 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
             // Validate that a project is selected
             if (!selectedProjectId) {
                 Alert.alert('Project Required', 'Please select a project to generate the report.');
+                return;
+            }
+
+            // Validate that at least one report type is selected in Advanced options
+            if (!includedReports.material && !includedReports.contractor && !includedReports.equipment && !includedReports.other) {
+                Alert.alert('Report Type Required', 'Please select at least one report type to include (Material, Contractor, Equipment, or Other).');
                 return;
             }
 
@@ -529,7 +551,14 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
             const pdfGenerator = new PDFReportGenerator(clientData, userData);
             
             console.log('📄 Calling generatePDF...');
-            await pdfGenerator.generatePDF(activities || [], reportTitle, laborData, equipmentData, otherCostData, startDate, endDate);
+            console.log('📄 Report options:', { mode: reportMode, included: includedReports });
+            await pdfGenerator.generatePDF(activities || [], reportTitle, laborData, equipmentData, otherCostData, startDate, endDate, {
+                mode: reportMode,
+                includeMaterial: includedReports.material,
+                includeContractor: includedReports.contractor,
+                includeEquipment: includedReports.equipment,
+                includeOther: includedReports.other,
+            });
             console.log('📄 generatePDF completed successfully');
 
             console.log('✅ PDF generation completed successfully');
@@ -773,6 +802,117 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                         </View>
                         )}
 
+                        {/* Report Mode Section */}
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Report Type</Text>
+                            <Text style={styles.sectionSubtitle}>
+                                Choose how much detail to include in the report
+                            </Text>
+
+                            <View style={styles.modeButtons}>
+                                {[
+                                    { key: 'summary' as const, label: 'Summary Report', description: 'Aggregated cost totals & breakdown only', icon: 'pie-chart' },
+                                    { key: 'detailed' as const, label: 'Detailed Report', description: 'Summary plus full day-by-day activity details', icon: 'document-text' }
+                                ].map((mode) => (
+                                    <TouchableOpacity
+                                        key={mode.key}
+                                        style={[
+                                            styles.modeButton,
+                                            reportMode === mode.key && styles.modeButtonActive
+                                        ]}
+                                        onPress={() => setReportMode(mode.key)}
+                                    >
+                                        <View style={styles.filterButtonLeft}>
+                                            <View style={[
+                                                styles.filterButtonIcon,
+                                                { backgroundColor: reportMode === mode.key ? '#3B82F620' : '#F1F5F9' }
+                                            ]}>
+                                                <Ionicons
+                                                    name={mode.icon as any}
+                                                    size={20}
+                                                    color={reportMode === mode.key ? '#3B82F6' : '#94A3B8'}
+                                                />
+                                            </View>
+                                            <View style={styles.filterButtonText}>
+                                                <Text style={[
+                                                    styles.filterButtonLabel,
+                                                    reportMode === mode.key && styles.filterButtonLabelActive
+                                                ]}>
+                                                    {mode.label}
+                                                </Text>
+                                                <Text style={styles.filterButtonDescription}>
+                                                    {mode.description}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                        {reportMode === mode.key && (
+                                            <Ionicons name="checkmark-circle" size={22} color="#3B82F6" />
+                                        )}
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            {/* Advanced: report type selection */}
+                            <TouchableOpacity
+                                style={styles.advancedToggle}
+                                onPress={() => setShowAdvanced(prev => !prev)}
+                                activeOpacity={0.7}
+                            >
+                                <View style={styles.advancedToggleLeft}>
+                                    <Ionicons name="options-outline" size={18} color="#3B82F6" />
+                                    <Text style={styles.advancedToggleText}>Advanced</Text>
+                                    <Text style={styles.advancedToggleCount}>
+                                        {`${[includedReports.material, includedReports.contractor, includedReports.equipment, includedReports.other].filter(Boolean).length}/4 selected`}
+                                    </Text>
+                                </View>
+                                <Ionicons
+                                    name={showAdvanced ? 'chevron-up' : 'chevron-down'}
+                                    size={18}
+                                    color="#64748B"
+                                />
+                            </TouchableOpacity>
+
+                            {showAdvanced && (
+                                <View style={styles.advancedPanel}>
+                                    <Text style={styles.advancedHint}>
+                                        Select which reports to include. All are selected by default.
+                                    </Text>
+                                    {[
+                                        { key: 'material' as const, label: 'Material Report', description: 'Materials with quantities, costs & who imported them', icon: 'cube', color: '#10B981' },
+                                        { key: 'contractor' as const, label: 'Contractor Report', description: 'Labor / contractor costs', icon: 'people', color: '#F59E0B' },
+                                        { key: 'equipment' as const, label: 'Equipment Report', description: 'Equipment usage & costs', icon: 'construct', color: '#3B82F6' },
+                                        { key: 'other' as const, label: 'Other Report', description: 'Miscellaneous / other costs', icon: 'cash', color: '#8B5CF6' }
+                                    ].map((type) => {
+                                        const checked = includedReports[type.key];
+                                        return (
+                                            <TouchableOpacity
+                                                key={type.key}
+                                                style={styles.checkRow}
+                                                onPress={() => toggleReportType(type.key)}
+                                                activeOpacity={0.7}
+                                            >
+                                                <View style={[styles.filterButtonIcon, { backgroundColor: `${type.color}20` }]}>
+                                                    <Ionicons name={type.icon as any} size={18} color={type.color} />
+                                                </View>
+                                                <View style={styles.checkRowText}>
+                                                    <Text style={styles.checkRowLabel}>{type.label}</Text>
+                                                    <Text style={styles.checkRowDescription}>{type.description}</Text>
+                                                </View>
+                                                <View style={[
+                                                    styles.checkbox,
+                                                    checked && styles.checkboxChecked
+                                                ]}>
+                                                    {checked && (
+                                                        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                                                    )}
+                                                </View>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
+                            )}
+                        </View>
+
                         {/* Project Filter Section */}
                         <View style={styles.section}>
                             <Text style={styles.sectionTitle}>Project Filter</Text>
@@ -932,7 +1072,9 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                             <View style={styles.previewCard}>
                                 <View style={styles.previewHeader}>
                                     <Ionicons name="document-text-outline" size={24} color="#3B82F6" />
-                                    <Text style={styles.previewTitle}>Material, Labor & Equipment Report</Text>
+                                    <Text style={styles.previewTitle}>
+                                        {reportMode === 'summary' ? 'Summary Report' : 'Detailed Report'}
+                                    </Text>
                                 </View>
                                 <View style={styles.previewDetails}>
                                     <View style={styles.previewRow}>
@@ -952,7 +1094,12 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                                     <View style={styles.previewRow}>
                                         <Text style={styles.previewLabel}>Includes:</Text>
                                         <Text style={styles.previewValue}>
-                                            Materials, Labor & Equipment Costs
+                                            {[
+                                                includedReports.material && 'Material',
+                                                includedReports.contractor && 'Contractor',
+                                                includedReports.equipment && 'Equipment',
+                                                includedReports.other && 'Other'
+                                            ].filter(Boolean).join(', ') || 'None selected'}
                                         </Text>
                                     </View>
                                     <View style={styles.previewRow}>
@@ -1213,6 +1360,98 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#64748B',
         marginTop: 2,
+    },
+    // Report mode (summary / detailed) buttons
+    modeButtons: {
+        gap: 10,
+    },
+    modeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        borderRadius: 12,
+        padding: 14,
+    },
+    modeButtonActive: {
+        borderColor: '#3B82F6',
+        backgroundColor: '#EFF6FF',
+    },
+    // Advanced toggle
+    advancedToggle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 14,
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    advancedToggleLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    advancedToggleText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#1E293B',
+    },
+    advancedToggleCount: {
+        fontSize: 12,
+        color: '#64748B',
+        marginLeft: 4,
+    },
+    advancedPanel: {
+        marginTop: 10,
+        gap: 10,
+    },
+    advancedHint: {
+        fontSize: 12,
+        color: '#94A3B8',
+        marginBottom: 2,
+    },
+    checkRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        borderRadius: 12,
+        padding: 12,
+        gap: 12,
+    },
+    checkRowText: {
+        flex: 1,
+    },
+    checkRowLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#1E293B',
+    },
+    checkRowDescription: {
+        fontSize: 12,
+        color: '#64748B',
+        marginTop: 2,
+    },
+    checkbox: {
+        width: 24,
+        height: 24,
+        borderRadius: 6,
+        borderWidth: 2,
+        borderColor: '#CBD5E1',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#FFFFFF',
+    },
+    checkboxChecked: {
+        backgroundColor: '#3B82F6',
+        borderColor: '#3B82F6',
     },
     previewCard: {
         backgroundColor: '#F8FAFC',
