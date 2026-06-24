@@ -676,7 +676,7 @@ const Index: React.FC = () => {
     const firstName = user?.firstName || 'there';
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
             {/* Header - static Exponentor app branding, shown to every signed-in user */}

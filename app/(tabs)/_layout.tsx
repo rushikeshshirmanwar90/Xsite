@@ -59,14 +59,14 @@ const TabLayout = () => {
             height: tabBarHeight + insets.bottom,
             paddingBottom: insets.bottom,
             paddingTop: sp(10),
-            borderTopLeftRadius: 26,
-            borderTopRightRadius: 26,
-            // Soft floating shadow
+            borderTopLeftRadius: 40,
+            borderTopRightRadius: 40,
+            // Soft floating shadow — large, upward-cast glow
             shadowColor: '#0F172A',
-            shadowOffset: { width: 0, height: -6 },
-            shadowOpacity: 0.1,
-            shadowRadius: 18,
-            elevation: 24,
+            shadowOffset: { width: 0, height: -18 },
+            shadowOpacity: 0.3,
+            shadowRadius: 44,
+            elevation: 40,
           },
           tabBarItemStyle: {
             paddingTop: sp(2),
