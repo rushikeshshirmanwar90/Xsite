@@ -23,16 +23,16 @@ export const getNotificationIcon = (type: string, approvalStatus?: string) => {
             case 'approved': return { icon: 'checkmark-circle', color: '#10B981' };
             case 'rejected': return { icon: 'close-circle', color: '#EF4444' };
             case 'imported': return { icon: 'cube', color: '#8B5CF6' };
-            default: return { icon: 'time-outline', color: '#F59E0B' };
+            default: return { icon: 'time-outline', color: '#EE730C' };
         }
     }
 
     switch (type) {
         case 'work_update': return { icon: 'checkmark-circle', color: '#10B981' };
-        case 'work_remaining': return { icon: 'time', color: '#F59E0B' };
-        case 'site_engineer': return { icon: 'person', color: '#3B82F6' };
+        case 'work_remaining': return { icon: 'time', color: '#EE730C' };
+        case 'site_engineer': return { icon: 'person', color: '#2E72F0' };
         case 'material_alert': return { icon: 'cube', color: '#8B5CF6' };
-        case 'material_request': return { icon: 'cube-outline', color: '#F59E0B' };
+        case 'material_request': return { icon: 'cube-outline', color: '#EE730C' };
         case 'safety_alert': return { icon: 'shield-checkmark', color: '#EF4444' };
         case 'delay_warning': return { icon: 'warning', color: '#DC2626' };
         default: return { icon: 'information-circle', color: '#6B7280' };

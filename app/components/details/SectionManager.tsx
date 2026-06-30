@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   addSectionButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
     height: 40,
     width: 40,
     borderRadius: 8,
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   addButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 8,

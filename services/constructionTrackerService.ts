@@ -51,4 +51,13 @@ export const constructionTrackerService = {
         });
         return handleResponse(res);
     },
+
+    async addPhase(miniSectionId: string, phaseName: string): Promise<ConstructionTracker> {
+        const res = await fetch(BASE, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ miniSectionId, phaseName }),
+        });
+        return handleResponse<ConstructionTracker>(res);
+    },
 };

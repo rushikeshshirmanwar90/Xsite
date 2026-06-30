@@ -69,13 +69,13 @@ const styles = StyleSheet.create<Styles>({
     alignItems: 'center' as const,
   },
   templateButtonActive: {
-    backgroundColor: '#3B82F6',
-    borderColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
+    borderColor: '#2E72F0',
   },
   templateButtonText: {
     fontSize: 14,
     fontWeight: '600' as const,
-    color: '#3B82F6',
+    color: '#2E72F0',
   },
   templateButtonTextActive: {
     color: '#fff',

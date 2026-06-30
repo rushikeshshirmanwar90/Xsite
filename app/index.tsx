@@ -68,7 +68,7 @@ export default function Index() {
     console.log('⏳ Index page showing loading...', { isLoading, isReady });
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
-        <ActivityIndicator size="large" color="#3B82F6" />
+        <ActivityIndicator size="large" color="#2E72F0" />
         <Text style={{ marginTop: 16, color: '#6B7280', fontSize: 14 }}>
           {isLoading ? 'Checking authentication...' : 'Loading...'}
         </Text>

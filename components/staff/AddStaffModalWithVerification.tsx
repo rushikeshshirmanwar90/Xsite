@@ -318,7 +318,7 @@ const AddStaffModalWithVerification: React.FC<AddStaffModalProps> = ({ visible, 
                                                     {roleOption}
                                                 </Text>
                                                 {role === roleOption && (
-                                                    <Ionicons name="checkmark" size={16} color="#3B82F6" />
+                                                    <Ionicons name="checkmark" size={16} color="#2E72F0" />
                                                 )}
                                             </TouchableOpacity>
                                         ))}
@@ -339,7 +339,7 @@ const AddStaffModalWithVerification: React.FC<AddStaffModalProps> = ({ visible, 
                                     disabled={isLoading}
                                 >
                                     <LinearGradient
-                                        colors={isLoading ? ['#9CA3AF', '#9CA3AF'] : ['#3B82F6', '#8B5CF6']}
+                                        colors={isLoading ? ['#9CA3AF', '#9CA3AF'] : ['#2E72F0', '#8B5CF6']}
                                         style={styles.verifyButtonGradient}
                                         start={{ x: 0, y: 0 }}
                                         end={{ x: 1, y: 0 }}
@@ -365,7 +365,7 @@ const AddStaffModalWithVerification: React.FC<AddStaffModalProps> = ({ visible, 
                                         onPress={handleSendOTP}
                                         disabled={isLoading}
                                     >
-                                        <Ionicons name="refresh-outline" size={16} color="#3B82F6" />
+                                        <Ionicons name="refresh-outline" size={16} color="#2E72F0" />
                                         <Text style={styles.resendText}>Resend</Text>
                                     </TouchableOpacity>
                                 </View>
@@ -632,7 +632,7 @@ const styles = StyleSheet.create({
     },
     resendText: {
         fontSize: 14,
-        color: '#3B82F6',
+        color: '#2E72F0',
         fontWeight: '500',
     },
     otpContainer: {
@@ -653,7 +653,7 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#FFFFFF',
         borderWidth: 2,
-        borderColor: '#3B82F6',
+        borderColor: '#2E72F0',
         borderRadius: 12,
         paddingHorizontal: 16,
         paddingVertical: 12,

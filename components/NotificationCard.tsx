@@ -48,12 +48,12 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
       return { name: 'checkmark-circle', color: '#10B981' };
     }
     if (data.action === 'section_reopened' || data.action === 'mini_section_reopened') {
-      return { name: 'refresh-circle', color: '#F59E0B' };
+      return { name: 'refresh-circle', color: '#EE730C' };
     }
 
     switch (data.category) {
       case 'project':
-        return { name: 'folder', color: '#3B82F6' };
+        return { name: 'folder', color: '#2E72F0' };
       case 'section':
         return { name: 'layers', color: '#8B5CF6' };
       case 'mini_section':
@@ -61,18 +61,18 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
       case 'staff':
         return { name: 'people', color: '#EF4444' };
       case 'labor':
-        return { name: 'hammer', color: '#F59E0B' };
+        return { name: 'hammer', color: '#EE730C' };
       case 'material':
         if (data.action === 'imported') return { name: 'download', color: '#10B981' };
         if (data.action === 'used') return { name: 'arrow-forward', color: '#EF4444' };
-        if (data.action === 'transferred') return { name: 'swap-horizontal', color: '#3B82F6' };
+        if (data.action === 'transferred') return { name: 'swap-horizontal', color: '#2E72F0' };
         return { name: 'cube', color: '#06B6D4' };
       case 'completion':
         if (data.action === 'section_completed' || data.action === 'mini_section_completed') {
           return { name: 'checkmark-circle', color: '#10B981' };
         }
         if (data.action === 'section_reopened' || data.action === 'mini_section_reopened') {
-          return { name: 'refresh-circle', color: '#F59E0B' };
+          return { name: 'refresh-circle', color: '#EE730C' };
         }
         return { name: 'checkmark-circle', color: '#10B981' };
       default:
@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
   unreadContainer: {
     backgroundColor: '#FEFEFE',
     borderColor: '#E0E7FF',
-    shadowColor: '#3B82F6',
+    shadowColor: '#2E72F0',
     shadowOpacity: 0.1,
   },
   unreadIndicator: {
@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
   },
   iconContainer: {
     width: 48,

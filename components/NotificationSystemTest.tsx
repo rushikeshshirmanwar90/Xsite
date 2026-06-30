@@ -650,7 +650,7 @@ const NotificationSystemTest: React.FC = () => {
 
       {currentTest && (
         <View style={styles.currentTest}>
-          <Ionicons name="sync" size={16} color="#3B82F6" />
+          <Ionicons name="sync" size={16} color="#2E72F0" />
           <Text style={styles.currentTestText}>{currentTest}</Text>
         </View>
       )}
@@ -738,7 +738,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   primaryButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
     flex: 1,
   },
   secondaryButton: {
@@ -768,7 +768,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   currentTestText: {
-    color: '#3B82F6',
+    color: '#2E72F0',
     fontWeight: '500',
   },
   results: {

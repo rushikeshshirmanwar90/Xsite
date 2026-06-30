@@ -308,13 +308,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981',
   },
   projectButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
   },
   sectionButton: {
     backgroundColor: '#8B5CF6',
   },
   miniButton: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: '#EE730C',
   },
   clearButton: {
     backgroundColor: '#EF4444',

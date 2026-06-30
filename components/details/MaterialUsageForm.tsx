@@ -245,9 +245,9 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
             'cement': { icon: 'cube-outline', color: '#8B5CF6' },
             'brick': { icon: 'square-outline', color: '#EF4444' },
             'steel': { icon: 'barbell-outline', color: '#6B7280' },
-            'sand': { icon: 'layers-outline', color: '#F59E0B' },
+            'sand': { icon: 'layers-outline', color: '#EE730C' },
             'gravel': { icon: 'diamond-outline', color: '#10B981' },
-            'concrete': { icon: 'cube', color: '#3B82F6' },
+            'concrete': { icon: 'cube', color: '#2E72F0' },
             'wood': { icon: 'leaf-outline', color: '#84CC16' },
             'paint': { icon: 'color-palette-outline', color: '#EC4899' },
             'tile': { icon: 'grid-outline', color: '#06B6D4' },
@@ -730,7 +730,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                     <View style={styles.header}>
                         <View style={styles.headerLeft}>
                             <View style={styles.iconContainer}>
-                                <Ionicons name="arrow-forward-circle" size={24} color="#3B82F6" />
+                                <Ionicons name="arrow-forward-circle" size={24} color="#2E72F0" />
                             </View>
                             <View>
                                 <Text style={styles.title}>Record Material Usage</Text>
@@ -878,7 +878,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                                                 <Ionicons 
                                                                     name={isSelected ? "radio-button-on" : "radio-button-off"} 
                                                                     size={20} 
-                                                                    color={isSelected ? "#3B82F6" : "#94A3B8"} 
+                                                                    color={isSelected ? "#2E72F0" : "#94A3B8"} 
                                                                 />
                                                             </View>
                                                             <View style={styles.sectionItemInfo}>
@@ -902,7 +902,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                         </View>
                                     ) : (
                                         <View style={styles.noSectionsWarning}>
-                                            <Ionicons name="alert-circle" size={20} color="#F59E0B" />
+                                            <Ionicons name="alert-circle" size={20} color="#EE730C" />
                                             <Text style={styles.helperText}>
                                                 {miniSections.length === 0 
                                                     ? 'No mini-sections available. Please create one first.'
@@ -1091,9 +1091,9 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                             style={styles.backButtonInline}
                                             onPress={handlePreviousStep}
                                         >
-                                            <Ionicons name="arrow-back" size={16} color="#3B82F6" />
+                                            <Ionicons name="arrow-back" size={16} color="#2E72F0" />
                                         </TouchableOpacity>
-                                        <Ionicons name="layers" size={20} color="#3B82F6" />
+                                        <Ionicons name="layers" size={20} color="#2E72F0" />
                                         <Text style={styles.sectionInfoTitle}>Using materials in:</Text>
                                     </View>
                                     <Text style={styles.sectionInfoName}>
@@ -1212,7 +1212,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                                         {/* Helpful info when no error and no input */}
                                                         {!hasError && currentQuantity === '' && (
                                                             <View style={styles.quantityHint}>
-                                                                <Ionicons name="information-circle-outline" size={16} color="#3B82F6" />
+                                                                <Ionicons name="information-circle-outline" size={16} color="#2E72F0" />
                                                                 <Text style={styles.quantityHintText}>
                                                                     Enter the amount you want to use
                                                                 </Text>
@@ -1324,7 +1324,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                                         }),
                                                         backgroundColor: swipeAnimation.interpolate({
                                                             inputRange: [0, 0.7, 1],
-                                                            outputRange: ['#3B82F6', '#10B981', '#10B981'],
+                                                            outputRange: ['#2E72F0', '#10B981', '#10B981'],
                                                             extrapolate: 'clamp',
                                                         }),
                                                     }
@@ -1431,7 +1431,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                                     ],
                                                     backgroundColor: swipeAnimation.interpolate({
                                                         inputRange: [0, 0.5, 0.7, 1],
-                                                        outputRange: ['#3B82F6', '#2563EB', '#10B981', '#059669'],
+                                                        outputRange: ['#2E72F0', '#2563EB', '#10B981', '#059669'],
                                                         extrapolate: 'clamp',
                                                     }),
                                                     shadowOpacity: swipeAnimation.interpolate({
@@ -1608,7 +1608,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                 },
                             ]}
                         >
-                            <Ionicons name="arrow-forward-circle" size={48} color="#3B82F6" />
+                            <Ionicons name="arrow-forward-circle" size={48} color="#2E72F0" />
                         </Animated.View>
                         <Text style={styles.loadingTitle}>Recording Material Usage</Text>
                         <Text style={styles.loadingSubtitle}>Please wait while we process your usage data</Text>
@@ -1674,7 +1674,7 @@ const styles = StyleSheet.create({
         width: 48,
         height: 48,
         borderRadius: 12,
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
@@ -1758,7 +1758,7 @@ const styles = StyleSheet.create({
     },
     searchResultText: {
         fontSize: 12,
-        color: '#3B82F6',
+        color: '#2E72F0',
         marginTop: 6,
         fontWeight: '500',
     },
@@ -1824,7 +1824,7 @@ const styles = StyleSheet.create({
         paddingVertical: 2,
         borderRadius: 4,
         borderWidth: 1,
-        borderColor: '#F59E0B',
+        borderColor: '#EE730C',
     },
     specsBadgeText: {
         fontSize: 10,
@@ -1861,9 +1861,9 @@ const styles = StyleSheet.create({
         borderBottomColor: '#F1F5F9',
     },
     sectionItemSelected: {
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         borderLeftWidth: 3,
-        borderLeftColor: '#3B82F6',
+        borderLeftColor: '#2E72F0',
     },
     sectionItemLeft: {
         flexDirection: 'row',
@@ -1874,15 +1874,15 @@ const styles = StyleSheet.create({
         width: 36,
         height: 36,
         borderRadius: 8,
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
     },
     sectionIconBadgeSelected: {
-        backgroundColor: '#DBEAFE',
+        backgroundColor: '#C4D8FC',
         borderWidth: 2,
-        borderColor: '#3B82F6',
+        borderColor: '#2E72F0',
     },
     sectionItemInfo: {
         flex: 1,
@@ -1931,16 +1931,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 8,
         paddingHorizontal: 12,
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#BFDBFE',
+        borderColor: '#C4D8FC',
         gap: 4,
     },
     compactBackText: {
         fontSize: 13,
         fontWeight: '600',
-        color: '#3B82F6',
+        color: '#2E72F0',
     },
     headerLabelContainer: {
         flex: 1,
@@ -1957,7 +1957,7 @@ const styles = StyleSheet.create({
     },
     multiSelectHelper: {
         fontSize: 11,
-        color: '#3B82F6',
+        color: '#2E72F0',
         marginTop: 2,
         fontWeight: '500',
     },
@@ -2064,7 +2064,7 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingVertical: 14,
         borderRadius: 12,
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'row',
@@ -2204,7 +2204,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     stepCircleActive: {
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
     },
     stepCircleCompleted: {
         backgroundColor: '#10B981',
@@ -2231,7 +2231,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     stepLabelActive: {
-        color: '#3B82F6',
+        color: '#2E72F0',
     },
     stepLabelCompleted: {
         color: '#10B981',
@@ -2310,12 +2310,12 @@ const styles = StyleSheet.create({
     },
     // Section Info Styles
     sectionInfo: {
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         borderRadius: 12,
         padding: 16,
         marginBottom: 20,
         borderWidth: 1,
-        borderColor: '#DBEAFE',
+        borderColor: '#C4D8FC',
     },
     sectionInfoHeader: {
         flexDirection: 'row',
@@ -2332,7 +2332,7 @@ const styles = StyleSheet.create({
     },
     sectionInfoTitle: {
         fontSize: 14,
-        color: '#3B82F6',
+        color: '#2E72F0',
         fontWeight: '500',
         marginLeft: 8,
     },
@@ -2431,7 +2431,7 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingVertical: 14,
         borderRadius: 12,
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'row',
@@ -2441,7 +2441,7 @@ const styles = StyleSheet.create({
         flex: 1.6, // Larger "Enter Quantities" button for Step 1
         paddingVertical: 16, // Slightly larger padding
         borderRadius: 12,
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'row',
@@ -2501,7 +2501,7 @@ const styles = StyleSheet.create({
         flex: 1.6, // Larger than the back button
         paddingVertical: 16, // Slightly larger padding
         borderRadius: 12,
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'row',
@@ -2515,14 +2515,14 @@ const styles = StyleSheet.create({
         marginTop: 4,
         paddingHorizontal: 8,
         paddingVertical: 6,
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         borderRadius: 6,
         borderWidth: 1,
-        borderColor: '#DBEAFE',
+        borderColor: '#C4D8FC',
     },
     quantityHintText: {
         fontSize: 12,
-        color: '#3B82F6',
+        color: '#2E72F0',
         flex: 1,
     },
     // Quantity Progress Styles
@@ -2583,7 +2583,7 @@ const styles = StyleSheet.create({
     quickActionButtonText: {
         fontSize: 12,
         fontWeight: '500',
-        color: '#3B82F6',
+        color: '#2E72F0',
     },
     // Step 2 Footer Styles
     step2Footer: {
@@ -2734,7 +2734,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         zIndex: 3,
-        shadowColor: '#3B82F6',
+        shadowColor: '#2E72F0',
         shadowOffset: { width: 0, height: 3 },
         shadowRadius: 8,
         elevation: 6,
@@ -2902,7 +2902,7 @@ const styles = StyleSheet.create({
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
     },
 });
 

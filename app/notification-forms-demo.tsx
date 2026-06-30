@@ -172,10 +172,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981',
   },
   usageButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
   },
   laborButton: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: '#EE730C',
   },
   selectorButtonText: {
     color: 'white',
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#3B82F6',
+    borderLeftColor: '#2E72F0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,

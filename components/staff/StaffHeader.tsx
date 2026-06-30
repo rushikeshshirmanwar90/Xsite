@@ -34,14 +34,14 @@ const StaffHeader: React.FC<StaffHeaderProps> = ({
                     <Text style={styles.headerTitle}>Team Management</Text>
                     <View style={styles.countsContainer}>
                         <View style={styles.countItem}>
-                            <Ionicons name="people" size={16} color="#3B82F6" />
+                            <Ionicons name="people" size={16} color="#2E72F0" />
                             <Text style={styles.countText}>
                                 {staffCount} Staff
                             </Text>
                         </View>
                         <View style={styles.countSeparator} />
                         <View style={styles.countItem}>
-                            <Ionicons name="shield-checkmark" size={16} color="#F59E0B" />
+                            <Ionicons name="shield-checkmark" size={16} color="#EE730C" />
                             <Text style={styles.countText}>
                                 {adminCount} Admin{adminCount !== 1 ? 's' : ''}
                             </Text>
@@ -78,7 +78,7 @@ const StaffHeader: React.FC<StaffHeaderProps> = ({
                         onPress={onScanQRPress}
                         activeOpacity={0.8}
                     >
-                        <Ionicons name="qr-code-outline" size={22} color="#3B82F6" />
+                        <Ionicons name="qr-code-outline" size={22} color="#2E72F0" />
                     </TouchableOpacity>
                 )}
             </View>
@@ -168,9 +168,9 @@ const styles = StyleSheet.create({
         width: 48,
         height: 48,
         borderRadius: 12,
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         borderWidth: 2,
-        borderColor: '#3B82F6',
+        borderColor: '#2E72F0',
         justifyContent: 'center',
         alignItems: 'center',
     },

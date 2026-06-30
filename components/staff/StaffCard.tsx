@@ -17,9 +17,9 @@ const StaffCard: React.FC<StaffCardProps> = ({ staff, onPress, onRemove, showRem
 
     const getRandomColor = (id: string | undefined): readonly [string, string] => {
         const colors: readonly [string, string][] = [
-            ['#3B82F6', '#1D4ED8'],
+            ['#2E72F0', '#1D4ED8'],
             ['#10B981', '#059669'],
-            ['#F59E0B', '#D97706'],
+            ['#EE730C', '#D97706'],
             ['#EF4444', '#DC2626'],
             ['#8B5CF6', '#7C3AED'],
             ['#06B6D4', '#0891B2'],
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
     },
     verifyButtonText: {
         fontSize: 11,
-        color: '#F59E0B',
+        color: '#EE730C',
         fontWeight: '600',
     },
     staffRole: {

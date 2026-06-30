@@ -150,7 +150,7 @@ const TestUnifiedActivitiesScreen: React.FC = () => {
         </View>
 
         <TouchableOpacity onPress={refresh} style={styles.refreshButton}>
-          <Ionicons name="refresh" size={20} color="#3B82F6" />
+          <Ionicons name="refresh" size={20} color="#2E72F0" />
         </TouchableOpacity>
       </View>
 
@@ -192,7 +192,7 @@ const TestUnifiedActivitiesScreen: React.FC = () => {
           <View style={styles.statsGrid}>
             <View style={styles.statCard}>
               <View style={styles.statIconContainer}>
-                <Ionicons name="list" size={24} color="#3B82F6" />
+                <Ionicons name="list" size={24} color="#2E72F0" />
               </View>
               <Text style={styles.statNumber}>{activities.length}</Text>
               <Text style={styles.statLabel}>Total Activities</Text>
@@ -230,7 +230,7 @@ const TestUnifiedActivitiesScreen: React.FC = () => {
             </View>
           ) : isLoading ? (
             <View style={styles.statusCard}>
-              <Ionicons name="hourglass" size={24} color="#F59E0B" />
+              <Ionicons name="hourglass" size={24} color="#EE730C" />
               <View style={styles.statusContent}>
                 <Text style={styles.statusTitle}>Loading Activities...</Text>
                 <Text style={styles.statusDescription}>Fetching activities from both APIs</Text>
@@ -280,7 +280,7 @@ const TestUnifiedActivitiesScreen: React.FC = () => {
               onPress={() => router.push('/activities')}
             >
               <Text style={styles.viewAllButtonText}>View All Activities</Text>
-              <Ionicons name="arrow-forward" size={16} color="#3B82F6" />
+              <Ionicons name="arrow-forward" size={16} color="#2E72F0" />
             </TouchableOpacity>
           </View>
         )}
@@ -377,7 +377,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981',
   },
   apiButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
   },
   testButtonText: {
     color: '#FFFFFF',
@@ -512,7 +512,7 @@ const styles = StyleSheet.create({
   viewAllButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#3B82F6',
+    color: '#2E72F0',
     marginRight: 4,
   },
   instructionsSection: {

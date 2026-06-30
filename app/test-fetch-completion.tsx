@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     testButton: {
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
     },
     toggleButton: {
         backgroundColor: '#059669',
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
     },
     loading: {
         textAlign: 'center',
-        color: '#3B82F6',
+        color: '#2E72F0',
         fontSize: 16,
         fontWeight: '500',
         marginVertical: 8,

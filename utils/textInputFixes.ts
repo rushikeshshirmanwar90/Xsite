@@ -53,12 +53,12 @@ export const getTextInputContainerStyles = (isFocused: boolean = false) => {
     return {
         backgroundColor: isFocused ? '#F0F9FF' : '#F9FAFB',
         borderWidth: 1.5,
-        borderColor: isFocused ? '#3B82F6' : '#E5E7EB',
+        borderColor: isFocused ? '#2E72F0' : '#E5E7EB',
         borderRadius: 12,
         minHeight: 56,
         ...Platform.select({
             ios: {
-                shadowColor: isFocused ? '#3B82F6' : '#000',
+                shadowColor: isFocused ? '#2E72F0' : '#000',
                 shadowOffset: { width: 0, height: isFocused ? 2 : 1 },
                 shadowOpacity: isFocused ? 0.1 : 0.05,
                 shadowRadius: isFocused ? 4 : 2,

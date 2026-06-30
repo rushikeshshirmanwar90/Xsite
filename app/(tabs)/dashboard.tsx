@@ -21,6 +21,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+const SLAB_ORDINALS = ['First','Second','Third','Fourth','Fifth','Sixth','Seventh','Eighth','Ninth','Tenth'];
+const slabSortOrder = (name: string): number => {
+  const lower = (name || '').toLowerCase();
+  if (lower === 'foundation') return 0;
+  if (lower === 'terrace') return 9999;
+  const idx = SLAB_ORDINALS.findIndex(o => lower === `${o.toLowerCase()} slab`);
+  return idx !== -1 ? idx + 1 : 1000;
+};
+const sortMiniSections = <T extends { name?: string }>(sections: T[]): T[] =>
+  [...sections].sort((a, b) => slabSortOrder(a.name || '') - slabSortOrder(b.name || ''));
+
 const AnalyticsDashboard: React.FC = () => {
   const router = useRouter();
   const { user } = useUser(); // Add user context for staff filtering
@@ -346,7 +357,7 @@ const AnalyticsDashboard: React.FC = () => {
     if (sections.length === 1) {
       // Direct redirection to the 3rd page if only 1 section exists
       const singleSection = sections[0];
-      setPhasesSectionId(singleSection._id || singleSection.sectionId);
+      setPhasesSectionId(singleSection.sectionId || singleSection._id);
       setPhasesSectionName(singleSection.name);
       setPhasesSubPage('phases');
     } else {
@@ -400,18 +411,24 @@ const AnalyticsDashboard: React.FC = () => {
 
       // 1. Fetch mini-sections
       const miniSecs = await getSection(sectionId);
-      setMiniSections(miniSecs);
+      setMiniSections(sortMiniSections(miniSecs));
 
-      // 2. Fetch trackers for this section
-      if (project?._id && sectionName) {
-        const response = await apiClient.get(`/api/construction-tracker?projectId=${project._id}&sectionName=${encodeURIComponent(sectionName)}`);
-        const responseData = response.data as any;
-        if (responseData.success && Array.isArray(responseData.data)) {
-          setTrackers(responseData.data);
-          console.log(`✅ Loaded ${responseData.data.length} trackers for section ${sectionName}`);
-        } else {
-          setTrackers([]);
-        }
+      // 2. Fetch tracker for each mini-section individually (keyed by miniSectionId)
+      if (miniSecs.length > 0) {
+        const trackerResults = await Promise.all(
+          miniSecs.map(async (ms: any) => {
+            try {
+              const res = await apiClient.get(`/api/construction-tracker?miniSectionId=${ms._id}`);
+              const data = (res.data as any);
+              return data.success ? data.data : null;
+            } catch {
+              return null;
+            }
+          })
+        );
+        const loaded = trackerResults.filter(Boolean);
+        setTrackers(loaded);
+        console.log(`✅ Loaded ${loaded.length} trackers for ${miniSecs.length} mini-sections`);
       } else {
         setTrackers([]);
       }
@@ -637,7 +654,7 @@ const AnalyticsDashboard: React.FC = () => {
           onPress={handlePhasesBackPress}
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={18} color="#3B82F6" />
+          <Ionicons name="arrow-back" size={18} color="#2E72F0" />
           <Text style={styles.backButtonText}>Back to Projects</Text>
         </TouchableOpacity>
 
@@ -646,7 +663,7 @@ const AnalyticsDashboard: React.FC = () => {
           <TouchableOpacity
             key={section._id || section.sectionId}
             activeOpacity={0.7}
-            onPress={() => handleSectionSelect(section._id || section.sectionId, section.name)}
+            onPress={() => handleSectionSelect(section.sectionId || section._id, section.name)}
             style={styles.projectListCard}
           >
             <View style={{ flex: 1 }}>
@@ -678,13 +695,13 @@ const AnalyticsDashboard: React.FC = () => {
             onPress={handlePhasesBackPress}
             style={styles.backButton}
           >
-            <Ionicons name="arrow-back" size={18} color="#3B82F6" />
+            <Ionicons name="arrow-back" size={18} color="#2E72F0" />
             <Text style={styles.backButtonText}>
               {isSingleSectionProject ? "Back to Projects" : "Back to Sections"}
             </Text>
           </TouchableOpacity>
           <View style={styles.loadingContainer}>
-            <Ionicons name="sync" size={36} color="#3B82F6" />
+            <Ionicons name="sync" size={36} color="#2E72F0" />
             <Text style={styles.loadingText}>Loading building phases...</Text>
           </View>
         </View>
@@ -700,7 +717,7 @@ const AnalyticsDashboard: React.FC = () => {
             onPress={handlePhasesBackPress}
             style={styles.backButton}
           >
-            <Ionicons name="arrow-back" size={18} color="#3B82F6" />
+            <Ionicons name="arrow-back" size={18} color="#2E72F0" />
             <Text style={styles.backButtonText}>
               {isSingleSectionProject ? "Back to Projects" : "Back to Sections"}
             </Text>
@@ -733,7 +750,7 @@ const AnalyticsDashboard: React.FC = () => {
           onPress={handlePhasesBackPress}
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={18} color="#3B82F6" />
+          <Ionicons name="arrow-back" size={18} color="#2E72F0" />
           <Text style={styles.backButtonText}>
             {isSingleSectionProject ? "Back to Projects" : "Back to Sections"}
           </Text>
@@ -757,7 +774,7 @@ const AnalyticsDashboard: React.FC = () => {
               Total Mini-sections: <Text style={{ fontWeight: '700', color: '#1E293B' }}>{miniSections.length}</Text>
             </Text>
             <Text style={styles.sectionStatText}>
-              Tracked: <Text style={{ fontWeight: '700', color: '#3B82F6' }}>{activeTrackers.length}</Text>
+              Tracked: <Text style={{ fontWeight: '700', color: '#2E72F0' }}>{activeTrackers.length}</Text>
             </Text>
           </View>
         </View>
@@ -927,8 +944,8 @@ const AnalyticsDashboard: React.FC = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#3B82F6']}
-            tintColor="#3B82F6"
+            colors={['#2E72F0']}
+            tintColor="#2E72F0"
             title="Pull to refresh"
             titleColor="#64748B"
           />
@@ -953,7 +970,7 @@ const AnalyticsDashboard: React.FC = () => {
               <Ionicons
                 name={refreshing ? "sync" : "refresh"}
                 size={22}
-                color={(refreshing || loading) ? "#94A3B8" : "#3B82F6"}
+                color={(refreshing || loading) ? "#94A3B8" : "#2E72F0"}
               />
             </TouchableOpacity>
             <TouchableOpacity
@@ -976,7 +993,7 @@ const AnalyticsDashboard: React.FC = () => {
                 }
               }}
             >
-              <Ionicons name="bug" size={22} color="#F59E0B" />
+              <Ionicons name="bug" size={22} color="#EE730C" />
             </TouchableOpacity>
           </View>
         </View>
@@ -1010,7 +1027,7 @@ const AnalyticsDashboard: React.FC = () => {
                 })
               }]
             }}>
-              <Ionicons name="sync" size={48} color="#3B82F6" />
+              <Ionicons name="sync" size={48} color="#2E72F0" />
             </Animated.View>
             <Text style={styles.loadingText}>Loading data...</Text>
             <Text style={[styles.loadingText, { fontSize: 12, marginTop: 4 }]}>Please wait...</Text>
@@ -1206,7 +1223,7 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     marginTop: 20,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -1271,7 +1288,7 @@ const styles = StyleSheet.create({
     bottom: 8,
     width: 30,
     height: 3,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
     borderRadius: 2,
   },
   statBoxPrimary: {
@@ -1367,7 +1384,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   sectionPercentageBadge: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
@@ -1386,7 +1403,7 @@ const styles = StyleSheet.create({
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
     borderRadius: 5,
   },
   sectionStatsRow: {
@@ -1507,15 +1524,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981',
   },
   timelineDotInProgress: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     borderWidth: 2,
-    borderColor: '#3B82F6',
+    borderColor: '#2E72F0',
   },
   innerDotInProgress: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
   },
   timelineLine: {
     width: 2,
@@ -1541,7 +1558,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   timelinePhaseNameInProgress: {
-    color: '#3B82F6',
+    color: '#2E72F0',
     fontWeight: '700',
   },
   phaseStatusPill: {
@@ -1573,8 +1590,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   activeTabButton: {
-    backgroundColor: '#3B82F6',
-    shadowColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
+    shadowColor: '#2E72F0',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -1596,17 +1613,17 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 10,
     paddingHorizontal: 14,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     borderRadius: 10,
     alignSelf: 'flex-start',
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: '#C4D8FC',
   },
   backButtonText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#3B82F6',
+    color: '#2E72F0',
   },
 
   // ── Project / Section List Cards ────────────────────────────────────

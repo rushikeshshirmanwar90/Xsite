@@ -175,7 +175,7 @@ const NotificationTestPanel: React.FC = () => {
         
         {statsLoading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color="#3B82F6" />
+            <ActivityIndicator size="small" color="#2E72F0" />
             <Text style={styles.loadingText}>Loading stats...</Text>
           </View>
         ) : stats ? (
@@ -218,7 +218,7 @@ const NotificationTestPanel: React.FC = () => {
         )}
 
         <TouchableOpacity style={styles.refreshButton} onPress={fetchStats}>
-          <Ionicons name="refresh" size={16} color="#3B82F6" />
+          <Ionicons name="refresh" size={16} color="#2E72F0" />
           <Text style={styles.refreshButtonText}>Refresh Stats</Text>
         </TouchableOpacity>
       </View>
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   refreshButtonText: {
-    color: '#3B82F6',
+    color: '#2E72F0',
     fontWeight: '600',
   },
   inputContainer: {
@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981',
   },
   pushButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
   },
   testButtonText: {
     color: '#FFFFFF',

@@ -215,13 +215,13 @@ const MyActivitiesScreen: React.FC = () => {
             case 'create':
                 return '#10B981'; // Green
             case 'update':
-                return '#3B82F6'; // Blue
+                return '#2E72F0'; // Blue
             case 'delete':
                 return '#EF4444'; // Red
             case 'assign':
                 return '#8B5CF6'; // Purple
             case 'import':
-                return '#F59E0B'; // Orange
+                return '#EE730C'; // Orange
             default:
                 return '#6B7280'; // Gray
         }
@@ -292,14 +292,14 @@ const MyActivitiesScreen: React.FC = () => {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        colors={['#3B82F6']}
-                        tintColor="#3B82F6"
+                        colors={['#2E72F0']}
+                        tintColor="#2E72F0"
                     />
                 }
             >
                 {loading ? (
                     <View style={styles.centerContainer}>
-                        <ActivityIndicator size="large" color="#3B82F6" />
+                        <ActivityIndicator size="large" color="#2E72F0" />
                         <Text style={styles.loadingText}>Loading your activities...</Text>
                     </View>
                 ) : error ? (
@@ -509,7 +509,7 @@ const styles = StyleSheet.create({
         marginTop: 16,
         paddingHorizontal: 24,
         paddingVertical: 12,
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         borderRadius: 8,
     },
     retryButtonText: {

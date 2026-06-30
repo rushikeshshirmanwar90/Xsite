@@ -101,7 +101,7 @@ const OtherCostAnalytics: React.FC = () => {
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color="#3B82F6" />
+              <Ionicons name="arrow-back" size={24} color="#2E72F0" />
             </TouchableOpacity>
             <View style={styles.projectInfo}>
               <Text style={styles.projectName}>Other Costs</Text>

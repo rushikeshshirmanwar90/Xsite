@@ -4,6 +4,7 @@ import MaterialFormModal from '@/components/details/MaterialFormModel';
 import MaterialUsageForm from '@/components/details/MaterialUsageForm';
 import SectionManager from '@/components/details/SectionManager';
 import TabSelector from '@/components/details/TabSelector';
+import UsageFlagButton from '@/components/details/UsageFlagButton';
 import { predefinedSections } from '@/data/details';
 import { getSection } from '@/functions/details';
 import { getClientId } from '@/functions/clientId';
@@ -32,19 +33,50 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
     UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+const SLAB_ORDINALS = ['First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth'];
+
+const FOUNDATION_PHASES = ['Excavation', 'PCC', 'Footing Reinforcement', 'Footing Concrete', 'Column Starter', 'Plinth Beam', 'Backfilling', 'Compaction', 'Foundation Complete'];
+const FLOOR_PHASES = ['Column Work', 'Slab Work', 'Brickwork', 'Electrical Concealed', 'Plumbing Concealed', 'Plastering', 'Waterproofing', 'Flooring', 'Putty', 'Painting', 'Doors & Windows', 'Electrical Fixtures', 'Plumbing Fixtures', 'Finishing', 'Completed'];
+const TERRACE_PHASES = ['Slab Work', 'Waterproofing', 'Parapet Wall', 'Water Tank Work', 'Solar Installation', 'Terrace Finishing', 'Completed'];
+
+const phaseTemplateForSection = (sectionName: string): string[] => {
+    const lower = (sectionName || '').toLowerCase();
+    if (lower.includes('foundation')) return FOUNDATION_PHASES;
+    if (lower.includes('terrace')) return TERRACE_PHASES;
+    return FLOOR_PHASES;
+};
+
+// Returns phases from the template that haven't been added to the tracker yet.
+const remainingPhases = (sectionName: string, existingPhases: { name: string }[]): string[] => {
+    const added = new Set(existingPhases.map(p => p.name.toLowerCase()));
+    return phaseTemplateForSection(sectionName).filter(p => !added.has(p.toLowerCase()));
+};
+
+const slabSortOrder = (name: string): number => {
+    const lower = (name || '').toLowerCase();
+    if (lower === 'foundation') return 0;
+    if (lower === 'terrace') return 9999;
+    const slabIdx = SLAB_ORDINALS.findIndex(o => lower === `${o.toLowerCase()} slab`);
+    if (slabIdx !== -1) return slabIdx + 1;
+    return 1000;
+};
+
+const sortMiniSections = <T extends { name?: string }>(sections: T[]): T[] =>
+    [...sections].sort((a, b) => slabSortOrder(a.name || '') - slabSortOrder(b.name || ''));
+
 const SwipeableMiniSection = ({
-    section, 
-    selectedMiniSection, 
-    miniSectionCompletions, 
-    miniSectionLoadingStates, 
-    onSectionSelect, 
-    onToggleCompletion, 
-    onDelete 
+    section,
+    selectedMiniSection,
+    miniSectionCompletions,
+    miniSectionLoadingStates,
+    onSectionSelect,
+    onToggleCompletion,
+    onDelete
 }: {
     section: Section;
     selectedMiniSection: string | null;
-    miniSectionCompletions: {[key: string]: boolean};
-    miniSectionLoadingStates: {[key: string]: boolean};
+    miniSectionCompletions: { [key: string]: boolean };
+    miniSectionLoadingStates: { [key: string]: boolean };
     onSectionSelect: (sectionId: string) => void;
     onToggleCompletion: (sectionId: string, sectionName: string) => void;
     onDelete: (sectionId: string, sectionName: string) => void;
@@ -58,7 +90,7 @@ const SwipeableMiniSection = ({
 
     const handleStateChange = (event: any) => {
         const { state, translationX } = event.nativeEvent;
-        
+
         if (state === State.END) {
             if (translationX < -100) {
                 // Swipe threshold reached - trigger delete
@@ -123,10 +155,10 @@ const SwipeableMiniSection = ({
                             alignItems: 'center',
                             paddingHorizontal: 11,
                             paddingVertical: 9,
-                            backgroundColor: selectedMiniSection === section._id ? '#EFF6FF' : '#FFFFFF',
+                            backgroundColor: selectedMiniSection === section._id ? '#EAF0FE' : '#FFFFFF',
                             borderRadius: 9,
                             borderWidth: selectedMiniSection === section._id ? 2 : 1,
-                            borderColor: selectedMiniSection === section._id ? '#3B82F6' : '#E2E8F0',
+                            borderColor: selectedMiniSection === section._id ? '#2E72F0' : '#E2E8F0',
                             shadowColor: '#000',
                             shadowOffset: { width: 0, height: 1 },
                             shadowOpacity: 0.04,
@@ -177,7 +209,7 @@ const SwipeableMiniSection = ({
                                 style={{
                                     fontSize: 12,
                                     fontWeight: '600',
-                                    color: selectedMiniSection === section._id ? '#3B82F6' : '#374151',
+                                    color: selectedMiniSection === section._id ? '#2E72F0' : '#374151',
                                     marginBottom: 1,
                                 }}
                                 numberOfLines={1}
@@ -194,7 +226,7 @@ const SwipeableMiniSection = ({
 
                         {/* Selection Indicator */}
                         {selectedMiniSection === section._id && (
-                            <Ionicons name="checkmark-circle" size={18} color="#3B82F6" />
+                            <Ionicons name="checkmark-circle" size={18} color="#2E72F0" />
                         )}
                     </TouchableOpacity>
                 </Animated.View>
@@ -221,8 +253,8 @@ const PhaseListRow = ({
             style={{
                 flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 13,
                 borderRadius: 12, borderWidth: isActive ? 2 : 1,
-                borderColor: isActive ? '#3B82F6' : '#E2E8F0',
-                backgroundColor: isActive ? '#EFF6FF' : '#FFFFFF', marginBottom: 8,
+                borderColor: isActive ? '#2E72F0' : '#E2E8F0',
+                backgroundColor: isActive ? '#EAF0FE' : '#FFFFFF', marginBottom: 8,
                 shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2, elevation: 1,
             }}
             onPress={onPress}
@@ -235,7 +267,7 @@ const PhaseListRow = ({
                 <Ionicons name={meta?.icon as any || 'ellipse-outline'} size={18} color={meta?.color || '#94A3B8'} />
             </View>
             <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: isActive ? '#3B82F6' : '#1E293B' }}>{phase.name}</Text>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: isActive ? '#2E72F0' : '#1E293B' }}>{phase.name}</Text>
                 <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>
                     {meta?.label} · {phase.progress}% complete
                     {phase.subPhases?.length > 0 ? ` · ${phase.subPhases.length} sub-phases` : ''}
@@ -247,7 +279,7 @@ const PhaseListRow = ({
                 </View>
                 <Text style={{ fontSize: 11, fontWeight: '700', color: meta?.color || '#94A3B8', marginTop: 3 }}>{phase.progress}%</Text>
             </View>
-            {isActive && <Ionicons name="checkmark-circle" size={20} color="#3B82F6" style={{ marginLeft: 8 }} />}
+            {isActive && <Ionicons name="checkmark-circle" size={20} color="#2E72F0" style={{ marginLeft: 8 }} />}
         </TouchableOpacity>
     );
 };
@@ -348,7 +380,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     const projectName = params.projectName as string;
     const sectionId = params.sectionId as string;
     const sectionName = params.sectionName as string;
-    
+
     // 🔍 DEBUG: Log params on component mount
     console.log('\n🚀 ========== DETAILS.TSX COMPONENT MOUNTED ==========');
     console.log('   - All params:', params);
@@ -374,7 +406,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     const [customEndDate, setCustomEndDate] = useState<Date>(new Date());
     const [showStartPicker, setShowStartPicker] = useState(false);
     const [showEndPicker, setShowEndPicker] = useState(false);
-    
+
     // Simple dropdown state - now using modal instead of dropdown
     const [showSectionModal, setShowSectionModal] = useState(false);
 
@@ -439,19 +471,19 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     const [isAddingMaterial, setIsAddingMaterial] = useState(false);
     const [isAddingMaterialUsage, setIsAddingMaterialUsage] = useState(false);
     const [sectionCompleted, setSectionCompleted] = useState(false);
-    const [miniSectionCompletions, setMiniSectionCompletions] = useState<{[key: string]: boolean}>({});
+    const [miniSectionCompletions, setMiniSectionCompletions] = useState<{ [key: string]: boolean }>({});
     const [isUpdatingCompletion, setIsUpdatingCompletion] = useState(false);
     const [generatingReport, setGeneratingReport] = useState(false);
     const [generatingStockReport, setGeneratingStockReport] = useState(false);
     const [currentUserType, setCurrentUserType] = useState<string>('staff'); // Track current user type
     const [showCompletionConfirmModal, setShowCompletionConfirmModal] = useState(false);
-    
+
     // Ref to track last completion toggle time per mini-section (for debouncing)
-    const lastToggleTimesRef = useRef<{[key: string]: number}>({});
+    const lastToggleTimesRef = useRef<{ [key: string]: number }>({});
     const DEBOUNCE_DELAY = 500; // 500ms debounce
-    
+
     // Track loading state per mini-section
-    const [miniSectionLoadingStates, setMiniSectionLoadingStates] = useState<{[key: string]: boolean}>({});
+    const [miniSectionLoadingStates, setMiniSectionLoadingStates] = useState<{ [key: string]: boolean }>({});
 
     // Low stock alert system
     const [lowStockThreshold, setLowStockThreshold] = useState(10); // Default 10% threshold
@@ -486,7 +518,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             if (completionLoadTimeoutRef.current) {
                 clearTimeout(completionLoadTimeoutRef.current);
             }
-            
+
             // Small delay to ensure mini-sections are properly set
             completionLoadTimeoutRef.current = setTimeout(() => {
                 if (isMountedRef.current) {
@@ -508,10 +540,10 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     const scrollViewRef = useRef<ScrollView>(null);
     const isMountedRef = useRef(true);
     const isLoadingRef = useRef(false);
-    
+
     // Ref to track completion load timeout for cleanup
     const completionLoadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    
+
     // Loading animations for material operations
     const materialLoadingAnimation = useRef(new Animated.Value(0)).current;
     const usageLoadingAnimation = useRef(new Animated.Value(0)).current;
@@ -692,19 +724,19 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
             // ✅ CRITICAL FIX: Apply consistent filtering to both available and used materials
             // This ensures total imported calculations are consistent across all sections
-            
+
             // ✅ Validate miniSectionId before adding to params
-            const isValidMiniSectionId = selectedMiniSection && 
-                                        selectedMiniSection !== 'all-sections' && 
-                                        selectedMiniSection !== 'default-section' &&
-                                        isValidMongoId(selectedMiniSection);
-            
+            const isValidMiniSectionId = selectedMiniSection &&
+                selectedMiniSection !== 'all-sections' &&
+                selectedMiniSection !== 'default-section' &&
+                isValidMongoId(selectedMiniSection);
+
             console.log('🔍 Mini-section validation:', {
                 selectedMiniSection,
                 isValidMiniSectionId,
                 isMongoId: selectedMiniSection ? isValidMongoId(selectedMiniSection) : false
             });
-            
+
             // ✅ Compute ALL aliases for this section
             const sectionAliases = [...new Set([
                 sectionId,
@@ -791,12 +823,12 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             console.log('📦 Available materials count:', availableData.MaterialAvailable?.length || 0);
             console.log('🔧 Used materials count:', usedData.MaterialUsed?.length || 0);
             console.log('✅ CONSISTENCY FIX: Both datasets fetched PROJECT-WIDE for consistent totals');
-            
+
             // Extract materials arrays from API response
             const availableMaterialsArray = availableData.MaterialAvailable || availableData.materials || [];
             const usedMaterialsArray = usedData.MaterialUsed || usedData.materials || [];
 
-            
+
             // ✅ LOG FIRST FEW MATERIALS TO VERIFY SORT ORDER
             if (availableMaterialsArray.length > 0) {
                 availableMaterialsArray.slice(0, 3).forEach((m: any, idx: number) => {
@@ -807,16 +839,16 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             // ✅ IMPORTANT: Transformation preserves API order (newest first from backend)
             const transformedAvailable = availableMaterialsArray.map((material: any, index: number) => {
                 const { icon, color } = getMaterialIconAndColor(material.name);
-                
+
                 // ✅ CRITICAL FIX: Properly extract per-unit cost from API response
                 let perUnitCost = 0;
                 const quantity = material.qnt || 0;
                 const totalCost = material.totalCost || 0;
-                
+
                 // Priority 1: Use perUnitCost if available
                 if (material.perUnitCost !== undefined && material.perUnitCost !== null && !isNaN(Number(material.perUnitCost))) {
                     perUnitCost = Number(material.perUnitCost);
-                } 
+                }
                 // Priority 2: Calculate from totalCost / quantity
                 else if (totalCost > 0 && quantity > 0) {
                     perUnitCost = totalCost / quantity;
@@ -825,7 +857,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 else if (material.cost !== undefined && material.cost !== null && !isNaN(Number(material.cost))) {
                     perUnitCost = Number(material.cost);
                 }
-                
+
                 return {
                     id: (page - 1) * limit + index + 1,
                     _id: material._id,
@@ -849,16 +881,16 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
             const transformedUsed = usedMaterialsArray.map((material: any, index: number) => {
                 const { icon, color } = getMaterialIconAndColor(material.name);
-                
+
                 // ✅ CRITICAL FIX: Properly extract per-unit cost from API response
                 let perUnitCost = 0;
                 const quantity = material.qnt || 0;
                 const totalCost = material.totalCost || 0;
-                
+
                 // Priority 1: Use perUnitCost if available
                 if (material.perUnitCost !== undefined && material.perUnitCost !== null && !isNaN(Number(material.perUnitCost))) {
                     perUnitCost = Number(material.perUnitCost);
-                } 
+                }
                 // Priority 2: Calculate from totalCost / quantity
                 else if (totalCost > 0 && quantity > 0) {
                     perUnitCost = totalCost / quantity;
@@ -867,7 +899,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 else if (material.cost !== undefined && material.cost !== null && !isNaN(Number(material.cost))) {
                     perUnitCost = Number(material.cost);
                 }
-                
+
                 return {
                     id: (page - 1) * limit + index + 1000,
                     _id: material._id,
@@ -905,7 +937,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     totalItems = data.pagination.totalItems || data.pagination.total || data.pagination.count || 0;
                     hasNextPage = data.pagination.hasNextPage ?? data.pagination.hasNext ?? (currentPage < totalPages);
                     hasPrevPage = data.pagination.hasPrevPage ?? data.pagination.hasPrev ?? (currentPage > 1);
-                    
+
                 }
                 // Strategy 2: Check for meta object
                 else if (data.meta) {
@@ -925,7 +957,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 }
                 // Strategy 4: Fallback - Calculate from materials count
                 else {
-                    
+
                     if (materialsArray.length === limit) {
                         // Got a full page - assume there might be more
                         totalPages = defaultPage + 1;
@@ -942,7 +974,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         totalItems = 0;
                         hasNextPage = false;
                     }
-                    
+
                     hasPrevPage = defaultPage > 1;
                 }
 
@@ -968,7 +1000,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             const availablePagination = extractPagination(availableData, page, transformedAvailable);
             const usedPagination = extractPagination(usedData, page, transformedUsed);
 
-            
+
             // ✅ VERIFY SORT ORDER: Log first material to confirm newest is at top
             if (transformedAvailable.length > 0) {
                 const firstMaterial = transformedAvailable[0];
@@ -989,12 +1021,12 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
         } catch (error: any) {
             console.error(`\n❌ ERROR FETCHING MATERIALS:`);
             console.error(`   Message: ${error?.message}`);
-            
+
             const errorMessage = error?.message || 'Failed to load materials';
-            
-            setMaterials(prev => ({ 
-                ...prev, 
-                loading: false, 
+
+            setMaterials(prev => ({
+                ...prev,
+                loading: false,
                 error: errorMessage
             }));
 
@@ -1024,7 +1056,13 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             return tracker.phases.find(p => p._id === miniSec.activePhaseId) || null;
         }
 
-        // If no phase linked, default to first phase containing "column" or fallback to first phase
+        // Foundation defaults to Excavation
+        const sectionLower = (miniSec.name || (tracker as any).sectionName || '').toLowerCase();
+        if (sectionLower.includes('foundation')) {
+            return tracker.phases.find(p => p.name.toLowerCase() === 'excavation') || tracker.phases[0];
+        }
+
+        // All other sections: default to first phase containing "column" or fallback to first phase
         const defaultPhase = tracker.phases.find(p =>
             p.name.toLowerCase().includes('column')
         ) || tracker.phases[0];
@@ -1212,6 +1250,26 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
     const closeNextPhaseSuggestion = () => {
         setNextPhaseSuggestion(null);
+        setCustomPhaseName('');
+    };
+
+    const [customPhaseName, setCustomPhaseName] = React.useState('');
+
+    const addPhaseToTracker = async (phaseName: string) => {
+        const miniSec = getActiveMiniSection();
+        if (!miniSec?._id) { toast.error('No section selected'); return; }
+        try {
+            const updated = await constructionTrackerService.addPhase(miniSec._id, phaseName);
+            setTracker(updated);
+            // Auto-select the newly added phase
+            const newPhase = updated.phases[updated.phases.length - 1];
+            if (newPhase) await handleLinkPhase(newPhase._id, { force: true });
+            toast.success(`"${phaseName}" added`);
+        } catch (err: any) {
+            toast.error(err?.message || 'Failed to add phase');
+        } finally {
+            closeNextPhaseSuggestion();
+        }
     };
 
     const selectPhaseFromSuggestion = async (phaseId: string) => {
@@ -1271,16 +1329,16 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
         try {
             const updatedIgnored = [...ignoredMaterials, materialKey];
             setIgnoredMaterials(updatedIgnored);
-            
+
             // Save to AsyncStorage for persistence
             await AsyncStorage.setItem(
-                `ignored_materials_${projectId}`, 
+                `ignored_materials_${projectId}`,
                 JSON.stringify(updatedIgnored)
             );
-            
+
             // Remove from low stock materials
             setLowStockMaterials(prev => prev.filter(item => item.materialKey !== materialKey));
-            
+
             toast.success(`${materialName} will no longer show low stock alerts`);
         } catch (error) {
             console.error('❌ Error ignoring material:', error);
@@ -1326,7 +1384,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
         const timeSinceDismissal = now - alertDismissedAt;
 
         const shouldShow = timeSinceDismissal >= fifteenHoursInMs;
-        
+
         if (!shouldShow) {
             const remainingTime = fifteenHoursInMs - timeSinceDismissal;
             const remainingHours = Math.floor(remainingTime / (60 * 60 * 1000));
@@ -1406,7 +1464,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             stockButtonPosRef.current = targetPos;
             stockButtonBase.setValue(targetPos);
             stockButtonPan.setValue({ x: 0, y: 0 });
-            AsyncStorage.setItem('low_stock_button_position', JSON.stringify(targetPos)).catch(() => {});
+            AsyncStorage.setItem('low_stock_button_position', JSON.stringify(targetPos)).catch(() => { });
         });
 
         // A near-zero-movement release is a tap, not a drag — open the alert.
@@ -1424,7 +1482,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     const calculateMaterialTotals = (materialName: string, materialUnit: string, isUsedTab: boolean) => {
         const availableMaterials = materials?.available || [];
         const usedMaterials = materials?.used || [];
-        
+
         // Project-wide calculations (always consistent)
         const projectWideAvailable = availableMaterials
             .filter(m => m.name === materialName && m.unit === materialUnit)
@@ -1435,19 +1493,19 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             .reduce((sum, m) => sum + m.quantity, 0);
 
         const projectWideTotalImported = projectWideAvailable + projectWideUsed;
-        
+
         // Section-specific used calculation (when mini-section is selected)
         let sectionSpecificUsed = projectWideUsed;
         if (selectedMiniSection && isValidMongoId(selectedMiniSection)) {
             sectionSpecificUsed = usedMaterials
-                .filter(m => 
-                    m.name === materialName && 
-                    m.unit === materialUnit && 
+                .filter(m =>
+                    m.name === materialName &&
+                    m.unit === materialUnit &&
                     m.miniSectionId === selectedMiniSection
                 )
                 .reduce((sum, m) => sum + m.quantity, 0);
         }
-        
+
         return {
             totalImported: projectWideTotalImported,
             currentlyAvailable: projectWideAvailable,
@@ -1515,7 +1573,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             setSelectedMiniSection(null);
         }
         setShowSectionModal(false); // Close modal after selection
-        
+
         // Reload materials with new filter
         reloadMaterials(1, true);
     };
@@ -1548,15 +1606,15 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
     const handleLaborPress = async () => {
         console.log('Labor button pressed - navigating to labor.tsx');
-        
+
         // First, always check if this is a multiple-section project
         try {
             const projectRes = await apiClient.get(`/api/project/${projectId}?clientId=${clientId}`);
             const projectData = projectRes.data?.project || projectRes.data?.data?.project || projectRes.data?.data || projectRes.data;
             const sections = projectData?.section || [];
-            
+
             console.log(`📋 Project has ${sections.length} sections`);
-            
+
             // If multiple sections, check if we're in a specific section context
             if (sections.length > 1) {
                 // Check if we're currently viewing a specific section (not the main project view)
@@ -1580,21 +1638,21 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             console.error('Error fetching project data for section count:', projectErr);
             // If we can't determine section count, proceed with caution
         }
-        
+
         // Check if user is a contractor for this project
         const isStaff = !!user?.role; // Staff users have a role field (site-engineer/supervisor/manager), admins do not
         if (isStaff && user?._id && clientId) {
             // Check if this staff member is a contractor for this client
             const clientAssignment = user.clients?.find((c: any) => c.clientId === clientId);
-            
+
             if (clientAssignment?.isContractor) {
                 console.log('📡 Staff user is contractor - fetching contractor details for labor navigation...');
-                
+
                 try {
                     const res = await apiClient.get(`/api/contractor?projectId=${projectId}&staffId=${user._id}`);
                     if (res.data?.success && res.data?.data) {
                         const contractor = res.data.data;
-                        
+
                         // Navigate to labor with contractor details
                         router.push({
                             pathname: '/labor',
@@ -1615,7 +1673,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 }
             }
         }
-        
+
         // Standard labor navigation (non-contractor or contractor without record)
         router.push({
             pathname: '/labor',
@@ -1690,6 +1748,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
         currentlyAvailable: number;
         perUnitCost: number;
         totalCost: number;
+        purchasedBy: string[];
     }>> => {
         const clientId = await getClientId();
         if (!clientId || !projectId) {
@@ -1738,13 +1797,13 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 .join('|');
         };
 
-        const grouped: { [key: string]: { name: string; unit: string; specs: Record<string, any>; currentlyAvailable: number; totalUsed: number; importedCost: number } } = {};
+        const grouped: { [key: string]: { name: string; unit: string; specs: Record<string, any>; currentlyAvailable: number; totalUsed: number; importedCost: number; purchasers: Set<string> } } = {};
 
         const getGroup = (entryName: string, entryUnit: string, entrySpecs: any) => {
             const specsKey = buildSpecsKey(entrySpecs);
             const key = `${entryName}-${entryUnit}-${specsKey}`;
             if (!grouped[key]) {
-                grouped[key] = { name: entryName, unit: entryUnit, specs: entrySpecs || {}, currentlyAvailable: 0, totalUsed: 0, importedCost: 0 };
+                grouped[key] = { name: entryName, unit: entryUnit, specs: entrySpecs || {}, currentlyAvailable: 0, totalUsed: 0, importedCost: 0, purchasers: new Set() };
             }
             return grouped[key];
         };
@@ -1768,6 +1827,29 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             group.importedCost += resolveCost(m, qty);
         });
 
+        // Fetch imported activities to get "purchased by" user names per material
+        try {
+            const activityRes = await fetch(
+                `${domain}/api/materialActivity?projectId=${projectId}&activity=imported&clientId=${clientId}&limit=${REPORT_LIMIT}`,
+                { method: 'GET', headers: { ...getAuthHeaders() } }
+            );
+            if (activityRes.ok) {
+                const activityData = await activityRes.json();
+                const activities = activityData.data?.activities || activityData.activities || [];
+                activities.forEach((act: any) => {
+                    const userName = act.user?.fullName;
+                    if (!userName) return;
+                    (act.materials || []).forEach((m: any) => {
+                        const specsKey = buildSpecsKey(m.specs);
+                        const key = `${m.name}-${m.unit}-${specsKey}`;
+                        if (grouped[key]) grouped[key].purchasers.add(userName);
+                    });
+                });
+            }
+        } catch {
+            // non-fatal — report generates without purchaser info
+        }
+
         return Object.values(grouped).map(group => {
             const totalImported = group.currentlyAvailable + group.totalUsed;
             const perUnitCost = totalImported > 0 ? group.importedCost / totalImported : 0;
@@ -1780,6 +1862,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 currentlyAvailable: group.currentlyAvailable,
                 perUnitCost,
                 totalCost: group.importedCost,
+                purchasedBy: Array.from(group.purchasers),
             };
         });
     };
@@ -1861,57 +1944,57 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     const toggleSectionCompletion = async () => {
         if (isUpdatingCompletion) return;
         if (!isMountedRef.current) return;
-        
+
         // Close the confirmation modal
         setShowCompletionConfirmModal(false);
-        
+
         // Validate IDs
         if (!sectionId || !isValidMongoId(sectionId)) {
             toast.error('Invalid section ID. Please refresh the page and try again.');
             return;
         }
-        
+
         if (!projectId || !isValidMongoId(projectId)) {
             toast.error('Invalid project ID. Please refresh the page and try again.');
             return;
         }
-        
+
         setIsUpdatingCompletion(true);
-        
+
         try {
             const payload = {
                 updateType: 'project-section',
                 id: sectionId,
                 projectId: projectId
             };
-            
+
             const response = await apiClient.patch(`/api/completion`, payload, {
                 headers: { 'Content-Type': 'application/json' },
                 timeout: 15000
             });
-            
+
             // Check if still mounted after API call
             if (!isMountedRef.current) return;
 
             const responseData = response.data as any;
             if (responseData.success) {
                 const newCompletionStatus = responseData.data?.isCompleted;
-                
+
                 if (typeof newCompletionStatus === 'boolean') {
                     // Only update state if mounted
                     if (isMountedRef.current) {
                         setSectionCompleted(newCompletionStatus);
                         toast.success(responseData.message || `Section ${newCompletionStatus ? 'completed' : 'reopened'} successfully`);
                     }
-                    
+
                     // Log completion activity (fire-and-forget, fully isolated)
                     if (isMountedRef.current) {
                         setTimeout(() => {
                             try {
                                 if (newCompletionStatus) {
-                                    logSectionCompleted(projectId, projectName, sectionId, sectionName, `Section marked as completed via details page`).catch(() => {});
+                                    logSectionCompleted(projectId, projectName, sectionId, sectionName, `Section marked as completed via details page`).catch(() => { });
                                 } else {
-                                    logSectionReopened(projectId, projectName, sectionId, sectionName, `Section reopened via details page`).catch(() => {});
+                                    logSectionReopened(projectId, projectName, sectionId, sectionName, `Section reopened via details page`).catch(() => { });
                                 }
                             } catch (activityError) {
                                 // Silent error - activity logging should never crash the app
@@ -1930,7 +2013,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             }
         } catch (error: any) {
             console.error('Section completion error:', error.message);
-            
+
             // Only show error if mounted
             if (isMountedRef.current) {
                 const errorMessage = error?.response?.data?.message || error?.message || 'Unknown error';
@@ -1950,34 +2033,34 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             // Basic validation
             if (!isMountedRef.current) return;
             if (!miniSectionId || !isValidMongoId(miniSectionId)) return;
-            
+
             // Debounce check
             const now = Date.now();
             const lastToggleTime = lastToggleTimesRef.current[miniSectionId] || 0;
             if (now - lastToggleTime < DEBOUNCE_DELAY) return;
             lastToggleTimesRef.current[miniSectionId] = now;
-            
+
             // Check if already updating
             if (miniSectionLoadingStates[miniSectionId]) return;
-            
+
             // Set loading
             if (!isMountedRef.current) return;
             setMiniSectionLoadingStates(prev => ({ ...prev, [miniSectionId]: true }));
-            
+
             // Show loading toast
             toast.loading('Updating completion status...');
-            
+
             // Enhanced API call with retry logic and increased timeout
             let lastError: any = null;
             const maxRetries = 2;
-            
+
             for (let attempt = 0; attempt <= maxRetries; attempt++) {
                 try {
                     const response = await apiClient.patch(
                         `/api/completion`,
                         { updateType: 'minisection', id: miniSectionId },
-                        { 
-                            headers: { 'Content-Type': 'application/json' }, 
+                        {
+                            headers: { 'Content-Type': 'application/json' },
                             timeout: 30000 // Increased to 30 seconds
                         }
                     );
@@ -1990,18 +2073,18 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     if (responseData?.success && typeof responseData.data?.isCompleted === 'boolean') {
                         const newStatus = responseData.data.isCompleted;
                         setMiniSectionCompletions(prev => ({ ...prev, [miniSectionId]: newStatus }));
-                        
+
                         const statusText = newStatus ? 'completed' : 'reopened';
                         toast.success(`${miniSectionName} ${statusText}`);
                         return; // Success, exit retry loop
                     }
-                    
+
                 } catch (error: any) {
                     lastError = error;
 
                     // If it's a timeout and we have retries left, wait and retry
                     if (attempt < maxRetries && (
-                        error.code === 'ECONNABORTED' || 
+                        error.code === 'ECONNABORTED' ||
                         error.message?.includes('timeout') ||
                         error.response?.status >= 500
                     )) {
@@ -2009,7 +2092,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         await new Promise(resolve => setTimeout(resolve, delay));
                         continue;
                     }
-                    
+
                     // If it's not retryable or we're out of retries, throw
                     throw error;
                 }
@@ -2017,12 +2100,12 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
         } catch (error: any) {
             if (error.name === 'CanceledError' || error.code === 'ERR_CANCELED') return;
-            
+
             console.error('Toggle error:', error.message);
-            
+
             if (isMountedRef.current) {
                 let errorMessage = 'Failed to update completion status';
-                
+
                 if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
                     errorMessage = 'Request timed out. Please check your connection and try again.';
                 } else if (error.response?.status === 404) {
@@ -2032,7 +2115,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 } else if (error.response?.data?.message) {
                     errorMessage = error.response.data.message;
                 }
-                
+
                 toast.error(errorMessage);
             }
         } finally {
@@ -2047,16 +2130,16 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
         if (!sectionId || miniSections.length === 0) {
             return;
         }
-        
+
         try {
-            const completionStates: {[key: string]: boolean} = {};
-            
+            const completionStates: { [key: string]: boolean } = {};
+
             // Load completion status for each mini-section in parallel
             const loadPromises = miniSections.map(async (section) => {
                 try {
                     const url = `/api/completion?updateType=minisection&id=${section._id}`;
                     const response = await apiClient.get(url, { timeout: 10000 });
-                    
+
                     const data = response.data as any;
                     if (data?.success && data?.data) {
                         completionStates[section._id] = Boolean(data.data.isCompleted);
@@ -2067,14 +2150,14 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     completionStates[section._id] = false;
                 }
             });
-            
+
             await Promise.all(loadPromises);
-            
+
             // Update state only if component is mounted
             if (isMountedRef.current) {
                 setMiniSectionCompletions(completionStates);
             }
-            
+
         } catch (error) {
             console.error('Failed to load completion status:', error);
         }
@@ -2083,7 +2166,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     // Helper function to get client ID from project
     const getClientIdFromProject = async (projectId: string) => {
         try {
-            
+
             // First, we need to get a clientId to make the API call
             // Try to get it from the standard method first
             let queryClientId = null;
@@ -2092,14 +2175,14 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             } catch (error) {
                 console.warn('⚠️ Could not get clientId for project API query:', error);
             }
-            
+
             // If we don't have a clientId to query with, try to get it from user data directly
             if (!queryClientId) {
                 try {
                     const userDetailsString = await AsyncStorage.getItem("user");
                     if (userDetailsString) {
                         const userData = safeJsonParse(userDetailsString, {}) as any;
-                        
+
                         // For staff users, try to use the first client
                         const firstClient = safeFirst(userData?.clients) as any;
                         if (firstClient?.clientId) {
@@ -2114,29 +2197,29 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     console.error('❌ Fallback clientId method failed:', fallbackError);
                 }
             }
-            
+
             if (!queryClientId) {
                 console.error('❌ Cannot query project API without clientId parameter');
                 return null;
             }
-            
+
             // ✅ Validate projectId before making API call
             if (!projectId || projectId === 'undefined' || projectId === 'null') {
                 console.error('❌ Project ID is invalid, cannot fetch project data');
                 console.error('   Received projectId:', projectId);
                 return null;
             }
-            
+
             // Make the API call with clientId parameter
             const apiUrl = `/api/project/${projectId}?clientId=${queryClientId}`;
-            
+
             const response = await apiClient.get(apiUrl);
             const projectData = response.data as any;
-            
-            
+
+
             // Try multiple possible response structures
             let clientId = null;
-            
+
             // Check different possible nested structures
             if (projectData?.project?.clientId) {
                 clientId = projectData.project.clientId;
@@ -2147,19 +2230,19 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             } else if (projectData?.data?.project?.clientId) {
                 clientId = projectData.data.project.clientId;
             }
-            
+
             // Handle ObjectId objects (convert to string)
             if (typeof clientId === 'object' && clientId !== null) {
                 clientId = clientId.toString();
             }
-            
-            
+
+
             if (!clientId) {
                 console.error('❌ No clientId found in project data');
                 console.error('❌ Full project response:', JSON.stringify(projectData, null, 2));
                 return null;
             }
-            
+
             return clientId;
         } catch (error) {
             console.error('❌ Error fetching project clientId:', error);
@@ -2175,17 +2258,17 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     // Helper function to get client ID (with fallback to project-based lookup)
     const getClientIdFromStorage = async () => {
         try {
-            
+
             // Try the standard method first (this is working based on your logs)
             const standardClientId = await getClientId();
             if (standardClientId) {
-                
+
                 // For material activities, we can use the standard clientId since it's working
                 // The project-based lookup is mainly for verification, not required for functionality
                 return standardClientId;
             }
-            
-            
+
+
             // Fallback: Get clientId from project (for edge cases)
             if (projectId) {
                 const projectClientId = await getClientIdFromProject(projectId);
@@ -2195,13 +2278,13 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     console.warn('⚠️ Project-based clientId lookup failed, but this is not critical');
                 }
             }
-            
+
             // Final fallback: Try to get clientId directly from user data
             try {
                 const userDetailsString = await AsyncStorage.getItem("user");
                 if (userDetailsString) {
                     const userData = safeJsonParse(userDetailsString, {}) as any;
-                    
+
                     // For staff users, use the first client
                     const firstClient = safeFirst(userData?.clients) as any;
                     if (firstClient?.clientId) {
@@ -2215,7 +2298,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             } catch (fallbackError) {
                 console.error('❌ Direct user data fallback failed:', fallbackError);
             }
-            
+
             console.error('❌ All clientId methods failed');
             return null;
         } catch (error) {
@@ -2254,7 +2337,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             };
 
             const response = await apiClient.post(`/api/materialActivity`, activityPayload);
-            
+
 
             const responseData = response.data as any;
             if (!responseData.success) {
@@ -2266,9 +2349,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             try {
                 // Get notification recipients (admins and staff for this client)
                 const recipients = await getNotificationRecipients(clientId, projectId, user.userId, materials, activity, user);
-                
+
                 if (recipients.length > 0) {
-                    
+
                     // Create notification payload
                     const notificationPayload = createMaterialNotificationPayload(
                         activity,
@@ -2296,7 +2379,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             console.error('========================================');
             console.error('Error Type:', error?.constructor?.name);
             console.error('Error Message:', (error as any)?.message);
-            
+
             if ((error as any)?.response) {
                 console.error('API Response Error:');
                 console.error('   - Status:', (error as any).response.status);
@@ -2308,8 +2391,8 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
     // Helper function to get notification recipients
     const getNotificationRecipients = async (
-        clientId: string, 
-        projectId: string, 
+        clientId: string,
+        projectId: string,
         excludeUserId: string,
         materials: any[],
         activity: 'imported' | 'used' | 'transferred',
@@ -2319,7 +2402,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
             // Try to get recipients from backend
             const response = await apiClient.get(`/api/notifications/recipients?clientId=${clientId}&projectId=${projectId}`);
-            
+
             const responseData = response.data as any;
             if (responseData.success) {
                 let recipients = responseData.recipients || [];
@@ -2329,7 +2412,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             }
         } catch (error: any) {
             console.warn('⚠️ Backend recipients API not available:', error?.response?.status);
-            
+
             // If 404, the endpoint doesn't exist yet
             if (error?.response?.status === 404) {
             }
@@ -2340,14 +2423,14 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             // Import and use SimpleNotificationService for local testing
             const { SimpleNotificationService } = await import('../services/SimpleNotificationService');
             const notificationService = SimpleNotificationService.getInstance();
-            
+
             // Create a test notification to show the system is working
             const materialCount = materials.length;
             const totalCost = materials.reduce((sum: number, m: any) => sum + (m.totalCost || m.cost || 0), 0);
-            
+
             let title = '';
             let body = '';
-            
+
             switch (activity) {
                 case 'imported':
                     title = `📦 Materials Imported`;
@@ -2362,7 +2445,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     body = `${user.fullName} transferred ${materialCount} material${materialCount > 1 ? 's' : ''} (₹${totalCost.toLocaleString()}) from ${projectName}`;
                     break;
             }
-            
+
             await notificationService.scheduleLocalNotification(
                 title,
                 body,
@@ -2377,7 +2460,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     route: 'notification',
                 }
             );
-            
+
         } catch (fallbackError) {
             console.error('❌ Local notification fallback failed:', fallbackError);
         }
@@ -2443,10 +2526,10 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     // Helper function to send enhanced notifications
     const sendEnhancedNotifications = async (payload: any) => {
         try {
-            
+
             // Try to send via backend notification service
             const response = await apiClient.post(`/api/notifications/send`, payload);
-            
+
             const responseData = response.data as any;
             if (responseData.success) {
                 return true;
@@ -2456,10 +2539,10 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             }
         } catch (error: any) {
             console.warn('⚠️ Backend notification service not available:', error?.response?.status);
-            
+
             if (error?.response?.status === 404) {
             }
-            
+
             // For now, we already created a local notification in the fallback
             return false;
         }
@@ -2471,9 +2554,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             'cement': { icon: 'cube-outline', color: '#8B5CF6' },
             'brick': { icon: 'square-outline', color: '#EF4444' },
             'steel': { icon: 'barbell-outline', color: '#6B7280' },
-            'sand': { icon: 'layers-outline', color: '#F59E0B' },
+            'sand': { icon: 'layers-outline', color: '#EE730C' },
             'gravel': { icon: 'diamond-outline', color: '#10B981' },
-            'concrete': { icon: 'cube', color: '#3B82F6' },
+            'concrete': { icon: 'cube', color: '#2E72F0' },
             'wood': { icon: 'leaf-outline', color: '#84CC16' },
             'paint': { icon: 'color-palette-outline', color: '#EC4899' },
             'tile': { icon: 'grid-outline', color: '#06B6D4' },
@@ -2505,7 +2588,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
         groupedMaterials.forEach((group: any) => {
             const materialKey = `${group.name}-${group.unit}`;
-            
+
             // Skip if this material is ignored
             if (ignoredMaterials.includes(materialKey)) {
                 return;
@@ -2516,15 +2599,15 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             // currentlyAvailable = quantity still available (not used yet)
             const totalImported = group.totalImported || 0;
             const currentAvailable = group.currentlyAvailable || group.totalQuantity || 0;
-            
+
             if (totalImported > 0) {
                 const stockPercentage = (currentAvailable / totalImported) * 100;
-                
+
 
                 // ✅ Check if stock is at or below threshold
                 if (stockPercentage <= lowStockThreshold) {
                     const alertLevel = stockPercentage <= 3 ? 'critical' : stockPercentage <= 7 ? 'warning' : 'low';
-                    
+
                     lowStockItems.push({
                         ...group,
                         materialKey,
@@ -2533,20 +2616,20 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         stockPercentage,
                         alertLevel
                     });
-                    
+
                 }
             } else {
             }
         });
 
-        
+
         if (lowStockItems.length > 0) {
             lowStockItems.forEach((item, index) => {
             });
         }
 
         setLowStockMaterials(lowStockItems);
-        
+
         // ✅ Show alert automatically if there are new low stock items
         // Only show if alert is not already visible AND 15 hours have passed since last dismissal
         if (lowStockItems.length > 0 && !showLowStockAlert && shouldShowAlert()) {
@@ -2561,7 +2644,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     useEffect(() => {
         // Set mounted flag
         isMountedRef.current = true;
-        
+
         fetchMaterials(1, 10, true); // ✅ OPTIMIZED: 10 items per page for better UX
         loadInitialCompletionStatus(); // Load completion status on mount
         loadIgnoredMaterials(); // Load ignored materials from storage
@@ -2583,17 +2666,17 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             }
         };
         loadUserType();
-        
+
         // Cleanup function
         return () => {
             isMountedRef.current = false;
-            
+
             // Clear any pending timeouts
             if (completionLoadTimeoutRef.current) {
                 clearTimeout(completionLoadTimeoutRef.current);
                 completionLoadTimeoutRef.current = null;
             }
-            
+
             // Stop any running animations
             materialLoadingAnimation.stopAnimation();
             usageLoadingAnimation.stopAnimation();
@@ -2640,7 +2723,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
             // Load mini-section completion status
             await loadMiniSectionCompletionStatus();
-            
+
         } catch (error) {
             console.error('❌ Error loading initial completion status:', error);
         }
@@ -2669,7 +2752,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     // Fetch mini-sections for the section selector
     // ✅ CRITICAL FIX: Add a refresh trigger to force re-fetch when needed
     const [miniSectionRefreshTrigger, setMiniSectionRefreshTrigger] = useState(0);
-    
+
     // ✅ NEW: Add useFocusEffect to refresh mini-sections when page comes into focus
     useFocusEffect(
         useCallback(() => {
@@ -2677,22 +2760,22 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             setMiniSectionRefreshTrigger(prev => prev + 1);
         }, [])
     );
-    
+
     useEffect(() => {
         let timeoutId: ReturnType<typeof setTimeout> | null = null;
         let isCancelled = false;
-        
+
         const fetchMiniSections = async () => {
             console.log('\n🔍 ========== DETAILS.TSX: FETCHING MINI-SECTIONS (ROBUST) ==========');
             console.log('   - SectionId:', sectionId);
             console.log('   - ProjectId:', projectId);
             console.log('   - Function called at:', new Date().toISOString());
-            
+
             if (!sectionId) {
                 console.warn('   ⚠️ No sectionId provided, skipping mini-section fetch');
                 return;
             }
-            
+
             if (sectionId.length !== 24) {
                 console.error('   ❌ Invalid sectionId format! Expected 24 characters, got:', sectionId.length);
                 return;
@@ -2703,14 +2786,14 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 let sectionAliases = [sectionId];
                 const clientId = await getClientIdFromStorage() || await getClientId();
                 if (isCancelled) return;
-                
+
                 if (clientId && clientId.length === 24) {
                     try {
                         console.log('   - Resolving parent section aliases from project...');
                         const projectRes = await apiClient.get(`/api/project/${projectId}?clientId=${clientId}`);
                         const projectData = projectRes.data?.project || projectRes.data?.data?.project || projectRes.data?.data || projectRes.data;
                         if (projectData && projectData.section && Array.isArray(projectData.section)) {
-                            const matchedSec = projectData.section.find((sec: any) => 
+                            const matchedSec = projectData.section.find((sec: any) =>
                                 String(sec._id) === String(sectionId) || String(sec.sectionId) === String(sectionId)
                             );
                             if (matchedSec) {
@@ -2737,9 +2820,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         }
                     })
                 );
-                
+
                 if (isCancelled) return;
-                
+
                 // Combine and deduplicate mini-sections
                 const combinedMiniSections: any[] = [];
                 const combinedIds = new Set();
@@ -2753,7 +2836,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         }
                     }
                 }
-                
+
                 console.log('   - Combined mini-sections count:', combinedMiniSections.length);
 
                 // activePhaseId now comes directly from the backend on each mini-section object
@@ -2761,7 +2844,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
                 // ✅ Step 3: Update state with resolved mini-sections
                 if (isMountedRef.current && !isCancelled) {
-                    setMiniSections(combinedMiniSections);
+                    setMiniSections(sortMiniSections(combinedMiniSections));
                     console.log('   ✅ Mini-sections state updated with', combinedMiniSections.length, 'sections');
 
                     // Default to "All Sections" (selectedMiniSection = null) — do not auto-select a specific mini-section
@@ -2773,18 +2856,18 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         }
                     }, 500);
                 }
-                
+
             } catch (error) {
                 if (isCancelled) return;
                 console.error('   ❌ Error fetching mini-sections:', error);
-                
+
                 // Final fallback: Basic getSection call
                 try {
                     console.log('   - Falling back to basic getSection call...');
                     const sections = await getSection(sectionId);
                     if (sections && Array.isArray(sections) && isMountedRef.current && !isCancelled) {
-                        setMiniSections(sections);
-                        
+                        setMiniSections(sortMiniSections(sections));
+
                         // Load completion status
                         timeoutId = setTimeout(async () => {
                             if (isMountedRef.current && !isCancelled) {
@@ -2796,12 +2879,12 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     console.error('   ❌ Fallback also failed:', fallbackError);
                 }
             }
-            
+
             console.log('🔍 ========== END MINI-SECTIONS FETCH ==========\n');
         };
 
         fetchMiniSections();
-        
+
         return () => {
             isCancelled = true;
             if (timeoutId) {
@@ -2812,25 +2895,25 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
     // ✅ OPTIMIZED: Wrapper function for material grouping with safety checks and section-aware filtering
     const getGroupedMaterialsWithCompleteData = (materialsToDisplay: any[], isUsedTab: boolean) => {
-        
+
         // ✅ SAFETY CHECK: Ensure we have valid data before grouping
         if (!materialsToDisplay || !Array.isArray(materialsToDisplay) || materialsToDisplay.length === 0) {
             return [];
         }
-        
+
         if (!materials || !materials.available || !materials.used) {
             return [];
         }
-        
+
         // ✅ IMPORTANT: For consistent totals, we always pass the full materials array to grouping
         // The section-specific filtering is handled INSIDE the groupMaterialsByName function
         // This ensures we have access to project-wide data for consistent total calculations
-        
+
         console.log(`🔍 getGroupedMaterialsWithCompleteData called:`);
         console.log(`   - materialsToDisplay count: ${materialsToDisplay.length}`);
         console.log(`   - isUsedTab: ${isUsedTab}`);
         console.log(`   - selectedMiniSection: ${selectedMiniSection}`);
-        
+
         // Pass the materials to grouping function which will handle section-specific logic internally
         return groupMaterialsByName(materialsToDisplay, isUsedTab);
     };
@@ -2865,7 +2948,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 // ✅ SIMPLIFIED: Create grouping key with just name and unit for now
                 // This avoids issues with price/vendor mismatches between available and used materials
                 const key = `${material.name}-${material.unit}`;
-                
+
                 console.log(`🔑 SIMPLE GROUPING KEY: ${material.name} | Key: ${key} | Quantity: ${material.quantity}`);
 
                 if (!grouped[key]) {
@@ -2930,16 +3013,16 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             // ✅ FIXED: Calculate totals with consistent section-aware logic using helper function
             Object.keys(grouped).forEach((key) => {
                 const group = grouped[key];
-                
+
                 console.log(`\n🔍 CALCULATING TOTALS FOR: ${group.name}`);
                 console.log(`   Group key: ${key}`);
                 console.log(`   Group totalQuantity: ${group.totalQuantity}`);
                 console.log(`   Selected mini-section: ${selectedMiniSection}`);
                 console.log(`   Is used tab: ${isUsedTab}`);
-                
+
                 // ✅ Use helper function for consistent calculations
                 const totals = calculateMaterialTotals(group.name, group.unit, isUsedTab);
-                
+
                 console.log(`📊 CALCULATION RESULTS: ${group.name}`);
                 console.log(`   Project-wide Available: ${totals.currentlyAvailable}`);
                 console.log(`   Project-wide Used: ${totals.projectWideUsed}`);
@@ -2952,24 +3035,24 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 group.totalImported = Math.max(totals.totalImported, group.totalQuantity);
                 group.currentlyAvailable = Math.max(totals.currentlyAvailable, isUsedTab ? 0 : group.totalQuantity);
                 group.totalUsed = totals.totalUsed;
-                
+
                 // ✅ FINAL SAFETY CHECKS
                 if (group.totalImported === 0 && group.totalQuantity > 0) {
                     console.warn(`⚠️ FIXING totalImported: Setting to group.totalQuantity=${group.totalQuantity}`);
                     group.totalImported = group.totalQuantity;
                 }
-                
+
                 if (group.currentlyAvailable === 0 && !isUsedTab && group.totalQuantity > 0) {
                     console.warn(`⚠️ FIXING currentlyAvailable: Setting to group.totalQuantity=${group.totalQuantity}`);
                     group.currentlyAvailable = group.totalQuantity;
                 }
-                
+
                 console.log(`✅ FINAL VALUES: ${group.name}`);
                 console.log(`   totalImported: ${group.totalImported} (project-wide)`);
                 console.log(`   totalUsed: ${group.totalUsed} (${isUsedTab && selectedMiniSection ? 'section-specific' : 'project-wide'})`);
                 console.log(`   currentlyAvailable: ${group.currentlyAvailable} (project-wide)`);
                 console.log(`   totalQuantity: ${group.totalQuantity} (display group)`);
-                
+
                 // ✅ VALIDATION: Ensure mathematical consistency
                 if (group.totalImported < (group.totalUsed + group.currentlyAvailable)) {
                     console.warn(`⚠️ MATHEMATICAL INCONSISTENCY DETECTED for ${group.name}:`);
@@ -2979,14 +3062,14 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             });
 
             const result = Object.values(grouped);
-            
+
             // ✅ CRITICAL FIX: Sort grouped materials by newest first
             // After grouping, we need to re-sort by the most recent createdAt in each group
             result.sort((a: any, b: any) => {
                 // Get the most recent date from variants in each group
                 const getLatestDate = (group: any) => {
                     if (!group.variants || group.variants.length === 0) return new Date(0);
-                    
+
                     // Find the variant with the most recent date
                     const dates = group.variants
                         .map((v: any) => {
@@ -2995,28 +3078,28 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                             return dateStr ? new Date(dateStr) : new Date(0);
                         })
                         .filter((d: Date) => !isNaN(d.getTime()));
-                    
+
                     return dates.length > 0 ? new Date(Math.max(...dates.map((d: Date) => d.getTime()))) : new Date(0);
                 };
-                
+
                 const dateA = getLatestDate(a);
                 const dateB = getLatestDate(b);
-                
+
                 // Sort descending (newest first)
                 return dateB.getTime() - dateA.getTime();
             });
-            
+
             if (result.length > 0) {
                 if (result.length > 1) {
                     // Debug logging removed to prevent memory pressure
                 }
             }
-            
+
             // Debug final grouped results
             if (__DEV__) {
                 // Debug logging removed to prevent memory pressure
             }
-            
+
             return result;
         } catch (error) {
             console.error('Error grouping materials:', error);
@@ -3026,31 +3109,31 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     // Helper function to validate API parameters
     const validateApiParameters = (params: any) => {
         const errors = [];
-        
+
         if (!params.projectId || !isValidMongoId(params.projectId)) {
             errors.push('Invalid or missing projectId');
         }
-        
+
         if (!params.sectionId || !isValidMongoId(params.sectionId)) {
             errors.push('Invalid or missing sectionId');
         }
-        
+
         if (!params.miniSectionId || !isValidMongoId(params.miniSectionId)) {
             errors.push('Invalid or missing miniSectionId');
         }
-        
+
         if (!params.clientId) {
             errors.push('Missing clientId');
         }
-        
+
         if (!params.materialUsages || !Array.isArray(params.materialUsages) || params.materialUsages.length === 0) {
             errors.push('Invalid or empty materialUsages array');
         }
-        
+
         if (!params.user || !params.user.userId) {
             errors.push('Invalid or missing user data');
         }
-        
+
         return errors;
     };
 
@@ -3143,10 +3226,10 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             const response = await apiClient.post(`/api/material-usage-batch`, apiPayload, requestConfig);
             const responseData = response.data as any;
 
-            
+
             if (responseData.data) {
             }
-            
+
 
             if (responseData.success) {
                 // Update loading message
@@ -3180,7 +3263,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 if (isMountedRef.current) {
                     // ✅ CRITICAL FIX: Close the form first to reset its state
                     setShowUsageForm(false);
-                    
+
                     // Refresh materials from API to get the latest data
 
                     // ✅ OPTIMIZED: Quick refresh since backend updates cache directly
@@ -3193,24 +3276,24 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     // Short delay for state update
                     await new Promise(resolve => setTimeout(resolve, 300));
 
-                    
+
                     // Switch to "used" tab to show the newly added usage
                     setActiveTab('used');
 
                     // Show success message with material count
                     toast.success(`✅ ${materialUsages.length} material usages recorded! Check the "Used Materials" tab.`);
-                    
+
                     // 🔔 NEW: Send simple notification for material usage
                     try {
-                        
+
                         const staffName = user?.fullName || 'Staff Member';
                         const usageCount = materialUsages.length;
                         const totalValue = responseData.data?.totalCostOfUsedMaterials || 0;
-                        
+
                         // Create a clean, professional notification message
                         const notificationDetails = `Used ${usageCount} material${usageCount > 1 ? 's' : ''} worth ₹${totalValue.toLocaleString()}`;
-                        
-                        
+
+
                         const notificationSent = await sendProjectNotification({
                             projectId: projectId,
                             clientId: clientId || undefined,
@@ -3219,7 +3302,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                             projectName: projectName,
                             details: notificationDetails,
                         });
-                        
+
                         if (notificationSent) {
                         } else {
                             console.warn('⚠️ Usage notification failed to send');
@@ -3236,26 +3319,26 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 toast.dismiss(loadingToast);
             }
 
-            
+
             if (error?.response) {
             } else if (error?.request) {
             } else {
             }
-            
+
             if (error?.config) {
             }
-            
+
 
             // If batch API fails with 400 (bad request) or 405 (method not allowed), try fallback to single material API
             if (error?.response?.status === 400 || error?.response?.status === 405 || error?.response?.status === 404) {
-                
+
                 try {
                     loadingToast = toast.loading('Retrying with alternative method...');
-                    
+
                     // Process materials one by one using the original API
                     let successCount = 0;
                     let failCount = 0;
-                    
+
                     for (const usage of materialUsages) {
                         try {
                             const singleApiPayload = {
@@ -3266,7 +3349,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                 qnt: usage.quantity,
                                 clientId: clientId // Add clientId to single API payload
                             };
-                            
+
                             const singleResponse = await apiClient.post(`/api/material-usage`, singleApiPayload, {
                                 headers: {
                                     'Content-Type': 'application/json',
@@ -3274,7 +3357,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                 timeout: 15000,
                             });
                             const singleResponseData = singleResponse.data as any;
-                            
+
                             if (singleResponseData.success) {
                                 successCount++;
                             } else {
@@ -3286,27 +3369,27 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     }
 
                     toast.dismiss(loadingToast);
-                    
+
                     if (successCount > 0) {
                         toast.success(`${successCount} material usages recorded successfully!`);
-                        
+
                         // Refresh materials and update UI
                         await new Promise(resolve => setTimeout(resolve, 500));
                         await reloadMaterials(1);
                         await new Promise(resolve => setTimeout(resolve, 500));
-                        
+
                         // Stop loading animation
                         stopUsageLoadingAnimation();
-                        
+
                         if (isMountedRef.current) {
                             setActiveTab('used');
                             setShowUsageForm(false);
                         }
-                        
+
                         if (failCount > 0) {
                             toast.error(`${failCount} materials failed to process`);
                         }
-                        
+
                         return; // Exit successfully
                     } else {
                         throw new Error(`All ${failCount} materials failed to process`);
@@ -3377,10 +3460,10 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     const targetProjectResponse = await apiClient.get(`/api/project/${targetProjectId}?clientId=${clientId}`);
                     const targetProjectData = targetProjectResponse.data as any;
                     if (targetProjectData?.success) {
-                        targetProjectName = targetProjectData.project?.name || 
-                                          targetProjectData.data?.name || 
-                                          targetProjectData.name || 
-                                          'Unknown Project';
+                        targetProjectName = targetProjectData.project?.name ||
+                            targetProjectData.data?.name ||
+                            targetProjectData.name ||
+                            'Unknown Project';
                     }
                 }
             } catch (projectError) {
@@ -3450,9 +3533,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 }
 
                 toast.success(`Successfully transferred ${quantity} ${unit} of ${materialName} to ${targetProjectName}`);
-                
+
                 await reloadMaterials(1);
-                
+
             } else {
                 throw new Error(responseData.error || responseData.message || 'Transfer failed');
             }
@@ -3461,26 +3544,41 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             console.error('\n❌ MATERIAL TRANSFER ERROR:');
             console.error('Error Type:', error?.constructor?.name);
             console.error('Error Message:', error?.message);
-            
+
             if (error?.response) {
                 console.error('API Response Error:');
                 console.error('  - Status:', error.response.status);
                 console.error('  - Data:', JSON.stringify(error.response.data, null, 2));
             }
-            
-            
+
+
             if (loadingToast) toast.dismiss(loadingToast);
-            
-            const errorMessage = error.response?.data?.error || 
-                               error.response?.data?.message || 
-                               error.message || 
-                               'Failed to transfer material';
+
+            const errorMessage = error.response?.data?.error ||
+                error.response?.data?.message ||
+                error.message ||
+                'Failed to transfer material';
             toast.error(errorMessage);
         }
     };
 
-    const handleAddSection = async () => {
-        if (!newSectionName.trim()) {
+    const getNextSlabName = (sections: Section[]): string => {
+        const existingIndices = sections
+            .map(s => SLAB_ORDINALS.findIndex(o => s.name?.toLowerCase() === `${o.toLowerCase()} slab`))
+            .filter(idx => idx !== -1);
+        if (existingIndices.length === 0) return 'First Slab';
+        const nextIdx = Math.max(...existingIndices) + 1;
+        return nextIdx < SLAB_ORDINALS.length ? `${SLAB_ORDINALS[nextIdx]} Slab` : `Slab ${nextIdx + 1}`;
+    };
+
+    const handleAutoAddSlab = () => {
+        const nextName = getNextSlabName(miniSections);
+        handleAddSection(nextName);
+    };
+
+    const handleAddSection = async (overrideName?: string) => {
+        const resolvedName = overrideName !== undefined ? overrideName : newSectionName.trim();
+        if (!resolvedName) {
             toast.error('Please enter a section name');
             return;
         }
@@ -3495,7 +3593,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
         const { logMiniSectionCreated } = require('@/utils/activityLogger');
 
         const sectionData = {
-            name: newSectionName.trim(),
+            name: resolvedName,
             projectDetails: {
                 projectName: projectName,
                 projectId: projectId
@@ -3511,7 +3609,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
         let loadingToast: any = null;
         try {
             loadingToast = toast.loading('Adding section...');
-            
+
             // Call API to add section
             const res: any = await addSection(sectionData, sendProjectNotification);
 
@@ -3528,7 +3626,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
             if (res && res.success) {
                 console.log('✅ Section added successfully, refetching sections...');
-                
+
                 // Show success message
                 toast.success("Section added successfully");
 
@@ -3540,7 +3638,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         sectionId,
                         sectionName,
                         res.section?._id || res.data?._id || 'unknown',
-                        newSectionName.trim()
+                        resolvedName
                     ).catch((err: any) => {
                         console.error('Failed to log activity:', err);
                     });
@@ -3550,11 +3648,13 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 console.log('🔄 Triggering mini-section refresh...');
                 setMiniSectionRefreshTrigger(prev => prev + 1);
 
-                // Clear form and close modal
-                setNewSectionName('');
-                setNewSectionDesc('');
-                setShowAddSectionModal(false);
-                
+                // Clear form and close modal only when using the manual modal flow
+                if (overrideName === undefined) {
+                    setNewSectionName('');
+                    setNewSectionDesc('');
+                    setShowAddSectionModal(false);
+                }
+
                 console.log('✅ Section addition complete');
             } else {
                 console.error('❌ API returned success: false');
@@ -3565,12 +3665,12 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 toast.dismiss(loadingToast);
             }
             console.error('❌ Add section error:', error);
-            
+
             // Check if component is still mounted before showing error
             if (!isMountedRef.current) {
                 return;
             }
-            
+
             const errorMessage = error?.response?.data?.error ||
                 error?.response?.data?.message ||
                 error?.message ||
@@ -3610,7 +3710,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
                                 // Use the correct delete function from details.ts
                                 const { deleteMiniSection } = require('@/functions/details');
-                                
+
                                 // Prepare section data for notification
                                 const sectionData = {
                                     name: miniSectionName,
@@ -3650,16 +3750,16 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                 if (loadingToast) {
                                     toast.dismiss(loadingToast);
                                 }
-                                
+
                                 // ✅ ROLLBACK: Restore original state on error by re-triggering full fetch
                                 const originalMiniSections = miniSections.filter(section => section._id !== miniSectionId);
                                 if (originalMiniSections.length < miniSections.length) {
                                     // Trigger a full re-fetch (includes additional mini-sections from materials/labor)
                                     setMiniSectionRefreshTrigger(prev => prev + 1);
                                 }
-                                
+
                                 console.error('Delete section error:', error);
-                                
+
                                 const errorMessage = error?.response?.data?.error ||
                                     error?.response?.data?.message ||
                                     error?.message ||
@@ -3686,7 +3786,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
         const usedMaterials = materials.used.filter(material => material.miniSectionId === miniSectionId);
         const materialCount = usedMaterials.length;
         const totalValue = usedMaterials.reduce((sum, material) => sum + (material.totalCost || material.price * material.quantity || 0), 0);
-        
+
         return {
             count: materialCount,
             totalValue: totalValue,
@@ -3703,7 +3803,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             if (hasUsedMaterials) {
                 // Get detailed information about used materials
                 const usedMaterialsInfo = getUsedMaterialsInMiniSection(miniSectionId);
-                
+
                 // Show warning alert for mini-sections with used materials
                 Alert.alert(
                     'Cannot Delete Mini-Section',
@@ -3746,7 +3846,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
                                 // Use the correct delete function from details.ts
                                 const { deleteMiniSection } = require('@/functions/details');
-                                
+
                                 // Prepare section data for notification
                                 const sectionData = {
                                     name: miniSectionName,
@@ -3786,16 +3886,16 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                 if (loadingToast) {
                                     toast.dismiss(loadingToast);
                                 }
-                                
+
                                 // ✅ ROLLBACK: Restore original state on error by re-triggering full fetch
                                 const originalMiniSections = miniSections.filter(section => section._id !== miniSectionId);
                                 if (originalMiniSections.length < miniSections.length) {
                                     // Trigger a full re-fetch (includes additional mini-sections from materials/labor)
                                     setMiniSectionRefreshTrigger(prev => prev + 1);
                                 }
-                                
+
                                 console.error('Delete section error:', error);
-                                
+
                                 const errorMessage = error?.response?.data?.error ||
                                     error?.response?.data?.message ||
                                     error?.message ||
@@ -3814,12 +3914,12 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
     // ✅ FIXED: Simplified getCurrentData with safety checks and proper typing
     const getCurrentData = (): Material[] => {
-        
+
         // ✅ SAFETY CHECK: Ensure materials state exists
         if (!materials || !materials.available || !materials.used) {
             return [] as Material[];
         }
-        
+
         // ✅ CRITICAL FIX: Return API data directly without additional filtering
         // The API already handles pagination and filtering, so we don't need to filter again
         const rawMaterials: Material[] = activeTab === 'imported' ? (materials?.available || []) : (materials?.used || []);
@@ -3830,54 +3930,54 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
         if (activeTab === 'used' && selectedMiniSection && isValidMongoId(selectedMiniSection)) {
             return rawMaterials.filter(m => m.miniSectionId === selectedMiniSection);
         }
-        
+
         return rawMaterials;
     };
 
     const getGroupedData = () => {
         const currentMaterials = getCurrentData();
         const isUsedTab = activeTab === 'used';
-        
+
         // ✅ SAFETY CHECK: Ensure we have valid materials before grouping
         if (!currentMaterials || !Array.isArray(currentMaterials)) {
             return [];
         }
-        
+
         return getGroupedMaterialsWithCompleteData(currentMaterials, isUsedTab);
     };
 
     const itemsPerPage = 10; // Items per page for pagination (API level)
-    const currentPage = activeTab === 'imported' 
+    const currentPage = activeTab === 'imported'
         ? (materials?.pagination?.available?.currentPage || 1)
         : (materials?.pagination?.used?.currentPage || 1);
-    
+
     // Use API pagination data directly
     const totalPages = activeTab === 'imported'
         ? (materials?.pagination?.available?.totalPages || 1)
         : (materials?.pagination?.used?.totalPages || 1);
-    
+
     const totalItems = activeTab === 'imported'
         ? (materials?.pagination?.available?.totalItems || 0)
         : (materials?.pagination?.used?.totalItems || 0);
-    
+
     const apiLoading = materials?.loading || false;
-    
+
     // ✅ CRITICAL FIX: Calculate actual displayed groups after grouping
     const groupedMaterialsCount = getGroupedData().length;
-    const displayMaterials = activeTab === 'imported' 
-        ? (materials?.available || []) 
+    const displayMaterials = activeTab === 'imported'
+        ? (materials?.available || [])
         : (materials?.used || []);
-    
+
     // ✅ PAGINATION VISIBILITY: Only show pagination if there are actually more pages
     // AND if we have enough grouped materials to warrant pagination
     const shouldShowPagination = !materials?.loading && totalPages > 1 && groupedMaterialsCount > 0;
-    
+
     const startItem = totalItems > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0;
     const endItem = totalItems > 0 ? Math.min(currentPage * itemsPerPage, totalItems) : 0;
 
     // ✅ FIXED: Enhanced page change handler with better error handling
     const handlePageChange = async (page: number) => {
-        
+
         // Validate page number
         if (page < 1 || page > totalPages) {
             console.warn(`⚠️ Invalid page number: ${page} (valid range: 1-${totalPages})`);
@@ -3891,9 +3991,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
         try {
             scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-            
+
             await fetchMaterials(page, 10, true);
-            
+
         } catch (error) {
             console.error(`❌ Failed to load page ${page}:`, error);
             toast.error(`Failed to load page ${page}. Please try again.`);
@@ -3902,7 +4002,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
     useEffect(() => {
         fetchMaterials(1, 10, true);
-        
+
         // ✅ CRITICAL FIX: Refresh mini-sections when switching to "used" tab
         if (activeTab === 'used') {
             console.log('🔄 Switched to used tab - refreshing mini-sections');
@@ -4050,7 +4150,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             // Get user details from AsyncStorage to send in headers
             const userDetailsString = await AsyncStorage.getItem("user");
             let userDetails = null;
-            
+
             if (userDetailsString) {
                 try {
                     userDetails = JSON.parse(userDetailsString);
@@ -4058,7 +4158,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     console.error('Failed to parse user details:', parseError);
                 }
             }
-            
+
             // Make API call with user details in headers
             const res = await apiClient.post(`/api/material`, formattedMaterials, {
                 headers: {
@@ -4085,7 +4185,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         const inputQnt = result.input?.qnt || 0;
                         const inputPerUnitCost = result.input?.perUnitCost || 0;
                         const inputTotalCost = result.input?.totalCost || (inputQnt * inputPerUnitCost);
-                        
+
                         const materialData = {
                             name: result.input?.materialName || result.material?.name || 'Unknown Material',
                             unit: result.input?.unit || result.material?.unit || 'unit',
@@ -4105,20 +4205,20 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
                     // Only log activity if we have successful materials
                     if (successfulMaterials.length > 0) {
-                        
+
                         // ✅ REMOVED: logMaterialImported() call
                         // The backend API (/api/material/add-stock) already creates MaterialActivity entries
                         // with detailed information (activity: "imported"). Creating a duplicate regular Activity
                         // here was causing simple text notifications instead of detailed material cards.
                         // Now only the MaterialActivity from the backend will be shown in notifications.
                         try {
-                            
+
                             const staffName = user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Staff Member';
                             const materialCount = successfulMaterials.length;
                             const totalValue = successfulMaterials.reduce((sum: number, m: any) => sum + (m.totalCost || 0), 0);
-                            
+
                             const notificationDetails = `Added ${materialCount} material${materialCount > 1 ? 's' : ''} worth ₹${totalValue.toLocaleString()}`;
-                            
+
                             const notificationSent = await sendProjectNotification({
                                 projectId: projectId,
                                 clientId: clientId || undefined,
@@ -4127,7 +4227,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                 projectName: projectName,
                                 details: notificationDetails,
                             });
-                            
+
                             if (notificationSent) {
                             } else {
                                 console.warn('⚠️ STEP 3 WARNING: Simple notification failed to send');
@@ -4140,16 +4240,16 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 }
 
                 // ✅ OPTIMIZED: Quick refresh since backend updates cache directly
-                
+
                 // Short delay for backend to update cache (much faster now!)
                 await new Promise(resolve => setTimeout(resolve, 500));
-                
+
                 // Force refresh to get updated cache
                 await reloadMaterials(1);
-                
+
                 // Short delay for state update
                 await new Promise(resolve => setTimeout(resolve, 300));
-                
+
                 stopMaterialLoadingAnimation();
 
                 // Show appropriate toast messages
@@ -4165,20 +4265,20 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 }
             } else if (responseData.success) {
                 console.warn('⚠️ API returned success but no results array');
-                
+
                 await new Promise(resolve => setTimeout(resolve, 500));
                 await reloadMaterials(1);
                 await new Promise(resolve => setTimeout(resolve, 300));
-                
+
                 stopMaterialLoadingAnimation();
                 toast.success('✅ Material added successfully');
             } else {
 
                 console.error('❌ API returned success: false');
-                const errorMsg = typeof responseData.error === 'string' 
-                    ? responseData.error 
+                const errorMsg = typeof responseData.error === 'string'
+                    ? responseData.error
                     : (responseData.message || 'Failed to add materials');
-                
+
                 stopMaterialLoadingAnimation();
                 toast.error(errorMsg);
                 throw new Error(errorMsg);
@@ -4186,7 +4286,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
         } catch (error) {
             console.error("Material request error:", error);
-            
+
             // ✅ FIXED: More defensive check for error object
             const hasResponse = error && typeof error === 'object' && 'response' in error;
 
@@ -4212,7 +4312,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 console.error("Non-Axios error:", error);
                 const errorMsg = (error as any)?.message || "Failed to add materials";
                 toast.error(errorMsg);
-                
+
                 // ✅ FIXED: Always throw a proper Error object
                 if (error instanceof Error) {
                     throw error;
@@ -4252,110 +4352,14 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 onMaterialAnalysisPress={selectedMiniSection ? handleMaterialAnalysisPress : undefined}
             />
 
-            {/* Action Buttons - Sticky at top, visible to everyone in both materials views */}
-            {(
+            {/* Section Completed Info Banner — material operations are disabled when completed */}
+            {sectionCompleted && (
                 <View style={{ marginHorizontal: 16, marginTop: 6, marginBottom: 6 }}>
-                    {/* Section Completed Info Banner */}
-                    {sectionCompleted && (
-                        <View style={actionStyles.sectionCompletedBanner}>
-                            <Ionicons name="checkmark-circle" size={16} color="#059669" />
-                            <Text style={actionStyles.sectionCompletedText}>
-                                This section is completed. Material operations are disabled.
-                            </Text>
-                        </View>
-                    )}
-                    
-                    {/* Action Buttons Container */}
-                    <View style={actionStyles.stickyActionButtonsContainer}>
-                        <TouchableOpacity
-                        style={[
-                            actionStyles.addMaterialButton,
-                            (isAddingMaterial || sectionCompleted) && actionStyles.addMaterialButtonDisabled
-                        ]}
-                        onPress={() => {
-                            if (sectionCompleted) {
-                                toast.error('Cannot add materials to a completed section. Please reopen the section first.');
-                                return;
-                            }
-                            setShowMaterialForm(true);
-                        }}
-                        activeOpacity={0.7}
-                        disabled={isAddingMaterial || isAddingMaterialUsage || sectionCompleted}
-                    >
-                        {isAddingMaterial ? (
-                            <Animated.View
-                                style={{
-                                    transform: [
-                                        {
-                                            rotate: materialLoadingAnimation.interpolate({
-                                                inputRange: [0, 1],
-                                                outputRange: ['0deg', '360deg'],
-                                            }),
-                                        },
-                                    ],
-                                }}
-                            >
-                                <Ionicons name="sync" size={16} color="#94A3B8" />
-                            </Animated.View>
-                        ) : (
-                            <Ionicons
-                                name={sectionCompleted ? "checkmark-circle" : "add-circle-outline"}
-                                size={16}
-                                color={sectionCompleted ? "#94A3B8" : "#059669"}
-                            />
-                        )}
-                        <Text style={[
-                            actionStyles.addMaterialButtonText,
-                            (isAddingMaterial || sectionCompleted) && actionStyles.addMaterialButtonTextDisabled
-                        ]}>
-                            {isAddingMaterial ? 'Adding...' : sectionCompleted ? 'Section Completed' : 'Add Material'}
+                    <View style={actionStyles.sectionCompletedBanner}>
+                        <Ionicons name="checkmark-circle" size={16} color="#059669" />
+                        <Text style={actionStyles.sectionCompletedText}>
+                            This section is completed. Material operations are disabled.
                         </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[
-                            actionStyles.addUsageButton,
-                            (isAddingMaterialUsage || sectionCompleted) && actionStyles.addUsageButtonDisabled
-                        ]}
-                        onPress={() => {
-                            if (sectionCompleted) {
-                                toast.error('Cannot add material usage to a completed section. Please reopen the section first.');
-                                return;
-                            }
-                            setShowUsageForm(true);
-                        }}
-                        activeOpacity={0.7}
-                        disabled={isAddingMaterial || isAddingMaterialUsage || sectionCompleted}
-                    >
-                        {isAddingMaterialUsage ? (
-                            <Animated.View
-                                style={{
-                                    transform: [
-                                        {
-                                            rotate: usageLoadingAnimation.interpolate({
-                                                inputRange: [0, 1],
-                                                outputRange: ['0deg', '360deg'],
-                                            }),
-                                        },
-                                    ],
-                                }}
-                            >
-                                <Ionicons name="sync" size={16} color="#94A3B8" />
-                            </Animated.View>
-                        ) : (
-                            <Ionicons
-                                name={sectionCompleted ? "checkmark-circle" : "arrow-forward-circle-outline"}
-                                size={16}
-                                color={sectionCompleted ? "#94A3B8" : "#DC2626"}
-                            />
-                        )}
-                        <Text style={[
-                            actionStyles.addUsageButtonText,
-                            (isAddingMaterialUsage || sectionCompleted) && actionStyles.addUsageButtonTextDisabled
-                        ]}>
-                            {isAddingMaterialUsage ? 'Adding...' : sectionCompleted ? 'Section Completed' : 'Add Usage'}
-                        </Text>
-                    </TouchableOpacity>
                     </View>
                 </View>
             )}
@@ -4370,7 +4374,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     } catch (error) {
                         // ✅ FIXED: Defensive error logging to prevent crashes
                         console.error('❌ Error caught in MaterialFormModal onSubmit:', error);
-                        
+
                         if (error && typeof error === 'object') {
                             console.error('Error type:', typeof error);
                             console.error('Error message:', (error as any)?.message || 'No message');
@@ -4378,7 +4382,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         } else {
                             console.error('Error is not an object:', error);
                         }
-                        
+
                         // Re-throw to let MaterialFormModal show error
                         // ✅ FIXED: Ensure we always throw a proper Error object
                         if (error instanceof Error) {
@@ -4407,7 +4411,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 sectionId={sectionId}
                 miniSectionCompletions={miniSectionCompletions}
             />
-            
+
             <ScrollView
                 ref={scrollViewRef}
                 style={styles.scrollContainer}
@@ -4422,6 +4426,36 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     />
                 )}
 
+                {/* Context banner — always adds material; only the title reflects the page */}
+                <TouchableOpacity
+                    style={pageBannerStyles.bannerAvailable}
+                    activeOpacity={0.75}
+                    disabled={isAddingMaterial || sectionCompleted}
+                    onPress={() => {
+                        if (sectionCompleted) {
+                            toast.error('Cannot add materials to a completed section. Please reopen the section first.');
+                            return;
+                        }
+                        setShowMaterialForm(true);
+                    }}
+                >
+                    <View style={[pageBannerStyles.iconWrap, { borderColor: '#E9D5FF' }]}>
+                        <Ionicons name="cube" size={24} color="#7C3AED" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={[pageBannerStyles.bannerEyebrow, { color: '#7C3AED' }]}>Add Material</Text>
+                        <Text style={pageBannerStyles.bannerTitle}>
+                            {activeTab === 'used' ? 'Material Used' : 'Material Available'}
+                        </Text>
+                    </View>
+                    <View style={[pageBannerStyles.addBtn, { backgroundColor: '#7C3AED' }]}>
+                        {isAddingMaterial
+                            ? <Ionicons name="sync" size={18} color="#fff" />
+                            : <Ionicons name="add" size={20} color="#fff" />}
+                    </View>
+                </TouchableOpacity>
+
+
                 {/* Compact Filters - Only visible in "Used Materials" tab */}
                 {activeTab === 'used' && (
                     <View style={sectionStyles.filtersContainer}>
@@ -4434,7 +4468,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                         // Find the selected mini-section name
                                         const selectedSection = miniSections.find(s => s._id === selectedMiniSection);
                                         const sectionName = selectedSection?.name || 'Unknown Section';
-                                        
+
                                         // Toggle completion status
                                         toggleMiniSectionCompletionDirect(selectedMiniSection, sectionName);
                                     }
@@ -4454,17 +4488,17 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                     }
                                     size={16}
                                     color={
-                                        !selectedMiniSection 
+                                        !selectedMiniSection
                                             ? "#CBD5E1" // Very light gray when no selection (disabled)
                                             : miniSectionLoadingStates[selectedMiniSection || '']
                                                 ? "#94A3B8" // Medium gray when loading
                                                 : miniSectionCompletions[selectedMiniSection]
                                                     ? "#10B981" // Green for completed
                                                     : "#64748B" // Gray for not completed
-                                    } 
+                                    }
                                 />
                             </TouchableOpacity>
-                            
+
                             {miniSections.length > 0 ? (
                                 <View style={sectionStyles.compactSectionSelector}>
                                     {/* Simple Inline Dropdown */}
@@ -4494,10 +4528,10 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                     elevation: 1,
                                                 }}
                                                 onPress={() => {
-                                    // ✅ Refresh mini-sections before opening modal
-                                    setMiniSectionRefreshTrigger(prev => prev + 1);
-                                    setShowSectionModal(true);
-                                }}
+                                                    // ✅ Refresh mini-sections before opening modal
+                                                    setMiniSectionRefreshTrigger(prev => prev + 1);
+                                                    setShowSectionModal(true);
+                                                }}
                                                 activeOpacity={0.7}
                                             >
                                                 <Text style={{
@@ -4519,14 +4553,14 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                             {/* Add Button */}
                                             <TouchableOpacity
                                                 style={{
-                                                    backgroundColor: '#3B82F6',
+                                                    backgroundColor: '#2E72F0',
                                                     width: 30,
                                                     height: 30,
                                                     borderRadius: 7,
                                                     justifyContent: 'center',
                                                     alignItems: 'center',
                                                 }}
-                                                onPress={() => setShowAddSectionModal(true)}
+                                                onPress={handleAutoAddSlab}
                                                 activeOpacity={0.7}
                                             >
                                                 <Ionicons name="add" size={17} color="#fff" />
@@ -4598,9 +4632,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                             const activePhase = activePhaseFromTracker || defaultPhaseObject;
                             const STATUS_META: Record<string, { label: string; color: string }> = {
                                 NOT_STARTED: { label: 'Not Started', color: '#94A3B8' },
-                                IN_PROGRESS:  { label: 'In Progress',  color: '#3B82F6' },
-                                ON_HOLD:      { label: 'On Hold',      color: '#F59E0B' },
-                                COMPLETED:    { label: 'Completed',    color: '#10B981' },
+                                IN_PROGRESS: { label: 'In Progress', color: '#2E72F0' },
+                                ON_HOLD: { label: 'On Hold', color: '#F59E0B' },
+                                COMPLETED: { label: 'Completed', color: '#10B981' },
                             };
 
                             return (
@@ -4616,10 +4650,10 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                     >
                                         <View style={{
                                             width: 32, height: 32, borderRadius: 9,
-                                            backgroundColor: '#EFF6FF',
+                                            backgroundColor: '#EAF0FE',
                                             alignItems: 'center', justifyContent: 'center', marginRight: 9,
                                         }}>
-                                            <Ionicons name="construct-outline" size={16} color="#3B82F6" />
+                                            <Ionicons name="construct-outline" size={16} color="#2E72F0" />
                                         </View>
                                         <View style={{ flex: 1 }}>
                                             <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
@@ -4641,7 +4675,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                 <Text style={{ fontSize: 16, fontWeight: '800', color: '#1E293B', marginRight: 6, flexShrink: 1 }} numberOfLines={1}>
                                                     {activePhase.name}
                                                 </Text>
-                                                <Text style={{ fontSize: 12, fontWeight: '600', color: '#3B82F6' }}>
+                                                <Text style={{ fontSize: 12, fontWeight: '600', color: '#2E72F0' }}>
                                                     Change ›
                                                 </Text>
                                             </TouchableOpacity>
@@ -4688,8 +4722,8 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                                     style={{
                                                                         flex: 1, alignItems: 'center', paddingVertical: 8,
                                                                         borderRadius: 8, borderWidth: 1,
-                                                                        borderColor: isSelected ? STATUS_META[activePhase.status]?.color || '#3B82F6' : '#E2E8F0',
-                                                                        backgroundColor: isSelected ? (STATUS_META[activePhase.status]?.color || '#3B82F6') + '15' : 'transparent',
+                                                                        borderColor: isSelected ? STATUS_META[activePhase.status]?.color || '#2E72F0' : '#E2E8F0',
+                                                                        backgroundColor: isSelected ? (STATUS_META[activePhase.status]?.color || '#2E72F0') + '15' : 'transparent',
                                                                     }}
                                                                     onPress={() => updatePhaseProgress(activePhase, pct)}
                                                                     disabled={isSaving}
@@ -4697,7 +4731,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                                 >
                                                                     <Text style={{
                                                                         fontSize: 12, fontWeight: '700',
-                                                                        color: isSelected ? STATUS_META[activePhase.status]?.color || '#3B82F6' : '#64748B',
+                                                                        color: isSelected ? STATUS_META[activePhase.status]?.color || '#2E72F0' : '#64748B',
                                                                     }}>{pct}%</Text>
                                                                 </TouchableOpacity>
                                                             );
@@ -4762,8 +4796,8 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                                                     style={{
                                                                                         flex: 1, alignItems: 'center', paddingVertical: 5,
                                                                                         borderRadius: 6, borderWidth: 1,
-                                                                                        borderColor: sp.progress === pct ? spMeta?.color || '#3B82F6' : '#E2E8F0',
-                                                                                        backgroundColor: sp.progress === pct ? (spMeta?.color || '#3B82F6') + '15' : 'transparent',
+                                                                                        borderColor: sp.progress === pct ? spMeta?.color || '#2E72F0' : '#E2E8F0',
+                                                                                        backgroundColor: sp.progress === pct ? (spMeta?.color || '#2E72F0') + '15' : 'transparent',
                                                                                     }}
                                                                                     onPress={() => updateSubPhaseProgress(activePhase, sp, pct)}
                                                                                     disabled={isSaving}
@@ -4771,7 +4805,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                                                 >
                                                                                     <Text style={{
                                                                                         fontSize: 11, fontWeight: '700',
-                                                                                        color: sp.progress === pct ? spMeta?.color || '#3B82F6' : '#64748B',
+                                                                                        color: sp.progress === pct ? spMeta?.color || '#2E72F0' : '#64748B',
                                                                                     }}>{pct}%</Text>
                                                                                 </TouchableOpacity>
                                                                             ))}
@@ -4794,14 +4828,13 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 <View style={styles.materialsSection}>
                     <View style={paginationStyles.headerContainer}>
                         <Text style={styles.sectionTitle}>
-                            {activeTab === 'imported' ? 'Available Materials' : 'Used Materials'}
                             {activeTab === 'used' && selectedMiniSection && (
                                 <Text style={{ fontSize: 14, color: '#64748B', fontWeight: '400' }}>
                                     {' '}(Filtered)
                                 </Text>
                             )}
                         </Text>
-                        
+
                         {/* Material count and pagination info */}
                         {!materials.loading && totalItems > 0 && (
                             <View style={paginationStyles.infoContainer}>
@@ -4826,7 +4859,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                     }) || '0deg'
                                 }]
                             }}>
-                                <Ionicons name="sync" size={48} color="#3B82F6" />
+                                <Ionicons name="sync" size={48} color="#2E72F0" />
                             </Animated.View>
                             <Text style={styles.noMaterialsTitle}>Loading Materials...</Text>
                             <Text style={styles.noMaterialsDescription}>
@@ -4851,25 +4884,23 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                         flexDirection: 'row',
                                                         alignItems: 'center',
                                                         justifyContent: 'center',
-                                                        backgroundColor: '#3B82F6',
+                                                        backgroundColor: '#2E72F0',
                                                         paddingVertical: 12,
                                                         paddingHorizontal: 24,
                                                         borderRadius: 10,
                                                         gap: 8,
                                                         marginTop: 8,
-                                                        shadowColor: '#3B82F6',
+                                                        shadowColor: '#2E72F0',
                                                         shadowOffset: { width: 0, height: 4 },
                                                         shadowOpacity: 0.3,
                                                         shadowRadius: 8,
                                                         elevation: 4,
                                                     }}
-                                                    onPress={() => {
-                                                        setShowAddSectionModal(true);
-                                                    }}
+                                                    onPress={handleAutoAddSlab}
                                                 >
                                                     <Ionicons name="add-circle" size={20} color="#FFFFFF" />
                                                     <Text style={{ fontSize: 15, fontWeight: '600', color: '#FFFFFF' }}>
-                                                        Add Section
+                                                        Add Slab
                                                     </Text>
                                                 </TouchableOpacity>
                                             </>
@@ -4899,7 +4930,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                     </View>
                                 );
                             }
-                            
+
                             return groupedByDate.map((dateGroup, dateIndex) => (
                                 <View key={dateGroup.date} style={dateGroupStyles.dateGroupContainer}>
                                     {/* Date Header */}
@@ -4973,25 +5004,23 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                             flexDirection: 'row',
                                             alignItems: 'center',
                                             justifyContent: 'center',
-                                            backgroundColor: '#3B82F6',
+                                            backgroundColor: '#2E72F0',
                                             paddingVertical: 12,
                                             paddingHorizontal: 24,
                                             borderRadius: 10,
                                             gap: 8,
                                             marginTop: 8,
-                                            shadowColor: '#3B82F6',
+                                            shadowColor: '#2E72F0',
                                             shadowOffset: { width: 0, height: 4 },
                                             shadowOpacity: 0.3,
                                             shadowRadius: 8,
                                             elevation: 4,
                                         }}
-                                        onPress={() => {
-                                            setShowAddSectionModal(true);
-                                        }}
+                                        onPress={handleAutoAddSlab}
                                     >
                                         <Ionicons name="add-circle" size={20} color="#FFFFFF" />
                                         <Text style={{ fontSize: 15, fontWeight: '600', color: '#FFFFFF' }}>
-                                            Add Section
+                                            Add Slab
                                         </Text>
                                     </TouchableOpacity>
                                 </>
@@ -5021,12 +5050,12 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                             }) || '0deg'
                                         }]
                                     }}>
-                                        <Ionicons name="sync" size={20} color="#3B82F6" />
+                                        <Ionicons name="sync" size={20} color="#2E72F0" />
                                     </Animated.View>
                                     <Text style={paginationStyles.loadingText}>Loading page...</Text>
                                 </View>
                             )}
-                            
+
                             <View style={[paginationStyles.paginationControls, apiLoading && { opacity: 0.5 }]}>
                                 {/* Previous Button */}
                                 <TouchableOpacity
@@ -5038,10 +5067,10 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                     disabled={currentPage === 1 || apiLoading}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons 
-                                        name="chevron-back" 
-                                        size={20} 
-                                        color={(currentPage === 1 || apiLoading) ? '#CBD5E1' : '#3B82F6'} 
+                                    <Ionicons
+                                        name="chevron-back"
+                                        size={20}
+                                        color={(currentPage === 1 || apiLoading) ? '#CBD5E1' : '#2E72F0'}
                                     />
                                     <Text style={[
                                         paginationStyles.paginationButtonText,
@@ -5055,10 +5084,10 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                 <View style={paginationStyles.pageNumbersContainer}>
                                     {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
                                         // Show first page, last page, current page, and pages around current
-                                        const showPage = page === 1 || 
-                                                        page === totalPages || 
-                                                        Math.abs(page - currentPage) <= 1;
-                                        
+                                        const showPage = page === 1 ||
+                                            page === totalPages ||
+                                            Math.abs(page - currentPage) <= 1;
+
                                         if (!showPage && page !== 2 && page !== totalPages - 1) {
                                             // Show ellipsis for gaps
                                             if (page === 2 && currentPage > 4) {
@@ -5117,10 +5146,10 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                     ]}>
                                         Next
                                     </Text>
-                                    <Ionicons 
-                                        name="chevron-forward" 
-                                        size={20} 
-                                        color={(currentPage === totalPages || apiLoading) ? '#CBD5E1' : '#3B82F6'} 
+                                    <Ionicons
+                                        name="chevron-forward"
+                                        size={20}
+                                        color={(currentPage === totalPages || apiLoading) ? '#CBD5E1' : '#2E72F0'}
                                     />
                                 </TouchableOpacity>
                             </View>
@@ -5189,6 +5218,23 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 </PanGestureHandler>
             )}
 
+            {/* Floating "Add Usage" flag — peeks from the right edge, expands briefly then
+                collapses to a small tab; tapping re-activates it and opens the usage form.
+                Anchored at a fixed distance from the bottom, sitting just above the low-stock
+                button (which lives ~100–150px from the bottom-right) so it never moves and
+                both stay visible and tappable. */}
+            <UsageFlagButton
+                disabled={sectionCompleted}
+                bottom={170}
+                onPress={() => {
+                    if (sectionCompleted) {
+                        toast.error('Cannot add material usage to a completed section. Please reopen the section first.');
+                        return;
+                    }
+                    setShowUsageForm(true);
+                }}
+            />
+
             {/* Custom Date Picker Modal */}
             <Modal
                 visible={showCustomDatePicker}
@@ -5205,7 +5251,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                             style={sectionStyles.dateButton}
                             onPress={() => setShowStartPicker(true)}
                         >
-                            <Ionicons name="calendar" size={20} color="#3B82F6" />
+                            <Ionicons name="calendar" size={20} color="#2E72F0" />
                             <Text style={sectionStyles.dateButtonText}>
                                 {customStartDate.toLocaleDateString()}
                             </Text>
@@ -5216,7 +5262,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                             style={sectionStyles.dateButton}
                             onPress={() => setShowEndPicker(true)}
                         >
-                            <Ionicons name="calendar" size={20} color="#3B82F6" />
+                            <Ionicons name="calendar" size={20} color="#2E72F0" />
                             <Text style={sectionStyles.dateButtonText}>
                                 {customEndDate.toLocaleDateString()}
                             </Text>
@@ -5346,9 +5392,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 <View style={sectionStyles.modalOverlay}>
                     <View style={[sectionStyles.modalContent, { maxHeight: '90%', maxWidth: '95%', width: '95%' }]}>
                         {/* Header */}
-                        <View style={{ 
-                            flexDirection: 'row', 
-                            alignItems: 'center', 
+                        <View style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
                             marginBottom: 16,
                             paddingBottom: 12,
                             borderBottomWidth: 1,
@@ -5371,8 +5417,8 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         </View>
 
                         {/* Materials List */}
-                        <ScrollView 
-                            style={{ maxHeight: 500 }} 
+                        <ScrollView
+                            style={{ maxHeight: 500 }}
                             showsVerticalScrollIndicator={false}
                             contentContainerStyle={{ paddingBottom: 8 }}
                         >
@@ -5393,11 +5439,11 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                     {/* Material Header */}
                                     <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 }}>
                                         <View style={[
-                                            styles.iconContainer, 
-                                            { 
-                                                backgroundColor: material.color, 
-                                                width: 36, 
-                                                height: 36, 
+                                            styles.iconContainer,
+                                            {
+                                                backgroundColor: material.color,
+                                                width: 36,
+                                                height: 36,
                                                 marginRight: 12,
                                                 shadowColor: material.color,
                                                 shadowOffset: { width: 0, height: 1 },
@@ -5409,11 +5455,11 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                             <Ionicons name={material.icon} size={18} color="#fff" />
                                         </View>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={{ 
-                                                fontSize: 14, 
-                                                fontWeight: '700', 
-                                                color: '#1E293B', 
-                                                marginBottom: 4 
+                                            <Text style={{
+                                                fontSize: 14,
+                                                fontWeight: '700',
+                                                color: '#1E293B',
+                                                marginBottom: 4
                                             }}>
                                                 {material.name}
                                             </Text>
@@ -5426,8 +5472,8 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                 borderWidth: 1,
                                                 borderColor: material.alertLevel === 'critical' ? '#FECACA' : '#FED7AA',
                                             }}>
-                                                <Text style={{ 
-                                                    fontSize: 10, 
+                                                <Text style={{
+                                                    fontSize: 10,
                                                     fontWeight: '600',
                                                     color: material.alertLevel === 'critical' ? '#DC2626' : '#D97706',
                                                     textTransform: 'uppercase',
@@ -5440,17 +5486,17 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                     </View>
 
                                     {/* Stock Information */}
-                                    <View style={{ 
-                                        backgroundColor: '#F8FAFC', 
-                                        borderRadius: 10, 
-                                        padding: 12, 
-                                        marginBottom: 12 
+                                    <View style={{
+                                        backgroundColor: '#F8FAFC',
+                                        borderRadius: 10,
+                                        padding: 12,
+                                        marginBottom: 12
                                     }}>
                                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
                                             <View style={{ alignItems: 'center', flex: 1 }}>
-                                                <Text style={{ 
-                                                    fontSize: 9, 
-                                                    color: '#64748B', 
+                                                <Text style={{
+                                                    fontSize: 9,
+                                                    color: '#64748B',
                                                     fontWeight: '600',
                                                     textTransform: 'uppercase',
                                                     letterSpacing: 0.3,
@@ -5458,28 +5504,28 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                 }}>
                                                     Total Imported
                                                 </Text>
-                                                <Text style={{ 
-                                                    fontSize: 13, 
-                                                    fontWeight: '700', 
-                                                    color: '#1E293B' 
+                                                <Text style={{
+                                                    fontSize: 13,
+                                                    fontWeight: '700',
+                                                    color: '#1E293B'
                                                 }}>
                                                     {material.totalImported}
                                                 </Text>
-                                                <Text style={{ 
-                                                    fontSize: 10, 
-                                                    color: '#64748B', 
-                                                    fontWeight: '500' 
+                                                <Text style={{
+                                                    fontSize: 10,
+                                                    color: '#64748B',
+                                                    fontWeight: '500'
                                                 }}>
                                                     {material.unit}
                                                 </Text>
                                             </View>
-                                            
+
                                             <View style={{ width: 1, backgroundColor: '#E2E8F0', marginHorizontal: 12 }} />
-                                            
+
                                             <View style={{ alignItems: 'center', flex: 1 }}>
-                                                <Text style={{ 
-                                                    fontSize: 9, 
-                                                    color: '#64748B', 
+                                                <Text style={{
+                                                    fontSize: 9,
+                                                    color: '#64748B',
                                                     fontWeight: '600',
                                                     textTransform: 'uppercase',
                                                     letterSpacing: 0.3,
@@ -5487,17 +5533,17 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                 }}>
                                                     Available Now
                                                 </Text>
-                                                <Text style={{ 
-                                                    fontSize: 13, 
-                                                    fontWeight: '700', 
+                                                <Text style={{
+                                                    fontSize: 13,
+                                                    fontWeight: '700',
                                                     color: material.alertLevel === 'critical' ? '#DC2626' : '#D97706'
                                                 }}>
                                                     {material.currentAvailable}
                                                 </Text>
-                                                <Text style={{ 
-                                                    fontSize: 10, 
-                                                    color: '#64748B', 
-                                                    fontWeight: '500' 
+                                                <Text style={{
+                                                    fontSize: 10,
+                                                    color: '#64748B',
+                                                    fontWeight: '500'
                                                 }}>
                                                     {material.unit}
                                                 </Text>
@@ -5505,10 +5551,10 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                         </View>
 
                                         {/* Enhanced Progress Bar */}
-                                        <View style={{ 
-                                            height: 6, 
-                                            backgroundColor: '#E2E8F0', 
-                                            borderRadius: 3, 
+                                        <View style={{
+                                            height: 6,
+                                            backgroundColor: '#E2E8F0',
+                                            borderRadius: 3,
                                             overflow: 'hidden',
                                             marginBottom: 6
                                         }}>
@@ -5519,15 +5565,15 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                 borderRadius: 3,
                                             }} />
                                         </View>
-                                        
-                                        <Text style={{ 
-                                            fontSize: 11, 
-                                            color: '#64748B', 
+
+                                        <Text style={{
+                                            fontSize: 11,
+                                            color: '#64748B',
                                             textAlign: 'center',
                                             fontWeight: '500',
                                             lineHeight: 14
                                         }}>
-                                            {material.stockPercentage <= 3 
+                                            {material.stockPercentage <= 3
                                                 ? `⚠️ Only ${material.currentAvailable} ${material.unit} left - Restock urgently needed`
                                                 : `${material.stockPercentage.toFixed(1)}% remaining`
                                             }
@@ -5555,10 +5601,10 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                         activeOpacity={0.7}
                                     >
                                         <Ionicons name="eye-off-outline" size={14} color="#64748B" style={{ marginRight: 6 }} />
-                                        <Text style={{ 
-                                            color: '#64748B', 
-                                            fontSize: 12, 
-                                            fontWeight: '600' 
+                                        <Text style={{
+                                            color: '#64748B',
+                                            fontSize: 12,
+                                            fontWeight: '600'
                                         }}>
                                             Don't alert me about this material
                                         </Text>
@@ -5571,12 +5617,12 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
                             <TouchableOpacity
                                 style={{
-                                    backgroundColor: '#3B82F6',
+                                    backgroundColor: '#2E72F0',
                                     paddingVertical: 12,
                                     paddingHorizontal: 20,
                                     borderRadius: 10,
                                     alignItems: 'center',
-                                    shadowColor: '#3B82F6',
+                                    shadowColor: '#2E72F0',
                                     shadowOffset: { width: 0, height: 1 },
                                     shadowOpacity: 0.15,
                                     shadowRadius: 2,
@@ -5585,10 +5631,10 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                 onPress={dismissAlertFor15Hours}
                                 activeOpacity={0.9}
                             >
-                                <Text style={{ 
-                                    color: '#FFFFFF', 
-                                    fontSize: 14, 
-                                    fontWeight: '600' 
+                                <Text style={{
+                                    color: '#FFFFFF',
+                                    fontSize: 14,
+                                    fontWeight: '600'
                                 }}>
                                     Got it
                                 </Text>
@@ -5621,7 +5667,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         </Animated.View>
                         <Text style={loadingStyles.loadingTitle}>Adding Materials</Text>
                         <Text style={loadingStyles.loadingSubtitle}>Please wait while we process your request...</Text>
-                        
+
                         {/* Progress dots animation */}
                         <View style={loadingStyles.dotsContainer}>
                             <Animated.View
@@ -5685,7 +5731,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         </Animated.View>
                         <Text style={loadingStyles.loadingTitle}>Recording Material Usage</Text>
                         <Text style={loadingStyles.loadingSubtitle}>Please wait while we process your request...</Text>
-                        
+
                         {/* Progress dots animation */}
                         <View style={loadingStyles.dotsContainer}>
                             <Animated.View
@@ -5736,16 +5782,16 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 <View style={confirmModalStyles.modalOverlay}>
                     <View style={confirmModalStyles.modalContainer}>
                         <View style={confirmModalStyles.modalHeader}>
-                            <Ionicons 
-                                name={sectionCompleted ? "refresh-circle" : "checkmark-circle"} 
-                                size={48} 
-                                color={sectionCompleted ? "#F59E0B" : "#059669"} 
+                            <Ionicons
+                                name={sectionCompleted ? "refresh-circle" : "checkmark-circle"}
+                                size={48}
+                                color={sectionCompleted ? "#EE730C" : "#059669"}
                             />
                             <Text style={confirmModalStyles.modalTitle}>
                                 {sectionCompleted ? 'Reopen Section?' : 'Complete Section?'}
                             </Text>
                             <Text style={confirmModalStyles.modalMessage}>
-                                {sectionCompleted 
+                                {sectionCompleted
                                     ? `Are you sure you want to reopen "${sectionName}"? This will allow material operations again.`
                                     : `Are you sure you want to mark "${sectionName}" as completed? This will disable material operations.`
                                 }
@@ -5797,197 +5843,197 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             >
                 <GestureHandlerRootView style={{ flex: 1 }}>
                     <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
-                    {/* Header */}
-                    <View style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        paddingHorizontal: 20,
-                        paddingVertical: 16,
-                        backgroundColor: '#FFFFFF',
-                        borderBottomWidth: 1,
-                        borderBottomColor: '#E2E8F0',
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.1,
-                        shadowRadius: 3,
-                        elevation: 3,
-                    }}>
-                        <View style={{ flex: 1 }}>
-                            <Text style={{
-                                fontSize: 18,
-                                fontWeight: '600',
-                                color: '#1F2937',
-                            }}>
-                                Select Mini-Section
-                            </Text>
-                            <Text style={{
-                                fontSize: 14,
-                                color: '#6B7280',
-                                marginTop: 2,
-                            }}>
-                                Swipe left to delete
-                            </Text>
-                        </View>
-                        <TouchableOpacity
-                            onPress={() => setShowSectionModal(false)}
-                            style={{
-                                padding: 8,
-                                borderRadius: 8,
-                                backgroundColor: '#F3F4F6',
-                            }}
-                            activeOpacity={0.7}
-                        >
-                            <Ionicons name="close" size={20} color="#6B7280" />
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* Content */}
-                    <ScrollView
-                        style={{ flex: 1 }}
-                        contentContainerStyle={{
-                            padding: 12,
-                            paddingBottom: 28,
-                        }}
-                        showsVerticalScrollIndicator={false}
-                    >
-                        {/* All Sections Option */}
-                        <TouchableOpacity
-                            style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                paddingHorizontal: 11,
-                                paddingVertical: 9,
-                                backgroundColor: !selectedMiniSection ? '#EFF6FF' : '#FFFFFF',
-                                borderRadius: 9,
-                                borderWidth: !selectedMiniSection ? 2 : 1,
-                                borderColor: !selectedMiniSection ? '#3B82F6' : '#E2E8F0',
-                                marginBottom: 8,
-                                shadowColor: '#000',
-                                shadowOffset: { width: 0, height: 1 },
-                                shadowOpacity: 0.04,
-                                shadowRadius: 1,
-                                elevation: 1,
-                            }}
-                            onPress={() => {
-                                handleSectionSelect('all-sections');
-                            }}
-                            activeOpacity={0.7}
-                        >
-                            <View style={{
-                                width: 28,
-                                height: 28,
-                                borderRadius: 14,
-                                backgroundColor: !selectedMiniSection ? '#3B82F6' : '#F3F4F6',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                marginRight: 8,
-                            }}>
-                                <Ionicons
-                                    name="apps-outline"
-                                    size={14}
-                                    color={!selectedMiniSection ? '#FFFFFF' : '#6B7280'}
-                                />
-                            </View>
+                        {/* Header */}
+                        <View style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            paddingHorizontal: 20,
+                            paddingVertical: 16,
+                            backgroundColor: '#FFFFFF',
+                            borderBottomWidth: 1,
+                            borderBottomColor: '#E2E8F0',
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.1,
+                            shadowRadius: 3,
+                            elevation: 3,
+                        }}>
                             <View style={{ flex: 1 }}>
-                                <Text style={{
-                                    fontSize: 12,
-                                    fontWeight: '600',
-                                    color: !selectedMiniSection ? '#3B82F6' : '#374151',
-                                    marginBottom: 1,
-                                }}>
-                                    All Sections
-                                </Text>
-                                <Text style={{
-                                    fontSize: 10,
-                                    color: '#6B7280',
-                                }}>
-                                    Show materials from all mini-sections
-                                </Text>
-                            </View>
-                            {!selectedMiniSection && (
-                                <Ionicons name="checkmark-circle" size={18} color="#3B82F6" />
-                            )}
-                        </TouchableOpacity>
-
-                        {/* Mini Sections List */}
-                        {(() => {
-                            console.log('\n🎨 ========== RENDERING MINI-SECTIONS ==========');
-                            console.log('   - miniSections.length:', miniSections.length);
-                            console.log('   - miniSections:', miniSections);
-                            if (miniSections.length > 0) {
-                                console.log('   - Mini-section IDs:', miniSections.map(s => s._id));
-                                console.log('   - Mini-section names:', miniSections.map(s => s.name));
-                            }
-                            console.log('🎨 ========== END RENDERING ==========\n');
-                            return null;
-                        })()}
-                        {miniSections.length > 0 && (
-                            <View>
-                                <Text style={{
-                                    fontSize: 12,
-                                    fontWeight: '600',
-                                    color: '#374151',
-                                    marginBottom: 8,
-                                    marginTop: 4,
-                                }}>
-                                    Mini-Sections ({miniSections.length})
-                                </Text>
-
-                                {miniSections.map((section, index) => (
-                                    <SwipeableMiniSection
-                                        key={section._id}
-                                        section={section}
-                                        selectedMiniSection={selectedMiniSection}
-                                        miniSectionCompletions={miniSectionCompletions}
-                                        miniSectionLoadingStates={miniSectionLoadingStates}
-                                        onSectionSelect={(sectionId) => {
-                                            handleSectionSelect(sectionId);
-                                        }}
-                                        onToggleCompletion={toggleMiniSectionCompletionDirect}
-                                        onDelete={handleDeleteSectionWithValidation}
-                                    />
-                                ))}
-                            </View>
-                        )}
-
-                        {/* Empty State */}
-                        {miniSections.length === 0 && (
-                            <View style={{
-                                alignItems: 'center',
-                                paddingVertical: 40,
-                            }}>
-                                <View style={{
-                                    width: 80,
-                                    height: 80,
-                                    borderRadius: 40,
-                                    backgroundColor: '#F3F4F6',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    marginBottom: 16,
-                                }}>
-                                    <Ionicons name="folder-outline" size={32} color="#9CA3AF" />
-                                </View>
                                 <Text style={{
                                     fontSize: 18,
                                     fontWeight: '600',
-                                    color: '#374151',
-                                    marginBottom: 8,
+                                    color: '#1F2937',
                                 }}>
-                                    No Mini-Sections
+                                    Select Mini-Section
                                 </Text>
                                 <Text style={{
                                     fontSize: 14,
                                     color: '#6B7280',
-                                    textAlign: 'center',
-                                    lineHeight: 20,
+                                    marginTop: 2,
                                 }}>
-                                    Create mini-sections to organize{'\n'}your materials better
+                                    Swipe left to delete
                                 </Text>
                             </View>
-                        )}
-                    </ScrollView>
-                </SafeAreaView>
+                            <TouchableOpacity
+                                onPress={() => setShowSectionModal(false)}
+                                style={{
+                                    padding: 8,
+                                    borderRadius: 8,
+                                    backgroundColor: '#F3F4F6',
+                                }}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="close" size={20} color="#6B7280" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Content */}
+                        <ScrollView
+                            style={{ flex: 1 }}
+                            contentContainerStyle={{
+                                padding: 12,
+                                paddingBottom: 28,
+                            }}
+                            showsVerticalScrollIndicator={false}
+                        >
+                            {/* All Sections Option */}
+                            <TouchableOpacity
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    paddingHorizontal: 11,
+                                    paddingVertical: 9,
+                                    backgroundColor: !selectedMiniSection ? '#EAF0FE' : '#FFFFFF',
+                                    borderRadius: 9,
+                                    borderWidth: !selectedMiniSection ? 2 : 1,
+                                    borderColor: !selectedMiniSection ? '#2E72F0' : '#E2E8F0',
+                                    marginBottom: 8,
+                                    shadowColor: '#000',
+                                    shadowOffset: { width: 0, height: 1 },
+                                    shadowOpacity: 0.04,
+                                    shadowRadius: 1,
+                                    elevation: 1,
+                                }}
+                                onPress={() => {
+                                    handleSectionSelect('all-sections');
+                                }}
+                                activeOpacity={0.7}
+                            >
+                                <View style={{
+                                    width: 28,
+                                    height: 28,
+                                    borderRadius: 14,
+                                    backgroundColor: !selectedMiniSection ? '#2E72F0' : '#F3F4F6',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    marginRight: 8,
+                                }}>
+                                    <Ionicons
+                                        name="apps-outline"
+                                        size={14}
+                                        color={!selectedMiniSection ? '#FFFFFF' : '#6B7280'}
+                                    />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{
+                                        fontSize: 12,
+                                        fontWeight: '600',
+                                        color: !selectedMiniSection ? '#2E72F0' : '#374151',
+                                        marginBottom: 1,
+                                    }}>
+                                        All Sections
+                                    </Text>
+                                    <Text style={{
+                                        fontSize: 10,
+                                        color: '#6B7280',
+                                    }}>
+                                        Show materials from all mini-sections
+                                    </Text>
+                                </View>
+                                {!selectedMiniSection && (
+                                    <Ionicons name="checkmark-circle" size={18} color="#2E72F0" />
+                                )}
+                            </TouchableOpacity>
+
+                            {/* Mini Sections List */}
+                            {(() => {
+                                console.log('\n🎨 ========== RENDERING MINI-SECTIONS ==========');
+                                console.log('   - miniSections.length:', miniSections.length);
+                                console.log('   - miniSections:', miniSections);
+                                if (miniSections.length > 0) {
+                                    console.log('   - Mini-section IDs:', miniSections.map(s => s._id));
+                                    console.log('   - Mini-section names:', miniSections.map(s => s.name));
+                                }
+                                console.log('🎨 ========== END RENDERING ==========\n');
+                                return null;
+                            })()}
+                            {miniSections.length > 0 && (
+                                <View>
+                                    <Text style={{
+                                        fontSize: 12,
+                                        fontWeight: '600',
+                                        color: '#374151',
+                                        marginBottom: 8,
+                                        marginTop: 4,
+                                    }}>
+                                        Mini-Sections ({miniSections.length})
+                                    </Text>
+
+                                    {miniSections.map((section, index) => (
+                                        <SwipeableMiniSection
+                                            key={section._id}
+                                            section={section}
+                                            selectedMiniSection={selectedMiniSection}
+                                            miniSectionCompletions={miniSectionCompletions}
+                                            miniSectionLoadingStates={miniSectionLoadingStates}
+                                            onSectionSelect={(sectionId) => {
+                                                handleSectionSelect(sectionId);
+                                            }}
+                                            onToggleCompletion={toggleMiniSectionCompletionDirect}
+                                            onDelete={handleDeleteSectionWithValidation}
+                                        />
+                                    ))}
+                                </View>
+                            )}
+
+                            {/* Empty State */}
+                            {miniSections.length === 0 && (
+                                <View style={{
+                                    alignItems: 'center',
+                                    paddingVertical: 40,
+                                }}>
+                                    <View style={{
+                                        width: 80,
+                                        height: 80,
+                                        borderRadius: 40,
+                                        backgroundColor: '#F3F4F6',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        marginBottom: 16,
+                                    }}>
+                                        <Ionicons name="folder-outline" size={32} color="#9CA3AF" />
+                                    </View>
+                                    <Text style={{
+                                        fontSize: 18,
+                                        fontWeight: '600',
+                                        color: '#374151',
+                                        marginBottom: 8,
+                                    }}>
+                                        No Mini-Sections
+                                    </Text>
+                                    <Text style={{
+                                        fontSize: 14,
+                                        color: '#6B7280',
+                                        textAlign: 'center',
+                                        lineHeight: 20,
+                                    }}>
+                                        Create mini-sections to organize{'\n'}your materials better
+                                    </Text>
+                                </View>
+                            )}
+                        </ScrollView>
+                    </SafeAreaView>
                 </GestureHandlerRootView>
             </Modal>
 
@@ -6015,9 +6061,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                 const miniSec = getActiveMiniSection();
                                 const STATUS_META: Record<string, { label: string; color: string; icon: string }> = {
                                     NOT_STARTED: { label: 'Not Started', color: '#94A3B8', icon: 'ellipse-outline' },
-                                    IN_PROGRESS:  { label: 'In Progress',  color: '#3B82F6', icon: 'time-outline' },
-                                    ON_HOLD:      { label: 'On Hold',      color: '#F59E0B', icon: 'pause-circle-outline' },
-                                    COMPLETED:    { label: 'Completed',    color: '#10B981', icon: 'checkmark-circle-outline' },
+                                    IN_PROGRESS: { label: 'In Progress', color: '#2E72F0', icon: 'time-outline' },
+                                    ON_HOLD: { label: 'On Hold', color: '#F59E0B', icon: 'pause-circle-outline' },
+                                    COMPLETED: { label: 'Completed', color: '#10B981', icon: 'checkmark-circle-outline' },
                                 };
                                 if (!tracker || !tracker.phases || tracker.phases.length === 0) {
                                     return (
@@ -6031,23 +6077,49 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                     );
                                 }
                                 const activePhase = getActivePhaseForMiniSection();
-                                return tracker.phases.map((ph: Phase) => {
-                                    const meta = STATUS_META[ph.status];
-                                    const isActive = miniSec?.activePhaseId === ph._id || (!miniSec?.activePhaseId && ph._id === activePhase?._id);
-                                    return (
-                                        <PhaseListRow
-                                            key={ph._id}
-                                            phase={ph}
-                                            isActive={isActive}
-                                            meta={meta}
-                                            onPress={() => {
-                                                if (isActive) return;
-                                                setShowPhaseSelectorModal(false);
-                                                setPhaseChangeTarget(ph);
-                                            }}
-                                        />
-                                    );
-                                });
+                                const lastPhase = tracker.phases[tracker.phases.length - 1];
+                                const lastCompleted = lastPhase?.status === 'COMPLETED';
+                                const sectionName = miniSec?.name || (tracker as any)?.sectionName || '';
+                                const hasMore = remainingPhases(sectionName, tracker.phases).length > 0;
+                                return (
+                                    <>
+                                        {tracker.phases.map((ph: Phase) => {
+                                            const meta = STATUS_META[ph.status];
+                                            const isActive = miniSec?.activePhaseId === ph._id || (!miniSec?.activePhaseId && ph._id === activePhase?._id);
+                                            return (
+                                                <PhaseListRow
+                                                    key={ph._id}
+                                                    phase={ph}
+                                                    isActive={isActive}
+                                                    meta={meta}
+                                                    onPress={() => {
+                                                        if (isActive) return;
+                                                        setShowPhaseSelectorModal(false);
+                                                        setPhaseChangeTarget(ph);
+                                                    }}
+                                                />
+                                            );
+                                        })}
+                                        {(lastCompleted || hasMore) && (
+                                            <TouchableOpacity
+                                                onPress={() => {
+                                                    setShowPhaseSelectorModal(false);
+                                                    setNextPhaseSuggestion({ completedPhaseName: lastPhase?.name || '' });
+                                                }}
+                                                style={{
+                                                    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                                                    gap: 8, marginTop: 8, paddingVertical: 12,
+                                                    borderRadius: 12, borderWidth: 1.5, borderColor: '#2E72F0',
+                                                    borderStyle: 'dashed', backgroundColor: '#EAF0FE',
+                                                }}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Ionicons name="add-circle-outline" size={18} color="#2E72F0" />
+                                                <Text style={{ fontSize: 14, fontWeight: '700', color: '#2E72F0' }}>Add Next Phase</Text>
+                                            </TouchableOpacity>
+                                        )}
+                                    </>
+                                );
                             })()}
                         </ScrollView>
                     </View>
@@ -6066,9 +6138,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         {phaseChangeTarget && (() => {
                             const STATUS_META: Record<string, { label: string; color: string; icon: string }> = {
                                 NOT_STARTED: { label: 'Not Started', color: '#94A3B8', icon: 'ellipse-outline' },
-                                IN_PROGRESS:  { label: 'In Progress',  color: '#3B82F6', icon: 'time-outline' },
-                                ON_HOLD:      { label: 'On Hold',      color: '#F59E0B', icon: 'pause-circle-outline' },
-                                COMPLETED:    { label: 'Completed',    color: '#10B981', icon: 'checkmark-circle-outline' },
+                                IN_PROGRESS: { label: 'In Progress', color: '#2E72F0', icon: 'time-outline' },
+                                ON_HOLD: { label: 'On Hold', color: '#F59E0B', icon: 'pause-circle-outline' },
+                                COMPLETED: { label: 'Completed', color: '#10B981', icon: 'checkmark-circle-outline' },
                             };
                             // Same rule as handleLinkPhase: only treat the current phase as a deliberate
                             // choice (and thus gate-worthy) if the mini-section has actually been linked.
@@ -6104,13 +6176,13 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                     <View style={{ alignItems: 'center', marginBottom: 14 }}>
                                         <View style={{
                                             width: 56, height: 56, borderRadius: 28,
-                                            backgroundColor: (isBlocked ? '#F59E0B' : targetMeta?.color || '#3B82F6') + '18',
+                                            backgroundColor: (isBlocked ? '#EE730C' : targetMeta?.color || '#2E72F0') + '18',
                                             alignItems: 'center', justifyContent: 'center', marginBottom: 12,
                                         }}>
                                             <Ionicons
                                                 name={isBlocked ? 'alert-circle-outline' : 'swap-horizontal-outline'}
                                                 size={28}
-                                                color={isBlocked ? '#F59E0B' : targetMeta?.color || '#3B82F6'}
+                                                color={isBlocked ? '#EE730C' : targetMeta?.color || '#2E72F0'}
                                             />
                                         </View>
                                         <Text style={{ fontSize: 17, fontWeight: '800', color: '#1E293B' }}>Switch Phase?</Text>
@@ -6130,7 +6202,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                         <Ionicons name="arrow-forward" size={18} color="#CBD5E1" style={{ marginHorizontal: 8 }} />
                                         <View style={{ flex: 1, alignItems: 'center' }}>
                                             <Text style={{ fontSize: 10, color: '#94A3B8', fontWeight: '600', textTransform: 'uppercase' }}>To</Text>
-                                            <Text style={{ fontSize: 13, fontWeight: '700', color: '#3B82F6', marginTop: 2 }} numberOfLines={1}>
+                                            <Text style={{ fontSize: 13, fontWeight: '700', color: '#2E72F0', marginTop: 2 }} numberOfLines={1}>
                                                 {phaseChangeTarget.name}
                                             </Text>
                                         </View>
@@ -6152,7 +6224,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
                                     <SwipeToConfirmBar
                                         label={isBlocked ? 'Slide to switch anyway' : 'Slide to confirm'}
-                                        color={isBlocked ? '#F59E0B' : '#3B82F6'}
+                                        color={isBlocked ? '#EE730C' : '#2E72F0'}
                                         onConfirm={confirmSwitch}
                                     />
                                 </View>
@@ -6175,9 +6247,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         const activePhase = getActivePhaseForMiniSection();
                         const STATUS_META: Record<string, { label: string; color: string; icon: string }> = {
                             NOT_STARTED: { label: 'Not Started', color: '#94A3B8', icon: 'ellipse-outline' },
-                            IN_PROGRESS:  { label: 'In Progress',  color: '#3B82F6', icon: 'time-outline' },
-                            ON_HOLD:      { label: 'On Hold',      color: '#F59E0B', icon: 'pause-circle-outline' },
-                            COMPLETED:    { label: 'Completed',    color: '#10B981', icon: 'checkmark-circle-outline' },
+                            IN_PROGRESS: { label: 'In Progress', color: '#2E72F0', icon: 'time-outline' },
+                            ON_HOLD: { label: 'On Hold', color: '#F59E0B', icon: 'pause-circle-outline' },
+                            COMPLETED: { label: 'Completed', color: '#10B981', icon: 'checkmark-circle-outline' },
                         };
 
                         return (
@@ -6214,32 +6286,72 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                         {nextPhaseSuggestion.completedPhaseName} Completed!
                                     </Text>
                                     <Text style={{ fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 4, marginBottom: 16, lineHeight: 17 }}>
-                                        Great work! Pick the next phase to continue
+                                        Great work! Add the next phase to continue
                                     </Text>
                                 </View>
 
-                                <ScrollView showsVerticalScrollIndicator={false}>
-                                    {!tracker || !tracker.phases || tracker.phases.length === 0 ? (
-                                        <View style={{ alignItems: 'center', paddingVertical: 24 }}>
-                                            <Ionicons name="construct-outline" size={32} color="#CBD5E1" />
-                                            <Text style={{ fontSize: 13, color: '#94A3B8', marginTop: 10, fontWeight: '500' }}>No phases found</Text>
-                                        </View>
-                                    ) : (
-                                        tracker.phases.map((ph: Phase) => {
-                                            const meta = STATUS_META[ph.status];
-                                            const isActive = miniSec?.activePhaseId === ph._id || (!miniSec?.activePhaseId && ph._id === activePhase?._id);
-                                            return (
-                                                <PhaseListRow
-                                                    key={ph._id}
-                                                    phase={ph}
-                                                    isActive={isActive}
-                                                    meta={meta}
-                                                    onPress={() => selectPhaseFromSuggestion(ph._id)}
-                                                />
-                                            );
-                                        })
-                                    )}
-                                </ScrollView>
+                                {/* Predefined remaining phases */}
+                                {(() => {
+                                    const sectionName = miniSec?.name || (tracker as any)?.sectionName || '';
+                                    const remaining = remainingPhases(sectionName, tracker?.phases || []);
+                                    return (
+                                        <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 260 }}>
+                                            {remaining.map((name) => (
+                                                <TouchableOpacity
+                                                    key={name}
+                                                    onPress={() => addPhaseToTracker(name)}
+                                                    style={{
+                                                        flexDirection: 'row', alignItems: 'center', gap: 10,
+                                                        paddingVertical: 12, paddingHorizontal: 14,
+                                                        borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0',
+                                                        backgroundColor: '#F8FAFC', marginBottom: 8,
+                                                    }}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <Ionicons name="add-circle-outline" size={18} color="#2E72F0" />
+                                                    <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: '#1E293B' }}>{name}</Text>
+                                                    <Ionicons name="chevron-forward" size={15} color="#94A3B8" />
+                                                </TouchableOpacity>
+                                            ))}
+                                            {remaining.length === 0 && (
+                                                <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+                                                    <Text style={{ fontSize: 13, color: '#94A3B8', fontWeight: '500' }}>All predefined phases added</Text>
+                                                </View>
+                                            )}
+                                        </ScrollView>
+                                    );
+                                })()}
+
+                                {/* Custom phase input */}
+                                <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 12 }}>
+                                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                                        Custom Phase
+                                    </Text>
+                                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                                        <TextInput
+                                            style={{
+                                                flex: 1, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10,
+                                                paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#1E293B',
+                                                backgroundColor: '#F8FAFC',
+                                            }}
+                                            value={customPhaseName}
+                                            onChangeText={setCustomPhaseName}
+                                            placeholder="e.g. Waterproofing..."
+                                            placeholderTextColor="#94A3B8"
+                                        />
+                                        <TouchableOpacity
+                                            style={{
+                                                backgroundColor: customPhaseName.trim() ? '#2E72F0' : '#E2E8F0',
+                                                paddingHorizontal: 16, borderRadius: 10, justifyContent: 'center',
+                                            }}
+                                            onPress={() => customPhaseName.trim() && addPhaseToTracker(customPhaseName.trim())}
+                                            activeOpacity={0.8}
+                                            disabled={!customPhaseName.trim()}
+                                        >
+                                            <Text style={{ fontSize: 13, fontWeight: '700', color: customPhaseName.trim() ? '#FFFFFF' : '#94A3B8' }}>Add</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
                             </Animated.View>
                         );
                     })()}
@@ -6417,7 +6529,7 @@ const actionStyles = StyleSheet.create({
         gap: 6,
     },
     completionToggleButtonUndo: {
-        backgroundColor: '#F59E0B',
+        backgroundColor: '#EE730C',
     },
     completionToggleButtonText: {
         fontSize: 14,
@@ -6577,7 +6689,7 @@ const sectionStyles = StyleSheet.create({
         paddingVertical: 10,
         paddingHorizontal: 20,
         borderRadius: 8,
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
     },
     modalApplyText: {
         fontSize: 15,
@@ -6637,7 +6749,7 @@ const paginationStyles = StyleSheet.create({
     },
     paginationButtonText: {
         fontSize: 14,
-        color: '#3B82F6',
+        color: '#2E72F0',
         fontWeight: '500',
     },
     paginationButtonTextDisabled: {
@@ -6659,8 +6771,8 @@ const paginationStyles = StyleSheet.create({
         justifyContent: 'center',
     },
     pageNumberButtonActive: {
-        backgroundColor: '#3B82F6',
-        borderColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
+        borderColor: '#2E72F0',
     },
     pageNumberText: {
         fontSize: 14,
@@ -6744,7 +6856,7 @@ const loadingStyles = StyleSheet.create({
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
     },
 });
 
@@ -6850,7 +6962,7 @@ const confirmModalStyles = StyleSheet.create({
         justifyContent: 'center',
     },
     confirmButtonReopen: {
-        backgroundColor: '#F59E0B',
+        backgroundColor: '#EE730C',
     },
     confirmButtonText: {
         fontSize: 16,
@@ -6861,6 +6973,72 @@ const confirmModalStyles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
+    },
+});
+
+const pageBannerStyles = StyleSheet.create({
+    bannerAvailable: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 14,
+        marginHorizontal: 16,
+        marginTop: 14,
+        marginBottom: 4,
+        backgroundColor: '#FAF5FF',
+        borderWidth: 1,
+        borderColor: '#E9D5FF',
+        borderRadius: 14,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+    },
+    bannerUsed: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 14,
+        marginHorizontal: 16,
+        marginTop: 14,
+        marginBottom: 4,
+        backgroundColor: '#FFFBEB',
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+        borderRadius: 14,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+    },
+    iconWrap: {
+        width: 44,
+        height: 44,
+        borderRadius: 11,
+        backgroundColor: '#FFFFFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        flexShrink: 0,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 3,
+        elevation: 2,
+    },
+    bannerEyebrow: {
+        fontSize: 11,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 0.8,
+        marginBottom: 2,
+    },
+    bannerTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#1E293B',
+    },
+    addBtn: {
+        width: 34,
+        height: 34,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
     },
 });
 

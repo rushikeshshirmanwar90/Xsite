@@ -14,6 +14,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -224,8 +225,6 @@ const OtherCostPage = () => {
         onShowSectionPrompt={() => {}}
         hideSection={true}
         hideMenu={true}
-        onAddContractor={() => setShowForm(true)}
-        isAddingContractor={isSubmitting}
       />
 
       {/* Form modal */}
@@ -242,9 +241,30 @@ const OtherCostPage = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
+        {/* Context banner */}
+        <TouchableOpacity
+          style={bannerStyle.banner}
+          activeOpacity={0.75}
+          disabled={isSubmitting}
+          onPress={() => setShowForm(true)}
+        >
+          <View style={bannerStyle.iconWrap}>
+            <Ionicons name="receipt" size={24} color="#E11D48" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={bannerStyle.eyebrow}>Extra Expenses</Text>
+            <Text style={bannerStyle.title}>Other Costs</Text>
+          </View>
+          <View style={bannerStyle.addBtn}>
+            {isSubmitting
+              ? <Ionicons name="sync" size={18} color="#fff" />
+              : <Ionicons name="add" size={20} color="#fff" />}
+          </View>
+        </TouchableOpacity>
+
         {loading ? (
           <View style={styles.emptyContainer}>
-            <Ionicons name="sync" size={48} color="#6366F1" />
+            <Ionicons name="sync" size={48} color="#E11D48" />
             <Text style={styles.emptyTitle}>Loading...</Text>
           </View>
         ) : grouped.length > 0 ? (
@@ -253,7 +273,7 @@ const OtherCostPage = () => {
               {/* Date header */}
               <View style={styles.dateHeader}>
                 <View style={styles.dateHeaderLeft}>
-                  <Ionicons name="receipt-outline" size={14} color="#64748B" />
+                  <Ionicons name="receipt-outline" size={14} color="#E11D48" />
                   <Text style={styles.dateHeaderCount}>
                     {group.entries.length} {group.entries.length === 1 ? 'Entry' : 'Entries'}
                   </Text>
@@ -284,7 +304,7 @@ const OtherCostPage = () => {
           ))
         ) : (
           <View style={styles.emptyContainer}>
-            <Ionicons name="receipt-outline" size={64} color="#CBD5E1" />
+            <Ionicons name="receipt-outline" size={64} color="#FECDD3" />
             <Text style={styles.emptyTitle}>No Other Costs Yet</Text>
             <Text style={styles.emptyDesc}>
               Tap the + button to record transportation, utilities, safety, or any miscellaneous
@@ -304,7 +324,7 @@ const OtherCostPage = () => {
                 marginBottom: 14,
               }}
             >
-              <Ionicons name="receipt" size={44} color="#6366F1" />
+              <Ionicons name="receipt" size={44} color="#E11D48" />
             </Animated.View>
             <Text style={styles.loadingTitle}>Adding Costs...</Text>
           </View>
@@ -424,5 +444,56 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#1E293B',
+  },
+});
+
+const bannerStyle = StyleSheet.create({
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginHorizontal: 16,
+    marginTop: 14,
+    marginBottom: 6,
+    backgroundColor: '#FFF1F2',
+    borderWidth: 1,
+    borderColor: '#FECDD3',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  iconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 11,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#FECDD3',
+    flexShrink: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  eyebrow: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#E11D48',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 2,
+  },
+  title: { fontSize: 15, fontWeight: '700', color: '#1E293B' },
+  addBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#E11D48',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
 });

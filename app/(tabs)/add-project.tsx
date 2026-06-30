@@ -439,76 +439,116 @@ const ProjectScreen: React.FC = () => {
                     console.warn('⚠️ Checked fields: _id, id, projectId');
                 }
 
-                // Handle single building creation if checkbox was checked
-                if (newProject.hasOnlyOneBuilding && projectId) {
-                    console.log('🏢 Creating single building for project...');
-                    
-                    try {
-                        const buildingPayload = {
-                            projectId: projectId,
-                            name: projectName, // Use same name as project
-                            clientId: clientId
-                        };
+                // Handle building creation
+                if (projectId) {
+                    if (newProject.hasOnlyOneBuilding) {
+                        console.log('🏢 Creating single building for project...');
+                        try {
+                            const buildingPayload = {
+                                projectId: projectId,
+                                name: projectName, // Use same name as project
+                                clientId: clientId,
+                                slabsCount: (newProject as any).slabsCount,
+                                hasTerrace: (newProject as any).hasTerrace
+                            };
 
-                        console.log('📤 Building payload:', buildingPayload);
+                            console.log('📤 Building payload:', buildingPayload);
 
-                        const buildingResponse = await apiClient.post(`/api/building`, buildingPayload);
-                        
-                        console.log('✅ Building created successfully:', buildingResponse.data);
+                            const buildingResponse = await apiClient.post(`/api/building`, buildingPayload);
+                            console.log('✅ Building created successfully:', buildingResponse.data);
 
-                        // Verify building was created
-                        if (buildingResponse.status === 200 || buildingResponse.status === 201) {
-                            console.log('✅ Building creation confirmed');
-
-                            // Log building creation activity
-                            if (userInfo) {
-                                try {
-                                    const buildingActivityPayload = {
-                                        user: userInfo,
-                                        clientId,
-                                        projectId,
-                                        projectName,
-                                        activityType: 'section_created',
-                                        category: 'section',
-                                        action: 'create',
-                                        description: `Created building "${projectName}" automatically`,
-                                        message: 'Building created automatically for single-building project',
-                                        date: new Date().toISOString(),
-                                        metadata: {
-                                            sectionType: 'Buildings',
-                                            sectionName: projectName,
-                                            autoCreated: true,
-                                        },
-                                    };
-
-                                    await apiClient.post(`/api/activity`, buildingActivityPayload);
-                                    console.log('✅ Building creation activity logged');
-                                } catch (buildingActivityError: any) {
-                                    console.error('❌ Error logging building creation activity:', buildingActivityError);
+                            if (buildingResponse.status === 200 || buildingResponse.status === 201) {
+                                console.log('✅ Building creation confirmed');
+                                // Log building creation activity
+                                if (userInfo) {
+                                    try {
+                                        const buildingActivityPayload = {
+                                            user: userInfo,
+                                            clientId,
+                                            projectId,
+                                            projectName,
+                                            activityType: 'section_created',
+                                            category: 'section',
+                                            action: 'create',
+                                            description: `Created building "${projectName}" automatically`,
+                                            message: 'Building created automatically for single-building project',
+                                            date: new Date().toISOString(),
+                                            metadata: {
+                                                sectionType: 'Buildings',
+                                                sectionName: projectName,
+                                                autoCreated: true,
+                                            },
+                                        };
+                                        await apiClient.post(`/api/activity`, buildingActivityPayload);
+                                    } catch (err) {
+                                        console.error('❌ Error logging building activity:', err);
+                                    }
                                 }
+                                await new Promise(resolve => setTimeout(resolve, 1000));
+                            } else {
+                                throw new Error(`Building creation failed with status: ${buildingResponse.status}`);
                             }
-
-                            console.log('🏢 Single building created successfully');
-                            
-                            // Add a small delay to ensure database consistency
-                            await new Promise(resolve => setTimeout(resolve, 1000));
-                        } else {
-                            throw new Error(`Building creation failed with status: ${buildingResponse.status}`);
+                        } catch (buildingError: any) {
+                            console.error('❌ Error creating single building:', buildingError);
+                            Alert.alert('Error', 'Failed to create building. Please try creating it manually from the project page.');
+                            await fetchProjectsData(false);
+                            setShowAddModal(false);
+                            return;
                         }
-                    } catch (buildingError: any) {
-                        console.error('❌ Error creating single building:', buildingError);
-                        console.error('❌ Building error response:', buildingError?.response?.data);
-                        console.error('❌ Building error status:', buildingError?.response?.status);
-                        
-                        // Show error and don't navigate if building creation fails
-                        Alert.alert('Error', 'Failed to create building. Please try creating it manually from the project page.');
-                        
-                        // Still refresh the projects list and close modal
-                        console.log('🔄 Refreshing projects list...');
-                        await fetchProjectsData(false);
-                        console.log('✅ Projects list refreshed');
-                        setShowAddModal(false);
-                        return; // Exit early, don't navigate
+                    } else if ((newProject as any).buildings && (newProject as any).buildings.length > 0) {
+                        console.log('🏢 Creating multiple buildings for project...');
+                        try {
+                            const buildingPayload = {
+                                projectId: projectId,
+                                clientId: clientId,
+                                buildings: (newProject as any).buildings
+                            };
+
+                            console.log('📤 Bulk Building payload:', buildingPayload);
+
+                            const buildingResponse = await apiClient.post(`/api/building`, buildingPayload);
+                            console.log('✅ Buildings created successfully:', buildingResponse.data);
+
+                            if (buildingResponse.status === 200 || buildingResponse.status === 201) {
+                                console.log('✅ Buildings creation confirmed');
+                                // Log building creation activity for each building
+                                if (userInfo && Array.isArray(buildingResponse.data?.data)) {
+                                    for (const b of buildingResponse.data.data) {
+                                        try {
+                                            const buildingActivityPayload = {
+                                                user: userInfo,
+                                                clientId,
+                                                projectId,
+                                                projectName,
+                                                activityType: 'section_created',
+                                                category: 'section',
+                                                action: 'create',
+                                                description: `Created building "${b.name}" automatically`,
+                                                message: 'Building created automatically for multiple-building project',
+                                                date: new Date().toISOString(),
+                                                metadata: {
+                                                    sectionType: 'Buildings',
+                                                    sectionName: b.name,
+                                                    autoCreated: true,
+                                                },
+                                            };
+                                            await apiClient.post(`/api/activity`, buildingActivityPayload);
+                                        } catch (err) {
+                                            console.error('❌ Error logging building activity:', err);
+                                        }
+                                    }
+                                }
+                                await new Promise(resolve => setTimeout(resolve, 1000));
+                            } else {
+                                throw new Error(`Buildings creation failed with status: ${buildingResponse.status}`);
+                            }
+                        } catch (buildingError: any) {
+                            console.error('❌ Error creating buildings in bulk:', buildingError);
+                            Alert.alert('Error', 'Failed to create buildings. Please try creating them manually from the project page.');
+                            await fetchProjectsData(false);
+                            setShowAddModal(false);
+                            return;
+                        }
                     }
                 }
 
@@ -522,9 +562,6 @@ const ProjectScreen: React.FC = () => {
                         staffName: userInfo?.fullName || 'Admin',
                         projectName: projectName,
                         details: `Created new project "${projectName}"${newProject.budget ? ` with budget ₹${Number(newProject.budget).toLocaleString('en-IN')}` : ''}`,
-                        performerId: user?._id,
-                        performerRole: user?.role,
-                        recipientType: 'admins',
                         category: 'project',
                         message: newProject.description || undefined,
                     });
@@ -549,59 +586,44 @@ const ProjectScreen: React.FC = () => {
                 // Close modal
                 setShowAddModal(false);
                 
-                // Navigate based on checkbox state
-                if (newProject.hasOnlyOneBuilding) {
-                    // Navigate directly to manage project page for single building projects
-                    console.log('🔄 Navigating to manage project page...');
-                    console.log('   - Project ID:', projectId);
-                    console.log('   - Project Name:', projectName);
-                    console.log('   - Project ID type:', typeof projectId);
-                    console.log('   - Project ID length:', projectId?.length);
-                    console.log('   - Client ID:', clientId);
-                    
-                    // Ensure projectId is a string
-                    const projectIdString = String(projectId);
-                    
-                    Alert.alert('Success', 'Project and building created successfully!', [
-                        {
-                            text: 'OK',
-                            onPress: () => {
-                                console.log('🔄 Starting navigation...');
-                                console.log('   - Using Project ID:', projectIdString);
-                                console.log('   - Using Client ID:', clientId);
-                                
-                                try {
-                                    // Ensure we have both required parameters
-                                    if (!projectIdString || !clientId) {
-                                        console.error('❌ Missing required navigation parameters');
-                                        console.error('   - Project ID:', projectIdString);
-                                        console.error('   - Client ID:', clientId);
-                                        Alert.alert('Error', 'Missing required data for navigation. Please find your project in the list and tap "Add Details".');
-                                        return;
-                                    }
+                // Navigate to manage project page
+                console.log('🔄 Navigating to manage project page...');
+                const projectIdString = String(projectId);
+                const isSingle = newProject.hasOnlyOneBuilding;
+                const successMsg = isSingle 
+                    ? 'Project and building created successfully!' 
+                    : 'Project and buildings created successfully!';
 
-                                    router.push({
-                                        pathname: '/manage_project/[id]',
-                                        params: {
-                                            id: projectIdString,
-                                            name: projectName,
-                                            sectionData: JSON.stringify([]), // Pass empty array to force fresh fetch
-                                            clientId: clientId, // Ensure clientId is passed
-                                            forceRefresh: 'true' // Add flag to indicate fresh data needed
-                                        }
-                                    });
-                                    console.log('✅ Navigation initiated successfully');
-                                } catch (navError) {
-                                    console.error('❌ Navigation error:', navError);
-                                    Alert.alert('Error', 'Failed to navigate to project page. Please find your project in the list and tap "Add Details".');
+                Alert.alert('Success', successMsg, [
+                    {
+                        text: 'OK',
+                        onPress: () => {
+                            console.log('🔄 Starting navigation...');
+                            try {
+                                if (!projectIdString || !clientId) {
+                                    console.error('❌ Missing required navigation parameters');
+                                    Alert.alert('Error', 'Missing required data for navigation. Please find your project in the list and tap "Add Details".');
+                                    return;
                                 }
+
+                                router.push({
+                                    pathname: '/manage_project/[id]',
+                                    params: {
+                                        id: projectIdString,
+                                        name: projectName,
+                                        sectionData: JSON.stringify([]), // Pass empty array to force fresh fetch
+                                        clientId: clientId,
+                                        forceRefresh: 'true'
+                                    }
+                                });
+                                console.log('✅ Navigation initiated successfully');
+                            } catch (navError) {
+                                console.error('❌ Navigation error:', navError);
+                                Alert.alert('Error', 'Failed to navigate to project page. Please find your project in the list and tap "Add Details".');
                             }
                         }
-                    ]);
-                } else {
-                    // Show success message and stay on projects list for multi-section projects
-                    Alert.alert('Success', 'Project added successfully!');
-                }
+                    }
+                ]);
             } else {
                 console.error('Failed to add project: Unexpected response status');
                 Alert.alert('Error', 'Failed to add project. Please try again.');
@@ -906,9 +928,6 @@ const ProjectScreen: React.FC = () => {
                         staffName: userInfo?.fullName || 'Admin',
                         projectName: editProjectName.trim(),
                         details: `Updated project "${editProjectName.trim()}"${changesSummary ? `: ${changesSummary}` : ''}`,
-                        performerId: user?._id,
-                        performerRole: user?.role,
-                        recipientType: 'admins',
                         category: 'project',
                         message: changedData.length > 0 ? `${changedData.length} field${changedData.length > 1 ? 's' : ''} updated` : undefined,
                     });
@@ -1009,9 +1028,6 @@ const ProjectScreen: React.FC = () => {
                         staffName: userInfo?.fullName || 'Admin',
                         projectName: project.name,
                         details: `Deleted project "${project.name}"`,
-                        performerId: user?._id,
-                        performerRole: user?.role,
-                        recipientType: 'admins',
                         category: 'project',
                         message: 'Project and all associated data have been permanently removed',
                     });
@@ -1089,7 +1105,7 @@ const ProjectScreen: React.FC = () => {
                         disabled={addingProject}
                     >
                         <LinearGradient
-                            colors={addingProject ? ['#9CA3AF', '#6B7280'] : ['#3B82F6', '#8B5CF6']}
+                            colors={addingProject ? ['#9CA3AF', '#6B7280'] : ['#2E72F0', '#8B5CF6']}
                             style={styles.addButtonGradient}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
@@ -1131,8 +1147,8 @@ const ProjectScreen: React.FC = () => {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        colors={['#3B82F6']}
-                        tintColor="#3B82F6"
+                        colors={['#2E72F0']}
+                        tintColor="#2E72F0"
                         title="Pull to refresh"
                         titleColor="#64748b"
                     />
@@ -1141,7 +1157,7 @@ const ProjectScreen: React.FC = () => {
                 {loading ? (
                     <View style={styles.centered}>
                         <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                            <Ionicons name="sync" size={48} color="#3B82F6" />
+                            <Ionicons name="sync" size={48} color="#2E72F0" />
                         </View>
                         <Text style={styles.loadingText}>Loading projects...</Text>
                         <Text style={[styles.loadingText, { fontSize: 12, marginTop: 4, color: '#94A3B8' }]}>Please wait...</Text>
@@ -1428,7 +1444,7 @@ const styles = StyleSheet.create({
     addButton: {
         borderRadius: 12,
         overflow: 'hidden',
-        shadowColor: '#3B82F6',
+        shadowColor: '#2E72F0',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 8,
@@ -1652,7 +1668,7 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingVertical: 12,
         borderRadius: 8,
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         alignItems: 'center',
         justifyContent: 'center',
     },

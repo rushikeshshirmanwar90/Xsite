@@ -5,49 +5,174 @@ import { Ionicons } from '@expo/vector-icons';
 import apiClient from '@/utils/axiosConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PDFReportGenerator } from '@/utils/pdfReportGenerator';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Easing,
   LayoutAnimation,
   Modal,
   Platform,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   UIManager,
-  View
+  View,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Enable LayoutAnimation on Android (no-op on the new architecture, harmless otherwise).
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+const OPTION_CONFIG: Record<string, { icon: string; color: string; bg: string; label: string }> = {
+  material:          { icon: 'cube',           color: '#7C3AED', bg: '#FAF5FF', label: 'Material'           },
+  contractor:        { icon: 'people',         color: '#16A34A', bg: '#F0FDF4', label: 'Contractor'         },
+  equipmentCost:     { icon: 'hardware-chip',  color: '#2563EB', bg: '#EAF0FE', label: 'Equipment'          },
+  otherCost:         { icon: 'cash',           color: '#E11D48', bg: '#FFF1F2', label: 'Other'              },
+  report:            { icon: 'bar-chart',      color: '#EE730C', bg: '#FEF0E3', label: 'Cost Report'        },
+};
+
+const MATERIAL_SUB_OPTIONS = [
+  { key: 'available', icon: 'cube-outline',      color: '#7C3AED', bg: '#FAF5FF', label: 'Material Available', desc: 'View all imported materials' },
+  { key: 'used',      icon: 'construct-outline', color: '#D97706', bg: '#FFFBEB', label: 'Material Used',      desc: 'View material consumption' },
+  { key: 'analysis',  icon: 'bar-chart-outline', color: '#2E72F0', bg: '#EAF0FE', label: 'Analysis',           desc: 'Stock levels & cost breakdown PDF' },
+];
+
+const REPORT_SUB_OPTIONS = [
+  { key: 'materialAnalysis', icon: 'cube-outline',         color: '#7C3AED', bg: '#FAF5FF', label: 'Material Analysis Report',  desc: 'Stock levels, costs & usage breakdown' },
+  { key: 'equipmentCost',    icon: 'hardware-chip-outline', color: '#2E72F0', bg: '#EAF0FE', label: 'Equipment Cost Report',      desc: 'Equipment expenses & details' },
+  { key: 'contractor',       icon: 'people-outline',        color: '#16A34A', bg: '#F0FDF4', label: 'Contractor Report',          desc: 'Labour & contractor summary' },
+  { key: 'otherCost',        icon: 'cash-outline',          color: '#E11D48', bg: '#FFF1F2', label: 'Other Cost Report',          desc: 'Miscellaneous expenses' },
+];
+
+// ─── Report Generation Overlay ────────────────────────────────────────────────
+const REPORT_STAGES = [
+  'Collecting data…',
+  'Analyzing records…',
+  'Building layout…',
+  'Finalizing report…',
+];
+
+const ReportGeneratingOverlay: React.FC<{ visible: boolean; label: string }> = ({ visible, label }) => {
+  // Every animation here uses useNativeDriver: true — zero JS thread cost
+  const spinAnim    = useRef(new Animated.Value(0)).current;
+  const pulseAnim   = useRef(new Animated.Value(1)).current;
+  const fadeAnim    = useRef(new Animated.Value(0)).current;
+  const slideAnim   = useRef(new Animated.Value(48)).current;
+  const shimmerAnim = useRef(new Animated.Value(0)).current; // replaces progressAnim
+  const [stageIdx, setStageIdx] = useState(0);
+
+  useEffect(() => {
+    if (!visible) {
+      fadeAnim.setValue(0);
+      slideAnim.setValue(48);
+      shimmerAnim.setValue(0);
+      spinAnim.stopAnimation();    spinAnim.setValue(0);
+      pulseAnim.stopAnimation();   pulseAnim.setValue(1);
+      shimmerAnim.stopAnimation();
+      setStageIdx(0);
+      return;
+    }
+
+    setStageIdx(0);
+
+    // Entrance
+    Animated.parallel([
+      Animated.timing(fadeAnim,  { toValue: 1, duration: 280, useNativeDriver: true }),
+      Animated.spring(slideAnim, { toValue: 0, tension: 70, friction: 10, useNativeDriver: true }),
+    ]).start();
+
+    // Icon spin — native driver
+    const spin = Animated.loop(
+      Animated.timing(spinAnim, { toValue: 1, duration: 1300, easing: Easing.linear, useNativeDriver: true })
+    );
+    spin.start();
+
+    // Ring pulse — native driver
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.1, duration: 750, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1,   duration: 750, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
+    pulse.start();
+
+    // Shimmer slide — native driver (translateX, no JS thread cost unlike width)
+    const shimmer = Animated.loop(
+      Animated.timing(shimmerAnim, { toValue: 1, duration: 1200, easing: Easing.inOut(Easing.ease), useNativeDriver: true })
+    );
+    shimmer.start();
+
+    // Stage text cycling — lightweight setState, not animation
+    const iv = setInterval(() => setStageIdx(s => (s + 1) % REPORT_STAGES.length), 1100);
+
+    return () => { spin.stop(); pulse.stop(); shimmer.stop(); clearInterval(iv); };
+  }, [visible]);
+
+  const rotate       = spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  const shimmerX     = shimmerAnim.interpolate({ inputRange: [0, 1], outputRange: [-180, 280] });
+
+  if (!visible) return null;
+
+  return (
+    <Modal visible transparent animationType="none" statusBarTranslucent>
+      <Animated.View style={[rStyles.backdrop, { opacity: fadeAnim }]}>
+        <Animated.View style={[rStyles.card, { transform: [{ translateY: slideAnim }] }]}>
+
+          {/* Animated icon ring */}
+          <Animated.View style={[rStyles.iconRing, { transform: [{ scale: pulseAnim }] }]}>
+            <Animated.View style={{ transform: [{ rotate }] }}>
+              <Ionicons name="bar-chart" size={40} color="#2E72F0" />
+            </Animated.View>
+            <View style={rStyles.iconOrbitDot} />
+          </Animated.View>
+
+          <Text style={rStyles.title}>Generating Report</Text>
+          <Text style={rStyles.subtitle}>{label}</Text>
+
+          {/* Shimmer track — all native driver, no JS thread cost */}
+          <View style={rStyles.progressTrack}>
+            <View style={rStyles.progressBase} />
+            <Animated.View style={[rStyles.shimmerLine, { transform: [{ translateX: shimmerX }] }]} />
+          </View>
+
+          {/* Stage text */}
+          <Text style={rStyles.stageText}>{REPORT_STAGES[stageIdx]}</Text>
+
+          {/* Step dots */}
+          <View style={rStyles.dotsRow}>
+            {REPORT_STAGES.map((_, i) => (
+              <View key={i} style={[rStyles.dot, stageIdx === i && rStyles.dotActive]} />
+            ))}
+          </View>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+};
+
 const getSectionIcon = (type: string, isCompleted: boolean = false) => {
   if (isCompleted) return 'checkmark-circle';
   switch (type?.toLowerCase()) {
     case 'building':
-    case 'buildings':
-      return 'business';
-    case 'rowhouse':
-      return 'home';
-    default:
-      return 'grid';
+    case 'buildings': return 'business';
+    case 'rowhouse':  return 'home';
+    default:          return 'grid';
   }
 };
-
-const getSectionIconColor = (_type: string, isCompleted: boolean = false) =>
-  isCompleted ? '#059669' : '#0EA5E9';
-
-const getSectionIconBackgroundColor = (_type: string, isCompleted: boolean = false) =>
-  isCompleted ? '#ECFDF5' : '#E0F2FE';
 
 type SectionOption = {
   key: string;
@@ -56,168 +181,201 @@ type SectionOption = {
   onPress: () => void;
 };
 
-// A single FAQ-style accordion row for a project section. The options panel expands /
-// collapses with a smooth LayoutAnimation while the chevron rotates via Animated.
+// ─── Section Accordion Card ────────────────────────────────────────────────────
 const SectionAccordionItem: React.FC<{
   section: ProjectSection;
+  index: number;
   isExpanded: boolean;
   isCompleted: boolean;
   isLoadingCompletion: boolean;
   options: SectionOption[];
   onToggle: () => void;
-}> = ({ section, isExpanded, isCompleted, isLoadingCompletion, options, onToggle }) => {
-  const chevron = useRef(new Animated.Value(isExpanded ? 1 : 0)).current;
+}> = ({ section, index, isExpanded, isCompleted, isLoadingCompletion, options, onToggle }) => {
+  const chevron  = useRef(new Animated.Value(isExpanded ? 1 : 0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.timing(chevron, {
       toValue: isExpanded ? 1 : 0,
-      duration: 220,
+      duration: 260,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [isExpanded, chevron]);
+  }, [isExpanded]);
 
-  const rotate = chevron.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '180deg'],
-  });
+  const handlePress = () => {
+    Animated.sequence([
+      Animated.timing(scaleAnim, { toValue: 0.97, duration: 80, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }),
+    ]).start();
+    onToggle();
+  };
+
+  const rotate = chevron.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
+
+  const statusColor = isCompleted ? '#16A34A' : '#2E72F0';
+  const statusBg    = isCompleted ? '#F0FDF4' : '#EAF0FE';
+  const accentColor = isCompleted ? '#22C55E' : '#2E72F0';
 
   return (
-    <View style={[styles.sectionCard, isExpanded && styles.sectionCardExpanded]}>
+    <Animated.View style={[styles.sectionCard, { transform: [{ scale: scaleAnim }] }]}>
+      {/* Solid accent strip on left — hidden when expanded */}
+      {!isExpanded && (
+        <View style={[styles.sectionAccentStrip, { backgroundColor: accentColor }]} />
+      )}
+
+      {/* Card header */}
       <TouchableOpacity
         style={styles.sectionHeaderRow}
-        activeOpacity={0.7}
-        onPress={onToggle}
+        activeOpacity={0.85}
+        onPress={handlePress}
       >
-        <View style={styles.sectionContent}>
-          <View style={[
-            styles.sectionIconContainer,
-            { backgroundColor: getSectionIconBackgroundColor(section.type, isCompleted) }
-          ]}>
-            {isLoadingCompletion ? (
-              <ActivityIndicator size="small" color="#94A3B8" />
-            ) : (
-              <Ionicons
-                name={getSectionIcon(section.type, isCompleted) as any}
-                size={24}
-                color={getSectionIconColor(section.type, isCompleted)}
-              />
-            )}
-          </View>
-          <View style={styles.sectionInfo}>
-            <Text style={styles.sectionName}>{section.name}</Text>
-            <Text style={styles.sectionHint}>
-              {isExpanded ? 'Tap to collapse' : 'Tap to view details'}
-            </Text>
+        {/* Index badge */}
+        <View style={[styles.indexBadge, { backgroundColor: statusBg }]}>
+          <Text style={[styles.indexBadgeText, { color: statusColor }]}>
+            {String(index + 1).padStart(2, '0')}
+          </Text>
+        </View>
+
+        {/* Icon */}
+        <View style={[styles.sectionIconWrap, { backgroundColor: statusBg }]}>
+          {isLoadingCompletion ? (
+            <ActivityIndicator size="small" color={statusColor} />
+          ) : (
+            <Ionicons
+              name={getSectionIcon(section.type, isCompleted) as any}
+              size={22}
+              color={statusColor}
+            />
+          )}
+        </View>
+
+        {/* Info */}
+        <View style={styles.sectionInfo}>
+          <Text style={styles.sectionName} numberOfLines={1}>{section.name}</Text>
+          <View style={styles.sectionMeta}>
+            <View style={[styles.statusPill, { backgroundColor: statusBg }]}>
+              <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+              <Text style={[styles.statusPillText, { color: statusColor }]}>
+                {isCompleted ? 'Completed' : 'In Progress'}
+              </Text>
+            </View>
           </View>
         </View>
+
+        {/* Chevron */}
         <Animated.View style={[styles.chevronWrap, { transform: [{ rotate }] }]}>
-          <Ionicons name="chevron-down" size={18} color="#0EA5E9" />
+          <View style={styles.chevronCircle}>
+            <Ionicons name="chevron-down" size={16} color="#2E72F0" />
+          </View>
         </Animated.View>
       </TouchableOpacity>
 
+      {/* Expanded options */}
       {isExpanded && (
         <View style={styles.optionsContainer}>
-          {options.map((option, idx) => (
-            <TouchableOpacity
-              key={option.key}
-              style={[styles.optionRow, idx === options.length - 1 && styles.optionRowLast]}
-              activeOpacity={0.7}
-              onPress={option.onPress}
-            >
-              <View style={styles.optionLeft}>
-                <View style={styles.optionIconChip}>
-                  <Ionicons name={option.icon as any} size={16} color="#0EA5E9" />
-                </View>
-                <Text style={styles.optionLabel}>{option.label}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
-            </TouchableOpacity>
-          ))}
+          <View style={styles.optionsDivider} />
+          <View style={styles.optionsGrid}>
+            {options.map((option) => {
+              const cfg = OPTION_CONFIG[option.key] || { icon: 'ellipsis-horizontal', color: '#2E72F0', bg: '#EAF0FE', label: option.label };
+              return (
+                <TouchableOpacity
+                  key={option.key}
+                  style={styles.optionChip}
+                  activeOpacity={0.75}
+                  onPress={option.onPress}
+                >
+                  <View style={[styles.optionChipIcon, { backgroundColor: cfg.bg }]}>
+                    <Ionicons name={cfg.icon as any} size={20} color={cfg.color} />
+                  </View>
+                  <Text style={styles.optionChipLabel}>{cfg.label}</Text>
+                  <Ionicons name="chevron-forward" size={14} color="#CBD5E1" />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
       )}
-    </View>
+    </Animated.View>
   );
 };
 
+// ─── Main Component ────────────────────────────────────────────────────────────
 const ProjectSections = () => {
   const params = useLocalSearchParams();
   const { id, name, sectionData, materialAvailable, materialUsed, contractorId, contractorType, userId } = params;
 
-
-  const [sections, setSections] = useState<ProjectSection[]>([]);
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [sections, setSections]       = useState<ProjectSection[]>([]);
+  const [showAddModal, setShowAddModal]   = useState(false);
   const [newSectionName, setNewSectionName] = useState('');
   const [newSectionType, setNewSectionType] = useState('building');
-  const [isAdding, setIsAdding] = useState(false);
-  const [projectCompleted, setProjectCompleted] = useState(false);
+  const [isAdding, setIsAdding]           = useState(false);
+  const [projectCompleted, setProjectCompleted]   = useState(false);
   const [isUpdatingProjectCompletion, setIsUpdatingProjectCompletion] = useState(false);
   const [sectionCompletions, setSectionCompletions] = useState<{ [key: string]: boolean }>({});
   const [isLoadingSectionCompletions, setIsLoadingSectionCompletions] = useState(false);
   const [generatingStockReport, setGeneratingStockReport] = useState(false);
-  // Tracks which section's FAQ-style options panel is currently expanded (only one at a time).
   const [expandedSectionId, setExpandedSectionId] = useState<string | null>(null);
-  const [resolvedClientId, setResolvedClientId] = useState<string>('');
+  const [resolvedClientId, setResolvedClientId]   = useState<string>('');
+  const [showReportModal, setShowReportModal]         = useState(false);
+  const [reportModalSection, setReportModalSection]   = useState<ProjectSection | null>(null);
+  const [showMaterialModal, setShowMaterialModal]     = useState(false);
+  const [materialModalSection, setMaterialModalSection] = useState<ProjectSection | null>(null);
+  const [contractorList, setContractorList]             = useState<any[]>([]);
+  const [showContractorPicker, setShowContractorPicker] = useState(false);
+  const [selectedForReport, setSelectedForReport]       = useState<Set<string>>(new Set());
+  const [isGeneratingReport, setIsGeneratingReport]     = useState(false);
+  const [reportGenerating, setReportGenerating]   = useState(false);
+  const [reportGeneratingLabel, setReportGeneratingLabel] = useState('');
 
-  // Resolve the current client id once so the Contractor option can pass it along.
+  // FAB pulse
+  const fabPulse = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(fabPulse, { toValue: 1.08, duration: 900, useNativeDriver: true }),
+        Animated.timing(fabPulse, { toValue: 1, duration: 900, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+
   useEffect(() => {
     (async () => {
-      try {
-        const cid = (await getClientId()) || '';
-        setResolvedClientId(cid);
-      } catch {
-        setResolvedClientId('');
-      }
+      try { setResolvedClientId((await getClientId()) || ''); } catch { setResolvedClientId(''); }
     })();
   }, []);
 
-  // Debug state changes
   useEffect(() => {
     console.log('🔍 [DEBUG] projectCompleted state changed to:', projectCompleted);
-    console.log('🔍 [DEBUG] Button should show:', projectCompleted ? 'COMPLETED (green)' : 'COMPLETE (gray)');
-    console.log('🔍 [DEBUG] Button text should be:', `${name} Work ${projectCompleted ? 'Completed' : 'Complete'}`);
   }, [projectCompleted, name]);
 
-  // Debug section completion changes
   useEffect(() => {
     console.log('🔍 [DEBUG] sectionCompletions state changed:', sectionCompletions);
-    console.log('🔍 [DEBUG] Number of sections tracked:', Object.keys(sectionCompletions).length);
-    Object.entries(sectionCompletions).forEach(([sectionId, isCompleted]) => {
-      const section = sections.find(s => (s._id || s.sectionId) === sectionId);
-      const sectionName = section ? section.name : 'Unknown';
-      console.log(`🔍 [DEBUG] - ${sectionName} (${sectionId}): ${isCompleted ? 'COMPLETED ✅' : 'INCOMPLETE ○'}`);
-    });
   }, [sectionCompletions, sections]);
 
   useEffect(() => {
     if (sectionData) {
       const parsedData = JSON.parse(Array.isArray(sectionData) ? sectionData[0] : sectionData);
       setSections(parsedData);
-
-      // If there's only one section and we're on this page, show a helpful message
-      if (parsedData.length === 1) {
-        console.log('Single section detected on sections page - user could have been redirected directly');
-      }
     }
   }, [sectionData]);
 
-  // Fetch section completion status when sections are loaded
   useEffect(() => {
-    if (sections && sections.length > 0 && id) {
-      console.log('🔄 Sections loaded, fetching completion status...');
-      fetchSectionCompletionStatus();
-    }
+    if (sections && sections.length > 0 && id) fetchSectionCompletionStatus();
   }, [sections, id]);
 
   useEffect(() => {
     console.log('Project sections received materials:', {
       materialAvailableCount: materialAvailable ? JSON.parse(Array.isArray(materialAvailable) ? materialAvailable[0] : materialAvailable).length : 0,
-      materialUsedCount: materialUsed ? JSON.parse(Array.isArray(materialUsed) ? materialUsed[0] : materialUsed).length : 0
+      materialUsedCount: materialUsed ? JSON.parse(Array.isArray(materialUsed) ? materialUsed[0] : materialUsed).length : 0,
     });
   }, [materialAvailable, materialUsed]);
 
-  // Navigates to the dedicated materials screen for a section — separate routes for
-  // the available and used views (Material Available / Material Used options).
+  useEffect(() => {
+    if (id) fetchProjectCompletionStatus();
+  }, [id]);
+
+  // ── Navigation helpers ──────────────────────────────────────────────────────
   const goToMaterials = (section: ProjectSection, tab: 'imported' | 'used') => {
     router.push({
       pathname: tab === 'used' ? '../material-used' : '../material-available',
@@ -233,18 +391,13 @@ const ProjectSections = () => {
   };
 
   const goToContractor = (section: ProjectSection) => {
-    // Contractor users coming from index.tsx are routed straight to labor.tsx.
     if (contractorId && contractorType && userId) {
       router.push({
         pathname: '../labor',
         params: {
-          projectId: id as string,
-          projectName: name as string,
-          sectionId: section._id || section.sectionId,
-          sectionName: section.name,
-          contractorId: contractorId as string,
-          contractorType: contractorType as string,
-          userId: userId as string,
+          projectId: id as string, projectName: name as string,
+          sectionId: section._id || section.sectionId, sectionName: section.name,
+          contractorId: contractorId as string, contractorType: contractorType as string, userId: userId as string,
         },
       });
       return;
@@ -252,10 +405,8 @@ const ProjectSections = () => {
     router.push({
       pathname: '../contractor',
       params: {
-        projectId: id as string,
-        projectName: name as string,
-        sectionId: section._id || section.sectionId,
-        sectionName: section.name,
+        projectId: id as string, projectName: name as string,
+        sectionId: section._id || section.sectionId, sectionName: section.name,
         clientId: resolvedClientId,
       },
     });
@@ -265,104 +416,274 @@ const ProjectSections = () => {
     router.push({
       pathname: '../equipment',
       params: {
-        projectId: id as string,
-        projectName: name as string,
-        sectionId: section._id || section.sectionId,
-        sectionName: section.name,
+        projectId: id as string, projectName: name as string,
+        sectionId: section._id || section.sectionId, sectionName: section.name,
       },
     });
   };
 
   const goToOtherCost = () => {
-    // Other Cost applies to the whole project, not a specific section.
-    router.push({
-      pathname: '../other-cost',
-      params: {
-        projectId: id as string,
-        projectName: name as string,
-      },
-    });
+    router.push({ pathname: '../other-cost', params: { projectId: id as string, projectName: name as string } });
   };
 
-  // The 5 segmented options shown as an FAQ-style accordion under each section.
+  const handleReportOption = async (key: string) => {
+    setShowReportModal(false);
+    if (!reportModalSection) return;
+
+    const opt = REPORT_SUB_OPTIONS.find(o => o.key === key);
+    setReportGeneratingLabel(opt?.label ?? 'Report');
+
+    // Give the report sub-options modal time to finish its close animation
+    // before mounting the overlay and starting network requests.
+    await new Promise(r => setTimeout(r, 250));
+    setReportGenerating(true);
+
+    switch (key) {
+      case 'materialAnalysis': {
+        await handleGenerateStockReport();
+        setReportGenerating(false);
+        break;
+      }
+      case 'equipmentCost': {
+        try {
+          const res = await apiClient.get('/api/equipment', {
+            params: {
+              projectId: id as string,
+              projectSectionId: reportModalSection?._id || reportModalSection?.sectionId,
+              status: 'active'
+            }
+          });
+          const equipmentList = res.data?.data || [];
+          if (equipmentList.length === 0) {
+            toast.error('No equipment costs recorded for this section.');
+            setReportGenerating(false);
+            break;
+          }
+          
+          let userName = 'Admin';
+          try {
+            const userDetailsString = await AsyncStorage.getItem('user');
+            if (userDetailsString) {
+              const ud = JSON.parse(userDetailsString);
+              userName = ud.firstName && ud.lastName ? `${ud.firstName} ${ud.lastName}` : ud.firstName || ud.name || ud.username || 'Admin';
+            }
+          } catch {}
+
+          const pdfGen = new PDFReportGenerator({}, { name: userName });
+          const sectionTitle = reportModalSection?.name ? `${name} - ${reportModalSection.name}` : (name as string || 'Project');
+          await pdfGen.generateEquipmentCostReport(equipmentList, sectionTitle);
+        } catch (error: any) {
+          toast.error(error?.message || 'Failed to generate equipment report. Please try again.');
+        } finally {
+          setReportGenerating(false);
+        }
+        break;
+      }
+      case 'otherCost': {
+        try {
+          const res = await apiClient.get('/api/otherCost', {
+            params: {
+              entityType: 'project',
+              entityId: id as string,
+              useStandalone: true,
+            }
+          });
+          const rawEntries = res.data?.data?.otherCostEntries || [];
+          if (rawEntries.length === 0) {
+            toast.error('No other costs recorded for this project.');
+            setReportGenerating(false);
+            break;
+          }
+          
+          let userName = 'Admin';
+          try {
+            const userDetailsString = await AsyncStorage.getItem('user');
+            if (userDetailsString) {
+              const ud = JSON.parse(userDetailsString);
+              userName = ud.firstName && ud.lastName ? `${ud.firstName} ${ud.lastName}` : ud.firstName || ud.name || ud.username || 'Admin';
+            }
+          } catch {}
+
+          const pdfGen = new PDFReportGenerator({}, { name: userName });
+          await pdfGen.generateOtherCostReport(rawEntries, (name as string || 'Project'));
+        } catch (error: any) {
+          toast.error(error?.message || 'Failed to generate other cost report. Please try again.');
+        } finally {
+          setReportGenerating(false);
+        }
+        break;
+      }
+      case 'contractor': {
+        try {
+          // Wait another 300ms after overlay mounts so its entrance animation
+          // finishes on the UI thread before the network call starts.
+          await new Promise(r => setTimeout(r, 300));
+          const res = await apiClient.get('/api/contractor', {
+            params: { projectId: id as string, includeCompleted: true },
+          });
+          setContractorList((res.data as any).data || []);
+        } catch {
+          setContractorList([]);
+        } finally {
+          setReportGenerating(false);
+          setSelectedForReport(new Set());
+          setTimeout(() => setShowContractorPicker(true), 320);
+        }
+        break;
+      }
+    }
+  };
+
+  // ── Contractor picker helpers ────────────────────────────────────────────────
+  const getContractorDisplayName = (c: any) => {
+    const s = c.staffId;
+    if (!s) return 'Contractor';
+    if (typeof s === 'string') return s;
+    return [s.firstName, s.lastName].filter(Boolean).join(' ') || 'Contractor';
+  };
+
+  const allPickerSelected = contractorList.length > 0 && selectedForReport.size === contractorList.length;
+  const toggleSelectAll = () => setSelectedForReport(
+    allPickerSelected ? new Set() : new Set(contractorList.map((c: any) => c._id))
+  );
+  const toggleContractorSelection = (id_: string) => setSelectedForReport(prev => {
+    const next = new Set(prev);
+    next.has(id_) ? next.delete(id_) : next.add(id_);
+    return next;
+  });
+
+  const fmtCurrency = (v: number) => `₹${v.toLocaleString('en-IN')}`;
+  const fmtDateRpt  = (d: string) => {
+    try { return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }); } catch { return d; }
+  };
+
+  const laborRowsHTML = (entries: any[]) => {
+    if (!entries.length) return '';
+    const byDate: Record<string, any[]> = {};
+    entries.forEach(e => { const k = new Date(e.addedAt).toDateString(); (byDate[k] = byDate[k] || []).push(e); });
+    return Object.entries(byDate).sort(([a],[b])=>new Date(a).getTime()-new Date(b).getTime()).map(([date,rows])=>{
+      const dayTotal = rows.reduce((s,r)=>s+r.totalCost,0);
+      return `<tr style="background:#1e293b;"><td colspan="4" style="padding:10px;color:white;font-weight:600;font-size:13px;">📅 ${fmtDateRpt(date)} — Total: ${fmtCurrency(dayTotal)}</td></tr>`
+        +rows.map(r=>`<tr style="background:#f8fafc;"><td style="padding:8px;border:1px solid #e2e8f0;font-size:12px;">${r.type}</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:center;font-size:12px;">${r.count}</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:right;font-size:12px;">${fmtCurrency(r.perLaborCost)}</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:right;font-weight:600;font-size:12px;">${fmtCurrency(r.totalCost)}</td></tr>`).join('');
+    }).join('');
+  };
+
+  const paymentRowsHTML = (payments: any[]) => {
+    if (!payments?.length) return '';
+    const byDate: Record<string, any[]> = {};
+    payments.forEach(p=>{ const k=new Date(p.paymentDate).toDateString();(byDate[k]=byDate[k]||[]).push(p); });
+    return Object.entries(byDate).sort(([a],[b])=>new Date(a).getTime()-new Date(b).getTime()).map(([date,ps])=>{
+      const dayTotal=ps.reduce((s,p)=>s+p.amount,0);
+      return `<tr style="background:#059669;"><td colspan="3" style="padding:10px;color:white;font-weight:600;font-size:13px;">💰 ${fmtDateRpt(date)} — Paid: ${fmtCurrency(dayTotal)}</td></tr>`
+        +ps.map(p=>`<tr style="background:#f0fdf4;"><td style="padding:8px;border:1px solid #e2e8f0;font-size:12px;"><span style="background:#dcfce7;color:#166534;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;">${(p.paymentType||'payment').toUpperCase()}</span></td><td style="padding:8px;border:1px solid #e2e8f0;font-size:12px;">${p.notes||'Payment recorded'}</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:right;font-weight:600;color:#059669;font-size:12px;">${fmtCurrency(p.amount)}</td></tr>`).join('');
+    }).join('');
+  };
+
+  const buildReportHTML = (selected: any[], laborMap: Record<string, any[]>) => {
+    const now = new Date().toLocaleDateString('en-IN', { weekday:'long', day:'2-digit', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' } as any);
+    const totalBudget = selected.reduce((s,c)=>s+(c.totalAmount||0),0);
+    const totalPaid   = selected.reduce((s,c)=>s+(c.totalPaid||0),0);
+    const totalWork   = selected.reduce((s,c)=>s+(c.usedAmount||0),0);
+    const css = `body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:20px;background:#fff;color:#1e293b;line-height:1.4;}table{width:100%;border-collapse:collapse;margin-bottom:16px;background:white;box-shadow:0 1px 3px rgba(0,0,0,0.1);}th{background:#374151;color:white;padding:10px 12px;text-align:left;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;}td{padding:10px;border:1px solid #e2e8f0;font-size:13px;}.no-data{text-align:center;padding:30px;color:#64748b;font-style:italic;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:16px;}.section-title{font-size:15px;font-weight:700;color:#1e293b;margin:20px 0 10px 0;padding:10px 14px;background:#f1f5f9;border-left:4px solid #2E72F0;border-radius:4px;}.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}.summary-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center;}.summary-card h3{margin:0 0 6px 0;font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;}.summary-card p{margin:0;font-size:16px;font-weight:700;color:#1e293b;}.footer{margin-top:40px;padding:16px;background:#f8fafc;border-radius:8px;text-align:center;font-size:12px;color:#64748b;}`;
+    const sections = selected.map(c=>{
+      const staffName = getContractorDisplayName(c);
+      const contractName = c.contractType || 'Contract';
+      const entries = laborMap[c._id] || [];
+      const outstanding = Math.max(0,(c.usedAmount||0)-(c.totalPaid||0));
+      const statusStyle = c.status==='completed'?'background:#dcfce7;color:#166534;':'background:#fef3c7;color:#92400e;';
+      return `<div style="margin-bottom:36px;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+        <div style="background:#2E72F0;padding:16px 20px;color:white;">
+          <div style="font-size:18px;font-weight:700;">${contractName}</div>
+          <div style="font-size:12px;opacity:0.85;margin-top:3px;">${staffName} &nbsp;•&nbsp; <span style="display:inline-block;${statusStyle}padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;text-transform:uppercase;">${c.status||'active'}</span></div>
+        </div>
+        <div style="padding:16px 20px;">
+          <div class="summary-grid"><div class="summary-card"><h3>Budget</h3><p>${fmtCurrency(c.totalAmount||0)}</p></div><div class="summary-card"><h3>Work Done</h3><p>${fmtCurrency(c.usedAmount||0)}</p></div><div class="summary-card"><h3>Paid</h3><p style="color:#059669;">${fmtCurrency(c.totalPaid||0)}</p></div><div class="summary-card"><h3>Outstanding</h3><p style="color:${outstanding>0?'#dc2626':'#059669'};">${fmtCurrency(outstanding)}</p></div></div>
+          <div class="section-title">Work Logs (Day-wise)</div>
+          ${entries.length?`<table><thead><tr><th>Worker Type</th><th style="text-align:center;">Count</th><th style="text-align:right;">Rate</th><th style="text-align:right;">Total</th></tr></thead><tbody>${laborRowsHTML(entries)}</tbody></table>`:'<div class="no-data">No work logs recorded.</div>'}
+          <div class="section-title">Payment History</div>
+          ${(c.payments||[]).length?`<table><thead><tr><th>Type</th><th>Notes</th><th style="text-align:right;">Amount</th></tr></thead><tbody>${paymentRowsHTML(c.payments)}</tbody></table>`:'<div class="no-data">No payments recorded.</div>'}
+        </div></div>`;
+    }).join('');
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Contractor Report</title><style>${css}.main-header{text-align:center;margin-bottom:24px;padding:20px;background:#2E72F0;color:white;border-radius:12px;}.main-header h1{margin:0 0 6px 0;font-size:24px;font-weight:700;}.main-header p{margin:3px 0;font-size:13px;opacity:0.9;}</style></head><body>
+      <div class="main-header"><h1>Contractor Report</h1><p><strong>${name as string}</strong></p><p>${selected.length} Contractor${selected.length!==1?'s':''} selected</p><p>Generated: ${now}</p></div>
+      ${selected.length>1?`<div style="margin-bottom:24px;"><h2 style="font-size:16px;font-weight:700;margin-bottom:12px;">Project Summary</h2><div class="summary-grid"><div class="summary-card"><h3>Total Budget</h3><p>${fmtCurrency(totalBudget)}</p></div><div class="summary-card"><h3>Work Done</h3><p>${fmtCurrency(totalWork)}</p></div><div class="summary-card"><h3>Total Paid</h3><p style="color:#059669;">${fmtCurrency(totalPaid)}</p></div><div class="summary-card"><h3>Contractors</h3><p>${selected.length}</p></div></div></div>`:''}
+      ${sections}
+      <div class="footer"><p><strong>Construction Management System</strong></p><p>Generated: ${new Date().toISOString()}</p></div>
+    </body></html>`;
+  };
+
+  const generateReportDirectly = async () => {
+    const selected = contractorList.filter((c: any) => selectedForReport.has(c._id));
+    if (!selected.length) return;
+    setShowContractorPicker(false);
+    setIsGeneratingReport(true);
+    try {
+      const laborMap: Record<string, any[]> = {};
+      await Promise.allSettled(selected.map(async (c: any) => {
+        const staffId = c.staffId?._id || c.staffId;
+        try {
+          const res = await apiClient.get('/api/labor', { params: { projectId: id as string, addedBy: staffId } });
+          const r = res.data as any;
+          laborMap[c._id] = r.success && r.data ? r.data.laborEntries || [] : [];
+        } catch { laborMap[c._id] = []; }
+      }));
+      const html = buildReportHTML(selected, laborMap);
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (isAvailable) {
+        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: `Contractor Report — ${name as string}`, UTI: 'com.adobe.pdf' });
+      } else {
+        Alert.alert('Report Ready', `PDF saved to: ${uri}`);
+      }
+      setSelectedForReport(new Set());
+    } catch {
+      Alert.alert('Error', 'Failed to generate report. Please try again.');
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
   const getSectionOptions = (section: ProjectSection): SectionOption[] => [
-    { key: 'materialAvailable', label: 'Material Available', icon: 'cube-outline', onPress: () => goToMaterials(section, 'imported') },
-    { key: 'materialUsed', label: 'Material Used', icon: 'construct-outline', onPress: () => goToMaterials(section, 'used') },
-    { key: 'contractor', label: 'Contractor', icon: 'people-outline', onPress: () => goToContractor(section) },
-    { key: 'equipmentCost', label: 'Equipment Cost', icon: 'hammer-outline', onPress: () => goToEquipment(section) },
-    { key: 'otherCost', label: 'Other Cost', icon: 'cash-outline', onPress: () => goToOtherCost() },
+    { key: 'material',      label: 'Material',      icon: 'cube-outline',         onPress: () => { setMaterialModalSection(section); setShowMaterialModal(true); } },
+    { key: 'contractor',    label: 'Contractor',    icon: 'people-outline',       onPress: () => goToContractor(section) },
+    { key: 'equipmentCost', label: 'Equipment', icon: 'hardware-chip-outline', onPress: () => goToEquipment(section) },
+    { key: 'otherCost',     label: 'Other',     icon: 'cash-outline',         onPress: () => goToOtherCost() },
+    { key: 'report',        label: 'Cost Report',   icon: 'bar-chart-outline',    onPress: () => { setReportModalSection(section); setShowReportModal(true); } },
   ];
 
-  // Smoothly animate the open/close of a section's options panel.
   const toggleSection = (sectionKey: string) => {
-    LayoutAnimation.configureNext(LayoutAnimation.create(
-      220,
-      LayoutAnimation.Types.easeInEaseOut,
-      LayoutAnimation.Properties.opacity,
-    ));
+    LayoutAnimation.configureNext(LayoutAnimation.create(240, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
     setExpandedSectionId(prev => (prev === sectionKey ? null : sectionKey));
   };
 
+  // ── Add section ─────────────────────────────────────────────────────────────
   const handleAddSection = async () => {
-    if (!newSectionName.trim()) {
-      toast.error('Please enter a section name');
-      return;
-    }
-
+    if (!newSectionName.trim()) { toast.error('Please enter a section name'); return; }
     setIsAdding(true);
     try {
-      const payload = {
-        projectId: id,
-        name: newSectionName.trim()
-      };
-
-      console.log('Adding section with payload:', payload);
+      const payload = { projectId: id, name: newSectionName.trim() };
       let res;
+      if      (newSectionType === 'building')  res = await apiClient.post(`/api/building`, payload);
+      else if (newSectionType === 'rowhouse')  res = await apiClient.post(`/api/rowHouse`, payload);
+      else                                     res = await apiClient.post(`/api/otherSection`, payload);
 
-      // Use the correct API endpoint based on section type
-      if (newSectionType === 'building') {
-        res = await apiClient.post(`/api/building`, payload);
-      } else if (newSectionType === 'rowhouse') {
-        res = await apiClient.post(`/api/rowHouse`, payload);
-      } else {
-        res = await apiClient.post(`/api/otherSection`, payload);
-      }
-
-      console.log('Section API response:', JSON.stringify(res?.data, null, 2));
-      console.log('Response status:', res?.status);
-
-      // If we get a 200 status, the section was added successfully
       if (res && (res.status === 200 || res.status === 201)) {
-        // Extract the new section data from response
         let newSectionData: any = null;
-        const responseData = res.data as Record<string, any>;
+        const rd = res.data as Record<string, any>;
+        if (rd._id || rd.sectionId)   newSectionData = rd;
+        else if (rd.section)          newSectionData = rd.section;
+        else if (rd.data)             newSectionData = rd.data;
+        else if (rd.building)         newSectionData = rd.building;
+        else if (rd.rowHouse)         newSectionData = rd.rowHouse;
+        else if (rd.otherSection)     newSectionData = rd.otherSection;
 
-        // Try different response structures
-        if (responseData._id || responseData.sectionId) {
-          newSectionData = responseData;
-        } else if (responseData.section) {
-          newSectionData = responseData.section;
-        } else if (responseData.data) {
-          newSectionData = responseData.data;
-        } else if (responseData.building) {
-          newSectionData = responseData.building;
-        } else if (responseData.rowHouse) {
-          newSectionData = responseData.rowHouse;
-        } else if (responseData.otherSection) {
-          newSectionData = responseData.otherSection;
-        }
-
-        // Create a formatted section even if we don't have full data
         const formattedSection: ProjectSection = {
           _id: newSectionData?._id || `temp-${Date.now()}`,
           sectionId: newSectionData?.sectionId || newSectionData?._id || `temp-${Date.now()}`,
           name: newSectionData?.name || newSectionName.trim(),
           type: newSectionType === 'building' ? 'Buildings' : (newSectionType === 'rowhouse' ? 'rowhouse' : 'other'),
-          ...(newSectionData || {})
+          ...(newSectionData || {}),
         };
-
-        console.log('Formatted section to add:', formattedSection);
-
         setSections([...sections, formattedSection]);
         setShowAddModal(false);
         setNewSectionName('');
@@ -372,413 +693,215 @@ const ProjectSections = () => {
         toast.error('Failed to add section');
       }
     } catch (error: any) {
-      console.error('Error adding section:', error);
-      console.error('Error response:', error?.response?.data);
       toast.error(error?.response?.data?.message || 'Failed to add section');
     } finally {
       setIsAdding(false);
     }
   };
 
-  // Function to fetch section completion status for all sections
+  // ── Completion helpers ───────────────────────────────────────────────────────
+  const isValidMongoId = (id: string) => /^[0-9a-fA-F]{24}$/.test(id);
+
   const fetchSectionCompletionStatus = async () => {
-    if (!sections || sections.length === 0 || !id) {
-      console.log('⚠️ No sections or project ID available for completion status fetch');
-      return;
-    }
-
+    if (!sections || sections.length === 0 || !id) return;
     setIsLoadingSectionCompletions(true);
-    console.log('🔍 Fetching completion status for all sections...');
-    console.log('Project ID:', id);
-    console.log('Sections to check:', sections.length);
-
     const completionStates: { [key: string]: boolean } = {};
-
     for (const section of sections) {
       const sectionId = section.sectionId || section._id;
-      if (!sectionId || !isValidMongoId(sectionId)) {
-        console.warn(`⚠️ Invalid section ID for ${section.name}:`, sectionId);
-        completionStates[sectionId] = false;
-        continue;
-      }
-
+      if (!sectionId || !isValidMongoId(sectionId)) { completionStates[sectionId] = false; continue; }
       try {
-        console.log(`📡 Checking completion for section: ${section.name} (${sectionId})`);
-
-        const completionUrl = `${domain}/api/completion?updateType=project-section&id=${sectionId}&projectId=${id}`;
-        const response = await apiClient.get(completionUrl, {
-          timeout: 10000
-        });
-
-        console.log(`📊 ${section.name} completion response:`, response.status, response.data);
-
-        const responseData = response.data as { success?: boolean; data?: { isCompleted?: boolean } };
-        if (responseData.success && responseData.data) {
-          const isCompleted = Boolean(responseData.data.isCompleted);
-          completionStates[sectionId] = isCompleted;
-          console.log(`✅ ${section.name} completion status: ${isCompleted ? 'COMPLETED ✓' : 'INCOMPLETE ○'}`);
-        } else {
-          completionStates[sectionId] = false;
-          console.log(`⚠️ ${section.name} completion status defaulted to false`);
-        }
-      } catch (error: any) {
-        console.log(`❌ ${section.name} completion fetch failed:`, error.message);
-        completionStates[sectionId] = false;
-      }
+        const response = await apiClient.get(
+          `${domain}/api/completion?updateType=project-section&id=${sectionId}&projectId=${id}`,
+          { timeout: 10000 }
+        );
+        const rd = response.data as { success?: boolean; data?: { isCompleted?: boolean } };
+        completionStates[sectionId] = rd.success && rd.data ? Boolean(rd.data.isCompleted) : false;
+      } catch { completionStates[sectionId] = false; }
     }
-
-    console.log('🔄 Updating section completion states:', completionStates);
     setSectionCompletions(completionStates);
     setIsLoadingSectionCompletions(false);
   };
 
-  // Helper function to validate MongoDB ObjectId
-  const isValidMongoId = (id: string) => {
-    return /^[0-9a-fA-F]{24}$/.test(id);
-  };
-
-  // Builds a readable key from a material's specs so entries sharing a name but with
-  // different specs (e.g. different grade/size/brand) are grouped into separate rows.
   const buildSpecsKey = (specs: any) => {
     if (!specs || typeof specs !== 'object' || Object.keys(specs).length === 0) return '';
-    return Object.keys(specs)
-      .sort()
-      .filter(k => specs[k] !== null && specs[k] !== undefined && specs[k] !== '')
-      .map(k => `${k}:${specs[k]}`)
-      .join('|');
+    return Object.keys(specs).sort().filter(k => specs[k] !== null && specs[k] !== undefined && specs[k] !== '').map(k => `${k}:${specs[k]}`).join('|');
   };
 
-  // Fetches the project's full available + used material lists directly from the API
-  // (NOT the materialAvailable/materialUsed route params — those are only populated on
-  // some navigation paths into this screen and are empty on the common ones, e.g. from
-  // the project list), and groups them by name/unit/specs into stock rows. totalImported =
-  // currentlyAvailable + totalUsed, with the actual cost summed from both lists.
   const fetchMaterialStockRows = async () => {
     const clientId = await getClientId();
     const projectId = id as string;
-    if (!clientId || !projectId) {
-      throw new Error('Missing project or client information');
-    }
-
+    if (!clientId || !projectId) throw new Error('Missing project or client information');
     const REPORT_LIMIT = 5000;
-    const buildQueryString = () => {
-      const queryParams = { projectId, clientId, page: 1, limit: REPORT_LIMIT, sortBy: 'createdAt', sortOrder: 'desc' };
-      return Object.entries(queryParams)
-        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
-        .join('&');
-    };
-
-    const [availableResponse, usedResponse] = await Promise.all([
-      apiClient.get(`/api/material?${buildQueryString()}`),
-      apiClient.get(`/api/material-usage?${buildQueryString()}`),
-    ]);
-
-    const availableData = availableResponse.data as any;
-    const usedData = usedResponse.data as any;
-    const availableList = availableData.MaterialAvailable || availableData.materials || [];
+    const qs = Object.entries({ projectId, clientId, page: 1, limit: REPORT_LIMIT, sortBy: 'createdAt', sortOrder: 'desc' })
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join('&');
+    const [avRes, usedRes] = await Promise.all([apiClient.get(`/api/material?${qs}`), apiClient.get(`/api/material-usage?${qs}`)]);
+    const avData   = avRes.data   as any;
+    const usedData = usedRes.data as any;
+    const avList   = avData.MaterialAvailable   || avData.materials   || [];
     const usedList = usedData.MaterialUsed || usedData.materials || [];
-
-    const grouped: { [key: string]: { name: string; unit: string; specs: Record<string, any>; currentlyAvailable: number; totalUsed: number; importedCost: number } } = {};
-
-    const getGroup = (entryName: string, entryUnit: string, entrySpecs: any) => {
-      const key = `${entryName}-${entryUnit}-${buildSpecsKey(entrySpecs)}`;
-      if (!grouped[key]) {
-        grouped[key] = { name: entryName, unit: entryUnit, specs: entrySpecs || {}, currentlyAvailable: 0, totalUsed: 0, importedCost: 0 };
-      }
+    const grouped: { [key: string]: { name: string; unit: string; specs: Record<string, any>; currentlyAvailable: number; totalUsed: number; importedCost: number; purchasers: Set<string> } } = {};
+    const getGroup = (n: string, u: string, s: any) => {
+      const key = `${n}-${u}-${buildSpecsKey(s)}`;
+      if (!grouped[key]) grouped[key] = { name: n, unit: u, specs: s || {}, currentlyAvailable: 0, totalUsed: 0, importedCost: 0, purchasers: new Set() };
       return grouped[key];
     };
-
-    const resolveCost = (m: any, qty: number) => {
-      if (m.totalCost !== undefined && m.totalCost !== null) return Number(m.totalCost);
-      return Number(m.perUnitCost ?? m.cost ?? 0) * qty;
-    };
-
-    availableList.forEach((m: any) => {
-      const qty = Number(m.qnt || 0);
-      const group = getGroup(m.name, m.unit, m.specs);
-      group.currentlyAvailable += qty;
-      group.importedCost += resolveCost(m, qty);
-    });
-
-    usedList.forEach((m: any) => {
-      const qty = Number(m.qnt || 0);
-      const group = getGroup(m.name, m.unit, m.specs);
-      group.totalUsed += qty;
-      group.importedCost += resolveCost(m, qty);
-    });
-
-    return Object.values(grouped).map(group => {
-      const totalImported = group.currentlyAvailable + group.totalUsed;
-      const perUnitCost = totalImported > 0 ? group.importedCost / totalImported : 0;
-      return {
-        name: group.name,
-        specs: group.specs,
-        unit: group.unit,
-        totalImported,
-        totalUsed: group.totalUsed,
-        currentlyAvailable: group.currentlyAvailable,
-        perUnitCost,
-        totalCost: group.importedCost,
-      };
+    const resolveCost = (m: any, qty: number) => m.totalCost !== undefined && m.totalCost !== null ? Number(m.totalCost) : Number(m.perUnitCost ?? m.cost ?? 0) * qty;
+    avList.forEach((m: any)   => { const qty = Number(m.qnt || 0); const g = getGroup(m.name, m.unit, m.specs); g.currentlyAvailable += qty; g.importedCost += resolveCost(m, qty); });
+    usedList.forEach((m: any) => { const qty = Number(m.qnt || 0); const g = getGroup(m.name, m.unit, m.specs); g.totalUsed += qty;          g.importedCost += resolveCost(m, qty); });
+    try {
+      const { domain } = await import('@/lib/domain');
+      const { getAuthHeaders } = await import('@/utils/axiosConfig');
+      const actRes = await fetch(`${domain}/api/materialActivity?projectId=${projectId}&activity=imported&clientId=${clientId}&limit=5000`, { method: 'GET', headers: { ...getAuthHeaders() } });
+      if (actRes.ok) {
+        const actData = await actRes.json();
+        const activities = actData.data?.activities || actData.activities || [];
+        activities.forEach((act: any) => {
+          const userName = act.user?.fullName;
+          if (!userName) return;
+          (act.materials || []).forEach((m: any) => { const key = `${m.name}-${m.unit}-${buildSpecsKey(m.specs)}`; if (grouped[key]) grouped[key].purchasers.add(userName); });
+        });
+      }
+    } catch { /* non-fatal */ }
+    return Object.values(grouped).map(g => {
+      const totalImported = g.currentlyAvailable + g.totalUsed;
+      return { name: g.name, specs: g.specs, unit: g.unit, totalImported, totalUsed: g.totalUsed, currentlyAvailable: g.currentlyAvailable, perUnitCost: totalImported > 0 ? g.importedCost / totalImported : 0, totalCost: g.importedCost, purchasedBy: Array.from(g.purchasers) };
     });
   };
 
-  // Generates a project-wide current material stock report — Sr No, Material Name,
-  // Total Imported (qty + per-unit price + total cost), Total Used, Total Available.
   const handleGenerateStockReport = async () => {
     if (generatingStockReport) return;
     setGeneratingStockReport(true);
     try {
       const rows = await fetchMaterialStockRows();
-
-      if (rows.length === 0) {
-        toast.error('No materials found to generate a stock report');
-        return;
-      }
-
+      if (rows.length === 0) { toast.error('No materials found to generate a stock report'); return; }
       let userName = 'Admin';
       try {
         const userDetailsString = await AsyncStorage.getItem('user');
         if (userDetailsString) {
-          const userData = JSON.parse(userDetailsString);
-          if (userData.firstName && userData.lastName) {
-            userName = `${userData.firstName} ${userData.lastName}`;
-          } else if (userData.firstName) {
-            userName = userData.firstName;
-          } else if (userData.name) {
-            userName = userData.name;
-          } else if (userData.username) {
-            userName = userData.username;
-          }
+          const ud = JSON.parse(userDetailsString);
+          userName = ud.firstName && ud.lastName ? `${ud.firstName} ${ud.lastName}` : ud.firstName || ud.name || ud.username || 'Admin';
         }
-      } catch (error) {
-        console.error('❌ Error getting user data:', error);
-      }
-
-      const pdfGenerator = new PDFReportGenerator({}, { name: userName });
-      await pdfGenerator.generateMaterialStockReport(rows, (name as string) || 'Project');
+      } catch {}
+      const pdfGen = new PDFReportGenerator({}, { name: userName });
+      await pdfGen.generateMaterialStockReport(rows, (name as string) || 'Project');
     } catch (error: any) {
-      console.error('❌ Error generating material stock report:', error);
       toast.error(error?.message || 'Failed to generate stock report. Please try again.');
     } finally {
       setGeneratingStockReport(false);
     }
   };
 
-  // Function to toggle project completion
   const toggleProjectCompletion = async () => {
     if (isUpdatingProjectCompletion) return;
-
-    // Validate project ID first
-    if (!id || !isValidMongoId(id as string)) {
-      toast.error('Invalid project ID. Please refresh the page and try again.');
-      return;
-    }
-
+    if (!id || !isValidMongoId(id as string)) { toast.error('Invalid project ID.'); return; }
     setIsUpdatingProjectCompletion(true);
     try {
-      console.log('🎯 Toggling project completion (from project-sections)...');
-      console.log('Domain:', domain);
-      console.log('Project ID:', id);
-      console.log('Project Name:', name);
-      console.log('API URL:', `${domain}/api/completion`);
-
-      const payload = {
-        updateType: 'project',
-        id: id
-      };
-
-      console.log('Payload:', JSON.stringify(payload, null, 2));
-
-      const response = await apiClient.patch(`/api/completion`, payload, {
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        timeout: 10000 // 10 second timeout
-      });
-
-      console.log('Response status:', response.status);
-      console.log('Response data:', JSON.stringify(response.data, null, 2));
-
-      const responseData = response.data as { success?: boolean; data?: { isCompleted?: boolean }; message?: string };
-      if (responseData.success) {
-        // Use the actual completion status from the API response instead of toggling
-        const newCompletionStatus = responseData.data?.isCompleted;
-        if (typeof newCompletionStatus === 'boolean') {
-          setProjectCompleted(newCompletionStatus);
-          toast.success(responseData.message || `Project ${newCompletionStatus ? 'completed' : 'reopened'} successfully`);
-        } else {
-          // Fallback to toggle logic if API doesn't return the new status
-          setProjectCompleted(!projectCompleted);
-          toast.success(responseData.message || `Project completion updated successfully`);
-        }
-      } else {
-        throw new Error(responseData.message || 'Failed to update project completion');
-      }
+      const response = await apiClient.patch(`/api/completion`, { updateType: 'project', id }, { headers: { 'Content-Type': 'application/json' }, timeout: 10000 });
+      const rd = response.data as { success?: boolean; data?: { isCompleted?: boolean }; message?: string };
+      if (rd.success) {
+        const newStatus = rd.data?.isCompleted;
+        setProjectCompleted(typeof newStatus === 'boolean' ? newStatus : !projectCompleted);
+        toast.success(rd.message || `Project ${newStatus ? 'completed' : 'reopened'} successfully`);
+      } else throw new Error(rd.message || 'Failed to update project completion');
     } catch (error: any) {
-      console.error('❌ Error updating project completion:', error);
-      console.error('Error details:', {
-        message: error?.message,
-        status: error?.response?.status,
-        statusText: error?.response?.statusText,
-        data: error?.response?.data,
-        config: {
-          url: error?.config?.url,
-          method: error?.config?.method,
-          data: error?.config?.data
-        }
-      });
-
-      // Handle specific error cases
-      const errorMessage = error?.response?.data?.message || error?.message || 'Unknown error';
-
-      if (errorMessage.includes('not found')) {
-        toast.error('Project not found. This project may not support completion tracking yet.');
-      } else if (error?.code === 'ECONNABORTED') {
-        toast.error('Request timeout. Please check your connection and try again.');
-      } else if (error?.response?.status === 404) {
-        toast.error('Completion feature not available for this project.');
-      } else {
-        toast.error(`Failed to update project completion: ${errorMessage}`);
-      }
+      const msg = error?.response?.data?.message || error?.message || 'Unknown error';
+      toast.error(`Failed to update project completion: ${msg}`);
     } finally {
       setIsUpdatingProjectCompletion(false);
     }
   };
 
-  // Function to fetch project completion status
   const fetchProjectCompletionStatus = async () => {
-    console.log('🔍 [DEBUG] fetchProjectCompletionStatus called');
-    console.log('🔍 [DEBUG] Project ID from params:', id);
-    console.log('🔍 [DEBUG] Project Name from params:', name);
-
-    // Validate project ID first
-    if (!id || !isValidMongoId(id as string)) {
-      console.warn('⚠️ [DEBUG] Invalid project ID, skipping completion status fetch');
-      console.warn('⚠️ [DEBUG] ID value:', id);
-      console.warn('⚠️ [DEBUG] ID type:', typeof id);
-      setProjectCompleted(false);
-      return;
-    }
-
+    if (!id || !isValidMongoId(id as string)) { setProjectCompleted(false); return; }
     try {
-      console.log('🔍 [DEBUG] Fetching project completion status (from project-sections)...');
-      console.log('🔍 [DEBUG] Domain:', domain);
-      console.log('🔍 [DEBUG] Project ID:', id);
-
-      const projectUrl = `${domain}/api/completion?updateType=project&id=${id}`;
-      console.log('🔍 [DEBUG] Fetching from:', projectUrl);
-
-      const response = await apiClient.get(projectUrl, {
-        timeout: 10000
-      });
-
-      console.log('🔍 [DEBUG] Response status:', response.status);
-      console.log('🔍 [DEBUG] Response data:', JSON.stringify(response.data, null, 2));
-
-      const responseData = response.data as { success?: boolean; data?: { isCompleted?: boolean } };
-      if (responseData.success && responseData.data) {
-        const completionStatus = responseData.data.isCompleted || false;
-        console.log('🔍 [DEBUG] Extracted completion status:', completionStatus);
-        console.log('🔍 [DEBUG] Setting projectCompleted to:', completionStatus);
-
-        setProjectCompleted(completionStatus);
-
-        console.log('✅ [DEBUG] Project completion status set to:', completionStatus);
-        console.log('✅ [DEBUG] UI should now show:', completionStatus ? 'COMPLETED (green)' : 'COMPLETE BUTTON (gray)');
-      } else {
-        console.log('⚠️ [DEBUG] Project completion status not found in response');
-        console.log('⚠️ [DEBUG] Response structure:', {
-          success: responseData.success,
-          hasData: !!responseData.data,
-          dataKeys: responseData.data ? Object.keys(responseData.data) : 'no data'
-        });
-        setProjectCompleted(false);
-      }
-    } catch (error: any) {
-      console.log('❌ [DEBUG] Project completion status fetch failed:', error?.response?.data || error.message);
-      console.log('❌ [DEBUG] Error details:', {
-        status: error?.response?.status,
-        statusText: error?.response?.statusText,
-        url: error?.config?.url,
-        method: error?.config?.method
-      });
-
-      // Handle specific error cases gracefully
-      if (error?.response?.status === 404) {
-        console.log('ℹ️ [DEBUG] Project completion status not available yet (404) - defaulting to false');
-      } else if (error?.code === 'ECONNABORTED') {
-        console.log('⏰ [DEBUG] Request timeout - defaulting to false');
-      }
-
-      setProjectCompleted(false);
-    }
+      const response = await apiClient.get(`${domain}/api/completion?updateType=project&id=${id}`, { timeout: 10000 });
+      const rd = response.data as { success?: boolean; data?: { isCompleted?: boolean } };
+      setProjectCompleted(rd.success && rd.data ? Boolean(rd.data.isCompleted) : false);
+    } catch { setProjectCompleted(false); }
   };
 
-  // Fetch completion status when component mounts
-  useEffect(() => {
-    console.log('🔍 [DEBUG] useEffect triggered for fetchProjectCompletionStatus');
-    console.log('🔍 [DEBUG] Project ID dependency:', id);
-    console.log('🔍 [DEBUG] Project Name dependency:', name);
+  const completedCount = Object.values(sectionCompletions).filter(Boolean).length;
+  const totalCount     = sections.length;
+  const progressPct    = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
-    if (id) {
-      console.log('🔍 [DEBUG] Calling fetchProjectCompletionStatus...');
-      fetchProjectCompletionStatus();
-    } else {
-      console.warn('⚠️ [DEBUG] No project ID available, skipping fetchProjectCompletionStatus');
-    }
-  }, [id]);
-
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
+    <View style={styles.root}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      {/* ── Header (white, flat) ────────────────────────────────────────────── */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={styles.backButton}
-          >
-            <Ionicons name="arrow-back" size={24} color="#0EA5E9" />
-          </TouchableOpacity>
-          <View>
-            <Text style={styles.projectName}>{name}</Text>
-            <Text style={styles.projectSubtitle}>Project Sections</Text>
-          </View>
-        </View>
+        <SafeAreaView edges={['top']}>
+          <View style={styles.headerInner}>
+            {/* Back */}
+            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.8}>
+              <Ionicons name="arrow-back" size={22} color="#475569" />
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={handleGenerateStockReport}
-          style={styles.stockReportButton}
-          disabled={generatingStockReport}
-          activeOpacity={0.7}
-        >
-          {generatingStockReport ? (
-            <ActivityIndicator size="small" color="#0EA5E9" />
-          ) : (
-            <Ionicons name="stats-chart-outline" size={20} color="#0EA5E9" />
+            {/* Title block */}
+            <View style={styles.headerCenter}>
+              <Text style={styles.headerProjectName} numberOfLines={1}>{name}</Text>
+              <Text style={styles.headerSubtitle}>Project Sections</Text>
+            </View>
+
+            {/* Stock report */}
+            <TouchableOpacity onPress={handleGenerateStockReport} style={styles.reportBtn} disabled={generatingStockReport} activeOpacity={0.8}>
+              {generatingStockReport
+                ? <ActivityIndicator size="small" color="#2E72F0" />
+                : <Ionicons name="stats-chart" size={20} color="#2E72F0" />}
+            </TouchableOpacity>
+          </View>
+
+          {/* Progress Bar */}
+          {totalCount > 0 && (
+            <View style={styles.progressBlock}>
+              <View style={styles.progressLabelRow}>
+                <Text style={styles.progressLabel}>{completedCount} of {totalCount} sections completed</Text>
+                <Text style={styles.progressPct}>{Math.round(progressPct)}%</Text>
+              </View>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
+              </View>
+            </View>
           )}
-        </TouchableOpacity>
+        </SafeAreaView>
       </View>
 
-      {/* Sections List */}
+      {/* ── Section List ─────────────────────────────────────────────────────── */}
       <ScrollView
-        style={styles.scrollContainer}
+        style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Summary pills */}
+        {totalCount > 0 && (
+          <View style={styles.summaryRow}>
+            <View style={[styles.summaryPill, { backgroundColor: '#EAF0FE' }]}>
+              <Ionicons name="layers" size={14} color="#2E72F0" />
+              <Text style={[styles.summaryPillText, { color: '#2E72F0' }]}>{totalCount} Sections</Text>
+            </View>
+            <View style={[styles.summaryPill, { backgroundColor: '#F0FDF4' }]}>
+              <Ionicons name="checkmark-circle" size={14} color="#16A34A" />
+              <Text style={[styles.summaryPillText, { color: '#16A34A' }]}>{completedCount} Done</Text>
+            </View>
+            <View style={[styles.summaryPill, { backgroundColor: '#FFFBEB' }]}>
+              <Ionicons name="time" size={14} color="#D97706" />
+              <Text style={[styles.summaryPillText, { color: '#D97706' }]}>{totalCount - completedCount} Pending</Text>
+            </View>
+          </View>
+        )}
+
         {sections && sections.length > 0 ? (
           sections.map((section, index) => {
-            const sectionId = section.sectionId || section._id;
+            const sectionId  = section.sectionId || section._id;
             const isCompleted = sectionCompletions[sectionId] || false;
-            const isLoadingCompletion = isLoadingSectionCompletions && !sectionCompletions.hasOwnProperty(sectionId);
-
+            const isLoadingCompletion = isLoadingSectionCompletions && !Object.prototype.hasOwnProperty.call(sectionCompletions, sectionId);
             const sectionKey = sectionId || String(index);
             const isExpanded = expandedSectionId === sectionKey;
-
             return (
               <SectionAccordionItem
                 key={section._id || index}
                 section={section}
+                index={index}
                 isExpanded={isExpanded}
                 isCompleted={isCompleted}
                 isLoadingCompletion={isLoadingCompletion}
@@ -788,487 +911,629 @@ const ProjectSections = () => {
             );
           })
         ) : (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="folder-open-outline" size={64} color="#CBD5E1" />
-            <Text style={styles.emptyTitle}>No Sections Found</Text>
+          /* Empty state */
+          <View style={styles.emptyState}>
+            <View style={styles.emptyIconWrap}>
+              <Ionicons name="folder-open" size={48} color="#2E72F0" />
+            </View>
+            <Text style={styles.emptyTitle}>No Sections Yet</Text>
             <Text style={styles.emptySubtitle}>
-              This project doesn't have any sections yet. Sections help organize your project materials and work areas.
+              Add your first section to start organizing this project's materials and work areas.
             </Text>
-            <TouchableOpacity
-              style={styles.addSectionButton}
-              onPress={() => setShowAddModal(true)}
-            >
-              <Ionicons name="add-circle" size={20} color="#FFFFFF" />
-              <Text style={styles.addSectionButtonText}>Add Project Section</Text>
+            <TouchableOpacity style={styles.emptyAddBtn} onPress={() => setShowAddModal(true)} activeOpacity={0.85}>
+              <View style={styles.emptyAddBtnInner}>
+                <Ionicons name="add-circle" size={20} color="#FFFFFF" />
+                <Text style={styles.emptyAddBtnText}>Add First Section</Text>
+              </View>
             </TouchableOpacity>
           </View>
         )}
+
+
+
+        <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Add Section Modal */}
+      {/* ── FAB ──────────────────────────────────────────────────────────────── */}
+      {sections.length > 0 && (
+        <Animated.View style={[styles.fab, { transform: [{ scale: fabPulse }] }]}>
+          <TouchableOpacity onPress={() => setShowAddModal(true)} activeOpacity={0.85} style={styles.fabInner}>
+            <View style={styles.fabSolid}>
+              <Ionicons name="add" size={28} color="#FFFFFF" />
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
+      {/* Animated report generation overlay */}
+      <ReportGeneratingOverlay visible={reportGenerating} label={reportGeneratingLabel} />
+
+      {/* Contractor Picker Modal — checkbox multi-select */}
       <Modal
-        visible={showAddModal}
+        visible={showContractorPicker}
         animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowAddModal(false)}
+        transparent
+        onRequestClose={() => { setShowContractorPicker(false); setSelectedForReport(new Set()); }}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            {/* Modal Header */}
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add New Section</Text>
-              <TouchableOpacity
-                onPress={() => setShowAddModal(false)}
-                style={styles.closeButton}
-              >
-                <Ionicons name="close" size={24} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Section Name Input */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Section Name *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g., Tower 1, Building A, Floor 2"
-                placeholderTextColor="#94A3B8"
-                value={newSectionName}
-                onChangeText={setNewSectionName}
-                autoFocus
-              />
-            </View>
-
-            {/* Section Type Selector */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Section Type</Text>
-              <View style={styles.typeSelector}>
-                <TouchableOpacity
-                  style={[
-                    styles.typeOption,
-                    newSectionType === 'building' && styles.typeOptionActive
-                  ]}
-                  onPress={() => setNewSectionType('building')}
-                >
-                  <Ionicons
-                    name="business"
-                    size={20}
-                    color={newSectionType === 'building' ? '#3B82F6' : '#64748B'}
-                  />
-                  <Text
-                    style={[
-                      styles.typeOptionText,
-                      newSectionType === 'building' && styles.typeOptionTextActive
-                    ]}
-                  >
-                    Building
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.typeOption,
-                    newSectionType === 'rowhouse' && styles.typeOptionActive
-                  ]}
-                  onPress={() => setNewSectionType('rowhouse')}
-                >
-                  <Ionicons
-                    name="home"
-                    size={20}
-                    color={newSectionType === 'rowhouse' ? '#3B82F6' : '#64748B'}
-                  />
-                  <Text
-                    style={[
-                      styles.typeOptionText,
-                      newSectionType === 'rowhouse' && styles.typeOptionTextActive
-                    ]}
-                  >
-                    Rowhouse
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.typeOption,
-                    newSectionType === 'other' && styles.typeOptionActive
-                  ]}
-                  onPress={() => setNewSectionType('other')}
-                >
-                  <Ionicons
-                    name="grid"
-                    size={20}
-                    color={newSectionType === 'other' ? '#3B82F6' : '#64748B'}
-                  />
-                  <Text
-                    style={[
-                      styles.typeOptionText,
-                      newSectionType === 'other' && styles.typeOptionTextActive
-                    ]}
-                  >
-                    Other
-                  </Text>
-                </TouchableOpacity>
+        <View style={pickerStyles.overlay}>
+          <View style={pickerStyles.sheet}>
+            <View style={pickerStyles.handle} />
+            <View style={pickerStyles.header}>
+              <View>
+                <Text style={pickerStyles.title}>Select Contractors</Text>
+                <Text style={pickerStyles.subtitle}>
+                  {selectedForReport.size === 0 ? 'Tap to select' : `${selectedForReport.size} selected`}
+                </Text>
               </View>
+              <TouchableOpacity style={pickerStyles.closeBtn} onPress={() => { setShowContractorPicker(false); setSelectedForReport(new Set()); }}>
+                <Ionicons name="close" size={22} color="#64748B" />
+              </TouchableOpacity>
             </View>
 
-            {/* Action Buttons */}
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => setShowAddModal(false)}
-                disabled={isAdding}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
+            <TouchableOpacity style={pickerStyles.selectAllRow} activeOpacity={0.7} onPress={toggleSelectAll}>
+              <View style={[pickerStyles.checkbox, allPickerSelected && pickerStyles.checkboxChecked]}>
+                {allPickerSelected && <Ionicons name="checkmark" size={14} color="#fff" />}
+              </View>
+              <Text style={pickerStyles.selectAllText}>Select All ({contractorList.length})</Text>
+            </TouchableOpacity>
 
+            <View style={pickerStyles.dividerLine} />
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
+              {contractorList.map((c: any) => {
+                const staffName = getContractorDisplayName(c);
+                const contractName = c.contractType || 'Contract';
+                const checked = selectedForReport.has(c._id);
+                const done = c.status === 'completed';
+                const outstanding = Math.max(0, (c.usedAmount || 0) - (c.totalPaid || 0));
+                return (
+                  <TouchableOpacity
+                    key={c._id}
+                    style={[pickerStyles.contractorRow, checked && pickerStyles.contractorRowSelected]}
+                    activeOpacity={0.75}
+                    onPress={() => toggleContractorSelection(c._id)}
+                  >
+                    <View style={[pickerStyles.checkbox, checked && pickerStyles.checkboxChecked]}>
+                      {checked && <Ionicons name="checkmark" size={14} color="#fff" />}
+                    </View>
+                    <View style={pickerStyles.avatar}>
+                      <Text style={pickerStyles.avatarText}>{contractName.charAt(0).toUpperCase()}</Text>
+                    </View>
+                    <View style={pickerStyles.cardText}>
+                      <View style={pickerStyles.nameRow}>
+                        <Text style={pickerStyles.contractorName} numberOfLines={1}>{contractName}</Text>
+                        <View style={[pickerStyles.statusPill, done ? pickerStyles.statusDone : pickerStyles.statusActive]}>
+                          <Text style={[pickerStyles.statusPillText, done ? pickerStyles.statusDoneText : pickerStyles.statusActiveText]}>
+                            {done ? 'DONE' : 'ACTIVE'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={pickerStyles.contractorMeta}>
+                        {staffName} · {fmtCurrency(c.totalAmount || 0)} budget
+                        {outstanding > 0 ? ` · ${fmtCurrency(outstanding)} due` : ' · Settled'}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+              <View style={{ height: 16 }} />
+            </ScrollView>
+
+            <View style={pickerStyles.footer}>
               <TouchableOpacity
-                style={[styles.addButton, isAdding && styles.addButtonDisabled]}
-                onPress={handleAddSection}
-                disabled={isAdding}
+                style={[pickerStyles.generateBtn, selectedForReport.size === 0 && pickerStyles.generateBtnDisabled]}
+                activeOpacity={0.85}
+                disabled={selectedForReport.size === 0}
+                onPress={generateReportDirectly}
               >
-                {isAdding ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Ionicons name="add-circle" size={20} color="#FFFFFF" />
-                    <Text style={styles.addButtonText}>Add Section</Text>
-                  </>
-                )}
+                <Ionicons name="document-text" size={18} color="#fff" />
+                <Text style={pickerStyles.generateBtnText}>
+                  Generate PDF{selectedForReport.size > 0 ? ` (${selectedForReport.size})` : ''}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+
+      {/* Report generating overlay */}
+      {isGeneratingReport && (
+        <View style={pickerStyles.generatingOverlay}>
+          <View style={pickerStyles.generatingCard}>
+            <Ionicons name="document-text" size={40} color="#2E72F0" />
+            <Text style={pickerStyles.generatingTitle}>Generating PDF...</Text>
+            <Text style={pickerStyles.generatingSubtitle}>Fetching work logs & building report</Text>
+          </View>
+        </View>
+      )}
+
+      {/* ── Material Sub-Options Modal ───────────────────────────────────────── */}
+      <Modal visible={showMaterialModal} animationType="slide" transparent onRequestClose={() => setShowMaterialModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Material</Text>
+                <Text style={styles.modalSubtitle}>Select an option to view or analyse</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowMaterialModal(false)} style={styles.modalCloseBtn}>
+                <Ionicons name="close" size={22} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.reportOptionsGrid}>
+              {MATERIAL_SUB_OPTIONS.map(opt => (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={styles.reportOptionCard}
+                  activeOpacity={0.75}
+                  onPress={() => {
+                    setShowMaterialModal(false);
+                    if (opt.key === 'available') {
+                      materialModalSection && goToMaterials(materialModalSection, 'imported');
+                    } else if (opt.key === 'used') {
+                      materialModalSection && goToMaterials(materialModalSection, 'used');
+                    } else if (opt.key === 'analysis') {
+                      if (materialModalSection) {
+                        setShowMaterialModal(false);
+                        router.push({
+                          pathname: '../analytics/mini-sections-analytics',
+                          params: {
+                            projectId: id as string,
+                            projectName: name as string,
+                            sectionId: materialModalSection._id || materialModalSection.sectionId,
+                            sectionName: materialModalSection.name,
+                            materialUsed: materialUsed as string,
+                            materialAvailable: materialAvailable as string,
+                          },
+                        });
+                      }
+                    }
+                  }}
+                >
+                  <View style={[styles.reportOptionIcon, { backgroundColor: opt.bg }]}>
+                    <Ionicons name={opt.icon as any} size={24} color={opt.color} />
+                  </View>
+                  <View style={styles.reportOptionText}>
+                    <Text style={styles.reportOptionLabel}>{opt.label}</Text>
+                    <Text style={styles.reportOptionDesc}>{opt.desc}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Report Sub-Options Modal ─────────────────────────────────────────── */}
+      <Modal visible={showReportModal} animationType="slide" transparent onRequestClose={() => setShowReportModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Generate Report</Text>
+                <Text style={styles.modalSubtitle}>Select a report type to generate</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowReportModal(false)} style={styles.modalCloseBtn}>
+                <Ionicons name="close" size={22} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.reportOptionsGrid}>
+              {REPORT_SUB_OPTIONS.map(opt => (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={styles.reportOptionCard}
+                  activeOpacity={0.75}
+                  onPress={() => handleReportOption(opt.key)}
+                >
+                  <View style={[styles.reportOptionIcon, { backgroundColor: opt.bg }]}>
+                    <Ionicons name={opt.icon as any} size={24} color={opt.color} />
+                  </View>
+                  <View style={styles.reportOptionText}>
+                    <Text style={styles.reportOptionLabel}>{opt.label}</Text>
+                    <Text style={styles.reportOptionDesc}>{opt.desc}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Add Section Modal ─────────────────────────────────────────────────── */}
+      <Modal visible={showAddModal} animationType="slide" transparent onRequestClose={() => setShowAddModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            {/* Modal handle */}
+            <View style={styles.modalHandle} />
+
+            {/* Modal header */}
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Add New Section</Text>
+                <Text style={styles.modalSubtitle}>Organize your project into sections</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowAddModal(false)} style={styles.modalCloseBtn}>
+                <Ionicons name="close" size={22} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Name input */}
+            <View style={styles.modalInputGroup}>
+              <Text style={styles.modalInputLabel}>Section Name <Text style={{ color: '#EF4444' }}>*</Text></Text>
+              <View style={styles.modalInputWrap}>
+                <Ionicons name="bookmark-outline" size={18} color="#2E72F0" style={{ marginRight: 10 }} />
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="e.g., Tower A, Building 1, Wing B"
+                  placeholderTextColor="#94A3B8"
+                  value={newSectionName}
+                  onChangeText={setNewSectionName}
+                  autoFocus
+                />
+              </View>
+            </View>
+
+            {/* Type selector */}
+            <View style={styles.modalInputGroup}>
+              <Text style={styles.modalInputLabel}>Section Type</Text>
+              <View style={styles.typeRow}>
+                {[
+                  { key: 'building',  label: 'Building',  icon: 'business'  },
+                  { key: 'other',     label: 'Other',     icon: 'grid'      },
+                ].map(t => (
+                  <TouchableOpacity
+                    key={t.key}
+                    style={[styles.typeChip, newSectionType === t.key && styles.typeChipActive]}
+                    onPress={() => setNewSectionType(t.key)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name={t.icon as any} size={18} color={newSectionType === t.key ? '#2E72F0' : '#64748B'} />
+                    <Text style={[styles.typeChipText, newSectionType === t.key && styles.typeChipTextActive]}>
+                      {t.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Actions */}
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowAddModal(false)} disabled={isAdding}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalAddBtn, isAdding && { opacity: 0.6 }]} onPress={handleAddSection} disabled={isAdding}>
+                <View style={styles.modalAddBtnInner}>
+                  {isAdding
+                    ? <ActivityIndicator size="small" color="#FFFFFF" />
+                    : <><Ionicons name="add-circle" size={18} color="#FFFFFF" /><Text style={styles.modalAddText}>Add Section</Text></>}
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 };
 
+// ─── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  backButton: {
-    marginRight: 12,
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
-  },
-  stockReportButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
-  },
-  projectName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1E293B',
-  },
-  projectSubtitle: {
-    fontSize: 14,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  scrollContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-  },
+  root:               { flex: 1, backgroundColor: '#F8FAFC' },
+
+  // Header
+  header:             { backgroundColor: '#FFFFFF', paddingBottom: 18, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  headerInner:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8, gap: 12 },
+  backBtn:            { width: 40, height: 40, borderRadius: 13, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' },
+  headerCenter:       { flex: 1 },
+  headerProjectName:  { fontSize: 18, fontWeight: '800', color: '#0F172A', letterSpacing: -0.3 },
+  headerSubtitle:     { fontSize: 12.5, color: '#64748B', marginTop: 2, fontWeight: '500' },
+  reportBtn:          { width: 40, height: 40, borderRadius: 13, backgroundColor: '#EAF0FE', borderWidth: 1, borderColor: '#E0E7FF', justifyContent: 'center', alignItems: 'center' },
+
+  // Progress
+  progressBlock:      { paddingHorizontal: 16, marginTop: 14 },
+  progressLabelRow:   { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 7 },
+  progressLabel:      { fontSize: 12, color: '#64748B', fontWeight: '500' },
+  progressPct:        { fontSize: 12, fontWeight: '800', color: '#2E72F0' },
+  progressTrack:      { height: 8, backgroundColor: '#EAF0FE', borderRadius: 99, overflow: 'hidden' },
+  progressFill:       { height: '100%', borderRadius: 99, backgroundColor: '#2E72F0' },
+
+  // Scroll
+  scrollView:         { flex: 1 },
+  scrollContent:      { padding: 16, paddingTop: 20 },
+
+  // Summary pills
+  summaryRow:         { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  summaryPill:        { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99 },
+  summaryPillText:    { fontSize: 12, fontWeight: '700' },
+
+  // Section card
   sectionCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    marginBottom: 12,
+    borderRadius: 18,
+    marginBottom: 14,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#EEF2F7',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
+    borderColor: '#EEF2F8',
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    elevation: 3,
+    flexDirection: 'column',
   },
-  sectionCardExpanded: {
-    borderColor: '#BAE6FD',
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-  },
-  chevronWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#F0F9FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sectionHint: {
-    fontSize: 12,
-    color: '#94A3B8',
-    marginTop: 2,
-  },
-  optionsContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 6,
-  },
-  optionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 13,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  optionRowLast: {
-    borderBottomWidth: 0,
-  },
-  optionLeft: {
+  sectionAccentStrip: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4 },
+  sectionHeaderRow:   { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingLeft: 20, paddingRight: 16, gap: 12 },
+  indexBadge:         { width: 30, height: 30, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  indexBadgeText:     { fontSize: 12, fontWeight: '800' },
+  sectionIconWrap:    { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  sectionInfo:        { flex: 1 },
+  sectionName:        { fontSize: 16, fontWeight: '700', color: '#0F172A', letterSpacing: -0.2 },
+  sectionMeta:        { flexDirection: 'row', marginTop: 5, gap: 6 },
+  statusPill:         { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99 },
+  statusDot:          { width: 6, height: 6, borderRadius: 3 },
+  statusPillText:     { fontSize: 11, fontWeight: '700' },
+  chevronWrap:        { width: 32, height: 32 },
+  chevronCircle:      { width: 32, height: 32, borderRadius: 11, backgroundColor: '#EAF0FE', justifyContent: 'center', alignItems: 'center' },
+
+  // Options
+  optionsContainer:   { paddingHorizontal: 16, paddingBottom: 14 },
+  optionsDivider:     { height: 1, backgroundColor: '#F1F5F9', marginBottom: 10 },
+  optionsGrid:        { gap: 8 },
+  optionChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-  },
-  optionIconChip: {
-    width: 32,
-    height: 32,
-    borderRadius: 9,
-    backgroundColor: '#F0F9FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  optionLabel: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#334155',
-  },
-  sectionContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 12,
-  },
-  sectionIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#E0F2FE',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  sectionInfo: {
-    flex: 1,
-    marginRight: 8,
-  },
-  sectionName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
-    flexShrink: 1,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 20,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: '#64748B',
-    textAlign: 'center',
-    maxWidth: '80%',
-    lineHeight: 20,
-    marginBottom: 24,
-  },
-  addSectionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#3B82F6',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    gap: 8,
-    shadowColor: '#3B82F6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  addSectionButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1E293B',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 15,
-    color: '#1E293B',
-  },
-  typeSelector: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  typeOption: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     backgroundColor: '#F8FAFC',
-    borderWidth: 2,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-  },
-  typeOptionActive: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#3B82F6',
-  },
-  typeOptionText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#64748B',
-  },
-  typeOptionTextActive: {
-    color: '#3B82F6',
-    fontWeight: '600',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 24,
-  },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    alignItems: 'center',
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#EEF2F8',
   },
-  cancelButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  addButton: {
-    flex: 1,
+  optionChipIcon:     { width: 38, height: 38, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  optionChipLabel:    { flex: 1, fontSize: 14, fontWeight: '600', color: '#334155' },
+
+  // Empty state
+  emptyState:         { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, paddingHorizontal: 24 },
+  emptyIconWrap:      { width: 100, height: 100, borderRadius: 28, justifyContent: 'center', alignItems: 'center', marginBottom: 20, backgroundColor: '#EAF0FE', borderWidth: 1, borderColor: '#E0E7FF' },
+  emptyTitle:         { fontSize: 20, fontWeight: '800', color: '#0F172A', marginBottom: 8, letterSpacing: -0.3 },
+  emptySubtitle:      { fontSize: 14, color: '#64748B', textAlign: 'center', lineHeight: 22, maxWidth: '80%', marginBottom: 28 },
+  emptyAddBtn:        { borderRadius: 14, overflow: 'hidden' },
+  emptyAddBtnInner:   { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14, paddingHorizontal: 28, backgroundColor: '#2E72F0' },
+  emptyAddBtnText:    { fontSize: 15, fontWeight: '700', color: '#FFFFFF', letterSpacing: 0.3 },
+
+  // Completion button
+  completionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 10,
+    marginTop: 8,
+    paddingVertical: 16,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
+  },
+  completionBtnDone:      { borderColor: '#BBF7D0', backgroundColor: '#F0FDF4' },
+  completionBtnText:      { fontSize: 15, fontWeight: '700', color: '#2E72F0' },
+  completionBtnTextDone:  { color: '#16A34A' },
+
+  // FAB
+  fab:      { position: 'absolute', bottom: 32, right: 24 },
+  fabInner: { borderRadius: 20, overflow: 'hidden', shadowColor: '#2E72F0', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 10 },
+  fabSolid: { width: 60, height: 60, borderRadius: 20, justifyContent: 'center', alignItems: 'center', backgroundColor: '#2E72F0' },
+
+  // Modal
+  modalOverlay:   { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'flex-end' },
+  modalSheet:     { backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 24, paddingBottom: 36, paddingTop: 12 },
+  modalHandle:    { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0', alignSelf: 'center', marginBottom: 20 },
+  modalHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
+  modalTitle:     { fontSize: 20, fontWeight: '800', color: '#0F172A', letterSpacing: -0.3 },
+  modalSubtitle:  { fontSize: 13, color: '#64748B', marginTop: 3 },
+  modalCloseBtn:  { width: 34, height: 34, borderRadius: 11, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' },
+  modalInputGroup: { marginBottom: 20 },
+  modalInputLabel: { fontSize: 12, fontWeight: '700', color: '#64748B', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.8 },
+  modalInputWrap:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 4 },
+  modalInput:      { flex: 1, fontSize: 15, color: '#0F172A', paddingVertical: 12 },
+  typeRow:         { flexDirection: 'row', gap: 10 },
+  typeChip: {
+    flex: 1,
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 6,
     paddingVertical: 14,
-    paddingHorizontal: 20,
-    backgroundColor: '#3B82F6',
-    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
   },
-  addButtonDisabled: {
-    opacity: 0.6,
-  },
-  addButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  projectCompletionButton: {
+  typeChipActive:     { backgroundColor: '#EAF0FE', borderColor: '#2E72F0' },
+  typeChipText:       { fontSize: 12, fontWeight: '600', color: '#64748B' },
+  typeChipTextActive: { color: '#2E72F0' },
+  // Report sub-options
+  reportOptionsGrid:   { gap: 10, marginBottom: 8 },
+  reportOptionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    gap: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: '#EEF2F8',
   },
-  projectCompletionButtonCompleted: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#059669',
-  },
-  projectCompletionButtonDisabled: {
-    opacity: 0.6,
-  },
-  projectCompletionButtonText: {
-    marginLeft: 6,
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6B7280',
-  },
-  projectCompletionButtonTextCompleted: {
-    color: '#059669',
-  },
+  reportOptionIcon:    { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  reportOptionText:    { flex: 1 },
+  reportOptionLabel:   { fontSize: 14, fontWeight: '700', color: '#0F172A', marginBottom: 2 },
+  reportOptionDesc:    { fontSize: 12, color: '#64748B', fontWeight: '500' },
+
+  modalActions:    { flexDirection: 'row', gap: 12, marginTop: 8 },
+  modalCancelBtn:  { flex: 1, paddingVertical: 15, backgroundColor: '#F8FAFC', borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
+  modalCancelText: { fontSize: 15, fontWeight: '700', color: '#64748B' },
+  modalAddBtn:     { flex: 1.5, borderRadius: 14, overflow: 'hidden' },
+  modalAddBtnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 15, backgroundColor: '#2E72F0' },
+  modalAddText:    { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
 });
 
 export default ProjectSections;
+
+// ─── Report Overlay Styles ─────────────────────────────────────────────────────
+const rStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(10,18,38,0.70)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
+    paddingVertical: 36,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 24 },
+    shadowOpacity: 0.18,
+    shadowRadius: 48,
+    elevation: 24,
+  },
+  iconRing: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#EAF0FE',
+    borderWidth: 3,
+    borderColor: '#C4D8FC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 26,
+    position: 'relative',
+  },
+  iconOrbitDot: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#EE730C',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  title: {
+    fontSize: 21,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.4,
+    marginBottom: 6,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
+    textAlign: 'center',
+    marginBottom: 28,
+    lineHeight: 19,
+  },
+  progressTrack: {
+    width: '100%',
+    height: 9,
+    backgroundColor: '#EAF0FE',
+    borderRadius: 99,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  progressBase: {
+    position: 'absolute',
+    left: 0, top: 0, bottom: 0,
+    width: '100%',
+    backgroundColor: '#C4D8FC',
+    borderRadius: 99,
+  },
+  shimmerLine: {
+    position: 'absolute',
+    top: 0, bottom: 0,
+    width: 80,
+    backgroundColor: 'rgba(255,255,255,0.75)',
+    borderRadius: 99,
+  },
+  stageText: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
+    marginBottom: 20,
+    letterSpacing: 0.1,
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    gap: 7,
+    alignItems: 'center',
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#E2E8F0',
+  },
+  dotActive: {
+    width: 26,
+    backgroundColor: '#2E72F0',
+  },
+});
+
+const pickerStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(10,18,38,0.55)', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 36,
+    paddingTop: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+    elevation: 20,
+  },
+  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0', alignSelf: 'center', marginBottom: 18 },
+  header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 },
+  title: { fontSize: 20, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 },
+  subtitle: { fontSize: 13, color: '#64748B', fontWeight: '500', marginTop: 3 },
+  closeBtn: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
+  selectAllRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 4 },
+  selectAllText: { fontSize: 14, fontWeight: '700', color: '#2E72F0' },
+  dividerLine: { height: 1, backgroundColor: '#E2E8F0', marginBottom: 8 },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
+  checkboxChecked: { backgroundColor: '#2E72F0', borderColor: '#2E72F0' },
+  contractorRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 14, padding: 14, marginBottom: 8 },
+  contractorRowSelected: { backgroundColor: '#EAF0FE', borderColor: '#C4D8FC' },
+  cardText: { flex: 1 },
+  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#EAF0FE', borderWidth: 1, borderColor: '#C4D8FC', alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 16, fontWeight: '700', color: '#2E72F0' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 3, flexWrap: 'wrap' },
+  contractorName: { fontSize: 14, fontWeight: '700', color: '#0F172A', flex: 1 },
+  contractorMeta: { fontSize: 12, color: '#64748B', fontWeight: '500' },
+  statusPill: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
+  statusActive: { backgroundColor: '#DCFCE7' },
+  statusDone: { backgroundColor: '#E0E7FF' },
+  statusPillText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.4 },
+  statusActiveText: { color: '#15803D' },
+  statusDoneText: { color: '#4338CA' },
+  footer: { paddingTop: 12, borderTopWidth: 1, borderColor: '#E2E8F0' },
+  generateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#2E72F0', borderRadius: 14, paddingVertical: 15 },
+  generateBtnDisabled: { backgroundColor: '#CBD5E1' },
+  generateBtnText: { fontSize: 15, fontWeight: '700', color: '#fff', letterSpacing: 0.2 },
+  generatingOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(10,18,38,0.6)', alignItems: 'center', justifyContent: 'center', zIndex: 9999 },
+  generatingCard: { backgroundColor: '#fff', borderRadius: 20, padding: 32, alignItems: 'center', gap: 12, width: 240, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 20 },
+  generatingTitle: { fontSize: 17, fontWeight: '800', color: '#0F172A', textAlign: 'center' },
+  generatingSubtitle: { fontSize: 13, color: '#64748B', textAlign: 'center', fontWeight: '500' },
+});

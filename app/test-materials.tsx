@@ -66,7 +66,7 @@ const sampleMaterials = [
         price: 1200,
         date: new Date().toLocaleDateString(),
         icon: 'layers-outline' as keyof typeof import('@expo/vector-icons').Ionicons.glyphMap,
-        color: '#F59E0B',
+        color: '#EE730C',
         specs: { type: 'River Sand', grade: 'Fine' },
         totalQuantity: 10,
         totalCost: 12000,
@@ -222,7 +222,7 @@ const TestMaterials = () => {
                                     }) || '0deg'
                                 }]
                             }}>
-                                <Ionicons name="sync" size={48} color="#3B82F6" />
+                                <Ionicons name="sync" size={48} color="#2E72F0" />
                             </Animated.View>
                             <Text style={styles.loadingTitle}>Loading Materials...</Text>
                             <Text style={styles.loadingDescription}>
@@ -257,7 +257,7 @@ const TestMaterials = () => {
                                             }) || '0deg'
                                         }]
                                     }}>
-                                        <Ionicons name="sync" size={20} color="#3B82F6" />
+                                        <Ionicons name="sync" size={20} color="#2E72F0" />
                                     </Animated.View>
                                     <Text style={styles.loadingText}>Loading page...</Text>
                                 </View>
@@ -277,7 +277,7 @@ const TestMaterials = () => {
                                     <Ionicons 
                                         name="chevron-back" 
                                         size={20} 
-                                        color={(currentPage === 1 || loading) ? '#CBD5E1' : '#3B82F6'} 
+                                        color={(currentPage === 1 || loading) ? '#CBD5E1' : '#2E72F0'} 
                                     />
                                     <Text style={[
                                         styles.paginationButtonText,
@@ -330,7 +330,7 @@ const TestMaterials = () => {
                                     <Ionicons 
                                         name="chevron-forward" 
                                         size={20} 
-                                        color={(currentPage === totalPages || loading) ? '#CBD5E1' : '#3B82F6'} 
+                                        color={(currentPage === totalPages || loading) ? '#CBD5E1' : '#2E72F0'} 
                                     />
                                 </TouchableOpacity>
                             </View>
@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
     },
     paginationButtonText: {
         fontSize: 14,
-        color: '#3B82F6',
+        color: '#2E72F0',
         fontWeight: '500',
     },
     paginationButtonTextDisabled: {
@@ -487,8 +487,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     pageNumberButtonActive: {
-        backgroundColor: '#3B82F6',
-        borderColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
+        borderColor: '#2E72F0',
     },
     pageNumberText: {
         fontSize: 14,

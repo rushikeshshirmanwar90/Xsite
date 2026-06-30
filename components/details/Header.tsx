@@ -40,6 +40,7 @@ interface HeaderProps {
     isGeneratingStockReport?: boolean;
     // Material analysis (cost breakdown pie chart) for the selected mini-section
     onMaterialAnalysisPress?: () => void;
+    subtitle?: string;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -72,6 +73,7 @@ const Header: React.FC<HeaderProps> = ({
     onStockReportPress,
     isGeneratingStockReport = false,
     onMaterialAnalysisPress,
+    subtitle,
 }) => {
     // State to store fetched sections
     const [sections, setSections] = useState<Section[]>([]);
@@ -174,6 +176,11 @@ const Header: React.FC<HeaderProps> = ({
                             </>
                         )}
                     </View>
+                    {subtitle && (
+                        <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A', marginTop: 1 }}>
+                            {subtitle}
+                        </Text>
+                    )}
                 </View>
 
                 {/* Right side buttons */}
@@ -209,9 +216,9 @@ const Header: React.FC<HeaderProps> = ({
                             activeOpacity={0.7}
                         >
                             {isGeneratingReport ? (
-                                <Ionicons name="sync" size={18} color="#3B82F6" />
+                                <Ionicons name="sync" size={18} color="#2E72F0" />
                             ) : (
-                                <Ionicons name="document-text-outline" size={20} color="#3B82F6" />
+                                <Ionicons name="document-text-outline" size={20} color="#2E72F0" />
                             )}
                         </TouchableOpacity>
                     )}

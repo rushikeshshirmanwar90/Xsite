@@ -155,7 +155,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userT
 
     // const statusColor = getStatusColor(project.status);
 
-    const statusColor = project.isAccessible === false ? '#EF4444' : projectCompleted ? '#10B981' : '#3B82F6';
+    const statusColor = project.isAccessible === false ? '#EF4444' : projectCompleted ? '#10B981' : '#2E72F0';
     const statusLabel = project.isAccessible === false ? 'Blocked' : projectCompleted ? 'Completed' : 'In Progress';
     const statusPillBg = project.isAccessible === false ? styles.statusPillBlocked : projectCompleted ? styles.statusPillCompleted : styles.statusPillOngoing;
     const progressColor = budgetProgress > 90 ? '#EF4444' : budgetProgress > 70 ? '#F59E0B' : '#10B981';
@@ -177,7 +177,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userT
             <View style={styles.card}>
                 {/* Blue accent bar across the top of every card */}
                 <LinearGradient
-                    colors={['#3B82F6', '#4F46E5']}
+                    colors={['#2E72F0', '#1A54C4']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.topAccentBar}
@@ -204,13 +204,13 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userT
                             {/* Row 1: location icon + name/address */}
                             <View style={styles.row}>
                                 <View style={styles.rowIconChip}>
-                                    <Ionicons name="location" size={16} color="#3B82F6" />
+                                    <Ionicons name="location" size={16} color="#2E72F0" />
                                 </View>
                                 <View style={styles.rowTextBlock}>
                                     <View style={styles.titleLine}>
                                         <Text style={styles.rowPrimaryText} numberOfLines={1}>{project.name}</Text>
                                         {projectPinned && userType === 'admin' && (
-                                            <Ionicons name="bookmark" size={13} color="#F59E0B" style={styles.pinIcon} />
+                                            <Ionicons name="bookmark" size={13} color="#EE730C" style={styles.pinIcon} />
                                         )}
                                     </View>
                                     <View style={styles.addressLine}>
@@ -238,7 +238,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userT
                     {project.clientName && (
                         <View style={styles.row}>
                             <View style={[styles.rowIconChip, { backgroundColor: 'rgba(99,102,241,0.10)' }]}>
-                                <Ionicons name="briefcase" size={16} color="#6366F1" />
+                                <Ionicons name="briefcase" size={16} color="#2E72F0" />
                             </View>
                             <View style={styles.rowTextBlock}>
                                 <Text style={styles.rowPrimaryText} numberOfLines={1}>{project.clientName}</Text>
@@ -347,7 +347,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userT
                                 <Ionicons 
                                     name={projectPinned ? "bookmark" : "bookmark-outline"} 
                                     size={20} 
-                                    color={projectPinned ? "#F59E0B" : "#6B7280"} 
+                                    color={projectPinned ? "#EE730C" : "#6B7280"} 
                                 />
                                 <Text style={[
                                     styles.optionText,
@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
         zIndex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         borderRadius: 999,
         paddingHorizontal: 9,
         paddingVertical: 4,
@@ -580,7 +580,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         paddingVertical: 13,
         borderRadius: 14,
         gap: 8,
@@ -650,10 +650,10 @@ const styles = StyleSheet.create({
         color: '#10B981',
     },
     optionTextPinned: {
-        color: '#F59E0B',
+        color: '#EE730C',
     },
     optionTextFeatured: {
-        color: '#3B82F6',
+        color: '#2E72F0',
     },
     optionTextDisabled: {
         color: '#9CA3AF',

@@ -328,7 +328,7 @@ const TestNotificationComplete: React.FC = () => {
         name: 'Default Notifications',
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#3B82F6',
+        lightColor: '#2E72F0',
         sound: 'default',
       });
 
@@ -631,7 +631,7 @@ ${failed === 0 ? '🎉 All critical tests passed!' : '⚠️ Some tests failed. 
         case 'passed': return { name: 'checkmark-circle', color: '#10B981' };
         case 'failed': return { name: 'close-circle', color: '#EF4444' };
         case 'warning': return { name: 'warning', color: '#F59E0B' };
-        case 'running': return { name: 'sync', color: '#3B82F6' };
+        case 'running': return { name: 'sync', color: '#2E72F0' };
         default: return { name: 'ellipse-outline', color: '#9CA3AF' };
       }
     };
@@ -673,7 +673,7 @@ ${failed === 0 ? '🎉 All critical tests passed!' : '⚠️ Some tests failed. 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <LinearGradient
-        colors={['#3B82F6', '#2563EB']}
+        colors={['#2E72F0', '#2563EB']}
         style={styles.header}
       >
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -748,8 +748,8 @@ ${failed === 0 ? '🎉 All critical tests passed!' : '⚠️ Some tests failed. 
             onPress={sendBackendTestNotification}
             disabled={loading}
           >
-            <Ionicons name="send" size={20} color="#3B82F6" />
-            <Text style={[styles.buttonText, { color: '#3B82F6' }]}>
+            <Ionicons name="send" size={20} color="#2E72F0" />
+            <Text style={[styles.buttonText, { color: '#2E72F0' }]}>
               Send Backend Test
             </Text>
           </TouchableOpacity>
@@ -863,12 +863,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   primaryButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
   },
   secondaryButton: {
     backgroundColor: '#FFF',
     borderWidth: 2,
-    borderColor: '#3B82F6',
+    borderColor: '#2E72F0',
   },
   buttonDisabled: {
     opacity: 0.5,
@@ -936,12 +936,12 @@ const styles = StyleSheet.create({
     // Add animation if needed
   },
   instructionsCard: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     margin: 16,
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: '#C4D8FC',
   },
   instructionsTitle: {
     fontSize: 16,

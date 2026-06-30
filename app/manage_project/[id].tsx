@@ -1163,7 +1163,7 @@ const ManageProject = () => {
                     {buildingDetails.hasBasement && (
                         <View style={styles.floorSummaryItemView}>
                             <View style={styles.floorIconContainer}>
-                                <Ionicons name="arrow-down" size={20} color="#3B82F6" />
+                                <Ionicons name="arrow-down" size={20} color="#2E72F0" />
                             </View>
                             <View style={styles.floorInfoView}>
                                 <Text style={styles.floorNameView}>Basement</Text>
@@ -1214,7 +1214,7 @@ const ManageProject = () => {
             {/* Total Floors Count */}
             <View style={styles.statsContainer}>
                 <View style={styles.statCard}>
-                    <Ionicons name="layers-outline" size={24} color="#3B82F6" />
+                    <Ionicons name="layers-outline" size={24} color="#2E72F0" />
                     <Text style={styles.statValue}>
                         {(buildingDetails.hasBasement ? 1 : 0) +
                             (buildingDetails.hasGroundFloor ? 1 : 0) +
@@ -1232,7 +1232,7 @@ const ManageProject = () => {
             {/* Manage Floors Button */}
             <View style={styles.manageFloorsSection}>
                 <View style={styles.manageFloorsInfo}>
-                    <Ionicons name="information-circle-outline" size={16} color="#3B82F6" />
+                    <Ionicons name="information-circle-outline" size={16} color="#2E72F0" />
                     <Text style={styles.manageFloorsInfoText}>
                         Floors will be created automatically based on your configuration above
                     </Text>
@@ -1259,7 +1259,7 @@ const ManageProject = () => {
             {/* Info message for new buildings */}
             {!hasExistingData && (
                 <View style={styles.infoMessage}>
-                    <Ionicons name="information-circle-outline" size={20} color="#3B82F6" />
+                    <Ionicons name="information-circle-outline" size={20} color="#2E72F0" />
                     <Text style={styles.infoMessageText}>
                         Configure your building details below, or skip to directly manage floors and units.
                     </Text>
@@ -1368,7 +1368,7 @@ const ManageProject = () => {
             {/* Manage Floors Button - Also available in edit mode */}
             <View style={styles.manageFloorsSection}>
                 <View style={styles.manageFloorsInfo}>
-                    <Ionicons name="information-circle-outline" size={16} color="#3B82F6" />
+                    <Ionicons name="information-circle-outline" size={16} color="#2E72F0" />
                     <Text style={styles.manageFloorsInfoText}>
                         Floors will be created automatically when you save or navigate to floor management
                     </Text>
@@ -1410,8 +1410,8 @@ const ManageProject = () => {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        colors={['#3B82F6']}
-                        tintColor="#3B82F6"
+                        colors={['#2E72F0']}
+                        tintColor="#2E72F0"
                         title="Pull to refresh"
                         titleColor="#64748b"
                     />
@@ -1425,7 +1425,7 @@ const ManageProject = () => {
                 {loading ? (
                     <View style={styles.centered}>
                         <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                            <Ionicons name="sync" size={48} color="#3B82F6" />
+                            <Ionicons name="sync" size={48} color="#2E72F0" />
                         </View>
                         <Text style={styles.loadingText}>Loading sections...</Text>
                         <Text style={[styles.loadingText, { fontSize: 12, marginTop: 4, color: '#94A3B8' }]}>Please wait...</Text>
@@ -1452,7 +1452,7 @@ const ManageProject = () => {
                             <View style={styles.sectionCardBody}>
                                 <View style={styles.sectionIconContainer}>
                                     {section.type === "Buildings" && (
-                                        <Ionicons name="business-outline" size={28} color="#3B82F6" />
+                                        <Ionicons name="business-outline" size={28} color="#2E72F0" />
                                     )}
                                     {section.type === 'rowhouse' && (
                                         <Ionicons name="home-outline" size={28} color="#10B981" />
@@ -1470,7 +1470,7 @@ const ManageProject = () => {
                                             style={styles.addDetailsButton}
                                             onPress={() => handleSectionDetails(section)}
                                         >
-                                            <Ionicons name="settings-outline" size={18} color="#3B82F6" />
+                                            <Ionicons name="settings-outline" size={18} color="#2E72F0" />
                                             <Text style={styles.addDetailsText}>
                                                 {section.type === 'Buildings' ? 'Building Details' : 'Add Details'}
                                             </Text>
@@ -1609,7 +1609,7 @@ const ManageProject = () => {
                                         onPress={() => setIsEditMode(true)}
                                         style={styles.editModeButton}
                                     >
-                                        <Ionicons name="create-outline" size={20} color="#3B82F6" />
+                                        <Ionicons name="create-outline" size={20} color="#2E72F0" />
                                         <Text style={styles.editModeButtonText}>Edit</Text>
                                     </TouchableOpacity>
                                 )}
@@ -1950,18 +1950,18 @@ const styles = StyleSheet.create({
     editModeButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 8,
         gap: 6,
         borderWidth: 1,
-        borderColor: '#DBEAFE',
+        borderColor: '#C4D8FC',
     },
     editModeButtonText: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#3B82F6',
+        color: '#2E72F0',
     },
     closeButton: {
         padding: 4,
@@ -2021,7 +2021,7 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         paddingHorizontal: 20,
         borderRadius: 8,
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
     },
     updateButtonText: {
         fontSize: 15,
@@ -2043,18 +2043,18 @@ const styles = StyleSheet.create({
     addDetailsButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         paddingVertical: 8,
         paddingHorizontal: 12,
         borderRadius: 8,
         gap: 6,
         flex: 1,
         borderWidth: 1,
-        borderColor: '#DBEAFE',
+        borderColor: '#C4D8FC',
         display: "none"
     },
     addDetailsText: {
-        color: '#3B82F6',
+        color: '#2E72F0',
         fontWeight: '600',
         fontSize: 14,
     },
@@ -2083,7 +2083,7 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         paddingHorizontal: 20,
         borderRadius: 8,
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
     },
     saveButtonText: {
         fontSize: 15,
@@ -2104,12 +2104,12 @@ const styles = StyleSheet.create({
     infoMessage: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         padding: 12,
         borderRadius: 8,
         marginBottom: 16,
         borderWidth: 1,
-        borderColor: '#DBEAFE',
+        borderColor: '#C4D8FC',
         gap: 8,
     },
     infoMessageText: {
@@ -2124,13 +2124,13 @@ const styles = StyleSheet.create({
     manageFloorsInfo: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         padding: 10,
         borderRadius: 8,
         marginBottom: 12,
         gap: 8,
         borderWidth: 1,
-        borderColor: '#DBEAFE',
+        borderColor: '#C4D8FC',
     },
     manageFloorsInfoText: {
         flex: 1,
@@ -2173,8 +2173,8 @@ const styles = StyleSheet.create({
         marginRight: 12,
     },
     checkboxChecked: {
-        backgroundColor: '#3B82F6',
-        borderColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
+        borderColor: '#2E72F0',
     },
     checkboxLabel: {
         fontSize: 16,
@@ -2396,9 +2396,9 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         paddingHorizontal: 20,
         borderRadius: 12,
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         gap: 8,
-        shadowColor: '#3B82F6',
+        shadowColor: '#2E72F0',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
         shadowRadius: 4,

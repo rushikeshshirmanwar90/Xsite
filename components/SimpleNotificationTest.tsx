@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   retryButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
     padding: 8,
     borderRadius: 6,
     marginTop: 8,
@@ -266,10 +266,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981',
   },
   usageButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
   },
   laborButton: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: '#EE730C',
   },
   adminButton: {
     backgroundColor: '#8B5CF6',
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginTop: 20,
     borderLeftWidth: 4,
-    borderLeftColor: '#3B82F6',
+    borderLeftColor: '#2E72F0',
   },
   infoText: {
     color: '#1E40AF',

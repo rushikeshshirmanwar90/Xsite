@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { LicenseGuard } from '@/components/LicenseGuard'
 
 // Brand palette — kept intentionally restrained (one blue accent + neutral grays)
-const ACTIVE_COLOR = '#3B82F6'
+const ACTIVE_COLOR = '#2E72F0'
 const INACTIVE_COLOR = '#94A3B8'
 
 type IoniconName = keyof typeof Ionicons.glyphMap
@@ -112,7 +112,7 @@ const TabLayout = () => {
             tabBarIcon: ({ focused }) => (
               <View style={styles.centerWrap}>
                 <LinearGradient
-                  colors={focused ? ['#1E40AF', '#3B82F6'] : ['#3B82F6', '#4F46E5']}
+                  colors={focused ? ['#1E40AF', '#2E72F0'] : ['#2E72F0', '#1A54C4']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.centerButton}
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   iconPillActive: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
   },
   centerWrap: {
     alignItems: 'center',
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 4,
     borderColor: '#FFFFFF',
-    shadowColor: '#3B82F6',
+    shadowColor: '#2E72F0',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.4,
     shadowRadius: 10,

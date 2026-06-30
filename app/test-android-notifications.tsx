@@ -81,7 +81,7 @@ export default function TestAndroidNotifications() {
       case 'fail':
         return '#EF4444';
       case 'warning':
-        return '#F59E0B';
+        return '#EE730C';
       default:
         return '#6B7280';
     }
@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
     minHeight: 50,
   },
   primaryButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
   },
   secondaryButton: {
     backgroundColor: '#10B981',
@@ -385,10 +385,10 @@ const styles = StyleSheet.create({
   infoContainer: {
     margin: 16,
     padding: 16,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: '#C4D8FC',
   },
   infoTitle: {
     fontSize: 16,

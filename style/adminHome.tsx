@@ -410,8 +410,8 @@ export const styles = StyleSheet.create({
         backgroundColor: '#fff',
     },
     checkboxSelected: {
-        backgroundColor: '#3B82F6',
-        borderColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
+        borderColor: '#2E72F0',
     },
 
     // Staff assignment styles
@@ -526,8 +526,8 @@ export const styles = StyleSheet.create({
         alignItems: 'center',
     },
     singleBuildingCheckboxBoxSelected: {
-        backgroundColor: '#3B82F6',
-        borderColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
+        borderColor: '#2E72F0',
     },
 
     // Centered container and state texts for loading/empty/error states
@@ -562,7 +562,7 @@ export const styles = StyleSheet.create({
         marginTop: 10,
         paddingHorizontal: 20,
         paddingVertical: 10,
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         borderRadius: 5,
     },
     retryButtonText: {
@@ -715,12 +715,12 @@ export const styles = StyleSheet.create({
     clientNameContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         paddingHorizontal: 16,
         paddingVertical: 10,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#BFDBFE',
+        borderColor: '#C4D8FC',
         gap: 8,
     },
     clientNameText: {
@@ -737,11 +737,11 @@ export const styles = StyleSheet.create({
         right: 24,
         width: 56,
         height: 56,
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         borderRadius: 28,
         alignItems: 'center' as const,
         justifyContent: 'center' as const,
-        shadowColor: '#3B82F6',
+        shadowColor: '#2E72F0',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -787,7 +787,7 @@ export const styles = StyleSheet.create({
         paddingVertical: 10,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#3B82F6',
+        borderColor: '#2E72F0',
         backgroundColor: '#FFFFFF',
     },
     paginationButtonDisabled: {
@@ -797,7 +797,7 @@ export const styles = StyleSheet.create({
     paginationButtonText: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#3B82F6',
+        color: '#2E72F0',
         marginHorizontal: 4,
     },
     paginationButtonTextDisabled: {
@@ -819,8 +819,8 @@ export const styles = StyleSheet.create({
         borderColor: '#E5E7EB',
     },
     pageNumberButtonActive: {
-        backgroundColor: '#3B82F6',
-        borderColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
+        borderColor: '#2E72F0',
     },
     pageNumberText: {
         fontSize: 14,
@@ -857,7 +857,7 @@ export const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         paddingHorizontal: 20,
         paddingVertical: 12,
         borderRadius: 10,
@@ -903,9 +903,9 @@ export const styles = StyleSheet.create({
         borderColor: '#F1F5F9',
     },
     shareCard: {
-        borderColor: '#DBEAFE',
+        borderColor: '#C4D8FC',
         backgroundColor: '#F8FAFC',
-        shadowColor: '#3B82F6',
+        shadowColor: '#2E72F0',
         shadowOpacity: 0.1,
     },
     shareHeader: {
@@ -917,7 +917,7 @@ export const styles = StyleSheet.create({
         width: 48,
         height: 48,
         borderRadius: 12,
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
@@ -974,7 +974,7 @@ export const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         paddingHorizontal: 20,
         paddingVertical: 12,
         borderRadius: 10,

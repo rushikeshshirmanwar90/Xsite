@@ -4,7 +4,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 const LoadingState: React.FC = () => {
     return (
         <View style={styles.loadingState}>
-            <ActivityIndicator size="large" color="#3B82F6" />
+            <ActivityIndicator size="large" color="#2E72F0" />
             <Text style={styles.loadingTitle}>Loading notifications...</Text>
             <Text style={styles.loadingMessage}>
                 Fetching material requests and updates

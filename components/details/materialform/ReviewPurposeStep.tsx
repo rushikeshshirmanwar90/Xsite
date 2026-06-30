@@ -101,7 +101,7 @@ const ReviewPurposeStep: React.FC<ReviewPurposeStepProps> = ({
                       }}
                       activeOpacity={0.7}
                     >
-                      <Edit size={16} color="#3B82F6" />
+                      <Edit size={16} color="#2E72F0" />
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.reviewRemoveButton}
@@ -158,7 +158,7 @@ const ReviewPurposeStep: React.FC<ReviewPurposeStepProps> = ({
             numberOfLines={4}
             textAlignVertical="top"
             placeholderTextColor="#94A3B8"
-            selectionColor="#3B82F6"
+            selectionColor="#2E72F0"
             autoCorrect={true}
             autoCapitalize="sentences"
           />
@@ -171,7 +171,7 @@ const ReviewPurposeStep: React.FC<ReviewPurposeStepProps> = ({
             onPress={onBack}
             activeOpacity={0.7}
           >
-            <ArrowLeft size={16} color="#3B82F6" />
+            <ArrowLeft size={16} color="#2E72F0" />
             <Text style={styles.backButtonInlineText}>Back to Edit Materials</Text>
           </TouchableOpacity>
         </View>
@@ -268,7 +268,7 @@ const styles = StyleSheet.create<Styles>({
     padding: 16,
     marginBottom: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#3B82F6',
+    borderLeftColor: '#2E72F0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -282,7 +282,7 @@ const styles = StyleSheet.create<Styles>({
     gap: 8,
   },
   reviewMaterialNumber: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
     color: '#fff',
     fontSize: 12,
     fontWeight: '700',
@@ -303,7 +303,7 @@ const styles = StyleSheet.create<Styles>({
   },
   reviewEditButton: {
     padding: 8,
-    backgroundColor: '#DBEAFE',
+    backgroundColor: '#C4D8FC',
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
@@ -406,16 +406,16 @@ const styles = StyleSheet.create<Styles>({
     textDecorationLine: 'none',
   },
   backButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#3B82F6',
+    borderColor: '#2E72F0',
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 8,
-    shadowColor: '#3B82F6',
+    shadowColor: '#2E72F0',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -442,7 +442,7 @@ const styles = StyleSheet.create<Styles>({
   backButtonInlineText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#3B82F6',
+    color: '#2E72F0',
   },
   // Error state styles
   errorContainer: {

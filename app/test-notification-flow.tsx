@@ -404,7 +404,7 @@ export default function TestNotificationFlow() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return '#9CA3AF';
-      case 'running': return '#3B82F6';
+      case 'running': return '#2E72F0';
       case 'success': return '#10B981';
       case 'error': return '#EF4444';
       default: return '#6B7280';
@@ -529,9 +529,9 @@ const styles = StyleSheet.create({
   },
   userInfo: {
     padding: 16,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     borderBottomWidth: 1,
-    borderBottomColor: '#DBEAFE',
+    borderBottomColor: '#C4D8FC',
   },
   userInfoText: {
     fontSize: 13,
@@ -542,7 +542,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
     padding: 16,
     margin: 16,
     borderRadius: 8,

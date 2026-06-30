@@ -579,8 +579,8 @@ const BuildingFloorsPage = () => {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        colors={['#3B82F6']}
-                        tintColor="#3B82F6"
+                        colors={['#2E72F0']}
+                        tintColor="#2E72F0"
                         title="Pull to refresh"
                         titleColor="#64748b"
                     />
@@ -595,7 +595,7 @@ const BuildingFloorsPage = () => {
                 {loading ? (
                     <View style={styles.centered}>
                         <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                            <Ionicons name="sync" size={48} color="#3B82F6" />
+                            <Ionicons name="sync" size={48} color="#2E72F0" />
                         </View>
                         <Text style={styles.loadingText}>Loading floors...</Text>
                     </View>
@@ -638,7 +638,7 @@ const BuildingFloorsPage = () => {
                                             style={styles.manageUnitsButton}
                                             onPress={() => handleManageUnits(floor)}
                                         >
-                                            <Ionicons name="grid-outline" size={18} color="#3B82F6" />
+                                            <Ionicons name="grid-outline" size={18} color="#2E72F0" />
                                             <Text style={styles.manageUnitsText}>Manage Units</Text>
                                         </TouchableOpacity>
 
@@ -650,7 +650,7 @@ const BuildingFloorsPage = () => {
                                                     setShowEditFloorModal(true);
                                                 }}
                                             >
-                                                <Ionicons name="create-outline" size={18} color="#F59E0B" />
+                                                <Ionicons name="create-outline" size={18} color="#EE730C" />
                                             </TouchableOpacity>
 
                                             <TouchableOpacity
@@ -871,7 +871,7 @@ const BuildingFloorsPage = () => {
                                                     style={styles.editUnitButton}
                                                     onPress={() => handleEditUnit(unit)}
                                                 >
-                                                    <Ionicons name="create-outline" size={16} color="#F59E0B" />
+                                                    <Ionicons name="create-outline" size={16} color="#EE730C" />
                                                 </TouchableOpacity>
                                                 
                                                 <TouchableOpacity
@@ -933,7 +933,7 @@ const BuildingFloorsPage = () => {
                             showsVerticalScrollIndicator={false}
                         >
                             <View style={styles.bulkInfoCard}>
-                                <Ionicons name="information-circle" size={20} color="#3B82F6" />
+                                <Ionicons name="information-circle" size={20} color="#2E72F0" />
                                 <Text style={styles.bulkInfoText}>
                                     Units will be numbered automatically: Ground floor (001, 002...), 1st floor (101, 102...), 2nd floor (201, 202...), etc.
                                 </Text>
@@ -1495,7 +1495,7 @@ const styles = StyleSheet.create({
     statText: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#3B82F6',
+        color: '#2E72F0',
     },
     floorCardBody: {
         padding: 16,
@@ -1517,17 +1517,17 @@ const styles = StyleSheet.create({
     manageUnitsButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         paddingVertical: 8,
         paddingHorizontal: 12,
         borderRadius: 8,
         gap: 6,
         flex: 1,
         borderWidth: 1,
-        borderColor: '#DBEAFE',
+        borderColor: '#C4D8FC',
     },
     manageUnitsText: {
-        color: '#3B82F6',
+        color: '#2E72F0',
         fontWeight: '600',
         fontSize: 14,
     },
@@ -1658,8 +1658,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#F8FAFC',
     },
     pickerButtonActive: {
-        backgroundColor: '#3B82F6',
-        borderColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
+        borderColor: '#2E72F0',
     },
     pickerButtonText: {
         fontSize: 14,
@@ -1694,7 +1694,7 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         paddingHorizontal: 20,
         borderRadius: 8,
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
     },
     saveButtonText: {
         fontSize: 15,
@@ -1741,7 +1741,7 @@ const styles = StyleSheet.create({
     bulkAddButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         paddingVertical: 6,
         paddingHorizontal: 12,
         borderRadius: 6,
@@ -1769,13 +1769,13 @@ const styles = StyleSheet.create({
     bulkInfoCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         padding: 12,
         borderRadius: 8,
         marginBottom: 16,
         gap: 8,
         borderWidth: 1,
-        borderColor: '#DBEAFE',
+        borderColor: '#C4D8FC',
     },
     bulkInfoText: {
         flex: 1,
@@ -1860,7 +1860,7 @@ const styles = StyleSheet.create({
     },
     statusReserved: {
         backgroundColor: '#FEF3C7',
-        borderColor: '#F59E0B',
+        borderColor: '#EE730C',
     },
     statusText: {
         fontSize: 11,
@@ -1875,7 +1875,7 @@ const styles = StyleSheet.create({
         color: '#EF4444',
     },
     statusTextReserved: {
-        color: '#F59E0B',
+        color: '#EE730C',
     },
     unitCardBody: {
         padding: 16,

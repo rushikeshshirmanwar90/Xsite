@@ -289,7 +289,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
       rentalPeriod: costType === 'rental' ? rentalPeriod : undefined,
       rentalDuration: costType === 'rental' ? parseInt(rentalDuration) : undefined,
       icon: selectedEquipmentType?.icon || 'construct',
-      color: selectedEquipmentType?.color || '#3B82F6',
+      color: selectedEquipmentType?.color || '#2E72F0',
       unit: selectedEquipmentType?.unit || 'units',
       calculationDetails: calculationDetails, // Store calculation details for debugging
     };
@@ -418,14 +418,14 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                     <View key={index} style={styles.compactEquipmentEntryCard}>
                       <View style={styles.compactEquipmentEntryHeader}>
                         <View style={styles.compactEquipmentEntryLeft}>
-                          <View style={[styles.compactEquipmentIcon, { backgroundColor: `${entry.color || '#3B82F6'}20` }]}>
-                            <Ionicons name={entry.icon || 'construct'} size={18} color={entry.color || '#3B82F6'} />
+                          <View style={[styles.compactEquipmentIcon, { backgroundColor: `${entry.color || '#2E72F0'}20` }]}>
+                            <Ionicons name={entry.icon || 'construct'} size={18} color={entry.color || '#2E72F0'} />
                           </View>
                           <View style={styles.compactEquipmentInfo}>
                             <Text style={styles.compactEquipmentType}>{entry.type}</Text>
                             <Text style={styles.compactEquipmentCategory}>{entry.category}</Text>
                             <View style={styles.compactCostTypeInfo}>
-                              <Ionicons name={entry.costType === 'rental' ? 'time' : 'card'} size={12} color="#3B82F6" />
+                              <Ionicons name={entry.costType === 'rental' ? 'time' : 'card'} size={12} color="#2E72F0" />
                               <Text style={styles.compactCostTypeText}>
                                 {entry.costType === 'rental' 
                                   ? `${entry.rentalDuration} ${getPeriodNoun(entry.rentalPeriod)}` 
@@ -441,7 +441,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                             onPress={() => editEquipmentEntry(index)}
                             activeOpacity={0.7}
                           >
-                            <Ionicons name="pencil" size={14} color="#3B82F6" />
+                            <Ionicons name="pencil" size={14} color="#2E72F0" />
                           </TouchableOpacity>
                           <TouchableOpacity 
                             style={styles.compactRemoveButton}
@@ -505,8 +505,8 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                     <View style={styles.editingBanner}>
                       <View style={styles.editingBannerHeader}>
                         <View style={styles.editingBannerLeft}>
-                          <View style={[styles.editingBannerIcon, { backgroundColor: `${editingEntry.color || '#3B82F6'}20` }]}>
-                            <Ionicons name="pencil" size={16} color={editingEntry.color || '#3B82F6'} />
+                          <View style={[styles.editingBannerIcon, { backgroundColor: `${editingEntry.color || '#2E72F0'}20` }]}>
+                            <Ionicons name="pencil" size={16} color={editingEntry.color || '#2E72F0'} />
                           </View>
                           <View style={styles.editingBannerInfo}>
                             <Text style={styles.editingBannerTitle}>Editing Equipment Entry</Text>
@@ -642,7 +642,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                                   <Text style={styles.typeCardCategory}>{equipment.category}</Text>
                                 </View>
                               </View>
-                              <Ionicons name="checkmark-circle" size={22} color="#3B82F6" />
+                              <Ionicons name="checkmark-circle" size={22} color="#2E72F0" />
                             </View>
                           </View>
                         </View>
@@ -862,7 +862,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                             {costType === 'rental' && quantity && perUnitCost && rentalDuration && (
                               <View style={styles.costPreviewContainer}>
                                 <View style={styles.costPreviewHeader}>
-                                  <Ionicons name="calculator" size={16} color="#3B82F6" />
+                                  <Ionicons name="calculator" size={16} color="#2E72F0" />
                                   <Text style={styles.costPreviewTitle}>Total Cost Calculation:</Text>
                                 </View>
                                 <View style={styles.costPreviewBreakdown}>
@@ -886,7 +886,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                             {costType === 'purchase' && quantity && perUnitCost && (
                               <View style={styles.costPreviewContainer}>
                                 <View style={styles.costPreviewHeader}>
-                                  <Ionicons name="calculator" size={16} color="#3B82F6" />
+                                  <Ionicons name="calculator" size={16} color="#2E72F0" />
                                   <Text style={styles.costPreviewTitle}>Total Cost Calculation:</Text>
                                 </View>
                                 <View style={styles.costPreviewBreakdown}>
@@ -1005,7 +1005,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                         }),
                         backgroundColor: swipeAnimation.interpolate({
                           inputRange: [0, 0.3, 0.7, 1],
-                          outputRange: ['#64748B', '#3B82F6', '#10B981', '#059669'],
+                          outputRange: ['#64748B', '#2E72F0', '#10B981', '#059669'],
                           extrapolate: 'clamp',
                         })
                       }
@@ -1029,7 +1029,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                         }],
                         backgroundColor: swipeAnimation.interpolate({
                           inputRange: [0, 0.3, 0.7, 1],
-                          outputRange: ['#3B82F6', '#3B82F6', '#10B981', '#059669'],
+                          outputRange: ['#2E72F0', '#2E72F0', '#10B981', '#059669'],
                           extrapolate: 'clamp',
                         })
                       }
@@ -1214,9 +1214,9 @@ const styles = StyleSheet.create({
     minHeight: 64,
   },
   typeCardSelected: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     borderLeftWidth: 3,
-    borderLeftColor: '#3B82F6',
+    borderLeftColor: '#2E72F0',
   },
   typeCardLeft: {
     flexDirection: 'row',
@@ -1228,7 +1228,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 10,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 14,
@@ -1396,12 +1396,12 @@ const styles = StyleSheet.create({
   
   // Cost preview styles
   costPreviewContainer: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     borderRadius: 8,
     padding: 12,
     marginTop: 8,
     borderWidth: 1,
-    borderColor: '#DBEAFE',
+    borderColor: '#C4D8FC',
   },
   costPreviewHeader: {
     flexDirection: 'row',
@@ -1425,7 +1425,7 @@ const styles = StyleSheet.create({
   },
   costPreviewFormulaDivider: {
     height: 1,
-    backgroundColor: '#DBEAFE',
+    backgroundColor: '#C4D8FC',
     marginVertical: 8,
   },
   costPreviewFormula: {
@@ -1438,7 +1438,7 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: '#C4D8FC',
   },
   
   // Cost type styles
@@ -1461,8 +1461,8 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   costTypeButtonSelected: {
-    backgroundColor: '#3B82F6',
-    borderColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
+    borderColor: '#2E72F0',
   },
   costTypeButtonText: {
     fontSize: 13,
@@ -1490,8 +1490,8 @@ const styles = StyleSheet.create({
     minHeight: 36,
   },
   rentalPeriodButtonSelected: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#3B82F6',
+    backgroundColor: '#EAF0FE',
+    borderColor: '#2E72F0',
   },
   rentalPeriodButtonText: {
     fontSize: 11,
@@ -1500,7 +1500,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   rentalPeriodButtonTextSelected: {
-    color: '#3B82F6',
+    color: '#2E72F0',
   },
 
   // Add equipment button styles
@@ -1538,8 +1538,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     borderWidth: 2,
-    borderColor: '#F59E0B',
-    shadowColor: '#F59E0B',
+    borderColor: '#EE730C',
+    shadowColor: '#EE730C',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -1584,7 +1584,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#F59E0B',
+    borderColor: '#EE730C',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1595,7 +1595,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#F59E0B',
+    borderColor: '#EE730C',
   },
   editingBannerMetric: {
     flexDirection: 'row',
@@ -1611,7 +1611,7 @@ const styles = StyleSheet.create({
   editingBannerDivider: {
     width: 1,
     height: 16,
-    backgroundColor: '#F59E0B',
+    backgroundColor: '#EE730C',
     marginHorizontal: 8,
   },
   editingBannerTotalLabel: {
@@ -1621,7 +1621,7 @@ const styles = StyleSheet.create({
   },
   editingBannerTotalValue: {
     fontSize: 12,
-    color: '#F59E0B',
+    color: '#EE730C',
     fontWeight: '700',
   },
   // Compact equipment entries styles
@@ -1688,14 +1688,14 @@ const styles = StyleSheet.create({
   compactCostTypeInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 16,
     alignSelf: 'flex-start',
     gap: 4,
     borderWidth: 1,
-    borderColor: '#DBEAFE',
+    borderColor: '#C4D8FC',
     maxWidth: '100%',
   },
   compactCostTypeText: {
@@ -1715,12 +1715,12 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     borderWidth: 1.5,
-    borderColor: '#3B82F6',
+    borderColor: '#2E72F0',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#3B82F6',
+    shadowColor: '#2E72F0',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
     shadowRadius: 3,
@@ -1928,7 +1928,7 @@ const styles = StyleSheet.create({
     top: 4,
     width: 48,
     height: 48,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',

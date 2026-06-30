@@ -25,7 +25,7 @@ const UnifiedActivityCard: React.FC<UnifiedActivityCardProps> = ({
         case 'used':
           return { name: 'arrow-forward', color: '#EF4444' };
         case 'transferred':
-          return { name: 'swap-horizontal', color: '#3B82F6' };
+          return { name: 'swap-horizontal', color: '#2E72F0' };
         default:
           return { name: 'cube', color: '#06B6D4' };
       }
@@ -35,7 +35,7 @@ const UnifiedActivityCard: React.FC<UnifiedActivityCardProps> = ({
         case 'complete':
           return { name: 'checkmark-circle', color: '#10B981' };
         case 'reopen':
-          return { name: 'refresh-circle', color: '#F59E0B' };
+          return { name: 'refresh-circle', color: '#EE730C' };
         default:
           return { name: 'information-circle', color: '#6B7280' };
       }
@@ -67,7 +67,7 @@ const UnifiedActivityCard: React.FC<UnifiedActivityCardProps> = ({
         case 'used':
           return '#FEE2E2';
         case 'transferred':
-          return '#DBEAFE';
+          return '#C4D8FC';
         default:
           return '#F0F9FF';
       }

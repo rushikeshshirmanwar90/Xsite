@@ -174,7 +174,7 @@ const AddStockModal: React.FC<AddStockModalProps> = ({
 
                     {/* Info Box */}
                     <View style={styles.infoBox}>
-                        <Ionicons name="information-circle" size={20} color="#3B82F6" />
+                        <Ionicons name="information-circle" size={20} color="#2E72F0" />
                         <Text style={styles.infoText}>
                             {mergeIfExists 
                                 ? 'Quantity will be added to existing material if specs match'
@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
     infoBox: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         padding: 12,
         borderRadius: 8,
         marginBottom: 24,

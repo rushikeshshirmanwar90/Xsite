@@ -135,7 +135,7 @@ const ClientStaffsManager: React.FC<ClientStaffsManagerProps> = ({
         <View style={styles.staffInfo}>
           <View style={styles.staffHeader}>
             <View style={styles.staffIcon}>
-              <Ionicons name="person" size={20} color="#3B82F6" />
+              <Ionicons name="person" size={20} color="#2E72F0" />
             </View>
             <View style={styles.staffDetails}>
               <Text style={styles.staffName}>{item.staffName}</Text>
@@ -172,7 +172,7 @@ const ClientStaffsManager: React.FC<ClientStaffsManagerProps> = ({
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3B82F6" />
+        <ActivityIndicator size="large" color="#2E72F0" />
         <Text style={styles.loadingText}>Loading staff members...</Text>
       </View>
     );
@@ -196,8 +196,8 @@ const ClientStaffsManager: React.FC<ClientStaffsManagerProps> = ({
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#3B82F6']}
-            tintColor="#3B82F6"
+            colors={['#2E72F0']}
+            tintColor="#2E72F0"
           />
         }
         contentContainerStyle={staffs.length === 0 ? styles.emptyContainer : undefined}
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,

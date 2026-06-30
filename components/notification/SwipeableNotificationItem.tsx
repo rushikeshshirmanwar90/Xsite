@@ -276,7 +276,7 @@ const styles = StyleSheet.create({
     approvalPendingItem: {
         backgroundColor: '#FFFBEB',
         borderLeftWidth: 4,
-        borderLeftColor: '#F59E0B',
+        borderLeftColor: '#EE730C',
     },
     iconContainer: {
         width: 32,
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     },
     projectText: {
         fontSize: 12,
-        color: '#3B82F6',
+        color: '#2E72F0',
         fontWeight: '500',
         marginBottom: 8,
     },
@@ -422,7 +422,7 @@ const styles = StyleSheet.create({
         right: 16,
         width: 8,
         height: 8,
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         borderRadius: 4,
     },
 });

@@ -216,7 +216,7 @@ const OtherCostFormModal: React.FC<Props> = ({ visible, onClose, onSubmit }) => 
                 {entries.map((e, i) => (
                   <View key={i} style={styles.entryRow}>
                     <View style={styles.entryIconBox}>
-                      <Ionicons name="receipt-outline" size={18} color="#6366F1" />
+                      <Ionicons name="receipt-outline" size={18} color="#2E72F0" />
                     </View>
                     <View style={styles.entryInfo}>
                       <Text style={styles.entryTitle} numberOfLines={1}>{e.title}</Text>
@@ -368,7 +368,7 @@ const OtherCostFormModal: React.FC<Props> = ({ visible, onClose, onSubmit }) => 
                       transform: [{ translateX: swipeAnim.interpolate({ inputRange: [0, 1], outputRange: [0, MAX_SWIPE], extrapolate: 'clamp' }) }],
                       backgroundColor: swipeAnim.interpolate({
                         inputRange: [0, 0.65, 0.7, 1],
-                        outputRange: ['#6366F1', '#6366F1', '#10B981', '#10B981'],
+                        outputRange: ['#2E72F0', '#2E72F0', '#10B981', '#10B981'],
                         extrapolate: 'clamp',
                       }),
                     },
@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 9,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#EAF0FE',
     justifyContent: 'center',
     alignItems: 'center',
     flexShrink: 0,
@@ -671,7 +671,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 3,
-    shadowColor: '#6366F1',
+    shadowColor: '#2E72F0',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.5,
     shadowRadius: 8,

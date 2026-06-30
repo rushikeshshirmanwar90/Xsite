@@ -74,7 +74,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ children }) => {
                 alignItems: 'center', 
                 backgroundColor: '#F0F4FF' // Light blue background
             }}>
-                <ActivityIndicator size="large" color="#4F46E5" />
+                <ActivityIndicator size="large" color="#1A54C4" />
                 <Text style={{
                     marginTop: 16,
                     fontSize: 16,

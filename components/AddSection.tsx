@@ -235,8 +235,8 @@ const styles = StyleSheet.create({
         borderColor: '#E5E7EB',
     },
     typeItemSelected: {
-        borderColor: '#3B82F6',
-        backgroundColor: '#EFF6FF',
+        borderColor: '#2E72F0',
+        backgroundColor: '#EAF0FE',
     },
     typeItemContent: {
         flexDirection: 'row',
@@ -258,11 +258,11 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
     },
     checkboxSelected: {
-        backgroundColor: '#3B82F6',
-        borderColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
+        borderColor: '#2E72F0',
     },
     submitButton: {
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         borderRadius: 8,
         padding: 16,
         alignItems: 'center',

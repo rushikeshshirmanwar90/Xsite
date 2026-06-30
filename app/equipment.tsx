@@ -69,18 +69,18 @@ const getEquipmentIconAndColor = (category: string, type: string) => {
     const categoryMap: { [key: string]: { icon: keyof typeof Ionicons.glyphMap, color: string } } = {
         'Earthmoving & Excavation Equipment': { icon: 'construct-outline', color: '#8B5CF6' },
         'Material Handling & Lifting': { icon: 'arrow-up-outline', color: '#10B981' },
-        'Concrete & Paving Equipment': { icon: 'cube-outline', color: '#F59E0B' },
+        'Concrete & Paving Equipment': { icon: 'cube-outline', color: '#EE730C' },
         'Hauling & Transport Vehicles': { icon: 'car-outline', color: '#EF4444' },
-        'Specialty & Finishing Equipment': { icon: 'settings-outline', color: '#6366F1' },
+        'Specialty & Finishing Equipment': { icon: 'settings-outline', color: '#2E72F0' },
     };
 
     // Specific equipment type overrides
     const typeMap: { [key: string]: { icon: keyof typeof Ionicons.glyphMap, color: string } } = {
         'Excavator': { icon: 'construct', color: '#8B5CF6' },
         'Tower Crane': { icon: 'arrow-up', color: '#10B981' },
-        'Concrete Mixer Truck': { icon: 'cube', color: '#F59E0B' },
+        'Concrete Mixer Truck': { icon: 'cube', color: '#EE730C' },
         'Dump Truck': { icon: 'car', color: '#EF4444' },
-        'Generator': { icon: 'flash', color: '#6366F1' },
+        'Generator': { icon: 'flash', color: '#2E72F0' },
         'Compressor': { icon: 'radio', color: '#06B6D4' },
         'Welding Machine': { icon: 'flame', color: '#F97316' },
     };
@@ -239,18 +239,18 @@ const EquipmentManagement = () => {
         const categoryMap: { [key: string]: { icon: keyof typeof Ionicons.glyphMap, color: string } } = {
             'Earthmoving & Excavation Equipment': { icon: 'construct-outline', color: '#8B5CF6' },
             'Material Handling & Lifting': { icon: 'arrow-up-outline', color: '#10B981' },
-            'Concrete & Paving Equipment': { icon: 'cube-outline', color: '#F59E0B' },
+            'Concrete & Paving Equipment': { icon: 'cube-outline', color: '#EE730C' },
             'Hauling & Transport Vehicles': { icon: 'car-outline', color: '#EF4444' },
-            'Specialty & Finishing Equipment': { icon: 'settings-outline', color: '#6366F1' },
+            'Specialty & Finishing Equipment': { icon: 'settings-outline', color: '#2E72F0' },
         };
 
         // Specific equipment type overrides
         const typeMap: { [key: string]: { icon: keyof typeof Ionicons.glyphMap, color: string } } = {
             'Excavator': { icon: 'construct', color: '#8B5CF6' },
             'Tower Crane': { icon: 'arrow-up', color: '#10B981' },
-            'Concrete Mixer Truck': { icon: 'cube', color: '#F59E0B' },
+            'Concrete Mixer Truck': { icon: 'cube', color: '#EE730C' },
             'Dump Truck': { icon: 'car', color: '#EF4444' },
-            'Generator': { icon: 'flash', color: '#6366F1' },
+            'Generator': { icon: 'flash', color: '#2E72F0' },
             'Compressor': { icon: 'radio', color: '#06B6D4' },
             'Welding Machine': { icon: 'flame', color: '#F97316' },
         };
@@ -653,44 +653,6 @@ const EquipmentManagement = () => {
                 hideSection={true}
             />
 
-            {/* Action Button - Add Equipment */}
-            <View style={actionStyles.stickyActionButtonsContainer}>
-                <TouchableOpacity
-                    style={[
-                        actionStyles.addEquipmentButton,
-                        isAddingEquipment && actionStyles.addEquipmentButtonDisabled
-                    ]}
-                    onPress={() => setShowEquipmentForm(true)}
-                    activeOpacity={0.7}
-                    disabled={isAddingEquipment}
-                >
-                    {isAddingEquipment ? (
-                        <Animated.View
-                            style={{
-                                transform: [
-                                    {
-                                        rotate: loadingAnimation.interpolate({
-                                            inputRange: [0, 1],
-                                            outputRange: ['0deg', '360deg'],
-                                        }),
-                                    },
-                                ],
-                            }}
-                        >
-                            <Ionicons name="sync" size={20} color="#94A3B8" />
-                        </Animated.View>
-                    ) : (
-                        <Ionicons name="construct-outline" size={20} color="#F59E0B" />
-                    )}
-                    <Text style={[
-                        actionStyles.addEquipmentButtonText,
-                        isAddingEquipment && actionStyles.addEquipmentButtonTextDisabled
-                    ]}>
-                        {isAddingEquipment ? 'Adding...' : 'Add Equipment'}
-                    </Text>
-                </TouchableOpacity>
-            </View>
-
             <EquipmentFormModal
                 visible={showEquipmentForm}
                 onClose={() => setShowEquipmentForm(false)}
@@ -710,11 +672,32 @@ const EquipmentManagement = () => {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        colors={['#F59E0B']}
-                        tintColor="#F59E0B"
+                        colors={['#EE730C']}
+                        tintColor="#EE730C"
                     />
                 }
             >
+                {/* Context banner */}
+                <TouchableOpacity
+                    style={bannerStyle.banner}
+                    activeOpacity={0.75}
+                    disabled={isAddingEquipment}
+                    onPress={() => setShowEquipmentForm(true)}
+                >
+                    <View style={bannerStyle.iconWrap}>
+                        <Ionicons name="hardware-chip" size={24} color="#2563EB" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={bannerStyle.eyebrow}>Machinery & Tools</Text>
+                        <Text style={bannerStyle.title}>Equipment Cost</Text>
+                    </View>
+                    <View style={bannerStyle.addBtn}>
+                        {isAddingEquipment
+                            ? <Ionicons name="sync" size={18} color="#fff" />
+                            : <Ionicons name="add" size={20} color="#fff" />}
+                    </View>
+                </TouchableOpacity>
+
                 {/* Equipment Entries Display */}
                 {loading ? (
                     <View style={styles.noMaterialsContainer}>
@@ -726,7 +709,7 @@ const EquipmentManagement = () => {
                                 }) || '0deg'
                             }]
                         }}>
-                            <Ionicons name="sync" size={48} color="#F59E0B" />
+                            <Ionicons name="sync" size={48} color="#EE730C" />
                         </Animated.View>
                         <Text style={styles.noMaterialsTitle}>Loading Equipment...</Text>
                         <Text style={styles.noMaterialsDescription}>
@@ -786,7 +769,7 @@ const EquipmentManagement = () => {
                             onPress={() => handlePageChange(currentPage - 1)}
                             disabled={currentPage === 1}
                         >
-                            <Ionicons name="chevron-back" size={16} color={currentPage === 1 ? "#CBD5E1" : "#F59E0B"} />
+                            <Ionicons name="chevron-back" size={16} color={currentPage === 1 ? "#CBD5E1" : "#EE730C"} />
                         </TouchableOpacity>
 
                         <View style={paginationStyles.pageNumbers}>
@@ -827,7 +810,7 @@ const EquipmentManagement = () => {
                             onPress={() => handlePageChange(currentPage + 1)}
                             disabled={currentPage === totalPages}
                         >
-                            <Ionicons name="chevron-forward" size={16} color={currentPage === totalPages ? "#CBD5E1" : "#F59E0B"} />
+                            <Ionicons name="chevron-forward" size={16} color={currentPage === totalPages ? "#CBD5E1" : "#EE730C"} />
                         </TouchableOpacity>
                     </View>
                 )}
@@ -852,7 +835,7 @@ const EquipmentManagement = () => {
                                 },
                             ]}
                         >
-                            <Ionicons name="construct" size={48} color="#F59E0B" />
+                            <Ionicons name="construct" size={48} color="#EE730C" />
                         </Animated.View>
                         <Text style={loadingStyles.loadingTitle}>Adding Equipment</Text>
                         <Text style={loadingStyles.loadingSubtitle}>Please wait while we process your request...</Text>
@@ -932,7 +915,7 @@ const actionStyles = StyleSheet.create({
     addEquipmentButtonText: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#F59E0B',
+        color: '#EE730C',
     },
     addEquipmentButtonDisabled: {
         backgroundColor: '#F1F5F9',
@@ -1044,7 +1027,7 @@ const equipmentCardStyles = StyleSheet.create({
         fontWeight: '600',
     },
     totalCost: {
-        color: '#F59E0B',
+        color: '#EE730C',
         fontSize: 16,
     },
     notesContainer: {
@@ -1122,8 +1105,8 @@ const paginationStyles = StyleSheet.create({
         alignItems: 'center',
     },
     pageNumberActive: {
-        backgroundColor: '#F59E0B',
-        borderColor: '#F59E0B',
+        backgroundColor: '#EE730C',
+        borderColor: '#EE730C',
     },
     pageNumberText: {
         fontSize: 14,
@@ -1185,6 +1168,57 @@ const loadingStyles = StyleSheet.create({
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#F59E0B',
+        backgroundColor: '#EE730C',
+    },
+});
+
+const bannerStyle = StyleSheet.create({
+    banner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 14,
+        marginHorizontal: 16,
+        marginTop: 14,
+        marginBottom: 6,
+        backgroundColor: '#EAF0FE',
+        borderWidth: 1,
+        borderColor: '#C4D8FC',
+        borderRadius: 14,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+    },
+    iconWrap: {
+        width: 44,
+        height: 44,
+        borderRadius: 11,
+        backgroundColor: '#FFFFFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#C4D8FC',
+        flexShrink: 0,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 3,
+        elevation: 2,
+    },
+    eyebrow: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#2563EB',
+        textTransform: 'uppercase',
+        letterSpacing: 0.8,
+        marginBottom: 2,
+    },
+    title: { fontSize: 15, fontWeight: '700', color: '#1E293B' },
+    addBtn: {
+        width: 34,
+        height: 34,
+        borderRadius: 10,
+        backgroundColor: '#2563EB',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
     },
 });

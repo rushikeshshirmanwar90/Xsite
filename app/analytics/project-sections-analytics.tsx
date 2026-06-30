@@ -437,7 +437,7 @@ const ProjectSectionsAnalytics: React.FC = () => {
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color="#3B82F6" />
+              <Ionicons name="arrow-back" size={24} color="#2E72F0" />
             </TouchableOpacity>
             <View style={styles.projectInfo}>
               <Text style={styles.projectName}>{projectName}</Text>
@@ -451,14 +451,14 @@ const ProjectSectionsAnalytics: React.FC = () => {
           <Text style={styles.summaryTitle}>Expenses Breakdown</Text>
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
-              <View style={[styles.summaryDot, { backgroundColor: '#3B82F6' }]} />
+              <View style={[styles.summaryDot, { backgroundColor: '#2E72F0' }]} />
               <Text style={styles.summaryLabel}>Materials Used</Text>
             </View>
             <Text style={styles.summaryValue}>{formatCurrency(totalUsed)}</Text>
           </View>
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
-              <View style={[styles.summaryDot, { backgroundColor: '#F59E0B' }]} />
+              <View style={[styles.summaryDot, { backgroundColor: '#EE730C' }]} />
               <Text style={styles.summaryLabel}>Labor Costs</Text>
             </View>
             <Text style={styles.summaryValue}>{formatCurrency(totalLabor)}</Text>
@@ -499,7 +499,7 @@ const ProjectSectionsAnalytics: React.FC = () => {
 
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#3B82F6" />
+            <ActivityIndicator size="large" color="#2E72F0" />
             <Text style={styles.loadingText}>Loading section data...</Text>
           </View>
         ) : sections.length === 0 ? (
@@ -781,7 +781,7 @@ const styles = StyleSheet.create({
   },
   summaryTotalValue: {
     fontSize: 16,
-    color: '#3B82F6',
+    color: '#2E72F0',
     fontWeight: '800',
   },
 });

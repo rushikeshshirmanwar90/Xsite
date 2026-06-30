@@ -18,7 +18,7 @@ export const UserProfileExample = () => {
   if (loading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#3B82F6" />
+        <ActivityIndicator size="large" color="#2E72F0" />
         <Text>Loading user data...</Text>
       </View>
     );
@@ -189,7 +189,7 @@ export const UserManagementExample = () => {
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#3B82F6" />
+        <ActivityIndicator size="large" color="#2E72F0" />
       </View>
     );
   }
@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
     color: '#4B5563',
   },
   button: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',

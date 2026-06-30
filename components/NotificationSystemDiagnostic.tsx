@@ -405,7 +405,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     borderLeftWidth: 4,
-    borderLeftColor: '#3B82F6',
+    borderLeftColor: '#2E72F0',
   },
   resultText: {
     fontSize: 12,
@@ -419,13 +419,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   primaryButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
   },
   testButton: {
     backgroundColor: '#10B981',
   },
   warningButton: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: '#EE730C',
   },
   buttonText: {
     color: 'white',

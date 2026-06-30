@@ -127,7 +127,7 @@ const MaterialActivityNotifications: React.FC<MaterialActivityNotificationsProps
     const getActivityColor = (activity: 'imported' | 'used' | 'transferred') => {
         if (activity === 'imported') return '#10B981';
         if (activity === 'used') return '#EF4444';
-        return '#3B82F6'; // For transferred
+        return '#2E72F0'; // For transferred
     };
 
     const formatDate = (dateString: string) => {
@@ -261,7 +261,7 @@ const MaterialActivityNotifications: React.FC<MaterialActivityNotificationsProps
                     <View style={styles.header}>
                         <View style={styles.headerLeft}>
                             <View style={styles.headerIconContainer}>
-                                <Ionicons name="notifications" size={24} color="#3B82F6" />
+                                <Ionicons name="notifications" size={24} color="#2E72F0" />
                             </View>
                             <View>
                                 <Text style={styles.title}>Material Activities</Text>
@@ -316,7 +316,7 @@ const MaterialActivityNotifications: React.FC<MaterialActivityNotificationsProps
                     {/* Activities List */}
                     {loading ? (
                         <View style={styles.loadingContainer}>
-                            <ActivityIndicator size="large" color="#3B82F6" />
+                            <ActivityIndicator size="large" color="#2E72F0" />
                             <Text style={styles.loadingText}>Loading activities...</Text>
                         </View>
                     ) : activities.length === 0 ? (
@@ -338,8 +338,8 @@ const MaterialActivityNotifications: React.FC<MaterialActivityNotificationsProps
                                 <RefreshControl
                                     refreshing={refreshing}
                                     onRefresh={onRefresh}
-                                    colors={['#3B82F6']}
-                                    tintColor="#3B82F6"
+                                    colors={['#2E72F0']}
+                                    tintColor="#2E72F0"
                                 />
                             }
                         />
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
         width: 48,
         height: 48,
         borderRadius: 12,
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
@@ -416,9 +416,9 @@ const styles = StyleSheet.create({
         gap: 6,
     },
     filterTabActive: {
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         borderWidth: 1,
-        borderColor: '#3B82F6',
+        borderColor: '#2E72F0',
     },
     filterTabText: {
         fontSize: 14,
@@ -426,7 +426,7 @@ const styles = StyleSheet.create({
         color: '#64748B',
     },
     filterTabTextActive: {
-        color: '#3B82F6',
+        color: '#2E72F0',
     },
     loadingContainer: {
         flex: 1,
@@ -541,7 +541,7 @@ const styles = StyleSheet.create({
         width: 6,
         height: 6,
         borderRadius: 3,
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
     },
     materialName: {
         flex: 1,

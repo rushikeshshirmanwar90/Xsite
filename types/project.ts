@@ -26,6 +26,9 @@ export interface Project {
   startDate?: string; // Added for project setup step (ISO date string)
   projectType?: string; // Added for project setup step
   notes?: string; // Added for project setup step
+  slabsCount?: number;
+  hasTerrace?: boolean;
+  buildings?: Array<{ name: string; slabsCount: number; hasTerrace: boolean }>;
 }
 
 export interface MaterialItem {

@@ -17,7 +17,7 @@ const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack }) => {
         <View style={styles.container}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#3B82F6" />
+                    <Ionicons name="arrow-back" size={24} color="#2E72F0" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Project Details</Text>
                 <View style={{ width: 24 }} />
@@ -31,7 +31,7 @@ const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack }) => {
                 </View>
                 <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Status:</Text>
-                    <View style={[styles.statusBadge, { backgroundColor: project.status === 'active' ? '#DCFCE7' : project.status === 'planning' ? '#FEF3C7' : '#DBEAFE' }]}>
+                    <View style={[styles.statusBadge, { backgroundColor: project.status === 'active' ? '#DCFCE7' : project.status === 'planning' ? '#FEF3C7' : '#C4D8FC' }]}>
                         <Text style={[styles.statusText, { color: project.status === 'active' ? '#166534' : project.status === 'planning' ? '#92400E' : '#1E40AF' }]}>
                             {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
                         </Text>
@@ -200,7 +200,7 @@ const App: React.FC = () => {
                     onPress={() => setShowAddModal(true)}
                 >
                     <LinearGradient
-                        colors={['#3B82F6', '#8B5CF6']}
+                        colors={['#2E72F0', '#8B5CF6']}
                         style={styles.addButtonGradient}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}

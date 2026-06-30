@@ -215,7 +215,7 @@ const NotificationTestHelper: React.FC<TestNotificationHelperProps> = ({ onClose
                   </Text>
                 </View>
               </View>
-              <Ionicons name="add" size={20} color="#3B82F6" />
+              <Ionicons name="add" size={20} color="#2E72F0" />
             </TouchableOpacity>
           ))}
         </View>
@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   primaryButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
   },
   primaryButtonText: {
     color: '#FFFFFF',

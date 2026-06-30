@@ -176,7 +176,7 @@ export class PDFReportGenerator {
                     <div style="background-color: #fef3c7; padding: 12px; border-bottom: 1px solid #e2e8f0;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <div>
-                                <span style="background-color: #F59E0B; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
+                                <span style="background-color: #EE730C; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
                                     👷 LABOR ENTRY
                                 </span>
                                 <span style="margin-left: 10px; font-weight: 600; color: #374151;">
@@ -204,7 +204,7 @@ export class PDFReportGenerator {
                             <tr>
                                 <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">
                                     <div style="display: flex; align-items: center;">
-                                        <div style="width: 8px; height: 8px; background-color: #F59E0B; border-radius: 50%; margin-right: 8px;"></div>
+                                        <div style="width: 8px; height: 8px; background-color: #EE730C; border-radius: 50%; margin-right: 8px;"></div>
                                         <strong>${labor.type || 'Unknown Type'}</strong>
                                     </div>
                                 </td>
@@ -224,7 +224,7 @@ export class PDFReportGenerator {
                                 <td style="padding: 10px; border-top: 2px solid #e2e8f0;" colspan="3">
                                     Entry Total
                                 </td>
-                                <td style="padding: 10px; text-align: right; border-top: 2px solid #e2e8f0; color: #F59E0B;">
+                                <td style="padding: 10px; text-align: right; border-top: 2px solid #e2e8f0; color: #EE730C;">
                                     ${this.formatCurrency(Number(labor.totalCost) || 0)}
                                 </td>
                             </tr>
@@ -274,10 +274,10 @@ export class PDFReportGenerator {
             
             return `
                 <div style="margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-                    <div style="background-color: #eff6ff; padding: 12px; border-bottom: 1px solid #e2e8f0;">
+                    <div style="background-color: #EAF0FE; padding: 12px; border-bottom: 1px solid #e2e8f0;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <div>
-                                <span style="background-color: #3B82F6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
+                                <span style="background-color: #2E72F0; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
                                     🚜 EQUIPMENT ENTRY
                                 </span>
                                 <span style="margin-left: 10px; font-weight: 600; color: #374151;">
@@ -306,7 +306,7 @@ export class PDFReportGenerator {
                             <tr>
                                 <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">
                                     <div style="display: flex; align-items: center;">
-                                        <div style="width: 8px; height: 8px; background-color: #3B82F6; border-radius: 50%; margin-right: 8px;"></div>
+                                        <div style="width: 8px; height: 8px; background-color: #2E72F0; border-radius: 50%; margin-right: 8px;"></div>
                                         <strong>${equipment.type || 'Unknown Equipment'}</strong>
                                     </div>
                                 </td>
@@ -314,8 +314,8 @@ export class PDFReportGenerator {
                                     ${equipment.quantity || 0}
                                 </td>
                                 <td style="padding: 8px; border-bottom: 1px solid #f1f5f9; text-align: center;">
-                                    <span style="background-color: ${equipment.costType === 'rental' ? '#EFF6FF' : equipment.costType === 'purchase' ? '#F0FDF4' : '#FEF3C7'}; 
-                                                 color: ${equipment.costType === 'rental' ? '#3B82F6' : equipment.costType === 'purchase' ? '#10B981' : '#F59E0B'}; 
+                                    <span style="background-color: ${equipment.costType === 'rental' ? '#EAF0FE' : equipment.costType === 'purchase' ? '#F0FDF4' : '#FEF3C7'}; 
+                                                 color: ${equipment.costType === 'rental' ? '#2E72F0' : equipment.costType === 'purchase' ? '#10B981' : '#F59E0B'}; 
                                                  padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">
                                         ${(equipment.costType || 'rental').toUpperCase()}
                                     </span>
@@ -329,11 +329,11 @@ export class PDFReportGenerator {
                             </tr>
                         </tbody>
                         <tfoot>
-                            <tr style="background-color: #eff6ff; font-weight: bold;">
+                            <tr style="background-color: #EAF0FE; font-weight: bold;">
                                 <td style="padding: 10px; border-top: 2px solid #e2e8f0;" colspan="4">
                                     Entry Total
                                 </td>
-                                <td style="padding: 10px; text-align: right; border-top: 2px solid #e2e8f0; color: #3B82F6;">
+                                <td style="padding: 10px; text-align: right; border-top: 2px solid #e2e8f0; color: #2E72F0;">
                                     ${this.formatCurrency(Number(equipment.totalCost) || 0)}
                                 </td>
                             </tr>
@@ -529,11 +529,11 @@ export class PDFReportGenerator {
 
         return `
             <div style="margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-                <div style="background-color: ${isImported ? '#f0fdf4' : isUsed ? '#fef2f2' : '#eff6ff'}; padding: 12px; border-bottom: 1px solid #e2e8f0;">
+                <div style="background-color: ${isImported ? '#f0fdf4' : isUsed ? '#fef2f2' : '#EAF0FE'}; padding: 12px; border-bottom: 1px solid #e2e8f0;">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                         <div style="flex: 1;">
                             <div style="margin-bottom: 8px;">
-                                <span style="background-color: ${isImported ? '#10B981' : isUsed ? '#EF4444' : '#3B82F6'}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
+                                <span style="background-color: ${isImported ? '#10B981' : isUsed ? '#EF4444' : '#2E72F0'}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
                                     ${isImported ? 'IMPORTED' : isUsed ? 'USED' : 'TRANSFERRED'}
                                 </span>
                                 <span style="margin-left: 10px; font-weight: 600; color: #374151;">
@@ -579,7 +579,7 @@ export class PDFReportGenerator {
                     ${activity.message ? `<div style="margin-top: 8px; font-size: 13px; color: #6b7280; font-style: italic;">"${activity.message}"</div>` : ''}
                     
                     ${isTransferred && activity.transferDetails ? `
-                        <div style="margin-top: 8px; padding: 8px; background-color: rgba(59, 130, 246, 0.1); border-radius: 6px; border-left: 3px solid #3B82F6;">
+                        <div style="margin-top: 8px; padding: 8px; background-color: rgba(59, 130, 246, 0.1); border-radius: 6px; border-left: 3px solid #2E72F0;">
                             <div style="font-size: 12px; color: #374151; font-weight: 600;">Transfer Details:</div>
                             <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">
                                 From: <strong>${activity.transferDetails.fromProject.name}</strong> → To: <strong>${activity.transferDetails.toProject.name}</strong>
@@ -898,13 +898,13 @@ export class PDFReportGenerator {
                 <!-- Labor Costs Summary -->
                 ${sortedLabor.length > 0 ? `
                     <div style="margin-bottom: 32px;">
-                        <div style="background-color: #fef3c7; padding: 16px; border-radius: 8px 8px 0 0; border: 1px solid #F59E0B; border-bottom: none;">
+                        <div style="background-color: #fef3c7; padding: 16px; border-radius: 8px 8px 0 0; border: 1px solid #EE730C; border-bottom: none;">
                             <h2 style="margin: 0; color: #D97706; font-size: 20px; display: flex; align-items: center;">
                                 <span style="margin-right: 8px;">👷</span> Labor Costs Summary
                             </h2>
                             <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">Total: ${this.formatCurrency(totalLaborCost)} across ${sortedLabor.length} labor categories</p>
                         </div>
-                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #F59E0B; border-top: none;">
+                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #EE730C; border-top: none;">
                             <thead>
                                 <tr style="background-color: #f8fafc;">
                                     <th style="padding: 12px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0; width: 50px;">#</th>
@@ -920,7 +920,7 @@ export class PDFReportGenerator {
                                         <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-weight: 600; color: #6b7280;">${index + 1}</td>
                                         <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">
                                             <div style="display: flex; align-items: center;">
-                                                <div style="width: 8px; height: 8px; background-color: #F59E0B; border-radius: 50%; margin-right: 8px;"></div>
+                                                <div style="width: 8px; height: 8px; background-color: #EE730C; border-radius: 50%; margin-right: 8px;"></div>
                                                 <strong style="color: #374151;">${name}</strong>
                                             </div>
                                         </td>
@@ -938,13 +938,13 @@ export class PDFReportGenerator {
                             </tbody>
                             <tfoot>
                                 <tr style="background-color: #fef3c7; font-weight: bold;">
-                                    <td colspan="3" style="padding: 12px; border-top: 2px solid #F59E0B; color: #D97706;">
+                                    <td colspan="3" style="padding: 12px; border-top: 2px solid #EE730C; color: #D97706;">
                                         Total Labor Cost
                                     </td>
-                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #F59E0B; color: #D97706; font-size: 16px;">
+                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #EE730C; color: #D97706; font-size: 16px;">
                                         ${this.formatCurrency(totalLaborCost)}
                                     </td>
-                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #F59E0B; color: #D97706;">
+                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #EE730C; color: #D97706;">
                                         100%
                                     </td>
                                 </tr>
@@ -956,13 +956,13 @@ export class PDFReportGenerator {
                 <!-- Equipment Costs Summary -->
                 ${sortedEquipment.length > 0 ? `
                     <div style="margin-bottom: 32px;">
-                        <div style="background-color: #eff6ff; padding: 16px; border-radius: 8px 8px 0 0; border: 1px solid #3B82F6; border-bottom: none;">
+                        <div style="background-color: #EAF0FE; padding: 16px; border-radius: 8px 8px 0 0; border: 1px solid #2E72F0; border-bottom: none;">
                             <h2 style="margin: 0; color: #1E40AF; font-size: 20px; display: flex; align-items: center;">
                                 <span style="margin-right: 8px;">🚜</span> Equipment Costs Summary
                             </h2>
                             <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">Total: ${this.formatCurrency(totalEquipmentCost)} across ${sortedEquipment.length} equipment types</p>
                         </div>
-                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #3B82F6; border-top: none;">
+                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #2E72F0; border-top: none;">
                             <thead>
                                 <tr style="background-color: #f8fafc;">
                                     <th style="padding: 12px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0; width: 50px;">#</th>
@@ -978,7 +978,7 @@ export class PDFReportGenerator {
                                         <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-weight: 600; color: #6b7280;">${index + 1}</td>
                                         <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">
                                             <div style="display: flex; align-items: center;">
-                                                <div style="width: 8px; height: 8px; background-color: #3B82F6; border-radius: 50%; margin-right: 8px;"></div>
+                                                <div style="width: 8px; height: 8px; background-color: #2E72F0; border-radius: 50%; margin-right: 8px;"></div>
                                                 <div>
                                                     <strong style="color: #374151;">${name}</strong>
                                                     <div style="font-size: 11px; color: #9ca3af; margin-top: 2px;">${data.category}</div>
@@ -998,14 +998,14 @@ export class PDFReportGenerator {
                                 `).join('')}
                             </tbody>
                             <tfoot>
-                                <tr style="background-color: #eff6ff; font-weight: bold;">
-                                    <td colspan="3" style="padding: 12px; border-top: 2px solid #3B82F6; color: #1E40AF;">
+                                <tr style="background-color: #EAF0FE; font-weight: bold;">
+                                    <td colspan="3" style="padding: 12px; border-top: 2px solid #2E72F0; color: #1E40AF;">
                                         Total Equipment Cost
                                     </td>
-                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #3B82F6; color: #1E40AF; font-size: 16px;">
+                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #2E72F0; color: #1E40AF; font-size: 16px;">
                                         ${this.formatCurrency(totalEquipmentCost)}
                                     </td>
-                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #3B82F6; color: #1E40AF;">
+                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #2E72F0; color: #1E40AF;">
                                         100%
                                     </td>
                                 </tr>
@@ -1171,7 +1171,7 @@ export class PDFReportGenerator {
                 <h3 style="margin: 0 0 12px 0; color: #374151;">Summary</h3>
                 <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
                     <div>
-                        <div style="font-size: 24px; font-weight: bold; color: #3b82f6;">${totalActivities + (laborData || []).length + (equipmentData || []).length + (otherCostData || []).length}</div>
+                        <div style="font-size: 24px; font-weight: bold; color: #2E72F0;">${totalActivities + (laborData || []).length + (equipmentData || []).length + (otherCostData || []).length}</div>
                         <div style="font-size: 12px; color: #6b7280;">Total Entries</div>
                     </div>
                     <div>
@@ -1186,11 +1186,11 @@ export class PDFReportGenerator {
                         <div style="font-size: 12px; color: #6b7280;">Materials Cost</div>
                     </div>
                     <div>
-                        <div style="font-size: 16px; font-weight: bold; color: #f59e0b;">${this.formatCurrency(totalLaborCost)}</div>
+                        <div style="font-size: 16px; font-weight: bold; color: #EE730C;">${this.formatCurrency(totalLaborCost)}</div>
                         <div style="font-size: 12px; color: #6b7280;">Labor Cost</div>
                     </div>
                     <div>
-                        <div style="font-size: 16px; font-weight: bold; color: #3b82f6;">${this.formatCurrency(totalEquipmentCost)}</div>
+                        <div style="font-size: 16px; font-weight: bold; color: #2E72F0;">${this.formatCurrency(totalEquipmentCost)}</div>
                         <div style="font-size: 12px; color: #6b7280;">Equipment Cost</div>
                     </div>
                     <div>
@@ -1210,7 +1210,7 @@ export class PDFReportGenerator {
                             <div style="font-size: 12px; color: #6b7280;">Materials Used</div>
                         </div>
                         <div>
-                            <div style="font-size: 16px; font-weight: bold; color: #3b82f6;">${transferredCount}</div>
+                            <div style="font-size: 16px; font-weight: bold; color: #2E72F0;">${transferredCount}</div>
                             <div style="font-size: 12px; color: #6b7280;">Materials Transferred</div>
                         </div>
                     </div>
@@ -1220,7 +1220,7 @@ export class PDFReportGenerator {
                             <div style="font-size: 12px; color: #6b7280;">Labor Entries</div>
                         </div>
                         <div>
-                            <div style="font-size: 16px; font-weight: bold; color: #f59e0b;">${(equipmentData || []).length}</div>
+                            <div style="font-size: 16px; font-weight: bold; color: #EE730C;">${(equipmentData || []).length}</div>
                             <div style="font-size: 12px; color: #6b7280;">Equipment Entries</div>
                         </div>
                         <div>
@@ -1326,7 +1326,7 @@ export class PDFReportGenerator {
                         ` : ''}
                         
                         ${dayTotal > 0 ? `
-                            <div style="margin-top: 16px; padding: 12px; background-color: #f0f9ff; border-radius: 6px; border-left: 4px solid #3B82F6;">
+                            <div style="margin-top: 16px; padding: 12px; background-color: #f0f9ff; border-radius: 6px; border-left: 4px solid #2E72F0;">
                                 <div style="display: flex; justify-content: space-between; align-items: center;">
                                     <div>
                                         <div style="font-size: 14px; font-weight: 600; color: #374151;">Day Total</div>
@@ -1334,7 +1334,7 @@ export class PDFReportGenerator {
                                             ${dayMaterialTotal > 0 ? `Materials: ${this.formatCurrency(dayMaterialTotal)}` : ''}${dayMaterialTotal > 0 && (dayLaborTotal > 0 || dayEquipmentTotal > 0 || dayOtherCostTotal > 0) ? ' • ' : ''}${dayLaborTotal > 0 ? `Labor: ${this.formatCurrency(dayLaborTotal)}` : ''}${(dayLaborTotal > 0 && (dayEquipmentTotal > 0 || dayOtherCostTotal > 0)) ? ' • ' : ''}${dayEquipmentTotal > 0 ? `Equipment: ${this.formatCurrency(dayEquipmentTotal)}` : ''}${dayEquipmentTotal > 0 && dayOtherCostTotal > 0 ? ' • ' : ''}${dayOtherCostTotal > 0 ? `Other Cost: ${this.formatCurrency(dayOtherCostTotal)}` : ''}
                                         </div>
                                     </div>
-                                    <div style="font-size: 20px; font-weight: bold; color: #3B82F6;">
+                                    <div style="font-size: 20px; font-weight: bold; color: #2E72F0;">
                                         ${this.formatCurrency(dayTotal)}
                                     </div>
                                 </div>
@@ -1385,13 +1385,13 @@ export class PDFReportGenerator {
                             <!-- Client Logo -->
                             <!-- TODO: Replace with actual client logo image when available -->
                             <!-- <img src="data:image/png;base64,..." style="width: 80px; height: 80px; border-radius: 12px; object-fit: cover;" alt="Company Logo" /> -->
-                            <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #3B82F6, #1E40AF); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 18px; text-align: center; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                            <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #2E72F0, #1E40AF); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 18px; text-align: center; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
                                 ${this.clientData.companyName ? this.clientData.companyName.substring(0, 2).toUpperCase() : 'CM'}
                             </div>
                         </div>
                         <div style="flex: 1; text-align: center; margin: 0 20px;">
                             <h1 style="margin: 0 0 8px 0; color: #1e293b; font-size: 32px; font-weight: 800;">${projectName || 'Project Cost Report'}</h1>
-                            <div style="background: linear-gradient(90deg, #3B82F6, #1E40AF); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 16px; font-weight: 600; margin-bottom: 8px;">
+                            <div style="background: linear-gradient(90deg, #2E72F0, #1E40AF); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 16px; font-weight: 600; margin-bottom: 8px;">
                                 ${(() => {
                                     const parts = [];
                                     if (includeMaterial) parts.push('Material');
@@ -1883,7 +1883,7 @@ export class PDFReportGenerator {
                                 <div style="font-size: 11px; opacity: 0.85; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Total Import Value</div>
                                 <div style="font-size: 26px; font-weight: 800;">${formatCurrency(grandTotal)}</div>
                             </div>
-                            <div style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; padding: 20px 24px; border-radius: 10px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);">
+                            <div style="background: linear-gradient(135deg, #2E72F0, #1d4ed8); color: white; padding: 20px 24px; border-radius: 10px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);">
                                 <div style="font-size: 11px; opacity: 0.85; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Material Types</div>
                                 <div style="font-size: 26px; font-weight: 800;">${new Set(allRows.map(r => r.name)).size}</div>
                             </div>
@@ -2062,7 +2062,7 @@ export class PDFReportGenerator {
     }
 
     // ✅ NEW: Generate a current material stock report — Sr No, Material Name,
-    // Total Imported (qty + per-unit price + total cost), Total Used, Total Available.
+    // Purchase qty, Per Unit Cost, Total Cost, Purchased By, Used, Remaining.
     async generateMaterialStockReport(
         materials: Array<{
             name: string;
@@ -2073,6 +2073,7 @@ export class PDFReportGenerator {
             currentlyAvailable: number;
             perUnitCost: number;
             totalCost: number;
+            purchasedBy?: string[];
         }>,
         reportTitle: string
     ): Promise<void> {
@@ -2117,26 +2118,35 @@ export class PDFReportGenerator {
 
             const tableRows = sortedMaterials.map((m, idx) => {
                 const specsString = buildSpecsString(m.specs);
+                const purchasersText = (m.purchasedBy && m.purchasedBy.length > 0)
+                    ? m.purchasedBy.join(', ')
+                    : '—';
                 return `
                 <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
-                    <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #374151; font-size: 12px; vertical-align: top;">
+                    <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #374151; font-size: 11px; vertical-align: top; text-align: left;">
                         ${idx + 1}
                     </td>
-                    <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: top;">
-                        <div style="font-weight: 700; color: #1e293b; font-size: 13px;">${m.name}</div>
-                        ${specsString ? `<div style="font-size: 11px; color: #64748b; margin-top: 2px;">${specsString}</div>` : ''}
-                        <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Unit: ${m.unit}</div>
+                    <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top;">
+                        <div style="font-weight: 700; color: #1e293b; font-size: 12px;">${m.name}</div>
+                        ${specsString ? `<div style="font-size: 10px; color: #64748b; margin-top: 2px;">${specsString}</div>` : ''}
+                        <div style="font-size: 10px; color: #94a3b8; margin-top: 2px;">Unit: ${m.unit}</div>
                     </td>
-                    <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: center; vertical-align: top;">
-                        <div style="font-weight: 700; color: #374151; font-size: 13px;">${(m.totalImported || 0).toLocaleString('en-IN')} ${m.unit}</div>
-                        <div style="font-size: 11px; color: #64748b; margin-top: 3px;">@ ${formatCurrency(m.perUnitCost)} / unit</div>
-                        <div style="font-size: 12px; font-weight: 700; color: #059669; margin-top: 2px;">${formatCurrency(m.totalCost)}</div>
+                    <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: center; vertical-align: top; font-weight: 700; color: #374151; font-size: 12px;">
+                        ${(m.totalImported || 0).toLocaleString('en-IN')}
+                        <div style="font-size: 10px; color: #94a3b8; font-weight: 400;">${m.unit}</div>
                     </td>
-                    <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: center; vertical-align: top; font-weight: 600; color: #b45309; font-size: 13px;">
+                    <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: center; vertical-align: top;">
+                        <div style="font-size: 11px; color: #64748b;">@ ${formatCurrency(m.perUnitCost)}/unit</div>
+                        <div style="font-weight: 700; color: #059669; font-size: 12px; margin-top: 2px;">${formatCurrency(m.totalCost)}</div>
+                    </td>
+                    <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; font-size: 11px; color: #475569;">
+                        ${purchasersText}
+                    </td>
+                    <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: center; vertical-align: top; font-weight: 600; color: #b45309; font-size: 12px;">
                         ${(m.totalUsed || 0).toLocaleString('en-IN')}
                         <div style="font-size: 10px; color: #94a3b8; font-weight: 400;">${m.unit}</div>
                     </td>
-                    <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: center; vertical-align: top; font-weight: 700; color: #1d4ed8; font-size: 13px;">
+                    <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: center; vertical-align: top; font-weight: 700; color: #1d4ed8; font-size: 12px;">
                         ${(m.currentlyAvailable || 0).toLocaleString('en-IN')}
                         <div style="font-size: 10px; color: #94a3b8; font-weight: 400;">${m.unit}</div>
                     </td>
@@ -2191,25 +2201,13 @@ export class PDFReportGenerator {
                                 <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Material Types</div>
                                 <div style="font-size: 13px; color: #0f172a; font-weight: 700; margin-top: 2px;">${sortedMaterials.length}</div>
                             </div>
+                            <div>
+                                <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Purchase Value</div>
+                                <div style="font-size: 13px; color: #059669; font-weight: 700; margin-top: 2px;">${formatCurrency(grandTotalImportValue)}</div>
+                            </div>
                         </div>
                         <div style="font-size: 11px; color: #64748b;">
                             ${generatedOn}
-                        </div>
-                    </div>
-
-                    <!-- Summary Cards -->
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px;">
-                        <div style="background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 20px 24px; border-radius: 10px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);">
-                            <div style="font-size: 11px; opacity: 0.85; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Total Import Value</div>
-                            <div style="font-size: 24px; font-weight: 800;">${formatCurrency(grandTotalImportValue)}</div>
-                        </div>
-                        <div style="background: linear-gradient(135deg, #f59e0b, #b45309); color: white; padding: 20px 24px; border-radius: 10px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);">
-                            <div style="font-size: 11px; opacity: 0.85; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Total Used Qty</div>
-                            <div style="font-size: 24px; font-weight: 800;">${totalUsedQty.toLocaleString('en-IN')}</div>
-                        </div>
-                        <div style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; padding: 20px 24px; border-radius: 10px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);">
-                            <div style="font-size: 11px; opacity: 0.85; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Total Available Qty</div>
-                            <div style="font-size: 24px; font-weight: 800;">${totalAvailableQty.toLocaleString('en-IN')}</div>
                         </div>
                     </div>
 
@@ -2223,33 +2221,36 @@ export class PDFReportGenerator {
                         <table style="width: 100%; border-collapse: collapse; background: white;">
                             <thead>
                                 <tr style="background: #f8fafc;">
-                                    <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 40px;">Sr No</th>
-                                    <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0;">Material Name</th>
-                                    <th style="padding: 12px; text-align: center; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 150px;">Total Imported</th>
-                                    <th style="padding: 12px; text-align: center; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 100px;">Total Used</th>
-                                    <th style="padding: 12px; text-align: center; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 100px;">Total Available</th>
+                                    <th style="padding: 10px 8px; text-align: left; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 36px;">Sr No</th>
+                                    <th style="padding: 10px 8px; text-align: left; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0;">Material Name</th>
+                                    <th style="padding: 10px 8px; text-align: center; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 80px;">Purchase</th>
+                                    <th style="padding: 10px 8px; text-align: center; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 110px;">Cost</th>
+                                    <th style="padding: 10px 8px; text-align: left; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 120px;">Purchased By</th>
+                                    <th style="padding: 10px 8px; text-align: center; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 70px;">Used</th>
+                                    <th style="padding: 10px 8px; text-align: center; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 80px;">Remaining</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 ${tableRows}
-                            </tbody>
-                            <tfoot>
                                 <tr style="background: linear-gradient(90deg, #f0fdf4, #dcfce7);">
-                                    <td colspan="2" style="padding: 14px 12px; border-top: 2px solid #10b981; font-weight: 700; font-size: 13px; color: #059669;">
+                                    <td colspan="2" style="padding: 12px 8px; border-top: 2px solid #10b981; font-weight: 700; font-size: 12px; color: #059669;">
                                         GRAND TOTAL
                                     </td>
-                                    <td style="padding: 14px 12px; border-top: 2px solid #10b981; text-align: center; font-weight: 800; font-size: 14px; color: #059669;">
+                                    <td style="padding: 12px 8px; border-top: 2px solid #10b981; text-align: center; font-weight: 800; font-size: 13px; color: #059669;">
                                         ${totalImportedQty.toLocaleString('en-IN')}
-                                        <div style="font-size: 11px; font-weight: 700; color: #059669;">${formatCurrency(grandTotalImportValue)}</div>
                                     </td>
-                                    <td style="padding: 14px 12px; border-top: 2px solid #10b981; text-align: center; font-weight: 700; font-size: 13px; color: #374151;">
+                                    <td style="padding: 12px 8px; border-top: 2px solid #10b981; text-align: center; font-weight: 800; font-size: 13px; color: #059669;">
+                                        ${formatCurrency(grandTotalImportValue)}
+                                    </td>
+                                    <td style="padding: 12px 8px; border-top: 2px solid #10b981;"></td>
+                                    <td style="padding: 12px 8px; border-top: 2px solid #10b981; text-align: center; font-weight: 700; font-size: 13px; color: #b45309;">
                                         ${totalUsedQty.toLocaleString('en-IN')}
                                     </td>
-                                    <td style="padding: 14px 12px; border-top: 2px solid #10b981; text-align: center; font-weight: 700; font-size: 13px; color: #374151;">
+                                    <td style="padding: 12px 8px; border-top: 2px solid #10b981; text-align: center; font-weight: 700; font-size: 13px; color: #1d4ed8;">
                                         ${totalAvailableQty.toLocaleString('en-IN')}
                                     </td>
                                 </tr>
-                            </tfoot>
+                            </tbody>
                         </table>
                     </div>
 
@@ -2345,6 +2346,545 @@ export class PDFReportGenerator {
             Alert.alert(
                 'Error',
                 'Failed to generate material stock report. Please try again. Error: ' + (error instanceof Error ? error.message : String(error)),
+                [{ text: 'OK' }]
+            );
+        }
+    }
+
+    // ✅ NEW: Generate a current equipment cost report
+    async generateEquipmentCostReport(
+        equipment: Array<{
+            _id: string;
+            type: string;
+            category: string;
+            quantity: number;
+            perUnitCost: number;
+            totalCost: number;
+            costType?: 'rental' | 'purchase' | 'lease';
+            rentalPeriod?: 'hourly' | 'daily' | 'weekly' | 'monthly';
+            rentalDuration?: number;
+            specifications?: {
+                model?: string;
+                brand?: string;
+                capacity?: string;
+                fuelType?: 'diesel' | 'petrol' | 'electric' | 'hybrid';
+                operatorRequired?: boolean;
+            };
+            status: string;
+            notes?: string;
+            usageDate?: string;
+            createdAt: string;
+        }>,
+        reportTitle: string
+    ): Promise<void> {
+        try {
+            console.log('📄 Starting Equipment Cost Report generation...');
+            console.log('📊 Equipment count:', equipment.length);
+
+            const companyName = this.clientData?.companyName || this.userData?.company || 'Company';
+            const generatedOn = new Date().toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+
+            const formatCurrency = (amount: number) =>
+                `₹${(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+            const buildSpecsString = (specs?: any): string => {
+                if (!specs || Object.keys(specs).length === 0) return '';
+                const parts = [];
+                if (specs.brand) parts.push(`Brand: ${specs.brand}`);
+                if (specs.model) parts.push(`Model: ${specs.model}`);
+                if (specs.capacity) parts.push(`Capacity: ${specs.capacity}`);
+                if (specs.fuelType) parts.push(`Fuel: ${specs.fuelType}`);
+                if (specs.operatorRequired) parts.push(`Operator: Required`);
+                return parts.join(' | ');
+            };
+
+            const getCostTypeDisplay = (item: any) => {
+                if (item.costType === 'rental' && item.rentalPeriod && item.rentalDuration) {
+                    return `Rental (${item.rentalDuration} ${item.rentalPeriod})`;
+                }
+                return item.costType ? item.costType.toUpperCase() : 'PURCHASE';
+            };
+
+            const grandTotalCost = equipment.reduce((sum, item) => sum + (item.totalCost || 0), 0);
+            const totalQuantity = equipment.reduce((sum, item) => sum + (item.quantity || 0), 0);
+
+            const tableRows = equipment.map((item, idx) => {
+                const specsString = buildSpecsString(item.specifications);
+                const costTypeStr = getCostTypeDisplay(item);
+                const notesText = item.notes ? item.notes : '—';
+                const itemDate = item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+                
+                return `
+                <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
+                    <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #374151; font-size: 11px; vertical-align: top; text-align: left;">
+                        ${idx + 1}
+                    </td>
+                    <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top;">
+                        <div style="font-weight: 700; color: #1e293b; font-size: 12px;">${item.type}</div>
+                        <div style="font-size: 10px; color: #64748b; margin-top: 2px;">Category: ${item.category}</div>
+                        ${specsString ? `<div style="font-size: 10px; color: #0284c7; margin-top: 2px; font-weight: 500;">${specsString}</div>` : ''}
+                    </td>
+                    <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; text-align: center; vertical-align: top; font-size: 11px; font-weight: 600; color: #475569;">
+                        <span style="background-color: #f1f5f9; padding: 2px 6px; border-radius: 4px;">${costTypeStr}</span>
+                    </td>
+                    <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; text-align: center; vertical-align: top; font-weight: 700; color: #374151; font-size: 12px;">
+                        ${(item.quantity || 0).toLocaleString('en-IN')}
+                    </td>
+                    <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; text-align: right; vertical-align: top;">
+                        <div style="font-size: 11px; color: #64748b;">${formatCurrency(item.perUnitCost)}</div>
+                    </td>
+                    <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; text-align: right; vertical-align: top; font-weight: 700; color: #2563eb; font-size: 12px;">
+                        ${formatCurrency(item.totalCost)}
+                    </td>
+                    <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; font-size: 11px; color: #64748b;">
+                        <div style="font-weight: 500;">${itemDate}</div>
+                        ${item.notes ? `<div style="font-size: 10px; color: #475569; font-style: italic; margin-top: 2px;">${notesText}</div>` : ''}
+                    </td>
+                </tr>
+            `;
+            }).join('');
+
+            const fullHTML = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <title>Equipment Cost Report - ${reportTitle}</title>
+                    <style>
+                        * { box-sizing: border-box; }
+                        body {
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                            line-height: 1.5;
+                            color: #374151;
+                            margin: 0;
+                            padding: 24px;
+                            background: #ffffff;
+                        }
+                        @media print {
+                            body { margin: 0; padding: 16px; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <!-- Header Banner -->
+                    <div style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #3b82f6 100%); color: white; padding: 32px 36px; border-radius: 12px; margin-bottom: 0;">
+                        <div style="font-size: 11px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.6; margin-bottom: 8px; font-weight: 500;">
+                            Equipment Cost Report
+                        </div>
+                        <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px; letter-spacing: -0.5px;">
+                            ${reportTitle}
+                        </div>
+                    </div>
+
+                    <!-- Meta Info Strip -->
+                    <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-top: none; border-radius: 0 0 12px 12px; padding: 14px 36px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px;">
+                        <div style="display: flex; gap: 32px;">
+                            <div>
+                                <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Company</div>
+                                <div style="font-size: 13px; color: #0f172a; font-weight: 700; margin-top: 2px;">${companyName}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Generated By</div>
+                                <div style="font-size: 13px; color: #0f172a; font-weight: 700; margin-top: 2px;">${this.userData?.name || 'Admin'}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Total Entries</div>
+                                <div style="font-size: 13px; color: #0f172a; font-weight: 700; margin-top: 2px;">${equipment.length}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Total Cost</div>
+                                <div style="font-size: 13px; color: #2563eb; font-weight: 700; margin-top: 2px;">${formatCurrency(grandTotalCost)}</div>
+                            </div>
+                        </div>
+                        <div style="font-size: 11px; color: #64748b;">
+                            ${generatedOn}
+                        </div>
+                    </div>
+
+                    <!-- Equipment Cost Table -->
+                    <div style="border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+                        <div style="background: linear-gradient(90deg, #1e3a8a, #2563eb); padding: 14px 20px;">
+                            <h2 style="margin: 0; color: white; font-size: 15px; font-weight: 700; letter-spacing: 0.3px;">
+                                🚜 Equipment Expenses
+                            </h2>
+                        </div>
+                        <table style="width: 100%; border-collapse: collapse; background: white;">
+                            <thead>
+                                <tr style="background: #f8fafc;">
+                                    <th style="padding: 10px 8px; text-align: left; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 36px;">Sr No</th>
+                                    <th style="padding: 10px 8px; text-align: left; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0;">Equipment details</th>
+                                    <th style="padding: 10px 8px; text-align: center; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 120px;">Cost Type</th>
+                                    <th style="padding: 10px 8px; text-align: center; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 60px;">Qty</th>
+                                    <th style="padding: 10px 8px; text-align: right; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 100px;">Rate</th>
+                                    <th style="padding: 10px 8px; text-align: right; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 110px;">Total Cost</th>
+                                    <th style="padding: 10px 8px; text-align: left; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 150px;">Date & Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${tableRows}
+                                <tr style="background: linear-gradient(90deg, #eff6ff, #dbeafe);">
+                                    <td colspan="3" style="padding: 12px 8px; border-top: 2px solid #3b82f6; font-weight: 700; font-size: 12px; color: #1e40af;">
+                                        GRAND TOTAL
+                                    </td>
+                                    <td style="padding: 12px 8px; border-top: 2px solid #3b82f6; text-align: center; font-weight: 800; font-size: 13px; color: #1e40af;">
+                                        ${totalQuantity.toLocaleString('en-IN')}
+                                    </td>
+                                    <td style="padding: 12px 8px; border-top: 2px solid #3b82f6;"></td>
+                                    <td style="padding: 12px 8px; border-top: 2px solid #3b82f6; text-align: right; font-weight: 800; font-size: 13px; color: #1e40af;">
+                                        ${formatCurrency(grandTotalCost)}
+                                    </td>
+                                    <td style="padding: 12px 8px; border-top: 2px solid #3b82f6;"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Footer -->
+                    <div style="margin-top: 28px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8;">
+                        Generated by Xsite Application · ${generatedOn}
+                    </div>
+                </body>
+                </html>
+            `;
+
+            // Generate PDF
+            const { uri } = await Print.printToFileAsync({
+                html: fullHTML,
+                base64: false,
+                margins: { left: 16, top: 16, right: 16, bottom: 16 },
+            });
+
+            // Build custom filename
+            const sanitizedTitle = reportTitle.replace(/[^a-zA-Z0-9_\s]/g, '').trim().replace(/\s+/g, '_');
+            const currentDate = new Date().toISOString().split('T')[0];
+            const customFilename = `Equipment_Cost_Report_${sanitizedTitle}_${currentDate}.pdf`;
+
+            // Try to copy with custom filename
+            let finalUri = uri;
+            try {
+                const documentDir = Paths.document;
+                if (documentDir) {
+                    const customFile = new File(documentDir, customFilename);
+                    if (customFile.exists) customFile.delete();
+                    const originalFile = new File(uri);
+                    originalFile.copy(customFile);
+                    if (customFile.exists) {
+                        finalUri = customFile.uri;
+                        try { originalFile.delete(); } catch (_) { }
+                    }
+                }
+            } catch (_) { /* use original uri */ }
+
+            // Show view/share dialog
+            setTimeout(() => {
+                Alert.alert(
+                    '✅ Equipment Report Ready',
+                    `Equipment Cost report has been generated.\n\nFilename: ${customFilename}`,
+                    [
+                        {
+                            text: 'View PDF',
+                            onPress: async () => {
+                                try {
+                                    if (Platform.OS === 'android') {
+                                        const contentUri = await FileSystemLegacy.getContentUriAsync(finalUri);
+                                        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+                                            data: contentUri,
+                                            flags: 1,
+                                            type: 'application/pdf',
+                                        });
+                                    } else {
+                                        if (await Sharing.isAvailableAsync()) {
+                                            await Sharing.shareAsync(finalUri, {
+                                                mimeType: 'application/pdf',
+                                                dialogTitle: `View: ${customFilename}`,
+                                                UTI: 'com.adobe.pdf',
+                                            });
+                                        }
+                                    }
+                                } catch (e) {
+                                    if (await Sharing.isAvailableAsync()) {
+                                        await Sharing.shareAsync(finalUri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
+                                    }
+                                }
+                            },
+                        },
+                        {
+                            text: 'Share PDF',
+                            onPress: async () => {
+                                if (await Sharing.isAvailableAsync()) {
+                                    await Sharing.shareAsync(finalUri, {
+                                        mimeType: 'application/pdf',
+                                        dialogTitle: `Share: ${customFilename}`,
+                                        UTI: 'com.adobe.pdf',
+                                    });
+                                }
+                            },
+                        },
+                        { text: 'Cancel', style: 'cancel' },
+                    ],
+                    { cancelable: true }
+                );
+            }, 100);
+
+        } catch (error) {
+            console.error('❌ Equipment Cost Report generation error:', error);
+            Alert.alert(
+                'Error',
+                'Failed to generate equipment cost report. Please try again. Error: ' + (error instanceof Error ? error.message : String(error)),
+                [{ text: 'OK' }]
+            );
+        }
+    }
+
+    // ✅ NEW: Generate a current other cost report
+    async generateOtherCostReport(
+        otherCosts: Array<{
+            _id: string;
+            title?: string;
+            name?: string;
+            amount: number;
+            category?: string;
+            description?: string;
+            addedAt?: string;
+            createdAt?: string;
+        }>,
+        reportTitle: string
+    ): Promise<void> {
+        try {
+            console.log('📄 Starting Other Cost Report generation...');
+            console.log('📊 Other Costs count:', otherCosts.length);
+
+            const companyName = this.clientData?.companyName || this.userData?.company || 'Company';
+            const generatedOn = new Date().toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+
+            const formatCurrency = (amount: number) =>
+                `₹${(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+            const grandTotalCost = otherCosts.reduce((sum, item) => sum + (item.amount || 0), 0);
+
+            const tableRows = otherCosts.map((item, idx) => {
+                const name = item.title || item.name || 'Other Cost';
+                const category = item.category || 'Miscellaneous';
+                const desc = item.description || '—';
+                const dateStr = item.addedAt || item.createdAt || new Date().toISOString();
+                const itemDate = new Date(dateStr).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+                
+                return `
+                <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
+                    <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #374151; font-size: 11px; vertical-align: top; text-align: left;">
+                        ${idx + 1}
+                    </td>
+                    <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top;">
+                        <div style="font-weight: 700; color: #1e293b; font-size: 12px;">${name}</div>
+                        <div style="font-size: 10px; color: #64748b; margin-top: 2px;">Category: ${category}</div>
+                    </td>
+                    <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top; font-size: 11px; color: #475569;">
+                        ${desc}
+                    </td>
+                    <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; text-align: center; vertical-align: top; font-size: 11px; color: #64748b;">
+                        ${itemDate}
+                    </td>
+                    <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; text-align: right; vertical-align: top; font-weight: 700; color: #b45309; font-size: 12px;">
+                        ${formatCurrency(item.amount)}
+                    </td>
+                </tr>
+            `;
+            }).join('');
+
+            const fullHTML = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <title>Other Cost Report - ${reportTitle}</title>
+                    <style>
+                        * { box-sizing: border-box; }
+                        body {
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                            line-height: 1.5;
+                            color: #374151;
+                            margin: 0;
+                            padding: 24px;
+                            background: #ffffff;
+                        }
+                        @media print {
+                            body { margin: 0; padding: 16px; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <!-- Header Banner -->
+                    <div style="background: linear-gradient(135deg, #581c87 0%, #7e22ce 50%, #a855f7 100%); color: white; padding: 32px 36px; border-radius: 12px; margin-bottom: 0;">
+                        <div style="font-size: 11px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.6; margin-bottom: 8px; font-weight: 500;">
+                            Other Cost Report
+                        </div>
+                        <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px; letter-spacing: -0.5px;">
+                            ${reportTitle}
+                        </div>
+                    </div>
+
+                    <!-- Meta Info Strip -->
+                    <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-top: none; border-radius: 0 0 12px 12px; padding: 14px 36px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px;">
+                        <div style="display: flex; gap: 32px;">
+                            <div>
+                                <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Company</div>
+                                <div style="font-size: 13px; color: #0f172a; font-weight: 700; margin-top: 2px;">${companyName}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Generated By</div>
+                                <div style="font-size: 13px; color: #0f172a; font-weight: 700; margin-top: 2px;">${this.userData?.name || 'Admin'}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Total Entries</div>
+                                <div style="font-size: 13px; color: #0f172a; font-weight: 700; margin-top: 2px;">${otherCosts.length}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Total Amount</div>
+                                <div style="font-size: 13px; color: #7e22ce; font-weight: 700; margin-top: 2px;">${formatCurrency(grandTotalCost)}</div>
+                            </div>
+                        </div>
+                        <div style="font-size: 11px; color: #64748b;">
+                            ${generatedOn}
+                        </div>
+                    </div>
+
+                    <!-- Other Cost Table -->
+                    <div style="border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+                        <div style="background: linear-gradient(90deg, #581c87, #7e22ce); padding: 14px 20px;">
+                            <h2 style="margin: 0; color: white; font-size: 15px; font-weight: 700; letter-spacing: 0.3px;">
+                                💸 Miscellaneous Expenses
+                            </h2>
+                        </div>
+                        <table style="width: 100%; border-collapse: collapse; background: white;">
+                            <thead>
+                                <tr style="background: #f8fafc;">
+                                    <th style="padding: 10px 8px; text-align: left; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 36px;">Sr No</th>
+                                    <th style="padding: 10px 8px; text-align: left; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0;">Expense</th>
+                                    <th style="padding: 10px 8px; text-align: left; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0;">Description</th>
+                                    <th style="padding: 10px 8px; text-align: center; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 100px;">Date</th>
+                                    <th style="padding: 10px 8px; text-align: right; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 120px;">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${tableRows}
+                                <tr style="background: linear-gradient(90deg, #faf5ff, #f3e8ff);">
+                                    <td colspan="4" style="padding: 12px 8px; border-top: 2px solid #a855f7; font-weight: 700; font-size: 12px; color: #6b21a8;">
+                                        GRAND TOTAL
+                                    </td>
+                                    <td style="padding: 12px 8px; border-top: 2px solid #a855f7; text-align: right; font-weight: 800; font-size: 13px; color: #6b21a8;">
+                                        ${formatCurrency(grandTotalCost)}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Footer -->
+                    <div style="margin-top: 28px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8;">
+                        Generated by Xsite Application · ${generatedOn}
+                    </div>
+                </body>
+                </html>
+            `;
+
+            // Generate PDF
+            const { uri } = await Print.printToFileAsync({
+                html: fullHTML,
+                base64: false,
+                margins: { left: 16, top: 16, right: 16, bottom: 16 },
+            });
+
+            // Build custom filename
+            const sanitizedTitle = reportTitle.replace(/[^a-zA-Z0-9_\s]/g, '').trim().replace(/\s+/g, '_');
+            const currentDate = new Date().toISOString().split('T')[0];
+            const customFilename = `Other_Cost_Report_${sanitizedTitle}_${currentDate}.pdf`;
+
+            // Try to copy with custom filename
+            let finalUri = uri;
+            try {
+                const documentDir = Paths.document;
+                if (documentDir) {
+                    const customFile = new File(documentDir, customFilename);
+                    if (customFile.exists) customFile.delete();
+                    const originalFile = new File(uri);
+                    originalFile.copy(customFile);
+                    if (customFile.exists) {
+                        finalUri = customFile.uri;
+                        try { originalFile.delete(); } catch (_) { }
+                    }
+                }
+            } catch (_) { /* use original uri */ }
+
+            // Show view/share dialog
+            setTimeout(() => {
+                Alert.alert(
+                    '✅ Other Cost Report Ready',
+                    `Other Cost report has been generated.\n\nFilename: ${customFilename}`,
+                    [
+                        {
+                            text: 'View PDF',
+                            onPress: async () => {
+                                try {
+                                    if (Platform.OS === 'android') {
+                                        const contentUri = await FileSystemLegacy.getContentUriAsync(finalUri);
+                                        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+                                            data: contentUri,
+                                            flags: 1,
+                                            type: 'application/pdf',
+                                        });
+                                    } else {
+                                        if (await Sharing.isAvailableAsync()) {
+                                            await Sharing.shareAsync(finalUri, {
+                                                mimeType: 'application/pdf',
+                                                dialogTitle: `View: ${customFilename}`,
+                                                UTI: 'com.adobe.pdf',
+                                            });
+                                        }
+                                    }
+                                } catch (e) {
+                                    if (await Sharing.isAvailableAsync()) {
+                                        await Sharing.shareAsync(finalUri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
+                                    }
+                                }
+                            },
+                        },
+                        {
+                            text: 'Share PDF',
+                            onPress: async () => {
+                                if (await Sharing.isAvailableAsync()) {
+                                    await Sharing.shareAsync(finalUri, {
+                                        mimeType: 'application/pdf',
+                                        dialogTitle: `Share: ${customFilename}`,
+                                        UTI: 'com.adobe.pdf',
+                                    });
+                                }
+                            },
+                        },
+                        { text: 'Cancel', style: 'cancel' },
+                    ],
+                    { cancelable: true }
+                );
+            }, 100);
+
+        } catch (error) {
+            console.error('❌ Other Cost Report generation error:', error);
+            Alert.alert(
+                'Error',
+                'Failed to generate other cost report. Please try again. Error: ' + (error instanceof Error ? error.message : String(error)),
                 [{ text: 'OK' }]
             );
         }

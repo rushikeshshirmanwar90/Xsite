@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   button: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#3B82F6',
+    borderLeftColor: '#2E72F0',
   },
   infoText: {
     color: '#1E40AF',

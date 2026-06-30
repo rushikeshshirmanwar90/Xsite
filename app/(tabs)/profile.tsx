@@ -621,8 +621,8 @@ const CompanyProfile: React.FC = () => {
             
             return {
                 status: `${clientData.license} ${daysText} left`,
-                color: isExpiringSoon ? '#F59E0B' : '#3B82F6',
-                bgColor: isExpiringSoon ? '#FEF3C7' : '#EFF6FF',
+                color: isExpiringSoon ? '#EE730C' : '#2E72F0',
+                bgColor: isExpiringSoon ? '#FEF3C7' : '#EAF0FE',
                 icon: isExpiringSoon ? 'warning-outline' : 'time-outline'
             };
         }
@@ -760,7 +760,7 @@ const CompanyProfile: React.FC = () => {
 
     return (
         <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="#3B82F6" />
+            <StatusBar barStyle="light-content" backgroundColor="#2E72F0" />
 
             <ScrollView 
                 showsVerticalScrollIndicator={false}
@@ -768,8 +768,8 @@ const CompanyProfile: React.FC = () => {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        colors={['#3B82F6']}
-                        tintColor="#3B82F6"
+                        colors={['#2E72F0']}
+                        tintColor="#2E72F0"
                     />
                 }
             >
@@ -794,7 +794,7 @@ const CompanyProfile: React.FC = () => {
                 {!isCurrentUserStaff && licenseAccess.hasAccess && typeof clientData.license === 'number' && clientData.license > 0 && clientData.license <= 7 && (
                     <View style={styles.expiringSoonWarning}>
                         <View style={styles.expiringSoonHeader}>
-                            <Ionicons name="time" size={20} color="#F59E0B" />
+                            <Ionicons name="time" size={20} color="#EE730C" />
                             <Text style={styles.expiringSoonTitle}>License Expiring Soon</Text>
                         </View>
                         <Text style={styles.expiringSoonMessage}>
@@ -805,7 +805,7 @@ const CompanyProfile: React.FC = () => {
                 )}
                 {/* Header with Gradient */}
                 <LinearGradient
-                    colors={['#3B82F6', '#2563EB']}
+                    colors={['#2E72F0', '#2563EB']}
                     style={styles.header}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
@@ -821,7 +821,7 @@ const CompanyProfile: React.FC = () => {
                     <Text style={styles.userEmail}>{userData.email || 'email@example.com'}</Text>
                     {!isCurrentUserStaff && (clientData.companyName || userData.company) && (
                         <View style={styles.companyBadge}>
-                            <Ionicons name="business" size={14} color="#3B82F6" />
+                            <Ionicons name="business" size={14} color="#2E72F0" />
                             <Text style={styles.companyText}>{clientData.companyName || userData.company}</Text>
                         </View>
                     )}
@@ -836,7 +836,7 @@ const CompanyProfile: React.FC = () => {
                         {!isCurrentUserStaff && (
                             <View style={[styles.statCard, styles.statCardPrimary]}>
                                 <View style={styles.statIconContainer}>
-                                    <Ionicons name="folder-open" size={24} color="#3B82F6" />
+                                    <Ionicons name="folder-open" size={24} color="#2E72F0" />
                                 </View>
                                 <Text style={styles.statValue}>
                                     {loading ? '...' : stats.totalProjects}
@@ -912,7 +912,7 @@ const CompanyProfile: React.FC = () => {
                                                 <Text style={[styles.licenseDetailValue, { 
                                                     color: clientData.license === -1 ? '#10B981' : 
                                                            clientData.license === 0 ? '#EF4444' : 
-                                                           clientData.license <= 7 ? '#F59E0B' : '#3B82F6' 
+                                                           clientData.license <= 7 ? '#EE730C' : '#2E72F0' 
                                                 }]}>
                                                     {clientData.license === -1 ? 'Unlimited' : clientData.license}
                                                 </Text>
@@ -956,7 +956,7 @@ const CompanyProfile: React.FC = () => {
 
                                     {typeof clientData.license === 'number' && clientData.license > 0 && clientData.license <= 7 && (
                                         <View style={styles.licenseWarning}>
-                                            <Ionicons name="alert-circle" size={16} color="#F59E0B" />
+                                            <Ionicons name="alert-circle" size={16} color="#EE730C" />
                                             <Text style={[styles.licenseWarningText, { color: '#F59E0B' }]}>
                                                 Your license expires soon. Consider renewing to avoid interruption.
                                             </Text>
@@ -988,7 +988,7 @@ const CompanyProfile: React.FC = () => {
                         <View style={[styles.infoCard, styles.shareCard]}>
                             <View style={styles.shareHeader}>
                                 <View style={styles.shareIconContainer}>
-                                    <Ionicons name="qr-code-outline" size={24} color="#3B82F6" />
+                                    <Ionicons name="qr-code-outline" size={24} color="#2E72F0" />
                                 </View>
                                 <View style={styles.shareContent}>
                                     <Text style={styles.shareTitle}>Get Connected</Text>
@@ -1120,11 +1120,11 @@ const CompanyProfile: React.FC = () => {
                                         ) : (
                                             <View style={styles.infoRow}>
                                                 <View style={styles.infoIconContainer}>
-                                                    <Ionicons name="alert-circle-outline" size={20} color="#F59E0B" />
+                                                    <Ionicons name="alert-circle-outline" size={20} color="#EE730C" />
                                                 </View>
                                                 <View style={styles.infoContent}>
                                                     <Text style={styles.infoLabel}>Assignment Status</Text>
-                                                    <Text style={[styles.infoValue, { color: '#F59E0B' }]}>
+                                                    <Text style={[styles.infoValue, { color: '#EE730C' }]}>
                                                         Not assigned to any client yet
                                                     </Text>
                                                 </View>
@@ -1202,7 +1202,7 @@ const CompanyProfile: React.FC = () => {
                                         {!clientData.email && !clientData.phone && (
                                             <View style={styles.infoRow}>
                                                 <View style={styles.infoIconContainer}>
-                                                    <Ionicons name="alert-circle-outline" size={20} color="#F59E0B" />
+                                                    <Ionicons name="alert-circle-outline" size={20} color="#EE730C" />
                                                 </View>
                                                 <View style={styles.infoContent}>
                                                     <Text style={styles.infoLabel}>No Data</Text>
@@ -1226,13 +1226,13 @@ const CompanyProfile: React.FC = () => {
                                 <>
                                     <View style={styles.infoRow}>
                                         <View style={styles.infoIconContainer}>
-                                            <Ionicons name="folder-open-outline" size={20} color="#3B82F6" />
+                                            <Ionicons name="folder-open-outline" size={20} color="#2E72F0" />
                                         </View>
                                         <View style={styles.infoContent}>
                                             <Text style={styles.infoLabel}>
                                                 Total Projects ({user.assignedProjects.length})
                                             </Text>
-                                            <Text style={[styles.infoValue, { color: '#3B82F6', fontWeight: '700' }]}>
+                                            <Text style={[styles.infoValue, { color: '#2E72F0', fontWeight: '700' }]}>
                                                 Working on multiple projects
                                             </Text>
                                         </View>
@@ -1247,7 +1247,7 @@ const CompanyProfile: React.FC = () => {
                                                           project.status === 'completed' ? 'checkmark-circle' : 'pause-circle'} 
                                                     size={16} 
                                                     color={project.status === 'active' ? '#10B981' : 
-                                                           project.status === 'completed' ? '#3B82F6' : '#F59E0B'} 
+                                                           project.status === 'completed' ? '#2E72F0' : '#F59E0B'} 
                                                 />
                                             </View>
                                             <View style={styles.infoContent}>
@@ -1261,7 +1261,7 @@ const CompanyProfile: React.FC = () => {
                                                     <Text style={{ 
                                                         fontSize: 10, 
                                                         color: project.status === 'active' ? '#10B981' : 
-                                                               project.status === 'completed' ? '#3B82F6' : '#F59E0B',
+                                                               project.status === 'completed' ? '#2E72F0' : '#F59E0B',
                                                         fontWeight: '600',
                                                         marginLeft: 8
                                                     }}>
@@ -1427,7 +1427,7 @@ const CompanyProfile: React.FC = () => {
                     >
                         <View style={styles.activityButtonLeft}>
                             <View style={styles.activityButtonIcon}>
-                                <Ionicons name="time-outline" size={22} color="#3B82F6" />
+                                <Ionicons name="time-outline" size={22} color="#2E72F0" />
                             </View>
                             <View style={styles.activityButtonContent}>
                                 <Text style={styles.activityButtonTitle}>View My Activities</Text>
@@ -1601,7 +1601,7 @@ const CompanyProfile: React.FC = () => {
                                 <Ionicons 
                                     name={isSharing ? "hourglass-outline" : "share-outline"} 
                                     size={18} 
-                                    color="#3B82F6" 
+                                    color="#2E72F0" 
                                 />
                                 <Text style={styles.modalShareButtonText}>
                                     {isSharing ? 'Sharing...' : 'Share This QR Code'}
@@ -1646,7 +1646,7 @@ const styles = StyleSheet.create({
     avatarText: {
         fontSize: 32,
         fontWeight: '700',
-        color: '#3B82F6',
+        color: '#2E72F0',
     },
     userName: {
         fontSize: 24,
@@ -1656,7 +1656,7 @@ const styles = StyleSheet.create({
     },
     userEmail: {
         fontSize: 14,
-        color: '#DBEAFE',
+        color: '#C4D8FC',
         marginBottom: 12,
     },
     companyBadge: {
@@ -1671,7 +1671,7 @@ const styles = StyleSheet.create({
     companyText: {
         fontSize: 13,
         fontWeight: '600',
-        color: '#3B82F6',
+        color: '#2E72F0',
     },
     staffBadge: {
         flexDirection: 'row',
@@ -1712,7 +1712,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
     },
     statCardPrimary: {
-        borderColor: '#DBEAFE',
+        borderColor: '#C4D8FC',
     },
     statCardSuccess: {
         borderColor: '#D1FAE5',
@@ -1769,13 +1769,13 @@ const styles = StyleSheet.create({
     urgentCard: {
         borderColor: '#FED7AA',
         backgroundColor: '#FFFBEB',
-        shadowColor: '#F59E0B',
+        shadowColor: '#EE730C',
         shadowOpacity: 0.1,
     },
     shareCard: {
-        borderColor: '#DBEAFE',
+        borderColor: '#C4D8FC',
         backgroundColor: '#F8FAFC',
-        shadowColor: '#3B82F6',
+        shadowColor: '#2E72F0',
         shadowOpacity: 0.1,
     },
     infoRow: {
@@ -1911,7 +1911,7 @@ const styles = StyleSheet.create({
         width: 44,
         height: 44,
         borderRadius: 12,
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
@@ -2182,7 +2182,7 @@ const styles = StyleSheet.create({
         width: 48,
         height: 48,
         borderRadius: 12,
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
@@ -2204,7 +2204,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         paddingHorizontal: 20,
         paddingVertical: 12,
         borderRadius: 10,
@@ -2293,19 +2293,19 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         paddingHorizontal: 16,
         paddingVertical: 10,
         borderRadius: 8,
         marginTop: 16,
         gap: 6,
         borderWidth: 1,
-        borderColor: '#DBEAFE',
+        borderColor: '#C4D8FC',
     },
     modalShareButtonText: {
         fontSize: 13,
         fontWeight: '600',
-        color: '#3B82F6',
+        color: '#2E72F0',
     },
     // License card styles
     licenseCard: {
@@ -2437,7 +2437,7 @@ const styles = StyleSheet.create({
     expiringSoonTitle: {
         fontSize: 15,
         fontWeight: '600',
-        color: '#F59E0B',
+        color: '#EE730C',
         marginLeft: 8,
     },
     expiringSoonMessage: {

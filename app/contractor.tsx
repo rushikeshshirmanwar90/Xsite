@@ -14,6 +14,8 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
@@ -60,12 +62,14 @@ export default function ContractorScreen() {
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
   const [currentContractorForPayment, setCurrentContractorForPayment] = useState<any | null>(null);
   
-  // Dropdown/Collapse states for grouped contractors
-  const [expandedStaff, setExpandedStaff] = useState<Set<string>>(new Set());
 
   // Report generator state
   const [showReportGenerator, setShowReportGenerator] = useState(false);
   const [selectedContractorForReport, setSelectedContractorForReport] = useState<any | null>(null);
+  const [showProjectReport, setShowProjectReport] = useState(false);
+  const [showContractorPicker, setShowContractorPicker] = useState(false);
+  const [selectedForReport, setSelectedForReport] = useState<Set<string>>(new Set());
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
   useEffect(() => {
     if (projectId) {
@@ -299,47 +303,10 @@ export default function ContractorScreen() {
     }
   };
 
-  // Helper function to calculate outstanding work value (usedAmount - totalPaid)
   const calculateOutstandingWorkValue = (contractor: any) => {
     const usedAmount = contractor.usedAmount || 0;
     const totalPaid = contractor.totalPaid || 0;
     return Math.max(0, usedAmount - totalPaid);
-  };
-
-  // Helper function to group contractors by staff
-  const groupContractorsByStaff = () => {
-    const grouped: { [key: string]: any[] } = {};
-    
-    console.log('Grouping contractors:', contractors.length, 'contractors found');
-    
-    contractors.forEach(contractor => {
-      // Use staffId._id if it's populated, otherwise use staffId directly
-      const staffId = contractor.staffId?._id || contractor.staffId;
-      const staffKey = staffId ? staffId.toString() : 'unknown';
-      
-      console.log('Processing contractor:', contractor._id, 'staffKey:', staffKey, 'staffId:', contractor.staffId);
-      
-      if (!grouped[staffKey]) {
-        grouped[staffKey] = [];
-      }
-      grouped[staffKey].push(contractor);
-    });
-    
-    console.log('Grouped result:', Object.keys(grouped).length, 'groups created');
-    console.log('Groups:', Object.entries(grouped).map(([key, contracts]) => ({ key, count: contracts.length })));
-    
-    return grouped;
-  };
-
-  // Helper function to toggle staff expansion
-  const toggleStaffExpansion = (staffId: string) => {
-    const newExpanded = new Set(expandedStaff);
-    if (newExpanded.has(staffId)) {
-      newExpanded.delete(staffId);
-    } else {
-      newExpanded.add(staffId);
-    }
-    setExpandedStaff(newExpanded);
   };
 
   // Helper function to get staff display name
@@ -349,154 +316,91 @@ export default function ContractorScreen() {
       : 'Unknown Contractor';
   };
 
-  // Function to render individual contract card
-  const renderContractCard = (item: any, isGrouped = false) => {
+  const renderContractCard = (item: any) => {
     const totalPaid = item.totalPaid || 0;
-    const remainingPayment = item.totalAmount - totalPaid;
+    const remaining = item.totalAmount - totalPaid;
     const percentPaid = item.totalAmount > 0 ? Math.min(100, Math.max(0, (totalPaid / item.totalAmount) * 100)) : 0;
-    const status = item.status || 'active';
-    
-    let progressColor = '#3B82F6';
-    if (percentPaid > 85) progressColor = '#8B5CF6';
-    else if (percentPaid > 50) progressColor = '#2563EB';
+    const isActive = (item.status || 'active') === 'active';
+    const name = getStaffDisplayName(item);
+    const outstanding = calculateOutstandingWorkValue(item);
+    const accentColor = isActive ? '#16A34A' : '#94A3B8';
 
     return (
-      <View style={[styles.card, isGrouped && styles.groupedCard]}>
-        {!isGrouped && (
-          <View style={styles.cardHeader}>
-            <View style={styles.cardHeaderLeft}>
-              <View style={styles.avatarContainer}>
-                <Text style={styles.avatarText}>
-                  {getStaffDisplayName(item).charAt(0).toUpperCase()}
-                </Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-                  <Text style={styles.contractorName} numberOfLines={1}>{getStaffDisplayName(item)}</Text>
-                  <View style={[
-                    styles.statusBadge, 
-                    status === 'completed' ? styles.statusCompleted : styles.statusActive
-                  ]}>
-                    <Text style={[
-                      styles.statusText,
-                      status === 'completed' ? styles.statusTextCompleted : styles.statusTextActive
-                    ]}>
-                      {status.toUpperCase()}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={styles.contractType}>
-                  {item.contractType}
-                  {item.paymentSchedule ? ` • ${item.paymentSchedule.charAt(0).toUpperCase() + item.paymentSchedule.slice(1)} Payment` : ''}
-                </Text>
-              </View>
+      <View style={cStyles.card}>
+        {/* Top row: identity + actions */}
+        <View style={cStyles.cardTop}>
+          <View style={cStyles.identityBlock}>
+            <View style={cStyles.avatarWrap}>
+              <Text style={cStyles.avatarInitial}>{name.charAt(0).toUpperCase()}</Text>
             </View>
-            <TouchableOpacity
-              style={styles.manageButton}
-              onPress={() => handleManagePress(item)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.manageButtonText}>Manage</Text>
-              <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
+            <View style={{ flex: 1 }}>
+              <View style={cStyles.nameRow}>
+                <View style={[cStyles.statusDot, { backgroundColor: accentColor }]} />
+                <Text style={cStyles.personName} numberOfLines={1}>
+                  {item.contractType}
+                </Text>
+              </View>
+              <Text style={cStyles.contractMeta} numberOfLines={1}>
+                {name}{item.paymentSchedule ? `  ·  ${item.paymentSchedule}` : ''}
+              </Text>
+            </View>
+          </View>
+          <View style={cStyles.actionIcons}>
+            <TouchableOpacity onPress={() => handleEditContractPress(item)} activeOpacity={0.6} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="pencil-outline" size={17} color="#94A3B8" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => handleDeleteContractPress(item)} activeOpacity={0.6} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="trash-outline" size={17} color="#CBD5E1" />
             </TouchableOpacity>
           </View>
-        )}
-
-        {isGrouped && (
-          <View style={styles.groupedCardHeader}>
-            <Text style={styles.contractTypeTitle}>{item.contractType}</Text>
-            <View style={styles.groupedCardActions}>
-              <View style={[
-                styles.statusBadge, 
-                status === 'completed' ? styles.statusCompleted : styles.statusActive
-              ]}>
-                <Text style={[
-                  styles.statusText,
-                  status === 'completed' ? styles.statusTextCompleted : styles.statusTextActive
-                ]}>
-                  {status.toUpperCase()}
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={styles.manageButtonSmall}
-                onPress={() => handleManagePress(item)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.manageButtonTextSmall}>Manage</Text>
-                <Ionicons name="chevron-forward" size={14} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        {/* Paid Progress bar */}
-        <View style={styles.progressContainer}>
-          <View style={styles.progressLabelRow}>
-            <Text style={styles.progressLabel}>Budget Paid ({formatCurrency(totalPaid)} of {formatCurrency(item.totalAmount)})</Text>
-            <Text style={styles.progressValue}>{percentPaid.toFixed(0)}%</Text>
-          </View>
-          <View style={styles.progressBarTrack}>
-            <View style={[styles.progressBarFill, { width: `${percentPaid}%`, backgroundColor: progressColor }]} />
-          </View>
         </View>
 
-        {/* Financial Stats */}
-        <View style={styles.financialStats}>
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>BUDGET</Text>
-            <Text style={[styles.statValue, { color: '#1E293B' }]}>
-              {formatCurrency(item.totalAmount)}
-            </Text>
+        {/* Progress bar */}
+        <View style={cStyles.progressWrap}>
+          <View style={cStyles.progressTrack}>
+            <View style={[cStyles.progressFill, { width: `${percentPaid}%` as any, backgroundColor: accentColor }]} />
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>PAID</Text>
-            <Text style={[styles.statValue, { color: '#4F46E5' }]}>
-              {formatCurrency(totalPaid)}
-            </Text>
+          <Text style={cStyles.progressLabel}>{Math.round(percentPaid)}%</Text>
+        </View>
+
+        {/* Stats row */}
+        <View style={cStyles.statsRow}>
+          <View style={cStyles.statCol}>
+            <Text style={cStyles.statLabel}>Budget</Text>
+            <Text style={cStyles.statValue}>{formatCurrency(item.totalAmount)}</Text>
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>REMAINING</Text>
-            <Text style={[styles.statValue, { color: remainingPayment < 0 ? '#EF4444' : '#16A34A' }]}>
-              {formatCurrency(remainingPayment)}
+          <View style={cStyles.statDivider} />
+          <View style={cStyles.statCol}>
+            <Text style={cStyles.statLabel}>Paid</Text>
+            <Text style={[cStyles.statValue, totalPaid > 0 && { color: '#16A34A' }]}>{formatCurrency(totalPaid)}</Text>
+          </View>
+          <View style={cStyles.statDivider} />
+          <View style={cStyles.statCol}>
+            <Text style={cStyles.statLabel}>Remaining</Text>
+            <Text style={[cStyles.statValue, { color: remaining <= 0 ? '#16A34A' : '#EF4444' }]}>
+              {formatCurrency(Math.max(0, remaining))}
             </Text>
           </View>
         </View>
 
-        {/* Logged Work Done Value with Payment Deduction */}
-        <View style={styles.workDoneContainer}>
-          <Ionicons name="construct-outline" size={15} color="#475569" />
-          <Text style={styles.workDoneText}>
-            Worker Log Value: <Text style={{ fontWeight: '700', color: '#1E293B' }}>{formatCurrency(item.usedAmount || 0)}</Text>
-            {item.totalPaid > 0 && (
-              <>
-                <Text style={{ color: '#EF4444' }}> - {formatCurrency(item.totalPaid)}</Text>
-                <Text style={{ fontWeight: '700', color: '#059669' }}> = {formatCurrency(calculateOutstandingWorkValue(item))}</Text>
-              </>
-            )}
+        {/* Action button */}
+        <TouchableOpacity
+          style={[cStyles.actionBtn, { backgroundColor: isActive ? '#0F172A' : '#F1F5F9' }]}
+          onPress={() => handleManagePress(item)}
+          activeOpacity={0.8}
+        >
+          <Text style={[cStyles.actionBtnText, { color: isActive ? '#FFFFFF' : '#64748B' }]}>
+            {isActive ? 'Payments & Logs' : 'View Details'}
           </Text>
-        </View>
+          <Ionicons name="arrow-forward" size={15} color={isActive ? '#FFFFFF' : '#94A3B8'} />
+        </TouchableOpacity>
 
-        {/* Quick Actions: Edit & Delete */}
-        <View style={styles.cardActionsRow}>
-          <TouchableOpacity
-            style={styles.cardEditBtn}
-            onPress={() => handleEditContractPress(item)}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="pencil-outline" size={16} color="#4F46E5" />
-            <Text style={styles.cardEditBtnText}>Edit</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.cardDeleteBtn}
-            onPress={() => handleDeleteContractPress(item)}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="trash-outline" size={16} color="#EF4444" />
-            <Text style={styles.cardDeleteBtnText}>Delete</Text>
-          </TouchableOpacity>
+        {/* Outstanding amount */}
+        <View style={cStyles.outstandingRow}>
+          <Text style={cStyles.outstandingLabel}>Outstanding</Text>
+          <Text style={[cStyles.outstandingAmount, { color: outstanding > 0 ? '#F59E0B' : '#16A34A' }]}>
+            {formatCurrency(outstanding)}
+          </Text>
         </View>
       </View>
     );
@@ -658,6 +562,129 @@ export default function ContractorScreen() {
     }
   };
 
+  // ── Checkbox helpers ─────────────────────────────────────────────────────────
+  const toggleContractorSelection = (id: string) => {
+    setSelectedForReport(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const allSelected = contractors.length > 0 && selectedForReport.size === contractors.length;
+  const toggleSelectAll = () => {
+    setSelectedForReport(allSelected ? new Set() : new Set(contractors.map((c: any) => c._id)));
+  };
+
+  // ── Direct PDF generation (no intermediate preview) ──────────────────────────
+  const fmtDate = (d: string) => {
+    try { return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }); } catch { return d; }
+  };
+
+  const laborRowsHTML = (entries: any[]) => {
+    if (!entries.length) return '';
+    const byDate: Record<string, any[]> = {};
+    entries.forEach(e => { const k = new Date(e.addedAt).toDateString(); (byDate[k] = byDate[k] || []).push(e); });
+    return Object.entries(byDate).sort(([a],[b]) => new Date(a).getTime()-new Date(b).getTime()).map(([date, rows]) => {
+      const dayTotal = rows.reduce((s,r) => s+r.totalCost, 0);
+      return `<tr style="background:#1e293b;"><td colspan="4" style="padding:10px;color:white;font-weight:600;font-size:13px;">📅 ${fmtDate(date)} — Total: ${formatCurrency(dayTotal)}</td></tr>`
+        + rows.map(r => `<tr style="background:#f8fafc;"><td style="padding:8px;border:1px solid #e2e8f0;font-size:12px;">${r.type}</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:center;font-size:12px;">${r.count}</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:right;font-size:12px;">${formatCurrency(r.perLaborCost)}</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:right;font-weight:600;font-size:12px;">${formatCurrency(r.totalCost)}</td></tr>`).join('');
+    }).join('');
+  };
+
+  const paymentRowsHTML = (payments: any[]) => {
+    if (!payments?.length) return '';
+    const byDate: Record<string, any[]> = {};
+    payments.forEach(p => { const k = new Date(p.paymentDate).toDateString(); (byDate[k] = byDate[k] || []).push(p); });
+    return Object.entries(byDate).sort(([a],[b]) => new Date(a).getTime()-new Date(b).getTime()).map(([date, ps]) => {
+      const dayTotal = ps.reduce((s,p) => s+p.amount, 0);
+      return `<tr style="background:#059669;"><td colspan="3" style="padding:10px;color:white;font-weight:600;font-size:13px;">💰 ${fmtDate(date)} — Paid: ${formatCurrency(dayTotal)}</td></tr>`
+        + ps.map(p => `<tr style="background:#f0fdf4;"><td style="padding:8px;border:1px solid #e2e8f0;font-size:12px;"><span style="background:#dcfce7;color:#166534;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;">${(p.paymentType||'payment').toUpperCase()}</span></td><td style="padding:8px;border:1px solid #e2e8f0;font-size:12px;">${p.notes||'Payment recorded'}</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:right;font-weight:600;color:#059669;font-size:12px;">${formatCurrency(p.amount)}</td></tr>`).join('');
+    }).join('');
+  };
+
+  const baseCSS = `body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:20px;background:#fff;color:#1e293b;line-height:1.4;}table{width:100%;border-collapse:collapse;margin-bottom:16px;background:white;box-shadow:0 1px 3px rgba(0,0,0,0.1);}th{background:#374151;color:white;padding:10px 12px;text-align:left;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;}td{padding:10px;border:1px solid #e2e8f0;font-size:13px;}.no-data{text-align:center;padding:30px;color:#64748b;font-style:italic;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:16px;}.section-title{font-size:15px;font-weight:700;color:#1e293b;margin:20px 0 10px 0;padding:10px 14px;background:#f1f5f9;border-left:4px solid #2E72F0;border-radius:4px;}.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}.summary-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center;}.summary-card h3{margin:0 0 6px 0;font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;}.summary-card p{margin:0;font-size:16px;font-weight:700;color:#1e293b;}.footer{margin-top:40px;padding:16px;background:#f8fafc;border-radius:8px;text-align:center;font-size:12px;color:#64748b;}`;
+
+  const buildReportHTML = (selected: any[], laborMap: Record<string, any[]>) => {
+    const now = new Date().toLocaleDateString('en-IN', { weekday:'long', day:'2-digit', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' } as any);
+    const totalBudget = selected.reduce((s,c) => s+(c.totalAmount||0), 0);
+    const totalPaid   = selected.reduce((s,c) => s+(c.totalPaid||0), 0);
+    const totalWork   = selected.reduce((s,c) => s+(c.usedAmount||0), 0);
+
+    const contractorSections = selected.map(c => {
+      const name = getStaffDisplayName(c);
+      const entries = laborMap[c._id] || [];
+      const outstanding = Math.max(0, (c.usedAmount||0) - (c.totalPaid||0));
+      const statusStyle = c.status==='completed' ? 'background:#dcfce7;color:#166534;' : 'background:#fef3c7;color:#92400e;';
+      return `
+        <div style="margin-bottom:36px;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+          <div style="background:#2E72F0;padding:16px 20px;color:white;">
+            <div style="font-size:18px;font-weight:700;">${name}</div>
+            <div style="font-size:12px;opacity:0.85;margin-top:3px;">${c.contractType||'Contract'} &nbsp;•&nbsp; <span style="display:inline-block;${statusStyle}padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;text-transform:uppercase;">${c.status||'active'}</span></div>
+          </div>
+          <div style="padding:16px 20px;">
+            <div class="summary-grid">
+              <div class="summary-card"><h3>Budget</h3><p>${formatCurrency(c.totalAmount||0)}</p></div>
+              <div class="summary-card"><h3>Work Done</h3><p>${formatCurrency(c.usedAmount||0)}</p></div>
+              <div class="summary-card"><h3>Paid</h3><p style="color:#059669;">${formatCurrency(c.totalPaid||0)}</p></div>
+              <div class="summary-card"><h3>Outstanding</h3><p style="color:${outstanding>0?'#dc2626':'#059669'};">${formatCurrency(outstanding)}</p></div>
+            </div>
+            <div class="section-title">Work Logs (Day-wise)</div>
+            ${entries.length ? `<table><thead><tr><th>Worker Type</th><th style="text-align:center;">Count</th><th style="text-align:right;">Rate</th><th style="text-align:right;">Total</th></tr></thead><tbody>${laborRowsHTML(entries)}</tbody></table>` : '<div class="no-data">No work logs recorded.</div>'}
+            <div class="section-title">Payment History</div>
+            ${(c.payments||[]).length ? `<table><thead><tr><th>Type</th><th>Notes</th><th style="text-align:right;">Amount</th></tr></thead><tbody>${paymentRowsHTML(c.payments)}</tbody></table>` : '<div class="no-data">No payments recorded.</div>'}
+          </div>
+        </div>`;
+    }).join('');
+
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Contractor Report</title><style>${baseCSS}.main-header{text-align:center;margin-bottom:24px;padding:20px;background:#2E72F0;color:white;border-radius:12px;}.main-header h1{margin:0 0 6px 0;font-size:24px;font-weight:700;}.main-header p{margin:3px 0;font-size:13px;opacity:0.9;}</style></head><body>
+      <div class="main-header"><h1>Contractor Report</h1><p><strong>${projectName}</strong></p><p>${selected.length} Contractor${selected.length!==1?'s':''} selected</p><p>Generated: ${now}</p></div>
+      ${selected.length > 1 ? `<div style="margin-bottom:24px;"><h2 style="font-size:16px;font-weight:700;margin-bottom:12px;">Project Summary</h2><div class="summary-grid"><div class="summary-card"><h3>Total Budget</h3><p>${formatCurrency(totalBudget)}</p></div><div class="summary-card"><h3>Work Done</h3><p>${formatCurrency(totalWork)}</p></div><div class="summary-card"><h3>Total Paid</h3><p style="color:#059669;">${formatCurrency(totalPaid)}</p></div><div class="summary-card"><h3>Contractors</h3><p>${selected.length}</p></div></div></div>` : ''}
+      ${contractorSections}
+      <div class="footer"><p><strong>Construction Management System</strong></p><p>Generated: ${new Date().toISOString()}</p></div>
+    </body></html>`;
+  };
+
+  const generateReportDirectly = async () => {
+    const selected = contractors.filter((c: any) => selectedForReport.has(c._id));
+    if (!selected.length) return;
+
+    setShowContractorPicker(false);
+    setIsGeneratingReport(true);
+
+    try {
+      // Fetch labor data for each selected contractor in parallel
+      const laborMap: Record<string, any[]> = {};
+      await Promise.allSettled(selected.map(async (c: any) => {
+        const staffId = c.staffId?._id || c.staffId;
+        try {
+          const res = await apiClient.get('/api/labor', { params: { projectId, addedBy: staffId } });
+          const r = res.data as any;
+          laborMap[c._id] = r.success && r.data ? r.data.laborEntries || [] : [];
+        } catch { laborMap[c._id] = []; }
+      }));
+
+      const html = buildReportHTML(selected, laborMap);
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (isAvailable) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: `Contractor Report — ${projectName}`,
+          UTI: 'com.adobe.pdf',
+        });
+      } else {
+        Alert.alert('Report Ready', `PDF saved to: ${uri}`);
+      }
+      setSelectedForReport(new Set());
+    } catch {
+      Alert.alert('Error', 'Failed to generate report. Please try again.');
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -673,111 +700,65 @@ export default function ContractorScreen() {
           <Text style={styles.headerTitle} numberOfLines={1}>Contractor Management</Text>
           <Text style={styles.headerSubtitle} numberOfLines={1}>{projectName}</Text>
         </View>
+        <TouchableOpacity
+          style={styles.reportHeaderButton}
+          onPress={() => setShowContractorPicker(true)}
+          activeOpacity={0.7}
+          disabled={contractors.length === 0}
+        >
+          <Ionicons name="document-text-outline" size={20} color={contractors.length === 0 ? '#94A3B8' : '#2E72F0'} />
+        </TouchableOpacity>
       </View>
 
       {/* Main List */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#3B82F6" />
+          <ActivityIndicator size="large" color="#2E72F0" />
           <Text style={styles.loadingText}>Loading contractors...</Text>
         </View>
       ) : (
-        <View>
-          <FlatList
-          data={Object.entries(groupContractorsByStaff())}
-          keyExtractor={([staffId]) => staffId}
+        <FlatList
+          data={contractors}
+          keyExtractor={(item: any) => item._id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          style={{ flex: 1 }}
+          ListHeaderComponent={
+            <TouchableOpacity
+              style={contractorBanner.banner}
+              activeOpacity={0.75}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setShowAddModal(true);
+              }}
+            >
+              <View style={contractorBanner.iconWrap}>
+                <Ionicons name="people" size={24} color="#16A34A" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={contractorBanner.eyebrow}>Staff Contracts</Text>
+                <Text style={contractorBanner.title}>Contractor Management</Text>
+              </View>
+              <View style={contractorBanner.addBtn}>
+                <Ionicons name="add" size={20} color="#fff" />
+              </View>
+            </TouchableOpacity>
+          }
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <View style={styles.emptyIconContainer}>
-                <Ionicons name="people-outline" size={48} color="#94A3B8" />
+                <Ionicons name="people-outline" size={56} color="#BBF7D0" />
               </View>
-              <Text style={styles.emptyTitle}>No Contractors Assigned</Text>
+              <Text style={styles.emptyTitle}>No Contractors Yet</Text>
               <Text style={styles.emptySubtitle}>
-                Add contractors to manage their budgets and worker logs for this project.
+                Tap the green banner above to add your first contractor.
               </Text>
             </View>
           }
-          renderItem={({ item: [staffId, contractorGroup] }) => {
-            console.log('Rendering group:', staffId, 'with', contractorGroup.length, 'contracts');
-            
-            const isExpanded = expandedStaff.has(staffId);
-            const contractCount = contractorGroup.length;
-            const firstContractor = contractorGroup[0];
-            const staffName = getStaffDisplayName(firstContractor);
-
-            console.log('Staff name:', staffName, 'isExpanded:', isExpanded);
-
-            // Calculate totals for the staff member
-            const totalBudget = contractorGroup.reduce((sum, c) => sum + (c.totalAmount || 0), 0);
-            const totalPaid = contractorGroup.reduce((sum, c) => sum + (c.totalPaid || 0), 0);
-            const totalUsedAmount = contractorGroup.reduce((sum, c) => sum + (c.usedAmount || 0), 0);
-
-            // Always render grouped with dropdown (as requested by user)
-            return (
-              <View style={styles.groupContainer}>
-                {/* Staff Header */}
-                <TouchableOpacity
-                  style={styles.staffHeader}
-                  onPress={() => {
-                    console.log('Toggling expansion for staffId:', staffId);
-                    toggleStaffExpansion(staffId);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.staffHeaderLeft}>
-                    <View style={styles.avatarContainer}>
-                      <Text style={styles.avatarText}>
-                        {staffName.charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.staffName}>{staffName}</Text>
-                      <Text style={styles.contractCount}>
-                        {contractorGroup.length} Contract{contractorGroup.length > 1 ? 's' : ''} • Total Budget: {formatCurrency(totalBudget)}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.staffHeaderRight}>
-                    <Text style={styles.totalPaidText}>{formatCurrency(totalPaid)} Paid</Text>
-                    <Ionicons 
-                      name={isExpanded ? "chevron-up" : "chevron-down"} 
-                      size={20} 
-                      color="#64748B" 
-                    />
-                  </View>
-                </TouchableOpacity>
-
-                {/* Expanded Contracts */}
-                {isExpanded && (
-                  <View style={styles.expandedContracts}>
-                    {contractorGroup.map((contractor, index) => (
-                      <View key={contractor._id} style={styles.contractWrapper}>
-                        {renderContractCard(contractor, true)}
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-            );
-          }}
+          renderItem={({ item }) => renderContractCard(item)}
         />
-        </View>
       )}
 
-      {/* Floating Add Button */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          setShowAddModal(true);
-        }}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="add" size={28} color="#FFFFFF" />
-        <Text style={styles.fabText}>Add Contractor</Text>
-      </TouchableOpacity>
 
       {/* Add Contractor Modal */}
       <ContractorFormModal
@@ -806,245 +787,175 @@ export default function ContractorScreen() {
         }}
       />
 
-      {/* Manage Contractor / Payouts & Worker Logs Modal */}
+      {/* Manage Contractor Modal */}
       <Modal
         visible={selectedContractorForManage !== null}
         animationType="slide"
         transparent={true}
         onRequestClose={() => setSelectedContractorForManage(null)}
       >
-        <View style={modalStyles.modalOverlay}>
-          <View style={modalStyles.modalContainer}>
-            <StatusBar style="dark" backgroundColor="transparent" translucent={true} />
+        <View style={mStyles.overlay}>
+          <View style={mStyles.sheet}>
+            <View style={mStyles.handle} />
+
             {/* Header */}
-            <View style={modalStyles.header}>
-            <TouchableOpacity
-              style={modalStyles.backButton}
-              onPress={() => setSelectedContractorForManage(null)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="close" size={26} color="#374151" />
-            </TouchableOpacity>
-            
-            <View style={modalStyles.headerTitleContainer}>
-              <Text style={modalStyles.headerTitle}>Contractor Dashboard</Text>
-              <Text style={modalStyles.headerSubtitle}>
-                {selectedContractorForManage?.staffId
-                  ? `${selectedContractorForManage.staffId.firstName} ${selectedContractorForManage.staffId.lastName}`
-                  : 'Contractor'}
-              </Text>
+            <View style={mStyles.header}>
+              <View style={{ flex: 1 }}>
+                <Text style={mStyles.title} numberOfLines={1}>
+                  {selectedContractorForManage?.contractType || 'Contract'}
+                </Text>
+                <Text style={mStyles.subtitle} numberOfLines={1}>
+                  {selectedContractorForManage?.staffId
+                    ? `${selectedContractorForManage.staffId.firstName} ${selectedContractorForManage.staffId.lastName}`
+                    : 'Contractor'}
+                </Text>
+              </View>
+              <TouchableOpacity style={mStyles.closeBtn} onPress={() => setSelectedContractorForManage(null)} activeOpacity={0.7}>
+                <Ionicons name="close" size={18} color="#64748B" />
+              </TouchableOpacity>
             </View>
 
-            {/* Complete / Reactivate Button in Header */}
+            {/* Status + action row */}
             {selectedContractorForManage && (
-              <View style={modalStyles.headerActions}>
+              <View style={mStyles.actionRow}>
+                <View style={[mStyles.statusPill, selectedContractorForManage.status === 'completed' ? mStyles.pillDone : mStyles.pillActive]}>
+                  <View style={[mStyles.pillDot, { backgroundColor: selectedContractorForManage.status === 'completed' ? '#94A3B8' : '#16A34A' }]} />
+                  <Text style={[mStyles.pillText, { color: selectedContractorForManage.status === 'completed' ? '#64748B' : '#15803D' }]}>
+                    {selectedContractorForManage.status === 'completed' ? 'Completed' : 'Active'}
+                  </Text>
+                </View>
+                <View style={{ flex: 1 }} />
                 {selectedContractorForManage.status === 'completed' ? (
                   <>
-                    <TouchableOpacity 
-                      style={[modalStyles.statusActionButton, modalStyles.downloadBtn]} 
-                      onPress={() => {
-                        setSelectedContractorForReport(selectedContractorForManage);
-                        setShowReportGenerator(true);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="download-outline" size={16} color="#FFFFFF" />
-                      <Text style={modalStyles.statusActionText}>Report</Text>
+                    <TouchableOpacity style={mStyles.ghostBtn} onPress={() => { setSelectedContractorForReport(selectedContractorForManage); setShowReportGenerator(true); }} activeOpacity={0.7}>
+                      <Ionicons name="download-outline" size={14} color="#64748B" />
+                      <Text style={mStyles.ghostBtnText}>Report</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={[modalStyles.statusActionButton, modalStyles.reactivateBtn]} 
-                      onPress={() => handleReactivateContract(selectedContractorForManage)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={modalStyles.statusActionText}>Reactivate</Text>
+                    <TouchableOpacity style={mStyles.ghostBtn} onPress={() => handleReactivateContract(selectedContractorForManage)} activeOpacity={0.7}>
+                      <Text style={mStyles.ghostBtnText}>Reactivate</Text>
                     </TouchableOpacity>
                   </>
                 ) : (
-                  <TouchableOpacity 
-                    style={[modalStyles.statusActionButton, modalStyles.completeBtn]} 
-                    onPress={() => handleCompleteContract(selectedContractorForManage)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={modalStyles.statusActionText}>Complete</Text>
+                  <TouchableOpacity style={mStyles.solidBtn} onPress={() => handleCompleteContract(selectedContractorForManage)} activeOpacity={0.7}>
+                    <Text style={mStyles.solidBtnText}>Mark Complete</Text>
                   </TouchableOpacity>
                 )}
               </View>
             )}
-          </View>
 
-          {/* Segmented Tab Selector */}
-          <View style={modalStyles.tabContainer}>
-            <TouchableOpacity
-              style={[modalStyles.tabButton, activeTab === 'payments' && modalStyles.activeTabButton]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setActiveTab('payments');
-              }}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="card-outline" size={18} color={activeTab === 'payments' ? '#3B82F6' : '#64748B'} style={{ marginRight: 6 }} />
-              <Text style={[modalStyles.tabButtonText, activeTab === 'payments' && modalStyles.activeTabButtonText]}>
-                Payments History
-              </Text>
-            </TouchableOpacity>
+            {/* Tab bar */}
+            <View style={mStyles.tabBar}>
+              <TouchableOpacity
+                style={[mStyles.tab, activeTab === 'payments' && mStyles.tabActive]}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setActiveTab('payments'); }}
+                activeOpacity={0.8}
+              >
+                <Text style={[mStyles.tabText, activeTab === 'payments' && mStyles.tabTextActive]}>Payments</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[mStyles.tab, activeTab === 'logs' && mStyles.tabActive]}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setActiveTab('logs'); }}
+                activeOpacity={0.8}
+              >
+                <Text style={[mStyles.tabText, activeTab === 'logs' && mStyles.tabTextActive]}>Work Logs</Text>
+              </TouchableOpacity>
+            </View>
 
-            <TouchableOpacity
-              style={[modalStyles.tabButton, activeTab === 'logs' && modalStyles.activeTabButton]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setActiveTab('logs');
-              }}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="construct-outline" size={18} color={activeTab === 'logs' ? '#3B82F6' : '#64748B'} style={{ marginRight: 6 }} />
-              <Text style={[modalStyles.tabButtonText, activeTab === 'logs' && modalStyles.activeTabButtonText]}>
-                Worker Logs
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Tab Contents */}
-          {activeTab === 'payments' ? (
-            <View style={{ flex: 1 }}>
-              {/* Financial mini summary inside modal */}
-              {selectedContractorForManage && (() => {
-                const totalPaid = selectedContractorForManage.totalPaid || 0;
-                const remaining = selectedContractorForManage.totalAmount - totalPaid;
-                return (
-                  <View style={modalStyles.summaryCard}>
-                    <View style={modalStyles.summaryRow}>
-                      <View>
-                        <Text style={modalStyles.summaryLabel}>TOTAL BUDGET</Text>
-                        <Text style={modalStyles.summaryValue}>{formatCurrency(selectedContractorForManage.totalAmount)}</Text>
-                      </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={modalStyles.summaryLabel}>REMAINING BUDGET</Text>
-                        <Text style={[modalStyles.summaryValue, { color: remaining < 0 ? '#EF4444' : '#16A34A' }]}>
-                          {formatCurrency(remaining)}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {selectedContractorForManage.status !== 'completed' && (
-                      <TouchableOpacity
-                        style={modalStyles.addPaymentBtn}
-                        onPress={() => handleOpenPaymentForm(selectedContractorForManage)}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons name="cash-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                        <Text style={modalStyles.addPaymentBtnText}>Record Payout / Payment</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                );
-              })()}
-
-              {/* Payments List */}
-              <FlatList
-                data={selectedContractorForManage?.payments || []}
-                keyExtractor={(item, index) => index.toString()}
-                contentContainerStyle={modalStyles.listContent}
-                showsVerticalScrollIndicator={false}
-                ListEmptyComponent={
-                  <View style={modalStyles.emptyState}>
-                    <View style={modalStyles.emptyIconContainer}>
-                      <Ionicons name="card-outline" size={48} color="#94A3B8" />
-                    </View>
-                    <Text style={modalStyles.emptyTitle}>No Payments Recorded</Text>
-                    <Text style={modalStyles.emptySubtitle}>
-                      Record periodic payouts given to the contractor for labor/work.
-                    </Text>
-                  </View>
-                }
-                renderItem={({ item }) => {
-                  let typeColor = '#3B82F6';
-                  let typeBg = '#EFF6FF';
-                  if (item.paymentType === 'weekly') { typeColor = '#4F46E5'; typeBg = '#EEF2FF'; }
-                  else if (item.paymentType === 'monthly') { typeColor = '#8B5CF6'; typeBg = '#F5F3FF'; }
-                  else if (item.paymentType === 'advance') { typeColor = '#D97706'; typeBg = '#FEF3C7'; }
-                  else if (item.paymentType === 'final') { typeColor = '#059669'; typeBg = '#D1FAE5'; }
-
+            {/* Payments tab */}
+            {activeTab === 'payments' ? (
+              <View style={{ flex: 1 }}>
+                {selectedContractorForManage && (() => {
+                  const totalPaid = selectedContractorForManage.totalPaid || 0;
+                  const remaining = selectedContractorForManage.totalAmount - totalPaid;
                   return (
-                    <View style={modalStyles.paymentCard}>
-                      <View style={modalStyles.paymentHeader}>
-                        <View style={[modalStyles.paymentTypeBadge, { backgroundColor: typeBg }]}>
-                          <Text style={[modalStyles.paymentTypeText, { color: typeColor }]}>
-                            {item.paymentType ? item.paymentType.toUpperCase() : 'PAYMENT'}
-                          </Text>
-                        </View>
-                        <Text style={modalStyles.paymentDateText}>{formatDate(item.paymentDate)}</Text>
+                    <View style={mStyles.summaryStrip}>
+                      <View style={mStyles.summaryItem}>
+                        <Text style={mStyles.summaryLabel}>Budget</Text>
+                        <Text style={mStyles.summaryValue}>{formatCurrency(selectedContractorForManage.totalAmount)}</Text>
                       </View>
-                      
-                      <View style={modalStyles.paymentDetailsRow}>
-                        <Text style={modalStyles.paymentNotes} numberOfLines={2}>
-                          {item.notes || 'Payout recorded successfully'}
-                        </Text>
-                        <Text style={modalStyles.paymentAmountText}>{formatCurrency(item.amount)}</Text>
+                      <View style={mStyles.summaryDivider} />
+                      <View style={mStyles.summaryItem}>
+                        <Text style={mStyles.summaryLabel}>Paid</Text>
+                        <Text style={[mStyles.summaryValue, totalPaid > 0 && { color: '#16A34A' }]}>{formatCurrency(totalPaid)}</Text>
+                      </View>
+                      <View style={mStyles.summaryDivider} />
+                      <View style={mStyles.summaryItem}>
+                        <Text style={mStyles.summaryLabel}>Remaining</Text>
+                        <Text style={[mStyles.summaryValue, { color: remaining < 0 ? '#EF4444' : '#0F172A' }]}>{formatCurrency(remaining)}</Text>
                       </View>
                     </View>
                   );
-                }}
-              />
-            </View>
-          ) : (
-            /* Worker Logs Tab */
-            loadingLabor ? (
-              <View style={modalStyles.loadingContainer}>
-                <ActivityIndicator size="large" color="#4F46E5" />
-                <Text style={modalStyles.loadingText}>Loading worker logs...</Text>
+                })()}
+
+                {selectedContractorForManage?.status !== 'completed' && (
+                  <TouchableOpacity
+                    style={mStyles.recordBtn}
+                    onPress={() => handleOpenPaymentForm(selectedContractorForManage)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={mStyles.recordBtnText}>Record Payment</Text>
+                    <Ionicons name="add" size={18} color="#fff" />
+                  </TouchableOpacity>
+                )}
+
+                <FlatList
+                  data={selectedContractorForManage?.payments || []}
+                  keyExtractor={(_, index) => index.toString()}
+                  contentContainerStyle={mStyles.listPad}
+                  showsVerticalScrollIndicator={false}
+                  ListEmptyComponent={
+                    <View style={mStyles.emptyWrap}>
+                      <Text style={mStyles.emptyTitle}>No payments yet</Text>
+                      <Text style={mStyles.emptyDesc}>Payments you record will appear here.</Text>
+                    </View>
+                  }
+                  renderItem={({ item }) => (
+                    <View style={mStyles.paymentRow}>
+                      <View style={{ flex: 1 }}>
+                        <View style={mStyles.rowTopLine}>
+                          <Text style={mStyles.paymentType}>{item.paymentType || 'payment'}</Text>
+                          <Text style={mStyles.rowDate}>{formatDate(item.paymentDate)}</Text>
+                        </View>
+                        {item.notes ? <Text style={mStyles.rowNote} numberOfLines={1}>{item.notes}</Text> : null}
+                      </View>
+                      <Text style={mStyles.rowAmount}>{formatCurrency(item.amount)}</Text>
+                    </View>
+                  )}
+                />
               </View>
             ) : (
-              <FlatList
-                data={laborEntries}
-                keyExtractor={(item) => item._id}
-                contentContainerStyle={modalStyles.listContent}
-                showsVerticalScrollIndicator={false}
-                ListEmptyComponent={
-                  <View style={modalStyles.emptyState}>
-                    <View style={modalStyles.emptyIconContainer}>
-                      <Ionicons name="construct-outline" size={48} color="#94A3B8" />
+              /* Work Logs tab */
+              loadingLabor ? (
+                <View style={mStyles.loadingWrap}>
+                  <ActivityIndicator size="large" color="#0F172A" />
+                </View>
+              ) : (
+                <FlatList
+                  data={laborEntries}
+                  keyExtractor={(item) => item._id}
+                  contentContainerStyle={mStyles.listPad}
+                  showsVerticalScrollIndicator={false}
+                  ListEmptyComponent={
+                    <View style={mStyles.emptyWrap}>
+                      <Text style={mStyles.emptyTitle}>No work logs yet</Text>
+                      <Text style={mStyles.emptyDesc}>Worker entries from this contractor will appear here.</Text>
                     </View>
-                    <Text style={modalStyles.emptyTitle}>No Worker Logs Recorded</Text>
-                    <Text style={modalStyles.emptySubtitle}>
-                      This contractor has not logged any workers or labor entries for this project yet.
-                    </Text>
-                  </View>
-                }
-                renderItem={({ item }) => (
-                  <View style={modalStyles.logCard}>
-                    <View style={modalStyles.logCardHeader}>
-                      <View style={modalStyles.logTypeRow}>
-                        <View style={modalStyles.typeIconBadge}>
-                          <Ionicons name="person" size={16} color="#4F46E5" />
+                  }
+                  renderItem={({ item }) => (
+                    <View style={mStyles.logRow}>
+                      <View style={{ flex: 1 }}>
+                        <View style={mStyles.rowTopLine}>
+                          <Text style={mStyles.logWorkerType}>{item.type}</Text>
+                          <Text style={mStyles.rowDate}>{formatDate(item.addedAt)}</Text>
                         </View>
-                        <Text style={modalStyles.logType}>{item.type}</Text>
+                        <Text style={mStyles.rowNote}>{item.count} workers · {formatCurrency(item.perLaborCost)} each</Text>
                       </View>
-                      <Text style={modalStyles.logDate}>{formatDate(item.addedAt)}</Text>
+                      <Text style={mStyles.rowAmount}>{formatCurrency(item.totalCost)}</Text>
                     </View>
-                    
-                    <View style={modalStyles.logStats}>
-                      <View style={modalStyles.logStatItem}>
-                        <Text style={modalStyles.logStatLabel}>COUNT</Text>
-                        <Text style={modalStyles.logStatValue}>{item.count}</Text>
-                      </View>
-                      <View style={modalStyles.logStatDivider} />
-                      <View style={modalStyles.logStatItem}>
-                        <Text style={modalStyles.logStatLabel}>RATE / WORKER</Text>
-                        <Text style={modalStyles.logStatValue}>{formatCurrency(item.perLaborCost)}</Text>
-                      </View>
-                      <View style={modalStyles.logStatDivider} />
-                      <View style={modalStyles.logStatItem}>
-                        <Text style={modalStyles.logStatLabel}>TOTAL COST</Text>
-                        <Text style={[modalStyles.logStatValue, { color: '#4F46E5', fontWeight: '700' }]}>
-                          {formatCurrency(item.totalCost)}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                )}
-              />
-            )
-          )}
+                  )}
+                />
+              )
+            )}
           </View>
         </View>
       </Modal>
@@ -1062,170 +973,128 @@ export default function ContractorScreen() {
           setPaymentType('weekly');
         }}
       >
-        <View style={modalStyles.recordOverlay}>
-          <KeyboardAvoidingView 
+        <View style={pStyles.overlay}>
+          <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={modalStyles.recordContainer}
+            style={pStyles.sheet}
           >
-            {/* Grab handle */}
-            <View style={styles.dragHandle} />
+            <View style={pStyles.handle} />
 
             {/* Header */}
-            <View style={styles.modalFormHeader}>
-              <View>
-                <Text style={styles.modalFormHeaderTitle}>Record Payout</Text>
+            <View style={pStyles.header}>
+              <View style={{ flex: 1 }}>
+                <Text style={pStyles.title}>Record Payment</Text>
                 {currentContractorForPayment && (
-                  <Text style={styles.modalFormHeaderSubtitle}>
+                  <Text style={pStyles.subtitle}>
+                    {currentContractorForPayment.contractType}
                     {currentContractorForPayment.staffId
-                      ? `${currentContractorForPayment.staffId.firstName} ${currentContractorForPayment.staffId.lastName}`
-                      : 'Contractor'} - {currentContractorForPayment.contractType}
+                      ? `  ·  ${currentContractorForPayment.staffId.firstName} ${currentContractorForPayment.staffId.lastName}`
+                      : ''}
                   </Text>
                 )}
               </View>
-              <TouchableOpacity onPress={() => {
-                setShowRecordPaymentModal(false);
-                setCurrentContractorForPayment(null);
-                setPaymentAmount('');
-                setPaymentNotes('');
-                setPaymentType('weekly');
-              }}>
-                <Ionicons name="close-circle" size={28} color="#94A3B8" />
+              <TouchableOpacity
+                style={pStyles.closeBtn}
+                onPress={() => {
+                  setShowRecordPaymentModal(false);
+                  setCurrentContractorForPayment(null);
+                  setPaymentAmount('');
+                  setPaymentNotes('');
+                  setPaymentType('weekly');
+                }}
+              >
+                <Ionicons name="close" size={18} color="#64748B" />
               </TouchableOpacity>
             </View>
 
-            <ScrollView 
-              style={styles.formContent} 
+            <ScrollView
+              style={pStyles.body}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              {/* Amount input */}
-              <Text style={styles.inputLabel}>PAYMENT AMOUNT (₹)</Text>
-              <View style={styles.amountInputContainer}>
-                <Text style={styles.currencySymbol}>₹</Text>
+              {/* Large amount input */}
+              <View style={pStyles.amountBox}>
+                <Text style={pStyles.currencySign}>₹</Text>
                 <TextInput
-                  style={styles.amountInput}
-                  placeholder="Enter payout amount"
-                  placeholderTextColor="#94A3B8"
+                  style={pStyles.amountInput}
+                  placeholder="0"
+                  placeholderTextColor="#CBD5E1"
                   keyboardType="numeric"
                   value={paymentAmount}
                   onChangeText={setPaymentAmount}
                 />
               </View>
-              
-              {/* Info about outstanding work value */}
+
+              {/* Quick-fill chips */}
               {currentContractorForPayment && (
-                <View style={styles.infoContainer}>
-                  <Ionicons name="information-circle-outline" size={16} color="#3B82F6" />
-                  <Text style={styles.infoText}>
-                    Total Work Done: {formatCurrency(currentContractorForPayment.usedAmount || 0)} | Outstanding: {formatCurrency(calculateOutstandingWorkValue(currentContractorForPayment))}
-                  </Text>
+                <View style={pStyles.chipsRow}>
+                  <TouchableOpacity
+                    style={pStyles.chip}
+                    activeOpacity={0.75}
+                    onPress={() => {
+                      const v = calculateOutstandingWorkValue(currentContractorForPayment);
+                      setPaymentAmount(v.toString());
+                      setPaymentNotes(`Payment for outstanding work — ${formatCurrency(v)}`);
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }}
+                  >
+                    <Text style={pStyles.chipLabel}>Outstanding</Text>
+                    <Text style={pStyles.chipValue}>{formatCurrency(calculateOutstandingWorkValue(currentContractorForPayment))}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={pStyles.chip}
+                    activeOpacity={0.75}
+                    onPress={() => {
+                      const v = currentContractorForPayment.totalAmount - (currentContractorForPayment.totalPaid || 0);
+                      setPaymentAmount(v.toString());
+                      setPaymentNotes(`Final payment — ${formatCurrency(v)}`);
+                      setPaymentType('final');
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }}
+                  >
+                    <Text style={pStyles.chipLabel}>Remaining</Text>
+                    <Text style={pStyles.chipValue}>{formatCurrency(currentContractorForPayment.totalAmount - (currentContractorForPayment.totalPaid || 0))}</Text>
+                  </TouchableOpacity>
                 </View>
               )}
 
-              {/* Quick Amount Options */}
-              {currentContractorForPayment && (
-                <View style={styles.quickAmountContainer}>
-                  <Text style={styles.quickAmountLabel}>QUICK AMOUNT OPTIONS</Text>
-                  <View style={styles.quickAmountButtons}>
-                    <TouchableOpacity
-                      style={styles.quickAmountBtn}
-                      onPress={() => {
-                        const outstandingWork = calculateOutstandingWorkValue(currentContractorForPayment);
-                        setPaymentAmount(outstandingWork.toString());
-                        setPaymentNotes(`Payment for outstanding work - ${formatCurrency(outstandingWork)}`);
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="construct-outline" size={16} color="#4F46E5" />
-                      <Text style={styles.quickAmountBtnText}>Outstanding Work</Text>
-                      <Text style={styles.quickAmountValue}>{formatCurrency(calculateOutstandingWorkValue(currentContractorForPayment))}</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.quickAmountBtn}
-                      onPress={() => {
-                        const remainingAmount = currentContractorForPayment.totalAmount - (currentContractorForPayment.totalPaid || 0);
-                        setPaymentAmount(remainingAmount.toString());
-                        setPaymentNotes(`Final payment - Remaining contract amount: ${formatCurrency(remainingAmount)}`);
-                        setPaymentType('final');
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="cash-outline" size={16} color="#059669" />
-                      <Text style={styles.quickAmountBtnText}>Remaining Amount</Text>
-                      <Text style={styles.quickAmountValue}>{formatCurrency(currentContractorForPayment.totalAmount - (currentContractorForPayment.totalPaid || 0))}</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-
-              {/* Payment Type selection */}
-              <Text style={styles.inputLabel}>PAYMENT SCHEDULE / TYPE</Text>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                style={[styles.dropdownSelector, showTypeDropdown && styles.dropdownActive]}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setShowTypeDropdown(!showTypeDropdown);
-                }}
-              >
-                <Text style={styles.selectorText}>
-                  {paymentType ? paymentType.toUpperCase() : 'Select Payout Type'}
-                </Text>
-                <Ionicons
-                  name={showTypeDropdown ? 'chevron-up' : 'chevron-down'}
-                  size={20}
-                  color="#64748B"
-                />
-              </TouchableOpacity>
-
-              {showTypeDropdown && (
-                <View style={styles.dropdownListContainer}>
-                  {['daily', 'weekly', 'monthly', 'advance', 'final'].map((type) => (
-                    <TouchableOpacity
-                      key={type}
-                      style={[
-                        styles.dropdownItem,
-                        paymentType === type && styles.dropdownItemSelected,
-                      ]}
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setPaymentType(type);
-                        setShowTypeDropdown(false);
-                      }}
-                    >
-                      <Text style={styles.categoryText}>{type.toUpperCase()}</Text>
-                      {paymentType === type && (
-                        <Ionicons name="checkmark" size={18} color="#3B82F6" />
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-
-              {/* Notes input */}
-              <Text style={styles.inputLabel}>PAYMENT DESCRIPTION / NOTES</Text>
-              <View style={[styles.amountInputContainer, { height: 100, alignItems: 'flex-start', paddingTop: 10 }]}>
-                <TextInput
-                  style={[styles.amountInput, { textAlignVertical: 'top' }]}
-                  placeholder="e.g. Week 4 labor logs clearing payment or advance given"
-                  placeholderTextColor="#94A3B8"
-                  multiline
-                  numberOfLines={4}
-                  value={paymentNotes}
-                  onChangeText={setPaymentNotes}
-                />
+              {/* Payment type pills */}
+              <Text style={pStyles.fieldLabel}>Payment type</Text>
+              <View style={pStyles.typePills}>
+                {['daily', 'weekly', 'monthly', 'advance', 'final'].map(type => (
+                  <TouchableOpacity
+                    key={type}
+                    style={[pStyles.typePill, paymentType === type && pStyles.typePillActive]}
+                    activeOpacity={0.75}
+                    onPress={() => { setPaymentType(type); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                  >
+                    <Text style={[pStyles.typePillText, paymentType === type && pStyles.typePillTextActive]}>
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-              
-              <View style={{ height: 20 }} />
+
+              {/* Notes */}
+              <Text style={pStyles.fieldLabel}>Note  <Text style={{ color: '#CBD5E1', fontWeight: '400' }}>(optional)</Text></Text>
+              <TextInput
+                style={pStyles.notesInput}
+                placeholder="Add a note about this payment…"
+                placeholderTextColor="#CBD5E1"
+                multiline
+                numberOfLines={3}
+                value={paymentNotes}
+                onChangeText={setPaymentNotes}
+                textAlignVertical="top"
+              />
+
+              <View style={{ height: 24 }} />
             </ScrollView>
 
-            {/* Actions */}
-            <View style={styles.footer}>
+            {/* Footer */}
+            <View style={pStyles.footer}>
               <TouchableOpacity
-                style={styles.cancelButton}
+                style={pStyles.cancelBtn}
                 onPress={() => {
                   setShowRecordPaymentModal(false);
                   setCurrentContractorForPayment(null);
@@ -1235,36 +1104,151 @@ export default function ContractorScreen() {
                 }}
                 disabled={recordingPayment}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={pStyles.cancelText}>Cancel</Text>
               </TouchableOpacity>
-
               <TouchableOpacity
-                style={styles.submitButton}
+                style={[pStyles.submitBtn, recordingPayment && { opacity: 0.6 }]}
                 onPress={handleRecordPaymentSubmit}
                 disabled={recordingPayment}
+                activeOpacity={0.85}
               >
-                {recordingPayment ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.submitButtonText}>Record Payment</Text>
-                )}
+                {recordingPayment
+                  ? <ActivityIndicator size="small" color="#FFFFFF" />
+                  : <Text style={pStyles.submitText}>Record Payment</Text>}
               </TouchableOpacity>
             </View>
           </KeyboardAvoidingView>
         </View>
       </Modal>
 
-      {/* Contractor Report Generator Modal */}
-      <ContractorReportGenerator
-        visible={showReportGenerator}
-        onClose={() => {
-          setShowReportGenerator(false);
-          setSelectedContractorForReport(null);
-        }}
-        contractorData={selectedContractorForReport}
-        projectId={projectId}
-        projectName={projectName}
-      />
+      {/* Contractor Picker Modal — checkbox multi-select */}
+      <Modal
+        visible={showContractorPicker}
+        animationType="slide"
+        transparent
+        onRequestClose={() => { setShowContractorPicker(false); setSelectedForReport(new Set()); }}
+      >
+        <View style={pickerStyles.overlay}>
+          <View style={pickerStyles.sheet}>
+            <View style={pickerStyles.handle} />
+
+            {/* Header */}
+            <View style={pickerStyles.header}>
+              <View>
+                <Text style={pickerStyles.title}>Select Contractors</Text>
+                <Text style={pickerStyles.subtitle}>
+                  {selectedForReport.size === 0 ? 'Tap to select' : `${selectedForReport.size} selected`}
+                </Text>
+              </View>
+              <TouchableOpacity style={pickerStyles.closeBtn} onPress={() => { setShowContractorPicker(false); setSelectedForReport(new Set()); }}>
+                <Ionicons name="close" size={22} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Select All row */}
+            <TouchableOpacity style={pickerStyles.selectAllRow} activeOpacity={0.7} onPress={toggleSelectAll}>
+              <View style={[pickerStyles.checkbox, allSelected && pickerStyles.checkboxChecked]}>
+                {allSelected && <Ionicons name="checkmark" size={14} color="#fff" />}
+              </View>
+              <Text style={pickerStyles.selectAllText}>Select All ({contractors.length})</Text>
+            </TouchableOpacity>
+
+            <View style={pickerStyles.dividerLine} />
+
+            {/* Individual contractor rows */}
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
+              {contractors.map((c: any) => {
+                const name = getStaffDisplayName(c);
+                const checked = selectedForReport.has(c._id);
+                const done = c.status === 'completed';
+                const outstanding = Math.max(0, (c.usedAmount || 0) - (c.totalPaid || 0));
+                return (
+                  <TouchableOpacity
+                    key={c._id}
+                    style={[pickerStyles.contractorRow, checked && pickerStyles.contractorRowSelected]}
+                    activeOpacity={0.75}
+                    onPress={() => toggleContractorSelection(c._id)}
+                  >
+                    <View style={[pickerStyles.checkbox, checked && pickerStyles.checkboxChecked]}>
+                      {checked && <Ionicons name="checkmark" size={14} color="#fff" />}
+                    </View>
+                    <View style={pickerStyles.avatar}>
+                      <Text style={pickerStyles.avatarText}>{(c.contractType || 'C').charAt(0).toUpperCase()}</Text>
+                    </View>
+                    <View style={pickerStyles.cardText}>
+                      <View style={pickerStyles.nameRow}>
+                        <Text style={pickerStyles.contractorName} numberOfLines={1}>{c.contractType || 'Contract'}</Text>
+                        <View style={[pickerStyles.statusPill, done ? pickerStyles.statusDone : pickerStyles.statusActive]}>
+                          <Text style={[pickerStyles.statusPillText, done ? pickerStyles.statusDoneText : pickerStyles.statusActiveText]}>
+                            {done ? 'DONE' : 'ACTIVE'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={pickerStyles.contractorMeta}>
+                        {name} · {formatCurrency(c.totalAmount || 0)} budget
+                        {outstanding > 0 ? ` · ₹${formatCurrency(outstanding)} due` : ' · Settled'}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+              <View style={{ height: 16 }} />
+            </ScrollView>
+
+            {/* Footer generate button */}
+            <View style={pickerStyles.footer}>
+              <TouchableOpacity
+                style={[pickerStyles.generateBtn, selectedForReport.size === 0 && pickerStyles.generateBtnDisabled]}
+                activeOpacity={0.85}
+                disabled={selectedForReport.size === 0}
+                onPress={generateReportDirectly}
+              >
+                <Ionicons name="document-text" size={18} color="#fff" />
+                <Text style={pickerStyles.generateBtnText}>
+                  Generate PDF{selectedForReport.size > 0 ? ` (${selectedForReport.size})` : ''}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Report Generating Overlay */}
+      {isGeneratingReport && (
+        <View style={pickerStyles.generatingOverlay}>
+          <View style={pickerStyles.generatingCard}>
+            <Ionicons name="document-text" size={40} color="#2E72F0" />
+            <Text style={pickerStyles.generatingTitle}>Generating PDF...</Text>
+            <Text style={pickerStyles.generatingSubtitle}>Fetching work logs & building report</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Single Contractor Report Generator Modal */}
+      {showReportGenerator && (
+        <ContractorReportGenerator
+          visible={showReportGenerator}
+          onClose={() => {
+            setShowReportGenerator(false);
+            setSelectedContractorForReport(null);
+          }}
+          contractorData={selectedContractorForReport}
+          projectId={projectId}
+          projectName={projectName}
+        />
+      )}
+
+      {/* Project-wide All Contractors Report */}
+      {showProjectReport && (
+        <ContractorReportGenerator
+          visible={showProjectReport}
+          onClose={() => setShowProjectReport(false)}
+          contractorData={null}
+          allContractors={contractors}
+          projectId={projectId}
+          projectName={projectName}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -1314,6 +1298,15 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  reportHeaderButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EAF0FE',
+    marginLeft: 8,
   },
   loadingText: {
     marginTop: 12,
@@ -1380,7 +1373,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -1403,7 +1396,7 @@ const styles = StyleSheet.create({
   manageButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4F46E5',
+    backgroundColor: '#1A54C4',
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
@@ -1544,13 +1537,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#EAF0FE',
     borderRadius: 8,
     paddingVertical: 8,
     gap: 6,
   },
   cardEditBtnText: {
-    color: '#4F46E5',
+    color: '#1A54C4',
     fontSize: 13,
     fontWeight: '600',
   },
@@ -1645,7 +1638,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   dropdownActive: {
-    borderColor: '#3B82F6',
+    borderColor: '#2E72F0',
     backgroundColor: '#FFFFFF',
   },
   selectorText: {
@@ -1676,7 +1669,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F1F5F9',
   },
   dropdownItemSelected: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
   },
   categoryText: {
     fontSize: 14,
@@ -1711,7 +1704,7 @@ const styles = StyleSheet.create({
     flex: 2,
     paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1723,7 +1716,7 @@ const styles = StyleSheet.create({
   infoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     borderRadius: 8,
     padding: 12,
     marginTop: 8,
@@ -1771,94 +1764,336 @@ const styles = StyleSheet.create({
     color: '#1E293B',
   },
   
-  // ── Grouped Contractor Styles ────────────────────────────────────
-  groupContainer: {
-    marginBottom: 16,
-  },
-  staffHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+});
+
+const cStyles = StyleSheet.create({
+  card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    elevation: 2,
-    shadowColor: '#000000',
-    shadowOpacity: 0.03,
+    borderColor: '#F1F5F9',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.06,
     shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  staffHeaderLeft: {
+  cardTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 18,
+  },
+  identityBlock: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    gap: 12,
     marginRight: 12,
   },
-  staffHeaderRight: {
-    alignItems: 'flex-end',
-    flexDirection: 'row',
-    gap: 8,
-  },
-  staffName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  contractCount: {
-    fontSize: 13,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  totalPaidText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#4F46E5',
-  },
-  expandedContracts: {
-    marginTop: 8,
-    paddingLeft: 8,
-  },
-  contractWrapper: {
-    marginBottom: 8,
-  },
-  groupedCard: {
-    marginLeft: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#3B82F6',
-  },
-  groupedCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  avatarWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
-    marginBottom: 16,
+    justifyContent: 'center',
+    flexShrink: 0,
   },
-  contractTypeTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
+  avatarInitial: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 3,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    flexShrink: 0,
+  },
+  personName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
     flex: 1,
   },
-  groupedCardActions: {
+  contractMeta: {
+    fontSize: 12,
+    color: '#94A3B8',
+    fontWeight: '500',
+    textTransform: 'capitalize',
+  },
+  actionIcons: {
+    flexDirection: 'row',
+    gap: 14,
+    paddingTop: 2,
+  },
+  progressWrap: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
+    marginBottom: 20,
+  },
+  progressTrack: {
+    flex: 1,
+    height: 3,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  progressLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#94A3B8',
+    minWidth: 32,
+    textAlign: 'right',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  statCol: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+  },
+  statDivider: {
+    width: 1,
+    height: 36,
+    backgroundColor: '#F1F5F9',
+    alignSelf: 'center',
+  },
+  statLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  statValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+    textAlign: 'center',
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 13,
+    borderRadius: 12,
+  },
+  actionBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: 0.1,
+  },
+  outstandingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  outstandingLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#94A3B8',
+  },
+  outstandingAmount: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+});
+
+const mStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: '88%',
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E2E8F0',
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 10,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 3,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: '#94A3B8',
+    fontWeight: '500',
+  },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 12,
+    flexShrink: 0,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 14,
     gap: 8,
   },
-  manageButtonSmall: {
+  statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4F46E5',
-    paddingVertical: 6,
+    gap: 5,
     paddingHorizontal: 10,
-    borderRadius: 6,
+    paddingVertical: 5,
+    borderRadius: 20,
   },
-  manageButtonTextSmall: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    marginRight: 4,
+  pillActive: { backgroundColor: '#F0FDF4' },
+  pillDone:   { backgroundColor: '#F1F5F9' },
+  pillDot: { width: 6, height: 6, borderRadius: 3 },
+  pillText: { fontSize: 12, fontWeight: '600' },
+  ghostBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
+  ghostBtnText: { fontSize: 12, fontWeight: '600', color: '#475569' },
+  solidBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: '#0F172A',
+  },
+  solidBtnText: { fontSize: 12, fontWeight: '600', color: '#FFFFFF' },
+  tabBar: {
+    flexDirection: 'row',
+    marginHorizontal: 20,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    padding: 3,
+    marginBottom: 14,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  tabActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  tabText: { fontSize: 13, fontWeight: '600', color: '#94A3B8' },
+  tabTextActive: { color: '#0F172A' },
+  summaryStrip: {
+    flexDirection: 'row',
+    marginHorizontal: 20,
+    marginBottom: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  summaryItem: { flex: 1, alignItems: 'center', gap: 4 },
+  summaryDivider: { width: 1, backgroundColor: '#E2E8F0', marginVertical: 4 },
+  summaryLabel: { fontSize: 10, fontWeight: '600', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.5 },
+  summaryValue: { fontSize: 14, fontWeight: '700', color: '#0F172A' },
+  recordBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginHorizontal: 20,
+    marginBottom: 14,
+    backgroundColor: '#0F172A',
+    paddingVertical: 13,
+    borderRadius: 12,
+  },
+  recordBtnText: { fontSize: 14, fontWeight: '600', color: '#FFFFFF' },
+  listPad: { paddingHorizontal: 20, paddingBottom: 40 },
+  emptyWrap: {
+    paddingVertical: 60,
+    alignItems: 'center',
+    gap: 6,
+  },
+  emptyTitle: { fontSize: 15, fontWeight: '600', color: '#334155' },
+  emptyDesc: { fontSize: 13, color: '#94A3B8', textAlign: 'center', lineHeight: 18 },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  paymentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  logRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  rowTopLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 3,
+  },
+  paymentType: { fontSize: 13, fontWeight: '700', color: '#0F172A', textTransform: 'capitalize' },
+  logWorkerType: { fontSize: 13, fontWeight: '700', color: '#0F172A' },
+  rowDate: { fontSize: 11, color: '#94A3B8', fontWeight: '500' },
+  rowNote: { fontSize: 12, color: '#94A3B8' },
+  rowAmount: { fontSize: 15, fontWeight: '700', color: '#0F172A', flexShrink: 0 },
 });
 
 const modalStyles = StyleSheet.create({
@@ -1981,7 +2216,7 @@ const modalStyles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#EAF0FE',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
@@ -2037,7 +2272,7 @@ const modalStyles = StyleSheet.create({
     backgroundColor: '#059669',
   },
   reactivateBtn: {
-    backgroundColor: '#4F46E5',
+    backgroundColor: '#1A54C4',
   },
   downloadBtn: {
     backgroundColor: '#10B981',
@@ -2063,7 +2298,7 @@ const modalStyles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   activeTabButton: {
-    borderBottomColor: '#3B82F6',
+    borderBottomColor: '#2E72F0',
   },
   tabButtonText: {
     fontSize: 14,
@@ -2071,7 +2306,7 @@ const modalStyles = StyleSheet.create({
     color: '#64748B',
   },
   activeTabButtonText: {
-    color: '#3B82F6',
+    color: '#2E72F0',
   },
   summaryCard: {
     backgroundColor: '#FFFFFF',
@@ -2108,7 +2343,7 @@ const modalStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
     paddingVertical: 12,
     borderRadius: 10,
   },
@@ -2177,5 +2412,464 @@ const modalStyles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 16,
     elevation: 20,
+  },
+});
+
+const pStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(15,23,42,0.5)',
+  },
+  sheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '92%',
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E2E8F0',
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  title: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 3,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: '#94A3B8',
+    fontWeight: '500',
+    textTransform: 'capitalize',
+  },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 12,
+    flexShrink: 0,
+  },
+  body: {
+    paddingHorizontal: 20,
+  },
+  amountBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    marginBottom: 16,
+  },
+  currencySign: {
+    fontSize: 32,
+    fontWeight: '300',
+    color: '#94A3B8',
+    marginRight: 6,
+    marginTop: 4,
+  },
+  amountInput: {
+    flex: 1,
+    fontSize: 40,
+    fontWeight: '700',
+    color: '#0F172A',
+    padding: 0,
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 24,
+  },
+  chip: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    gap: 3,
+  },
+  chipLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  chipValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+    marginBottom: 10,
+  },
+  typePills: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 22,
+  },
+  typePill: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+  },
+  typePillActive: {
+    backgroundColor: '#0F172A',
+    borderColor: '#0F172A',
+  },
+  typePillText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  typePillTextActive: {
+    color: '#FFFFFF',
+  },
+  notesInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: '#0F172A',
+    minHeight: 88,
+    marginBottom: 8,
+  },
+  footer: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+  },
+  cancelText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  submitBtn: {
+    flex: 2,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#0F172A',
+    alignItems: 'center',
+  },
+  submitText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+});
+
+const pickerStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(10,18,38,0.55)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 36,
+    paddingTop: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+    elevation: 20,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E2E8F0',
+    alignSelf: 'center',
+    marginBottom: 18,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.4,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
+    marginTop: 3,
+  },
+  closeBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Select All row
+  selectAllRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+  },
+  selectAllText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#2E72F0',
+  },
+  dividerLine: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginBottom: 8,
+  },
+  // Checkbox
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  checkboxChecked: {
+    backgroundColor: '#2E72F0',
+    borderColor: '#2E72F0',
+  },
+  // Contractor rows
+  contractorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 8,
+  },
+  contractorRowSelected: {
+    backgroundColor: '#EAF0FE',
+    borderColor: '#C4D8FC',
+  },
+  cardText: {
+    flex: 1,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#EAF0FE',
+    borderWidth: 1,
+    borderColor: '#C4D8FC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#2E72F0',
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 3,
+    flexWrap: 'wrap',
+  },
+  contractorName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+    flex: 1,
+  },
+  contractorMeta: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  statusPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  statusActive: {
+    backgroundColor: '#DCFCE7',
+  },
+  statusDone: {
+    backgroundColor: '#E0E7FF',
+  },
+  statusPillText: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+  },
+  statusActiveText: {
+    color: '#15803D',
+  },
+  statusDoneText: {
+    color: '#4338CA',
+  },
+  // Footer
+  footer: {
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  generateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#2E72F0',
+    borderRadius: 14,
+    paddingVertical: 15,
+  },
+  generateBtnDisabled: {
+    backgroundColor: '#CBD5E1',
+  },
+  generateBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: 0.2,
+  },
+  // Generating overlay
+  generatingOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(10,18,38,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 9999,
+  },
+  generatingCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 32,
+    alignItems: 'center',
+    gap: 12,
+    width: 240,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  generatingTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0F172A',
+    textAlign: 'center',
+  },
+  generatingSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+});
+
+const contractorBanner = StyleSheet.create({
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginHorizontal: 16,
+    marginTop: 14,
+    marginBottom: 6,
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  iconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 11,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    flexShrink: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  eyebrow: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#16A34A',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 2,
+  },
+  title: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  addBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#16A34A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
 });

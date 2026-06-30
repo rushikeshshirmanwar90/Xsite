@@ -182,12 +182,12 @@ const EquipmentAnalytics: React.FC = () => {
     const categoryMap: { [key: string]: { icon: keyof typeof Ionicons.glyphMap, color: string } } = {
       'Earthmoving & Excavation Equipment': { icon: 'construct-outline', color: '#8B5CF6' },
       'Material Handling & Lifting': { icon: 'arrow-up-outline', color: '#10B981' },
-      'Concrete & Paving Equipment': { icon: 'cube-outline', color: '#F59E0B' },
+      'Concrete & Paving Equipment': { icon: 'cube-outline', color: '#EE730C' },
       'Hauling & Transport Vehicles': { icon: 'car-outline', color: '#EF4444' },
-      'Specialty & Finishing Equipment': { icon: 'settings-outline', color: '#6366F1' },
+      'Specialty & Finishing Equipment': { icon: 'settings-outline', color: '#2E72F0' },
     };
 
-    return categoryMap[category] || { icon: 'construct-outline', color: '#F59E0B' };
+    return categoryMap[category] || { icon: 'construct-outline', color: '#EE730C' };
   };
 
   const getCostTypeDisplay = (equipment: EquipmentDetail) => {
@@ -204,7 +204,7 @@ const EquipmentAnalytics: React.FC = () => {
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color="#3B82F6" />
+              <Ionicons name="arrow-back" size={24} color="#2E72F0" />
             </TouchableOpacity>
             <View style={styles.projectInfo}>
               <Text style={styles.projectName}>Equipment Cost</Text>
@@ -224,7 +224,7 @@ const EquipmentAnalytics: React.FC = () => {
 
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#F59E0B" />
+            <ActivityIndicator size="large" color="#EE730C" />
             <Text style={styles.loadingText}>Loading equipment details...</Text>
           </View>
         ) : equipmentDetails.length === 0 ? (
@@ -240,7 +240,7 @@ const EquipmentAnalytics: React.FC = () => {
             {/* Total Expense Card */}
             <View style={styles.totalCard}>
               <View style={styles.totalIconContainer}>
-                <Ionicons name="construct" size={32} color="#F59E0B" />
+                <Ionicons name="construct" size={32} color="#EE730C" />
               </View>
               <View style={styles.totalInfo}>
                 <Text style={styles.totalLabel}>TOTAL EXPENSE</Text>
@@ -255,11 +255,11 @@ const EquipmentAnalytics: React.FC = () => {
             <View style={styles.statsRow}>
               <View style={[styles.statCard, { backgroundColor: '#FEF3C7' }]}>
                 <View style={styles.statIconContainer}>
-                  <Ionicons name="layers-outline" size={20} color="#F59E0B" />
+                  <Ionicons name="layers-outline" size={20} color="#EE730C" />
                 </View>
                 <View style={styles.statInfo}>
                   <Text style={styles.statLabel}>Total Items</Text>
-                  <Text style={[styles.statValue, { color: '#F59E0B' }]}>{equipmentDetails.length}</Text>
+                  <Text style={[styles.statValue, { color: '#EE730C' }]}>{equipmentDetails.length}</Text>
                 </View>
               </View>
               <View style={[styles.statCard, { backgroundColor: '#FEF7F0' }]}>
@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#F59E0B',
+    color: '#EE730C',
     marginBottom: 4,
   },
   totalSubtext: {
@@ -648,7 +648,7 @@ const styles = StyleSheet.create({
   totalCostValue: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#F59E0B',
+    color: '#EE730C',
   },
   notesContainer: {
     backgroundColor: '#FEF7F0',
@@ -656,7 +656,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 12,
     borderLeftWidth: 3,
-    borderLeftColor: '#F59E0B',
+    borderLeftColor: '#EE730C',
   },
   notesLabel: {
     fontSize: 12,

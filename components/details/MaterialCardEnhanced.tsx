@@ -644,7 +644,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 </View>
                                 {showMiniSectionLabel && material.miniSectionId && (
                                     <View style={styles.miniSectionBadge}>
-                                        <Ionicons name="location" size={12} color="#3B82F6" />
+                                        <Ionicons name="location" size={12} color="#2E72F0" />
                                         <Text style={styles.miniSectionText}>
                                             {getMiniSectionName(material.miniSectionId)}
                                         </Text>
@@ -994,7 +994,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                     onPress={handleOpenEditModal}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons name="create-outline" size={20} color="#3B82F6" />
+                                    <Ionicons name="create-outline" size={20} color="#2E72F0" />
                                     <Text style={styles.optionText}>Edit Stock</Text>
                                     <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
                                 </TouchableOpacity>
@@ -1020,7 +1020,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                             onPress={handleOpenTransferModal}
                             activeOpacity={0.7}
                         >
-                            <Ionicons name="swap-horizontal" size={20} color="#3B82F6" />
+                            <Ionicons name="swap-horizontal" size={20} color="#2E72F0" />
                             <Text style={styles.optionText}>Transfer Material</Text>
                             <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
                         </TouchableOpacity>
@@ -1051,7 +1051,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                         
                         {loadingProjects ? (
                             <View style={styles.loadingContainer}>
-                                <Ionicons name="sync" size={32} color="#3B82F6" />
+                                <Ionicons name="sync" size={32} color="#2E72F0" />
                                 <Text style={styles.loadingText}>Loading projects...</Text>
                             </View>
                         ) : availableProjects.length > 0 ? (
@@ -1064,7 +1064,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 >
                                     <View style={styles.projectInfo}>
                                         <View style={styles.projectIconContainer}>
-                                            <Ionicons name="folder" size={24} color="#3B82F6" />
+                                            <Ionicons name="folder" size={24} color="#2E72F0" />
                                         </View>
                                         <View style={styles.projectDetails}>
                                             <Text style={styles.projectName}>{project.name}</Text>
@@ -1109,7 +1109,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                         {/* Transfer Summary */}
                         <View style={styles.transferSummary}>
                             <View style={styles.transferHeader}>
-                                <Ionicons name="swap-horizontal" size={24} color="#3B82F6" />
+                                <Ionicons name="swap-horizontal" size={24} color="#2E72F0" />
                                 <Text style={styles.transferTitle}>Material Transfer</Text>
                             </View>
                             
@@ -1326,8 +1326,8 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 )}
                                 {/* Warning if vendor is different */}
                                 {addStockVendor.trim() !== '' && (
-                                    <View style={[styles.costWarning, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}>
-                                        <Ionicons name="person-circle" size={16} color="#3B82F6" />
+                                    <View style={[styles.costWarning, { backgroundColor: '#EAF0FE', borderColor: '#C4D8FC' }]}>
+                                        <Ionicons name="person-circle" size={16} color="#2E72F0" />
                                         <Text style={[styles.costWarningText, { color: '#1D4ED8' }]}>
                                             Vendor entered! A new material entry will be created for this vendor.
                                         </Text>
@@ -1492,7 +1492,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                         <TouchableOpacity
                             style={[
                                 styles.confirmButton,
-                                { backgroundColor: '#3B82F6' },
+                                { backgroundColor: '#2E72F0' },
                                 (savingEdit || !editQuantity || parseFloat(editQuantity) <= 0) && styles.confirmButtonDisabled
                             ]}
                             onPress={handleSaveEdit}
@@ -1581,7 +1581,7 @@ const styles = StyleSheet.create({
         paddingVertical: 3,
         borderRadius: 6,
         borderWidth: 1,
-        borderColor: '#F59E0B',
+        borderColor: '#EE730C',
     },
     specsText: {
         fontSize: 11,
@@ -1591,7 +1591,7 @@ const styles = StyleSheet.create({
     miniSectionBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: 6,
@@ -1602,7 +1602,7 @@ const styles = StyleSheet.create({
     },
     miniSectionText: {
         fontSize: 11,
-        color: '#3B82F6',
+        color: '#2E72F0',
         fontWeight: '600',
     },
     variantCountText: {
@@ -2005,7 +2005,7 @@ const styles = StyleSheet.create({
         width: 48,
         height: 48,
         borderRadius: 12,
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 12,
@@ -2082,7 +2082,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         paddingVertical: 16,
         borderRadius: 12,
         gap: 8,

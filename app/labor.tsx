@@ -71,10 +71,10 @@ const SwipeableMiniSection = ({
                             alignItems: 'center',
                             paddingHorizontal: 20,
                             paddingVertical: 18,
-                            backgroundColor: selectedMiniSection === section._id ? '#EFF6FF' : '#FFFFFF',
+                            backgroundColor: selectedMiniSection === section._id ? '#EAF0FE' : '#FFFFFF',
                             borderRadius: 12,
                             borderWidth: selectedMiniSection === section._id ? 2 : 1,
-                            borderColor: selectedMiniSection === section._id ? '#3B82F6' : '#E2E8F0',
+                            borderColor: selectedMiniSection === section._id ? '#2E72F0' : '#E2E8F0',
                             shadowColor: '#000',
                             shadowOffset: { width: 0, height: 2 },
                             shadowOpacity: 0.05,
@@ -89,7 +89,7 @@ const SwipeableMiniSection = ({
                             width: 40,
                             height: 40,
                             borderRadius: 20,
-                            backgroundColor: selectedMiniSection === section._id ? '#3B82F6' : '#F3F4F6',
+                            backgroundColor: selectedMiniSection === section._id ? '#2E72F0' : '#F3F4F6',
                             alignItems: 'center',
                             justifyContent: 'center',
                             marginRight: 16,
@@ -107,7 +107,7 @@ const SwipeableMiniSection = ({
                                 style={{
                                     fontSize: 16,
                                     fontWeight: '600',
-                                    color: selectedMiniSection === section._id ? '#3B82F6' : '#374151',
+                                    color: selectedMiniSection === section._id ? '#2E72F0' : '#374151',
                                     marginBottom: 4,
                                 }}
                                 numberOfLines={1}
@@ -124,7 +124,7 @@ const SwipeableMiniSection = ({
                         
                         {/* Selection Indicator */}
                         {selectedMiniSection === section._id && (
-                            <Ionicons name="checkmark-circle" size={24} color="#3B82F6" />
+                            <Ionicons name="checkmark-circle" size={24} color="#2E72F0" />
                         )}
                     </TouchableOpacity>
                 </Animated.View>
@@ -364,8 +364,8 @@ const LaborPage = () => {
     const getLaborIconAndColor = (category: string) => {
         const categoryMap: { [key: string]: { icon: keyof typeof import('@expo/vector-icons').Ionicons.glyphMap, color: string } } = {
             'Civil / Structural Works': { icon: 'hammer-outline', color: '#EF4444' },
-            'Electrical Works': { icon: 'flash-outline', color: '#F59E0B' },
-            'Plumbing & Sanitary Works': { icon: 'water-outline', color: '#3B82F6' },
+            'Electrical Works': { icon: 'flash-outline', color: '#EE730C' },
+            'Plumbing & Sanitary Works': { icon: 'water-outline', color: '#2E72F0' },
             'Finishing Works': { icon: 'brush-outline', color: '#EC4899' },
             'Mechanical & HVAC Works': { icon: 'thermometer-outline', color: '#F97316' },
             'Fire Fighting & Safety Works': { icon: 'flame-outline', color: '#DC2626' },
@@ -1196,7 +1196,7 @@ const LaborPage = () => {
                                             
                                             let progressColor = '#10B981';
                                             if (percentUsed > 85) progressColor = '#EF4444';
-                                            else if (percentUsed > 60) progressColor = '#F59E0B';
+                                            else if (percentUsed > 60) progressColor = '#EE730C';
 
                                             const contractStatus = contract.status || 'active';
                                             const isCompleted = contractStatus === 'completed';
@@ -1210,7 +1210,7 @@ const LaborPage = () => {
                                                             <Ionicons 
                                                                 name={isCompleted ? "checkmark-circle" : "wallet-outline"} 
                                                                 size={18} 
-                                                                color={isCompleted ? "#10B981" : "#3B82F6"} 
+                                                                color={isCompleted ? "#10B981" : "#2E72F0"} 
                                                             />
                                                         </View>
                                                         <View style={{ flex: 1 }}>
@@ -1229,7 +1229,7 @@ const LaborPage = () => {
                                                     <View style={contractorProgressStyles.compactFinancialRow}>
                                                         <View style={contractorProgressStyles.compactFinancialItem}>
                                                             <Text style={contractorProgressStyles.compactFinancialLabel}>Work Done</Text>
-                                                            <Text style={[contractorProgressStyles.compactFinancialValue, { color: '#F59E0B' }]}>
+                                                            <Text style={[contractorProgressStyles.compactFinancialValue, { color: '#EE730C' }]}>
                                                                 {formatCurrencyLocal(usedAmount)}
                                                             </Text>
                                                         </View>
@@ -1279,7 +1279,7 @@ const LaborPage = () => {
                                 }) || '0deg'
                             }]
                         }}>
-                            <Ionicons name="sync" size={48} color="#3B82F6" />
+                            <Ionicons name="sync" size={48} color="#2E72F0" />
                         </Animated.View>
                         <Text style={styles.noMaterialsTitle}>Loading Labor Entries...</Text>
                         <Text style={styles.noMaterialsDescription}>
@@ -1410,7 +1410,7 @@ const LaborPage = () => {
                                     </Text>
                                 </View>
                                 {!selectedMiniSection && (
-                                    <Ionicons name="checkmark-circle" size={24} color="#3B82F6" />
+                                    <Ionicons name="checkmark-circle" size={24} color="#2E72F0" />
                                 )}
                             </TouchableOpacity>
 
@@ -1472,7 +1472,7 @@ const LaborPage = () => {
                                 },
                             ]}
                         >
-                            <Ionicons name="people-circle" size={48} color="#3B82F6" />
+                            <Ionicons name="people-circle" size={48} color="#2E72F0" />
                         </Animated.View>
                         <Text style={loadingStyles.loadingTitle}>Adding Labor Entries</Text>
                         <Text style={loadingStyles.loadingSubtitle}>Please wait while we process your request...</Text>
@@ -1608,7 +1608,7 @@ const loadingStyles = StyleSheet.create({
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
     },
 });
 
@@ -1706,9 +1706,9 @@ const modalStyles = StyleSheet.create({
         elevation: 2,
     },
     allSectionsOptionSelected: {
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         borderWidth: 2,
-        borderColor: '#3B82F6',
+        borderColor: '#2E72F0',
     },
     allSectionsIcon: {
         width: 40,
@@ -1720,7 +1720,7 @@ const modalStyles = StyleSheet.create({
         marginRight: 16,
     },
     allSectionsIconSelected: {
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
     },
     allSectionsTitle: {
         fontSize: 16,
@@ -1729,7 +1729,7 @@ const modalStyles = StyleSheet.create({
         marginBottom: 2,
     },
     allSectionsTitleSelected: {
-        color: '#3B82F6',
+        color: '#2E72F0',
     },
     allSectionsDescription: {
         fontSize: 14,
@@ -1778,8 +1778,8 @@ const contractorProgressStyles = StyleSheet.create({
         borderRadius: 18,
         padding: 20,
         borderWidth: 1,
-        borderColor: '#BFDBFE',
-        shadowColor: '#3B82F6',
+        borderColor: '#C4D8FC',
+        shadowColor: '#2E72F0',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.1,
         shadowRadius: 12,
@@ -1919,9 +1919,9 @@ const contractorProgressStyles = StyleSheet.create({
         borderRadius: 12,
         padding: 16,
         borderWidth: 1,
-        borderColor: '#BFDBFE',
+        borderColor: '#C4D8FC',
         elevation: 2,
-        shadowColor: '#3B82F6',
+        shadowColor: '#2E72F0',
         shadowOpacity: 0.08,
         shadowOffset: { width: 0, height: 2 },
         shadowRadius: 4,
@@ -1941,7 +1941,7 @@ const contractorProgressStyles = StyleSheet.create({
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 12,
@@ -1964,7 +1964,7 @@ const contractorProgressStyles = StyleSheet.create({
     totalUsedText: {
         fontSize: 12,
         fontWeight: '600',
-        color: '#F59E0B',
+        color: '#EE730C',
     },
     expandedContracts: {
         marginTop: 8,
@@ -1974,7 +1974,7 @@ const contractorProgressStyles = StyleSheet.create({
         marginHorizontal: 0,
         marginLeft: 8,
         borderLeftWidth: 3,
-        borderLeftColor: '#3B82F6',
+        borderLeftColor: '#2E72F0',
     },
     
     // ── Compact Card Styles ────────────────────────────────────

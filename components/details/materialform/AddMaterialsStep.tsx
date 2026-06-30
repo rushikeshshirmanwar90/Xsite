@@ -84,7 +84,7 @@ const AddMaterialsStep: React.FC<AddMaterialsStepProps> = ({
       {/* Editing Mode Banner */}
       {editingMaterialIndex !== null && (
         <View style={styles.editingBanner}>
-          <Ionicons name="create" size={16} color="#F59E0B" />
+          <Ionicons name="create" size={16} color="#EE730C" />
           <Text style={styles.editingBannerText}>
             Editing material #{editingMaterialIndex + 1}
           </Text>
@@ -204,13 +204,13 @@ const styles = StyleSheet.create<Styles>({
     marginTop: 8,
   },
   addMaterialButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
     borderRadius: 10,
     padding: 16,
     alignItems: 'center' as const,
     flexDirection: 'row' as const,
     justifyContent: 'center' as const,
-    shadowColor: '#3B82F6',
+    shadowColor: '#2E72F0',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -282,7 +282,7 @@ const styles = StyleSheet.create<Styles>({
   },
   editingBanner: {
     backgroundColor: '#FEF3C7',
-    borderColor: '#F59E0B',
+    borderColor: '#EE730C',
     borderWidth: 1,
     borderRadius: 8,
     paddingVertical: 8,

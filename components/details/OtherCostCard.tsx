@@ -39,7 +39,7 @@ const OtherCostCard: React.FC<Props> = ({ cost, animation }) => {
     <Animated.View style={[styles.card, cardStyle]}>
       {/* Icon */}
       <View style={styles.iconBox}>
-        <Ionicons name="receipt-outline" size={22} color="#6366F1" />
+        <Ionicons name="receipt-outline" size={22} color="#E11D48" />
       </View>
 
       {/* Info */}
@@ -48,7 +48,7 @@ const OtherCostCard: React.FC<Props> = ({ cost, animation }) => {
           {cost.name ?? cost.title ?? '—'}
         </Text>
         {cost.category ? (
-          <Text style={[styles.description, { color: '#6366F1', fontWeight: '600', fontSize: 11, marginBottom: 2 }]}>
+          <Text style={[styles.description, { color: '#E11D48', fontWeight: '600', fontSize: 11, marginBottom: 2 }]}>
             {cost.category}
           </Text>
         ) : null}
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#FFE4E6',
     justifyContent: 'center',
     alignItems: 'center',
     flexShrink: 0,

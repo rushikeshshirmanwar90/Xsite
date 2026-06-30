@@ -325,7 +325,7 @@ export default function RegisterScreen() {
                         <View style={styles.formContainer}>
                             <View style={styles.headerSection}>
                                 <Animated.View style={[styles.iconContainer, { transform: [{ scale: scaleAnim }] }]}>
-                                    <Ionicons name="person-add" size={32} color="#3B82F6" />
+                                    <Ionicons name="person-add" size={32} color="#2E72F0" />
                                 </Animated.View>
                                 <Text style={styles.welcomeText}>Create Staff Account</Text>
                                 <Text style={styles.stepDescription}>
@@ -403,7 +403,7 @@ export default function RegisterScreen() {
                                             toast.info('Email verification reset. You can now enter a different email address');
                                         }}
                                     >
-                                        <Ionicons name="mail" size={16} color="#3b82f6" />
+                                        <Ionicons name="mail" size={16} color="#2E72F0" />
                                         <Text style={styles.changeEmailButtonVerifiedText}>Change Email</Text>
                                     </TouchableOpacity>
                                 )}
@@ -416,10 +416,10 @@ export default function RegisterScreen() {
                                         disabled={sendingOtp || !email.trim()}
                                     >
                                         {sendingOtp ? (
-                                            <ActivityIndicator size="small" color="#3b82f6" />
+                                            <ActivityIndicator size="small" color="#2E72F0" />
                                         ) : (
                                             <>
-                                                <Ionicons name="mail-outline" size={18} color="#3b82f6" />
+                                                <Ionicons name="mail-outline" size={18} color="#2E72F0" />
                                                 <Text style={styles.verifyButtonText}>Verify Email</Text>
                                             </>
                                         )}
@@ -431,7 +431,7 @@ export default function RegisterScreen() {
                                     <View style={styles.otpContainer}>
                                         {/* Email Display */}
                                         <View style={styles.emailDisplayContainer}>
-                                            <MaterialIcons name="email" size={16} color="#3B82F6" />
+                                            <MaterialIcons name="email" size={16} color="#2E72F0" />
                                             <Text style={styles.emailDisplayText}>
                                                 Verifying: {email}
                                             </Text>
@@ -523,7 +523,7 @@ export default function RegisterScreen() {
                                     disabled={loading}
                                 >
                                     <LinearGradient
-                                        colors={['#3b82f6', '#4f46e5']}
+                                        colors={['#2E72F0', '#1A54C4']}
                                         style={styles.buttonGradient}
                                         start={{ x: 0, y: 0 }}
                                         end={{ x: 1, y: 1 }}
@@ -544,7 +544,7 @@ export default function RegisterScreen() {
                                     style={styles.secondaryButton}
                                     onPress={() => router.back()}
                                 >
-                                    <Ionicons name="arrow-back" size={18} color="#3b82f6" style={{ marginRight: 8 }} />
+                                    <Ionicons name="arrow-back" size={18} color="#2E72F0" style={{ marginRight: 8 }} />
                                     <Text style={styles.secondaryButtonText}>Back to Login</Text>
                                 </TouchableOpacity>
                             </View>
@@ -557,7 +557,7 @@ export default function RegisterScreen() {
             {isNavigating && (
                 <View style={styles.navigatingOverlay}>
                     <View style={styles.navigatingContainer}>
-                        <ActivityIndicator size="large" color="#3b82f6" />
+                        <ActivityIndicator size="large" color="#2E72F0" />
                         <Text style={styles.navigatingText}>Setting up your account...</Text>
                     </View>
                 </View>
@@ -626,11 +626,11 @@ const styles = StyleSheet.create({
         width: 80,
         height: 80,
         borderRadius: 40,
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 16,
-        shadowColor: '#3B82F6',
+        shadowColor: '#2E72F0',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.1,
         shadowRadius: 8,
@@ -737,7 +737,7 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
     dropdownItemTextActive: {
-        color: '#3B82F6',
+        color: '#2E72F0',
         fontWeight: '700',
     },
     helperText: {
@@ -749,7 +749,7 @@ const styles = StyleSheet.create({
     button: {
         borderRadius: 16,
         overflow: 'hidden',
-        shadowColor: '#3B82F6',
+        shadowColor: '#2E72F0',
         shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.25,
         shadowRadius: 12,
@@ -769,7 +769,7 @@ const styles = StyleSheet.create({
     secondaryButton: {
         backgroundColor: 'transparent',
         borderWidth: 2,
-        borderColor: '#3b82f6',
+        borderColor: '#2E72F0',
         borderRadius: 16,
         paddingVertical: 16,
         flexDirection: 'row',
@@ -777,7 +777,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     secondaryButtonText: {
-        color: '#3b82f6',
+        color: '#2E72F0',
         fontSize: 16,
         fontWeight: '600',
     },
@@ -785,21 +785,21 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         borderWidth: 2,
-        borderColor: '#3b82f6',
+        borderColor: '#2E72F0',
         borderRadius: 16,
         paddingVertical: 14,
         marginBottom: 16,
         gap: 8,
-        shadowColor: '#3B82F6',
+        shadowColor: '#2E72F0',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
         elevation: 2,
     },
     verifyButtonText: {
-        color: '#3b82f6',
+        color: '#2E72F0',
         fontSize: 15,
         fontWeight: '600',
     },
@@ -809,12 +809,12 @@ const styles = StyleSheet.create({
     emailDisplayContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         borderRadius: 12,
         padding: 16,
         marginBottom: 16,
         borderWidth: 2,
-        borderColor: '#BFDBFE',
+        borderColor: '#C4D8FC',
     },
     emailDisplayText: {
         marginLeft: 8,
@@ -849,13 +849,13 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: 'transparent',
         borderWidth: 2,
-        borderColor: '#3b82f6',
+        borderColor: '#2E72F0',
         borderRadius: 16,
         paddingVertical: 14,
         alignItems: 'center',
     },
     resendButtonText: {
-        color: '#3b82f6',
+        color: '#2E72F0',
         fontSize: 15,
         fontWeight: '600',
     },
@@ -880,21 +880,21 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         borderWidth: 2,
-        borderColor: '#3b82f6',
+        borderColor: '#2E72F0',
         borderRadius: 16,
         paddingVertical: 12,
         marginBottom: 16,
         gap: 6,
-        shadowColor: '#3B82F6',
+        shadowColor: '#2E72F0',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
         elevation: 2,
     },
     changeEmailButtonVerifiedText: {
-        color: '#3b82f6',
+        color: '#2E72F0',
         fontSize: 14,
         fontWeight: '600',
     },
@@ -949,7 +949,7 @@ const styles = StyleSheet.create({
         marginTop: 20,
         fontSize: 17,
         fontWeight: '600',
-        color: '#3b82f6',
+        color: '#2E72F0',
         textAlign: 'center',
     },
 });

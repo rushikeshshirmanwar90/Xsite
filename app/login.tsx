@@ -502,7 +502,7 @@ export default function LoginScreen() {
                             disabled={loading}
                         >
                             <LinearGradient
-                                colors={['#3b82f6', '#4f46e5']}
+                                colors={['#2E72F0', '#1A54C4']}
                                 style={styles.buttonGradient}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 1 }}
@@ -544,7 +544,7 @@ export default function LoginScreen() {
                             disabled={loading}
                         >
                             <LinearGradient
-                                colors={['#3b82f6', '#4f46e5']}
+                                colors={['#2E72F0', '#1A54C4']}
                                 style={styles.buttonGradient}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 1 }}
@@ -631,7 +631,7 @@ export default function LoginScreen() {
                             disabled={loading}
                         >
                             <LinearGradient
-                                colors={['#3b82f6', '#4f46e5']}
+                                colors={['#2E72F0', '#1A54C4']}
                                 style={styles.buttonGradient}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 1 }}
@@ -688,7 +688,7 @@ export default function LoginScreen() {
             {isNavigating && (
                 <View style={styles.navigatingOverlay}>
                     <View style={styles.navigatingContainer}>
-                        <ActivityIndicator size="large" color="#3b82f6" />
+                        <ActivityIndicator size="large" color="#2E72F0" />
                         <Text style={styles.navigatingText}>Redirecting...</Text>
                     </View>
                 </View>
@@ -755,7 +755,7 @@ const styles = StyleSheet.create({
     welcomeText: {
         fontSize: 26,
         fontWeight: 'bold',
-        color: '#4f46e5',
+        color: '#1A54C4',
         marginBottom: 16,
         textAlign: 'center',
     },
@@ -799,7 +799,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         overflow: 'hidden',
         marginTop: 8,
-        shadowColor: '#4f46e5',
+        shadowColor: '#1A54C4',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 8,
@@ -817,13 +817,13 @@ const styles = StyleSheet.create({
     secondaryButton: {
         backgroundColor: 'transparent',
         borderWidth: 1,
-        borderColor: '#3b82f6',
+        borderColor: '#2E72F0',
         borderRadius: 12,
         paddingVertical: 15,
         marginTop: 16,
     },
     secondaryButtonText: {
-        color: '#3b82f6',
+        color: '#2E72F0',
         textAlign: 'center',
         fontWeight: 'bold',
     },
@@ -836,7 +836,7 @@ const styles = StyleSheet.create({
         color: '#666',
     },
     signupLink: {
-        color: '#4f46e5',
+        color: '#1A54C4',
         fontWeight: 'bold',
     },
     emailDisplayContainer: {
@@ -847,7 +847,7 @@ const styles = StyleSheet.create({
         padding: 12,
         marginBottom: 12,
         borderWidth: 1,
-        borderColor: '#bfdbfe',
+        borderColor: '#C4D8FC',
     },
     emailDisplayText: {
         flex: 1,
@@ -859,7 +859,7 @@ const styles = StyleSheet.create({
     changeEmailButton: {
         paddingHorizontal: 12,
         paddingVertical: 4,
-        backgroundColor: '#3b82f6',
+        backgroundColor: '#2E72F0',
         borderRadius: 6,
     },
     changeEmailText: {
@@ -873,7 +873,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     forgetPasswordText: {
-        color: '#3b82f6',
+        color: '#2E72F0',
         fontSize: 14,
         fontWeight: '600',
     },
@@ -903,7 +903,7 @@ const styles = StyleSheet.create({
         marginTop: 16,
         fontSize: 16,
         fontWeight: '600',
-        color: '#3b82f6',
+        color: '#2E72F0',
     },
     registerContainer: {
         flexDirection: 'row',
@@ -922,7 +922,7 @@ const styles = StyleSheet.create({
     },
     registerLink: {
         fontSize: 14,
-        color: '#4f46e5',
+        color: '#1A54C4',
         fontWeight: '700',
         textDecorationLine: 'underline',
     },

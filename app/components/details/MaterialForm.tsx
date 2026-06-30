@@ -372,14 +372,14 @@ const styles = StyleSheet.create({
   unitContainer: {
     position: 'absolute',
     right: 12,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4,
   },
   unitText: {
     fontSize: 12,
-    color: '#3B82F6',
+    color: '#2E72F0',
     fontWeight: '500',
   },
   notesInput: {

@@ -261,8 +261,8 @@ const Details = () => {
             switch (material.category.toLowerCase()) {
               case 'steel':
                 iconName = 'construction';
-                iconColor = '#3B82F6';
-                categoryColor = '#3B82F6';
+                iconColor = '#2E72F0';
+                categoryColor = '#2E72F0';
                 break;
               case 'brick':
                 iconName = 'foundation';
@@ -271,8 +271,8 @@ const Details = () => {
                 break;
               case 'electrical':
                 iconName = 'electrical-services';
-                iconColor = '#F59E0B';
-                categoryColor = '#F59E0B';
+                iconColor = '#EE730C';
+                categoryColor = '#EE730C';
                 break;
               case 'plumbing':
                 iconName = 'plumbing';

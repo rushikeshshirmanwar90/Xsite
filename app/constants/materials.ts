@@ -24,7 +24,7 @@ export const MATERIAL_TEMPLATES: Record<string, MaterialTemplate> = {
     unit: 'meter',
     specFields: ['diameter', 'material'],
     icon: 'flash-outline',
-    color: '#F59E0B',
+    color: '#EE730C',
   },
   electric_wire: {
     name: 'Electric Wire',
@@ -32,7 +32,7 @@ export const MATERIAL_TEMPLATES: Record<string, MaterialTemplate> = {
     unit: 'meter',
     specFields: ['sqmm', 'meter', 'material', 'color'],
     icon: 'flash-outline',
-    color: '#F59E0B',
+    color: '#EE730C',
   },
   plumbing_pipe: {
     name: 'Plumbing Pipe',
@@ -40,7 +40,7 @@ export const MATERIAL_TEMPLATES: Record<string, MaterialTemplate> = {
     unit: 'meter',
     specFields: ['itemType', 'diameter', 'material'],
     icon: 'water-outline',
-    color: '#3B82F6',
+    color: '#2E72F0',
   },
   granite_sheet: {
     name: 'Granite Sheet',

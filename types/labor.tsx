@@ -47,14 +47,14 @@ export const laborCategories: LaborCategory[] = [
     id: 'electrical',
     name: 'Electrical Works Labour',
     icon: 'flash-outline',
-    color: '#F59E0B',
+    color: '#EE730C',
     types: ['Electrician', 'Electrical Helper', 'Cable Puller', 'Panel Fitter']
   },
   {
     id: 'plumbing',
     name: 'Plumbing & Sanitary Labour',
     icon: 'water-outline',
-    color: '#3B82F6',
+    color: '#2E72F0',
     types: ['Plumber', 'Pipe Fitter', 'Sanitary Fitter', 'Plumbing Helper']
   },
   {

@@ -439,36 +439,14 @@ const Index: React.FC = () => {
 
         const proceedWithStandardViewDetails = (proj: Project) => {
             const secs = proj.section || [];
-            if (secs.length === 1) {
-                const section = secs[0];
-                router.push({
-                    pathname: '/details',
-                    params: {
-                        projectId: proj._id ?? '',
-                        projectName: proj.name,
-                        sectionId: section._id || section.sectionId,
-                        sectionName: section.name
-                    }
-                });
-            } else if (secs.length > 1) {
-                router.push({
-                    pathname: '/project-sections',
-                    params: {
-                        id: proj._id ?? '',
-                        name: proj.name,
-                        sectionData: JSON.stringify(secs)
-                    }
-                });
-            } else {
-                router.push({
-                    pathname: '/project-sections',
-                    params: {
-                        id: proj._id ?? '',
-                        name: proj.name,
-                        sectionData: JSON.stringify([])
-                    }
-                });
-            }
+            router.push({
+                pathname: '/project-sections',
+                params: {
+                    id: proj._id ?? '',
+                    name: proj.name,
+                    sectionData: JSON.stringify(secs)
+                }
+            });
         };
 
         // Check if user is staff and has contractor status under this project's client
@@ -693,7 +671,7 @@ const Index: React.FC = () => {
                 <TouchableOpacity style={homeStyles.heroNotifButton}
                     onPress={() => router.push('/notification' as any)}
                 >
-                    <Ionicons name="notifications-outline" size={20} color="#1F2937" />
+                    <Ionicons name="notifications-outline" size={20} color="#EE730C" />
                 </TouchableOpacity>
             </View>
 
@@ -703,7 +681,7 @@ const Index: React.FC = () => {
                     <View style={[styles.qrCodeCard, styles.shareCard]}>
                         <View style={styles.shareHeader}>
                             <View style={styles.shareIconContainer}>
-                                <Ionicons name="qr-code-outline" size={24} color="#3B82F6" />
+                                <Ionicons name="qr-code-outline" size={24} color="#2E72F0" />
                             </View>
                             <View style={styles.shareContent}>
                                 <Text style={styles.shareTitle}>Get Connected</Text>
@@ -785,9 +763,12 @@ const Index: React.FC = () => {
                         <Ionicons
                             name={showCompletedProjects ? "list-outline" : "checkmark-done-outline"}
                             size={14}
-                            color="#3B82F6"
+                            color={showCompletedProjects ? "#16A34A" : "#2E72F0"}
                         />
-                        <Text style={homeStyles.viewCompletedButtonText} numberOfLines={1}>
+                        <Text
+                            style={[homeStyles.viewCompletedButtonText, showCompletedProjects && homeStyles.viewCompletedButtonTextActive]}
+                            numberOfLines={1}
+                        >
                             {showCompletedProjects ? 'View Ongoing' : 'View Completed'}
                         </Text>
                     </TouchableOpacity>
@@ -800,8 +781,8 @@ const Index: React.FC = () => {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        colors={['#3B82F6']}
-                        tintColor="#3B82F6"
+                        colors={['#2E72F0']}
+                        tintColor="#2E72F0"
                         title="Pull to refresh"
                         titleColor="#64748B"
                     />
@@ -810,14 +791,14 @@ const Index: React.FC = () => {
                 {loading ? (
                     <View style={styles.centerContainer}>
                         <View style={homeStyles.stateIconBadge}>
-                            <Ionicons name="sync" size={40} color="#3B82F6" />
+                            <Ionicons name="sync" size={40} color="#2E72F0" />
                         </View>
                         <Text style={styles.loadingText}>Loading projects...</Text>
                         <Text style={[styles.loadingText, { fontSize: 12, marginTop: 4, color: '#94A3B8' }]}>Please wait...</Text>
                     </View>
                 ) : error ? (
                     <View style={styles.centerContainer}>
-                        <View style={[homeStyles.stateIconBadge, { backgroundColor: 'rgba(239,68,68,0.08)' }]}>
+                        <View style={[homeStyles.stateIconBadge, { backgroundColor: '#FFF1F2', borderColor: '#FECDD3' }]}>
                             <Ionicons name="alert-circle" size={40} color="#EF4444" />
                         </View>
                         <Text style={styles.errorText}>{error}</Text>
@@ -898,7 +879,7 @@ const Index: React.FC = () => {
                                                 <Ionicons
                                                     name={isStaff ? "folder-open-outline" : (showCompletedProjects ? "checkmark-done-circle-outline" : "folder-open-outline")}
                                                     size={40}
-                                                    color="#3B82F6"
+                                                    color="#2E72F0"
                                                 />
                                             </View>
                                             <Text style={styles.emptyText}>
@@ -918,7 +899,7 @@ const Index: React.FC = () => {
                         ) : (
                             <View style={styles.centerContainer}>
                                 <View style={homeStyles.stateIconBadge}>
-                                    <Ionicons name="folder-open-outline" size={40} color="#3B82F6" />
+                                    <Ionicons name="folder-open-outline" size={40} color="#2E72F0" />
                                 </View>
                                 <Text style={styles.emptyText}>No projects found</Text>
                                 <Text style={styles.emptySubText}>
@@ -936,8 +917,8 @@ const Index: React.FC = () => {
             {userIsAdmin && (
                 <FloatingStatsButton
                     stats={[
-                        { icon: 'briefcase', color: '#3B82F6', value: projects.length, label: 'Total Projects' },
-                        { icon: 'pulse', color: '#F59E0B', value: projects.filter((p) => !p.isCompleted).length, label: 'Active Projects' },
+                        { icon: 'briefcase', color: '#2E72F0', value: projects.length, label: 'Total Projects' },
+                        { icon: 'pulse', color: '#EE730C', value: projects.filter((p) => !p.isCompleted).length, label: 'Active Projects' },
                         { icon: 'checkmark-done', color: '#10B981', value: projects.filter((p) => p.isCompleted).length, label: 'Completed' },
                     ]}
                 />
@@ -950,15 +931,20 @@ export default Index;
 
 // Local, UI-only styles for the redesigned brand header/greeting/section/state badges.
 // Kept local to this file so the shared `@/style/adminHome` stylesheet stays untouched.
+// Flat, white-base UI with light pastel accent patches per zone.
+// Header zone = light-blue tint, Projects toggle = blue (ongoing) / green (completed),
+// state badges = soft rounded-square pastel chips. No gradients, 1px hairline borders.
 const homeStyles = StyleSheet.create({
     brandHeader: {
         backgroundColor: '#FFFFFF',
         paddingHorizontal: 20,
-        paddingTop: 12,
-        paddingBottom: 14,
+        paddingTop: 10,
+        paddingBottom: 16,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
     },
     brandLeft: {
         flexDirection: 'row',
@@ -967,48 +953,48 @@ const homeStyles = StyleSheet.create({
         gap: 12,
     },
     brandLogo: {
-        width: 42,
-        height: 42,
-        borderRadius: 12,
-        backgroundColor: '#3B82F6',
+        width: 46,
+        height: 46,
+        borderRadius: 15,
+        backgroundColor: '#2E72F0',
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#3B82F6',
+        shadowColor: '#2E72F0',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.25,
-        shadowRadius: 8,
+        shadowOpacity: 0.18,
+        shadowRadius: 10,
         elevation: 3,
     },
     brandLogoText: {
         color: '#FFFFFF',
-        fontSize: 15,
+        fontSize: 16,
         fontWeight: '800',
-        letterSpacing: 0.3,
+        letterSpacing: 0.4,
     },
     brandTextBlock: {
         flex: 1,
     },
     brandTitle: {
-        fontSize: 17,
+        fontSize: 18,
         fontWeight: '800',
         color: '#0F172A',
-        letterSpacing: -0.3,
+        letterSpacing: -0.4,
     },
     brandSubtitle: {
-        fontSize: 11.5,
-        color: '#94A3B8',
+        fontSize: 12,
+        color: '#64748B',
         fontWeight: '500',
-        marginTop: 1,
+        marginTop: 2,
     },
     heroNotifButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 13,
-        backgroundColor: '#F8FAFC',
+        width: 44,
+        height: 44,
+        borderRadius: 14,
+        backgroundColor: '#FEF0E3',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: '#E5E7EB',
+        borderColor: '#FBCF99',
     },
     greetingSection: {
         paddingHorizontal: 20,
@@ -1025,7 +1011,7 @@ const homeStyles = StyleSheet.create({
     },
     greetingSubtitle: {
         fontSize: 12,
-        color: '#94A3B8',
+        color: '#64748B',
         fontWeight: '500',
     },
     sectionHeader: {
@@ -1033,42 +1019,48 @@ const homeStyles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingTop: 18,
+        paddingTop: 22,
         paddingBottom: 14,
     },
     sectionTitle: {
-        fontSize: 19,
+        fontSize: 20,
         fontWeight: '800',
         color: '#0F172A',
-        letterSpacing: -0.3,
+        letterSpacing: -0.4,
     },
     viewCompletedButton: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 5,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: '#EAF0FE',
         borderWidth: 1,
-        borderColor: '#BFDBFE',
+        borderColor: '#C4D8FC',
         borderRadius: 999,
-        paddingHorizontal: 12,
-        paddingVertical: 7,
+        paddingHorizontal: 13,
+        paddingVertical: 8,
     },
     viewCompletedButtonActive: {
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#F0FDF4',
+        borderColor: '#BBF7D0',
     },
     viewCompletedButtonText: {
         fontSize: 12,
         fontWeight: '700',
-        color: '#3B82F6',
+        color: '#2E72F0',
+    },
+    viewCompletedButtonTextActive: {
+        color: '#16A34A',
     },
     stateIconBadge: {
         width: 84,
         height: 84,
-        borderRadius: 42,
-        backgroundColor: 'rgba(59,130,246,0.08)',
+        borderRadius: 28,
+        backgroundColor: '#EAF0FE',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 16,
+        marginBottom: 18,
         alignSelf: 'center',
+        borderWidth: 1,
+        borderColor: '#C4D8FC',
     },
 });

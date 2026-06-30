@@ -678,8 +678,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
   },
   statusOptionSelected: {
-    backgroundColor: '#3B82F6',
-    borderColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
+    borderColor: '#2E72F0',
   },
   statusOptionText: {
     fontSize: 14,
@@ -714,7 +714,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     borderRadius: 8,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
     alignItems: 'center',
     justifyContent: 'center',
   },

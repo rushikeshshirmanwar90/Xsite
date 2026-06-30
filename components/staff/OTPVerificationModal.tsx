@@ -71,7 +71,7 @@ const OTPVerificationModal: React.FC<OTPVerificationModalProps> = ({
                     {/* Header */}
                     <View style={styles.header}>
                         <View style={styles.iconContainer}>
-                            <Ionicons name="mail-outline" size={32} color="#3B82F6" />
+                            <Ionicons name="mail-outline" size={32} color="#2E72F0" />
                         </View>
                         <TouchableOpacity
                             style={styles.closeButton}
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
         width: 56,
         height: 56,
         borderRadius: 28,
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     email: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#3B82F6',
+        color: '#2E72F0',
         marginBottom: 24,
     },
     inputContainer: {
@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     verifyButton: {
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         borderRadius: 12,
         padding: 16,
         flexDirection: 'row',

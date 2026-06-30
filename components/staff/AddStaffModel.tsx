@@ -203,7 +203,7 @@ const AddStaffModal: React.FC<AddStaffModalProps> = ({ visible, onClose, onAdd }
                                                     {roleOption}
                                                 </Text>
                                                 {role === roleOption && (
-                                                    <Ionicons name="checkmark" size={16} color="#3B82F6" />
+                                                    <Ionicons name="checkmark" size={16} color="#2E72F0" />
                                                 )}
                                             </TouchableOpacity>
                                         ))}
@@ -219,7 +219,7 @@ const AddStaffModal: React.FC<AddStaffModalProps> = ({ visible, onClose, onAdd }
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
                             <LinearGradient
-                                colors={['#3B82F6', '#8B5CF6']}
+                                colors={['#2E72F0', '#8B5CF6']}
                                 style={styles.submitButtonGradient}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}

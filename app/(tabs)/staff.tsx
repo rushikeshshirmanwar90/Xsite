@@ -714,7 +714,7 @@ const StaffManagement: React.FC = () => {
                 return (
                     <View style={styles.sectionHeader}>
                         <View style={styles.sectionTitleContainer}>
-                            <Ionicons name="shield-checkmark" size={20} color="#F59E0B" />
+                            <Ionicons name="shield-checkmark" size={20} color="#EE730C" />
                             <Text style={styles.sectionTitle}>Administrators</Text>
                         </View>
                         <Text style={styles.sectionCount}>
@@ -737,7 +737,7 @@ const StaffManagement: React.FC = () => {
                 return (
                     <View style={styles.sectionHeader}>
                         <View style={styles.sectionTitleContainer}>
-                            <Ionicons name="people" size={20} color="#3B82F6" />
+                            <Ionicons name="people" size={20} color="#2E72F0" />
                             <Text style={styles.sectionTitle}>Staff Members</Text>
                         </View>
                         <Text style={styles.sectionCount}>
@@ -804,8 +804,8 @@ const StaffManagement: React.FC = () => {
                         <RefreshControl
                             refreshing={refreshing}
                             onRefresh={onRefresh}
-                            colors={['#3B82F6']} // Android
-                            tintColor="#3B82F6" // iOS
+                            colors={['#2E72F0']} // Android
+                            tintColor="#2E72F0" // iOS
                             title="Pull to refresh" // iOS
                             titleColor="#64748B" // iOS
                         />

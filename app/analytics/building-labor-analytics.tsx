@@ -136,8 +136,8 @@ const BuildingLaborAnalytics: React.FC = () => {
   const getLaborIconAndColor = (category: string) => {
     const categoryMap: { [key: string]: { icon: keyof typeof Ionicons.glyphMap, color: string } } = {
       'Civil / Structural Works': { icon: 'hammer-outline', color: '#EF4444' },
-      'Electrical Works': { icon: 'flash-outline', color: '#F59E0B' },
-      'Plumbing & Sanitary Works': { icon: 'water-outline', color: '#3B82F6' },
+      'Electrical Works': { icon: 'flash-outline', color: '#EE730C' },
+      'Plumbing & Sanitary Works': { icon: 'water-outline', color: '#2E72F0' },
       'Finishing Works': { icon: 'brush-outline', color: '#EC4899' },
       'Mechanical & HVAC Works': { icon: 'thermometer-outline', color: '#F97316' },
       'Fire Fighting & Safety Works': { icon: 'flame-outline', color: '#DC2626' },
@@ -159,7 +159,7 @@ const BuildingLaborAnalytics: React.FC = () => {
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color="#3B82F6" />
+              <Ionicons name="arrow-back" size={24} color="#2E72F0" />
             </TouchableOpacity>
             <View style={styles.projectInfo}>
               <Text style={styles.projectName}>General Building Labor</Text>
@@ -219,11 +219,11 @@ const BuildingLaborAnalytics: React.FC = () => {
               </View>
               <View style={[styles.statCard, { backgroundColor: '#FEF3C7' }]}>
                 <View style={styles.statIconContainer}>
-                  <Ionicons name="cash-outline" size={20} color="#F59E0B" />
+                  <Ionicons name="cash-outline" size={20} color="#EE730C" />
                 </View>
                 <View style={styles.statInfo}>
                   <Text style={styles.statLabel}>Labor Cost</Text>
-                  <Text style={[styles.statValue, { color: '#F59E0B' }]}>{formatCurrency(totalExpense)}</Text>
+                  <Text style={[styles.statValue, { color: '#EE730C' }]}>{formatCurrency(totalExpense)}</Text>
                 </View>
               </View>
             </View>
@@ -553,7 +553,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 12,
     borderLeftWidth: 3,
-    borderLeftColor: '#F59E0B',
+    borderLeftColor: '#EE730C',
   },
   notesLabel: {
     fontSize: 12,

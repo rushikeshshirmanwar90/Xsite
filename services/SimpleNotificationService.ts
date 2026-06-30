@@ -134,7 +134,7 @@ export class SimpleNotificationService {
             name: 'Default Notifications',
             importance: Notifications.AndroidImportance.MAX,
             vibrationPattern: [0, 250, 250, 250],
-            lightColor: '#3B82F6',
+            lightColor: '#2E72F0',
             sound: 'default',
             enableVibrate: true,
             enableLights: true,

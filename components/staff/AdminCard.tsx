@@ -30,7 +30,7 @@ const AdminCard: React.FC<AdminCardProps> = ({ admin, onPress }) => {
 
     const getAdminColor = (): readonly [string, string] => {
         // Use a consistent admin color scheme (gold/orange for admin)
-        return ['#F59E0B', '#D97706'];
+        return ['#EE730C', '#D97706'];
     };
 
     const avatarColors = getAdminColor();
@@ -59,7 +59,7 @@ const AdminCard: React.FC<AdminCardProps> = ({ admin, onPress }) => {
                         <View style={styles.nameContainer}>
                             <Text style={styles.adminName}>{fullName}</Text>
                             <View style={styles.adminBadge}>
-                                <Ionicons name="shield-checkmark" size={12} color="#F59E0B" />
+                                <Ionicons name="shield-checkmark" size={12} color="#EE730C" />
                                 <Text style={styles.adminBadgeText}>ADMIN</Text>
                             </View>
                         </View>
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         borderLeftWidth: 4,
-        borderLeftColor: '#F59E0B',
+        borderLeftColor: '#EE730C',
     },
     adminCardContent: {
         flex: 1,
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
     adminBadgeText: {
         fontSize: 10,
         fontWeight: '700',
-        color: '#F59E0B',
+        color: '#EE730C',
         letterSpacing: 0.5,
     },
     contactInfo: {

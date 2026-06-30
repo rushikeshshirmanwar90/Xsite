@@ -62,7 +62,7 @@ const laborCategories: LaborCategory[] = [
     id: 'electrical',
     name: 'Electrical Works',
     icon: 'flash-outline',
-    color: '#F59E0B',
+    color: '#EE730C',
     types: [
       'Electrical Engineer / Supervisor',
       'Electrician',
@@ -75,7 +75,7 @@ const laborCategories: LaborCategory[] = [
     id: 'plumbing',
     name: 'Plumbing & Sanitary Works',
     icon: 'water-outline',
-    color: '#3B82F6',
+    color: '#2E72F0',
     types: [
       'Plumbing Engineer / Supervisor',
       'Plumber',
@@ -634,7 +634,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
       miniSectionId: selectedMiniSection,
       miniSectionName: miniSectionName,
       icon: selectedCategoryData?.icon || 'people',
-      color: selectedCategoryData?.color || '#3B82F6',
+      color: selectedCategoryData?.color || '#2E72F0',
       description: description || '',
     };
 
@@ -831,14 +831,14 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                     <View key={index} style={styles.compactLaborEntryCard}>
                       <View style={styles.compactLaborEntryHeader}>
                         <View style={styles.compactLaborEntryLeft}>
-                          <View style={[styles.compactLaborIcon, { backgroundColor: `${entry.color || '#3B82F6'}20` }]}>
-                            <Ionicons name={entry.icon || 'people'} size={18} color={entry.color || '#3B82F6'} />
+                          <View style={[styles.compactLaborIcon, { backgroundColor: `${entry.color || '#2E72F0'}20` }]}>
+                            <Ionicons name={entry.icon || 'people'} size={18} color={entry.color || '#2E72F0'} />
                           </View>
                           <View style={styles.compactLaborInfo}>
                             <Text style={styles.compactLaborType}>{entry.type}</Text>
                             <Text style={styles.compactLaborCategory}>{entry.category}</Text>
                             <View style={styles.compactAreaInfo}>
-                              <Ionicons name="location" size={12} color="#3B82F6" />
+                              <Ionicons name="location" size={12} color="#2E72F0" />
                               <Text style={styles.compactAreaText}>{entry.miniSectionName}</Text>
                             </View>
                           </View>
@@ -849,7 +849,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                             onPress={() => editLaborEntry(index)}
                             activeOpacity={0.7}
                           >
-                            <Ionicons name="pencil" size={14} color="#3B82F6" />
+                            <Ionicons name="pencil" size={14} color="#2E72F0" />
                           </TouchableOpacity>
                           <TouchableOpacity
                             style={styles.compactRemoveButton}
@@ -923,8 +923,8 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                     <View style={styles.editingBanner}>
                       <View style={styles.editingBannerHeader}>
                         <View style={styles.editingBannerLeft}>
-                          <View style={[styles.editingBannerIcon, { backgroundColor: `${editingEntry.color || '#3B82F6'}20` }]}>
-                            <Ionicons name="pencil" size={16} color={editingEntry.color || '#3B82F6'} />
+                          <View style={[styles.editingBannerIcon, { backgroundColor: `${editingEntry.color || '#2E72F0'}20` }]}>
+                            <Ionicons name="pencil" size={16} color={editingEntry.color || '#2E72F0'} />
                           </View>
                           <View style={styles.editingBannerInfo}>
                             <Text style={styles.editingBannerTitle}>Editing Labor Entry</Text>
@@ -1100,7 +1100,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                                   <Ionicons
                                     name={selectedCategoryData?.icon || 'person-outline'}
                                     size={18}
-                                    color={selectedCategoryData?.color || '#3B82F6'}
+                                    color={selectedCategoryData?.color || '#2E72F0'}
                                   />
                                 </View>
                                 <View style={styles.basicTypeInfo}>
@@ -1185,16 +1185,16 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                         <View style={styles.selectedTypeContainer}>
                           <View style={[styles.typeCard, styles.typeCardSelected]}>
                             <View style={styles.typeCardLeft}>
-                              <View style={[styles.typeIconBadge, { backgroundColor: (selectedCategoryData?.color || '#3B82F6') + '20' }]}>
+                              <View style={[styles.typeIconBadge, { backgroundColor: (selectedCategoryData?.color || '#2E72F0') + '20' }]}>
                                 <Ionicons
                                   name={selectedCategoryData?.icon || 'person-outline'}
                                   size={18}
-                                  color={selectedCategoryData?.color || '#3B82F6'}
+                                  color={selectedCategoryData?.color || '#2E72F0'}
                                 />
                               </View>
                               <Text style={[styles.typeCardName, styles.typeCardNameSelected]}>{selectedType}</Text>
                             </View>
-                            <Ionicons name="checkmark-circle" size={22} color="#3B82F6" />
+                            <Ionicons name="checkmark-circle" size={22} color="#2E72F0" />
                           </View>
                         </View>
                       </View>
@@ -1283,7 +1283,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                                   >
                                     <View style={styles.miniSectionCardContent}>
                                       <View style={styles.miniSectionIconBadge}>
-                                        <Ionicons name="layers-outline" size={20} color="#3B82F6" />
+                                        <Ionicons name="layers-outline" size={20} color="#2E72F0" />
                                       </View>
                                       <View style={styles.miniSectionInfo}>
                                         <Text style={styles.miniSectionName}>{section.name}</Text>
@@ -1347,13 +1347,13 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                                 <View style={styles.selectedMiniSectionCard}>
                                   <View style={styles.selectedMiniSectionContent}>
                                     <View style={styles.selectedMiniSectionIconBadge}>
-                                      <Ionicons name="layers" size={20} color="#3B82F6" />
+                                      <Ionicons name="layers" size={20} color="#2E72F0" />
                                     </View>
                                     <View style={styles.selectedMiniSectionInfo}>
                                       <Text style={styles.selectedMiniSectionTitle}>{section.name}</Text>
                                       <Text style={styles.selectedMiniSectionSubtitle}>Specific work area</Text>
                                     </View>
-                                    <Ionicons name="checkmark-circle" size={22} color="#3B82F6" />
+                                    <Ionicons name="checkmark-circle" size={22} color="#2E72F0" />
                                   </View>
                                 </View>
                               </View>
@@ -1425,7 +1425,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
 
                             {!count && (
                               <View style={styles.laborHint}>
-                                <Ionicons name="information-circle-outline" size={16} color="#3B82F6" />
+                                <Ionicons name="information-circle-outline" size={16} color="#2E72F0" />
                                 <Text style={styles.laborHintText}>
                                   Enter the number of laborers needed
                                 </Text>
@@ -1459,7 +1459,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
 
                             {!perLaborCost && (
                               <View style={styles.laborHint}>
-                                <Ionicons name="information-circle-outline" size={16} color="#3B82F6" />
+                                <Ionicons name="information-circle-outline" size={16} color="#2E72F0" />
                                 <Text style={styles.laborHintText}>
                                   Enter the cost for each laborer
                                 </Text>
@@ -1611,7 +1611,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                         }],
                         backgroundColor: swipeAnimation.interpolate({
                           inputRange: [0, 0.65, 0.7, 1],
-                          outputRange: ['#3B82F6', '#3B82F6', '#10B981', '#10B981'],
+                          outputRange: ['#2E72F0', '#2E72F0', '#10B981', '#10B981'],
                           extrapolate: 'clamp',
                         }),
                       }
@@ -1775,8 +1775,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     borderWidth: 2,
-    borderColor: '#F59E0B',
-    shadowColor: '#F59E0B',
+    borderColor: '#EE730C',
+    shadowColor: '#EE730C',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -1821,7 +1821,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#F59E0B',
+    borderColor: '#EE730C',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1832,7 +1832,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#F59E0B',
+    borderColor: '#EE730C',
   },
   editingBannerMetric: {
     flexDirection: 'row',
@@ -1848,7 +1848,7 @@ const styles = StyleSheet.create({
   editingBannerDivider: {
     width: 1,
     height: 16,
-    backgroundColor: '#F59E0B',
+    backgroundColor: '#EE730C',
     marginHorizontal: 8,
   },
   editingBannerTotalLabel: {
@@ -1858,7 +1858,7 @@ const styles = StyleSheet.create({
   },
   editingBannerTotalValue: {
     fontSize: 12,
-    color: '#F59E0B',
+    color: '#EE730C',
     fontWeight: '700',
   },
   cancelAddFormContainer: {
@@ -1988,8 +1988,8 @@ const styles = StyleSheet.create({
     minHeight: 80,
   },
   categoryCardSelected: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#3B82F6',
+    backgroundColor: '#EAF0FE',
+    borderColor: '#2E72F0',
     borderWidth: 2,
   },
   undoButton: {
@@ -2018,7 +2018,7 @@ const styles = StyleSheet.create({
     color: '#1E40AF',
   },
   categoryCountSelected: {
-    color: '#3B82F6',
+    color: '#2E72F0',
   },
   categoryIcon: {
     width: 48,
@@ -2151,10 +2151,10 @@ const styles = StyleSheet.create({
   basicTypeCard: {
     backgroundColor: '#F8FAFC',
     borderLeftWidth: 3,
-    borderLeftColor: '#3B82F6',
+    borderLeftColor: '#2E72F0',
   },
   basicTypeIconBadge: {
-    backgroundColor: '#DBEAFE',
+    backgroundColor: '#C4D8FC',
   },
   basicTypeInfo: {
     flex: 1,
@@ -2237,7 +2237,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#3B82F6',
+    borderColor: '#2E72F0',
   },
   selectedQuickLaborContent: {
     flexDirection: 'row',
@@ -2399,9 +2399,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
   },
   typeCardSelected: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     borderLeftWidth: 3,
-    borderLeftColor: '#3B82F6',
+    borderLeftColor: '#2E72F0',
   },
   typeCardLeft: {
     flexDirection: 'row',
@@ -2412,7 +2412,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 8,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -2518,7 +2518,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     borderRadius: 8,
     padding: 16,
     marginTop: 8,
@@ -2714,7 +2714,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 10,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -2836,7 +2836,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#3B82F6',
+    borderColor: '#2E72F0',
   },
   selectedMiniSectionContent: {
     flexDirection: 'row',
@@ -2847,7 +2847,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 10,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -2858,7 +2858,7 @@ const styles = StyleSheet.create({
   selectedMiniSectionTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#3B82F6',
+    color: '#2E72F0',
     marginBottom: 2,
     lineHeight: 18,
   },
@@ -2883,9 +2883,9 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F1F5F9',
   },
   sectionItemSelected: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     borderLeftWidth: 3,
-    borderLeftColor: '#3B82F6',
+    borderLeftColor: '#2E72F0',
   },
   sectionItemLeft: {
     flexDirection: 'row',
@@ -2896,7 +2896,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 8,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -2925,11 +2925,11 @@ const styles = StyleSheet.create({
 
   // Total Cost Card
   totalCostCard: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     borderRadius: 8,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#DBEAFE',
+    borderColor: '#C4D8FC',
   },
   totalCostRow: {
     flexDirection: 'row',
@@ -3126,14 +3126,14 @@ const styles = StyleSheet.create({
     marginTop: 4,
     paddingHorizontal: 8,
     paddingVertical: 6,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#DBEAFE',
+    borderColor: '#C4D8FC',
   },
   laborHintText: {
     fontSize: 12,
-    color: '#3B82F6',
+    color: '#2E72F0',
     flex: 1,
   },
   // Compact Labor Entries Summary Styles
@@ -3200,14 +3200,14 @@ const styles = StyleSheet.create({
   compactAreaInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 16,
     alignSelf: 'flex-start',
     gap: 4,
     borderWidth: 1,
-    borderColor: '#DBEAFE',
+    borderColor: '#C4D8FC',
     maxWidth: '100%',
   },
   compactAreaText: {
@@ -3227,12 +3227,12 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     borderWidth: 1.5,
-    borderColor: '#3B82F6',
+    borderColor: '#2E72F0',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#3B82F6',
+    shadowColor: '#2E72F0',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
     shadowRadius: 3,
@@ -3338,7 +3338,7 @@ const styles = StyleSheet.create({
   },
   laborEntrySection: {
     fontSize: 12,
-    color: '#3B82F6',
+    color: '#2E72F0',
     fontWeight: '500',
   },
   removeEntryButton: {
@@ -3396,7 +3396,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   finalSubmitButton: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
@@ -3462,7 +3462,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 3,
-    shadowColor: '#3B82F6',
+    shadowColor: '#2E72F0',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.5,
     shadowRadius: 8,
@@ -3550,7 +3550,7 @@ const styles = StyleSheet.create({
   },
   hintText: {
     fontSize: 12,
-    color: '#3B82F6',
+    color: '#2E72F0',
     flex: 1,
   },
 });

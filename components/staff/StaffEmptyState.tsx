@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     emptyStateButton: {
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         paddingHorizontal: 20,
         paddingVertical: 12,
         borderRadius: 8,

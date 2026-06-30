@@ -32,7 +32,7 @@ export const LicenseGuard: React.FC<LicenseGuardProps> = ({ children }) => {
     if (loading) {
         return (
             <View style={styles.container}>
-                <ActivityIndicator size="large" color="#3B82F6" />
+                <ActivityIndicator size="large" color="#2E72F0" />
                 <Text style={styles.loadingText}>Verifying license...</Text>
             </View>
         );
@@ -42,7 +42,7 @@ export const LicenseGuard: React.FC<LicenseGuardProps> = ({ children }) => {
     if (error) {
         return (
             <View style={styles.container}>
-                <Ionicons name="alert-circle" size={64} color="#F59E0B" />
+                <Ionicons name="alert-circle" size={64} color="#EE730C" />
                 <Text style={styles.errorTitle}>Unable to Verify License</Text>
                 <Text style={styles.errorMessage}>{error}</Text>
                 <View style={styles.errorButtonsContainer}>
@@ -123,7 +123,7 @@ export const LicenseGuard: React.FC<LicenseGuardProps> = ({ children }) => {
                                         Linking.openURL('tel:9579896842');
                                     }}
                                 >
-                                    <Ionicons name="call" size={20} color="#3B82F6" />
+                                    <Ionicons name="call" size={20} color="#2E72F0" />
                                     <Text style={styles.callButtonText}>Call Support</Text>
                                 </TouchableOpacity>
                             </>
@@ -131,7 +131,7 @@ export const LicenseGuard: React.FC<LicenseGuardProps> = ({ children }) => {
 
                         {isStaff && (
                             <View style={styles.staffNotice}>
-                                <Ionicons name="information-circle" size={24} color="#3B82F6" />
+                                <Ionicons name="information-circle" size={24} color="#2E72F0" />
                                 <Text style={styles.staffNoticeText}>
                                     Please contact your admin to resolve this issue.
                                 </Text>
@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
     retryButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         paddingHorizontal: 24,
         paddingVertical: 12,
         borderRadius: 12,
@@ -318,12 +318,12 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         gap: 8,
         borderWidth: 2,
-        borderColor: '#3B82F6',
+        borderColor: '#2E72F0',
     },
     callButtonText: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#3B82F6',
+        color: '#2E72F0',
     },
     logoutButton: {
         flexDirection: 'row',
@@ -354,12 +354,12 @@ const styles = StyleSheet.create({
     staffNotice: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         padding: 16,
         borderRadius: 12,
         gap: 12,
         borderWidth: 1,
-        borderColor: '#BFDBFE',
+        borderColor: '#C4D8FC',
     },
     staffNoticeText: {
         flex: 1,

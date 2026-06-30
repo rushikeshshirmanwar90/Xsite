@@ -114,7 +114,7 @@ const StaffNoClientScreen: React.FC<StaffNoClientScreenProps> = ({ staffData }) 
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.iconContainer}>
-          <AlertCircle size={48} color="#F59E0B" />
+          <AlertCircle size={48} color="#EE730C" />
         </View>
         <Text style={styles.title}>No Client Assigned</Text>
         <Text style={styles.subtitle}>
@@ -157,7 +157,7 @@ const StaffNoClientScreen: React.FC<StaffNoClientScreenProps> = ({ staffData }) 
               {staffData._id}
             </Text>
             <TouchableOpacity onPress={handleCopyStaffId} style={styles.copyButton}>
-              <Copy size={16} color="#3B82F6" />
+              <Copy size={16} color="#2E72F0" />
             </TouchableOpacity>
           </View>
         </View>
@@ -166,7 +166,7 @@ const StaffNoClientScreen: React.FC<StaffNoClientScreenProps> = ({ staffData }) 
       {/* QR Code Section */}
       <View style={styles.card}>
         <View style={styles.qrHeader}>
-          <QrCode size={24} color="#3B82F6" />
+          <QrCode size={24} color="#2E72F0" />
           <Text style={styles.cardTitle}>QR Code</Text>
         </View>
         <Text style={styles.qrSubtitle}>
@@ -210,7 +210,7 @@ const StaffNoClientScreen: React.FC<StaffNoClientScreenProps> = ({ staffData }) 
         >
           <RefreshCw
             size={20}
-            color="#3B82F6"
+            color="#2E72F0"
             style={isRefreshing ? styles.rotating : undefined}
           />
           <Text style={styles.secondaryButtonText}>
@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   primaryButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
   },
   primaryButtonText: {
     color: 'white',
@@ -386,12 +386,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   secondaryButton: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: '#C4D8FC',
   },
   secondaryButtonText: {
-    color: '#3B82F6',
+    color: '#2E72F0',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -409,11 +409,11 @@ const styles = StyleSheet.create({
     // Add rotation animation if needed
   },
   instructionsCard: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     borderRadius: 12,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: '#C4D8FC',
   },
   instructionsTitle: {
     fontSize: 16,

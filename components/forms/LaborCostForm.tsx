@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   button: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: '#EE730C',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#F59E0B',
+    borderLeftColor: '#EE730C',
   },
   infoText: {
     color: '#92400E',

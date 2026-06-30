@@ -831,12 +831,12 @@ const NotificationPage: React.FC = () => {
     };
 
     const getActivityIcon = (type: string, category: string) => {
-        if (category === 'project') return { name: 'folder', color: '#3B82F6' };
+        if (category === 'project') return { name: 'folder', color: '#2E72F0' };
         if (category === 'section') return { name: 'layers', color: '#8B5CF6' };
         if (category === 'mini_section') return { name: 'grid', color: '#10B981' };
         if (category === 'phase') return { name: 'git-branch', color: '#1E293B' };
         if (category === 'staff') return { name: 'people', color: '#EF4444' };
-        if (category === 'labor') return { name: 'hammer', color: '#F59E0B' };
+        if (category === 'labor') return { name: 'hammer', color: '#EE730C' };
         if (category === 'material') return { name: 'cube', color: '#06B6D4' };
         if (category === 'equipment') return { name: 'construct', color: '#8B5CF6' };
         if (category === 'other_cost') return { name: 'briefcase', color: '#8B5CF6' };
@@ -846,7 +846,7 @@ const NotificationPage: React.FC = () => {
     const getMaterialActivityIcon = (activity: 'imported' | 'used' | 'transferred') => {
         if (activity === 'imported') return { name: 'download', color: '#10B981' };
         if (activity === 'used') return { name: 'arrow-forward', color: '#EF4444' };
-        return { name: 'swap-horizontal', color: '#3B82F6' }; // For transferred
+        return { name: 'swap-horizontal', color: '#2E72F0' }; // For transferred
     };
 
     const formatTimeAgo = (dateString: string | undefined | null) => {
@@ -1029,7 +1029,7 @@ const NotificationPage: React.FC = () => {
                                             <View style={styles.laborDescriptionCard}>
                                                 <View style={styles.laborDescriptionAccent} />
                                                 <View style={styles.laborDescriptionContent}>
-                                                    <Ionicons name="document-text-outline" size={14} color="#F59E0B" style={{ marginTop: 1 }} />
+                                                    <Ionicons name="document-text-outline" size={14} color="#EE730C" style={{ marginTop: 1 }} />
                                                     <View style={{ flex: 1 }}>
                                                         <Text style={styles.laborDescriptionLabel}>Work Done</Text>
                                                         <Text style={styles.laborDescriptionText} numberOfLines={3}>{entry.description}</Text>
@@ -1192,7 +1192,7 @@ const NotificationPage: React.FC = () => {
                         <View style={styles.materialActivityFooter}>
                             <View style={styles.userInfo}>
                                 <View style={[styles.userAvatar, { backgroundColor: avatarColor }]}>
-                                    <Text style={[styles.userAvatarText, { color: '#4F46E5' }]}>
+                                    <Text style={[styles.userAvatarText, { color: '#1A54C4' }]}>
                                         {displayUser.fullName.charAt(0).toUpperCase()}
                                     </Text>
                                 </View>
@@ -1249,9 +1249,9 @@ const NotificationPage: React.FC = () => {
             'cement': { icon: 'cube-outline', color: '#8B5CF6' },
             'brick': { icon: 'square-outline', color: '#EF4444' },
             'steel': { icon: 'barbell-outline', color: '#6B7280' },
-            'sand': { icon: 'layers-outline', color: '#F59E0B' },
+            'sand': { icon: 'layers-outline', color: '#EE730C' },
             'gravel': { icon: 'diamond-outline', color: '#10B981' },
-            'concrete': { icon: 'cube', color: '#3B82F6' },
+            'concrete': { icon: 'cube', color: '#2E72F0' },
             'wood': { icon: 'leaf-outline', color: '#84CC16' },
             'paint': { icon: 'color-palette-outline', color: '#EC4899' },
             'tile': { icon: 'grid-outline', color: '#06B6D4' },
@@ -1332,8 +1332,8 @@ const NotificationPage: React.FC = () => {
                         <View style={[
                             styles.activityBadge,
                             {
-                                backgroundColor: isImported ? '#10B981' : isUsed ? '#EF4444' : '#3B82F6',
-                                shadowColor: isImported ? '#10B981' : isUsed ? '#EF4444' : '#3B82F6',
+                                backgroundColor: isImported ? '#10B981' : isUsed ? '#EF4444' : '#2E72F0',
+                                shadowColor: isImported ? '#10B981' : isUsed ? '#EF4444' : '#2E72F0',
                                 shadowOffset: { width: 0, height: 2 },
                                 shadowOpacity: 0.3,
                                 shadowRadius: 4,
@@ -1383,7 +1383,7 @@ const NotificationPage: React.FC = () => {
                         <View style={styles.transferDetailsContainer}>
                             <View style={styles.transferRoute}>
                                 <View style={styles.transferProject}>
-                                    <Ionicons name="folder" size={16} color="#3B82F6" />
+                                    <Ionicons name="folder" size={16} color="#2E72F0" />
                                     <Text style={styles.transferProjectName}>
                                         {activity.transferDetails.fromProject.name}
                                     </Text>
@@ -2013,7 +2013,7 @@ const NotificationPage: React.FC = () => {
                         <Ionicons
                             name={selectedVendors.length > 0 ? "funnel" : "funnel-outline"}
                             size={20}
-                            color={selectedVendors.length > 0 ? "#FFFFFF" : "#3B82F6"}
+                            color={selectedVendors.length > 0 ? "#FFFFFF" : "#2E72F0"}
                         />
                         {selectedVendors.length > 0 && (
                             <View style={styles.vendorFilterBadge}>
@@ -2134,7 +2134,7 @@ const NotificationPage: React.FC = () => {
                         <Ionicons
                             name="swap-horizontal-outline"
                             size={16}
-                            color={materialSubTab === 'transferred' ? '#3B82F6' : '#64748B'}
+                            color={materialSubTab === 'transferred' ? '#2E72F0' : '#64748B'}
                         />
                         <Text style={[styles.subTabText, materialSubTab === 'transferred' && styles.subTabTextActive]}>
                             Transferred
@@ -2151,8 +2151,8 @@ const NotificationPage: React.FC = () => {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        colors={['#3B82F6']}
-                        tintColor="#3B82F6"
+                        colors={['#2E72F0']}
+                        tintColor="#2E72F0"
                     />
                 }
             >
@@ -2161,7 +2161,7 @@ const NotificationPage: React.FC = () => {
                         {console.log('🔄 Rendering: LOADING STATE')}
                         <View style={styles.loadingContainer}>
                             <View style={styles.loadingHeader}>
-                                <ActivityIndicator size="large" color="#3B82F6" />
+                                <ActivityIndicator size="large" color="#2E72F0" />
                                 <Text style={styles.loadingText}>Loading activities...</Text>
                             </View>
                             {/* Loading Skeleton */}
@@ -2202,7 +2202,7 @@ const NotificationPage: React.FC = () => {
                         <View style={styles.simpleEmptyState}>
                             {selectedVendors.length > 0 && (activeTab === 'project' || activeTab === 'labor') ? (
                                 <View style={styles.simpleEmptyContainer}>
-                                    <Ionicons name="funnel-outline" size={56} color="#3B82F6" />
+                                    <Ionicons name="funnel-outline" size={56} color="#2E72F0" />
                                     <Text style={styles.simpleEmptyTitle}>
                                         To see {activeTab === 'project' ? 'Project' : 'Labor'} activities, please remove the vendor filter.
                                     </Text>
@@ -2533,7 +2533,7 @@ const NotificationPage: React.FC = () => {
                                     <Ionicons
                                         name="apps-outline"
                                         size={20}
-                                        color={selectedVendors.length === 0 ? "#3B82F6" : "#64748B"}
+                                        color={selectedVendors.length === 0 ? "#2E72F0" : "#64748B"}
                                     />
                                     <Text style={[
                                         styles.vendorItemText,
@@ -2683,11 +2683,11 @@ const styles = StyleSheet.create({
     vendorFilterButton: {
         padding: 10,
         borderRadius: 10,
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         position: 'relative',
     },
     vendorFilterButtonActive: {
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
     },
     vendorFilterBadge: {
         position: 'absolute',
@@ -2777,8 +2777,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
     },
     checkboxChecked: {
-        backgroundColor: '#3B82F6',
-        borderColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
+        borderColor: '#2E72F0',
     },
     vendorItemText: {
         fontSize: 15,
@@ -2848,7 +2848,7 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         paddingHorizontal: 20,
         borderRadius: 12,
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         flex: 1,
     },
     applyFilterButtonText: {
@@ -2878,7 +2878,7 @@ const styles = StyleSheet.create({
         color: '#6B7280',
     },
     tabTextActive: {
-        color: '#3B82F6',
+        color: '#2E72F0',
         fontWeight: '600',
     },
     tabIndicator: {
@@ -2887,7 +2887,7 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         height: 3,
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         borderTopLeftRadius: 3,
         borderTopRightRadius: 3,
     },
@@ -2918,8 +2918,8 @@ const styles = StyleSheet.create({
     },
     subTabActive: {
         backgroundColor: '#FFFFFF',
-        borderColor: '#3B82F6',
-        shadowColor: '#3B82F6',
+        borderColor: '#2E72F0',
+        shadowColor: '#2E72F0',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
@@ -3169,7 +3169,7 @@ const styles = StyleSheet.create({
     },
     laborDescriptionAccent: {
         width: 3,
-        backgroundColor: '#F59E0B',
+        backgroundColor: '#EE730C',
     },
     laborDescriptionContent: {
         flex: 1,
@@ -3252,7 +3252,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         marginBottom: 12,
         borderLeftWidth: 3,
-        borderLeftColor: '#3B82F6',
+        borderLeftColor: '#2E72F0',
     },
     messageText: {
         flex: 1,
@@ -3277,7 +3277,7 @@ const styles = StyleSheet.create({
         width: 32,
         height: 32,
         borderRadius: 16,
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -3369,7 +3369,7 @@ const styles = StyleSheet.create({
     },
     retryButton: {
         marginTop: 20,
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         paddingHorizontal: 24,
         paddingVertical: 12,
         borderRadius: 8,
@@ -3392,7 +3392,7 @@ const styles = StyleSheet.create({
         marginTop: 20,
     },
     debugButton: {
-        backgroundColor: '#F59E0B',
+        backgroundColor: '#EE730C',
     },
     emptyStateGradient: {
         padding: 40,
@@ -3430,12 +3430,12 @@ const styles = StyleSheet.create({
     emptyActionButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         paddingHorizontal: 24,
         paddingVertical: 12,
         borderRadius: 12,
         gap: 8,
-        shadowColor: '#3B82F6',
+        shadowColor: '#2E72F0',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -3583,12 +3583,12 @@ const styles = StyleSheet.create({
     loadMoreButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         paddingHorizontal: 24,
         paddingVertical: 14,
         borderRadius: 12,
         gap: 8,
-        shadowColor: '#3B82F6',
+        shadowColor: '#2E72F0',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -3599,7 +3599,7 @@ const styles = StyleSheet.create({
     loadMoreButtonSecondary: {
         backgroundColor: '#FFFFFF',
         borderWidth: 2,
-        borderColor: '#3B82F6',
+        borderColor: '#2E72F0',
         shadowColor: '#000',
         shadowOpacity: 0.1,
     },
@@ -3614,7 +3614,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     loadMoreTextSecondary: {
-        color: '#3B82F6',
+        color: '#2E72F0',
     },
     loadMoreHint: {
         marginTop: 12,
@@ -3667,7 +3667,7 @@ const styles = StyleSheet.create({
     },
     paginationButtonText: {
         fontSize: 14,
-        color: '#3B82F6',
+        color: '#2E72F0',
         fontWeight: '500',
     },
     paginationButtonTextDisabled: {
@@ -3689,8 +3689,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     pageNumberButtonActive: {
-        backgroundColor: '#3B82F6',
-        borderColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
+        borderColor: '#2E72F0',
     },
     pageNumberText: {
         fontSize: 14,
@@ -3719,7 +3719,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         paddingVertical: 8,
         paddingHorizontal: 16,
         borderRadius: 8,
@@ -3733,16 +3733,16 @@ const styles = StyleSheet.create({
     },
     singlePageHint: {
         fontSize: 11,
-        color: '#F59E0B',
+        color: '#EE730C',
         fontStyle: 'italic',
         textAlign: 'center',
         marginTop: 4,
     },
     // Pagination Banner Styles
     paginationBanner: {
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#EAF0FE',
         borderBottomWidth: 1,
-        borderBottomColor: '#BFDBFE',
+        borderBottomColor: '#C4D8FC',
         paddingHorizontal: 16,
         paddingVertical: 12,
     },
@@ -3760,7 +3760,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     paginationBannerBadge: {
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: 6,

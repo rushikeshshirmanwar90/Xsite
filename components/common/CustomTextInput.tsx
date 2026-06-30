@@ -63,7 +63,7 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
                 <MaterialIcons 
                     name={icon} 
                     size={20} 
-                    color={isFocused ? '#3B82F6' : iconColor} 
+                    color={isFocused ? '#2E72F0' : iconColor} 
                     style={styles.icon} 
                 />
             )}
@@ -110,7 +110,7 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
                     <Ionicons
                         name={isPasswordVisible ? "eye-off" : "eye"}
                         size={24}
-                        color="#3B82F6"
+                        color="#2E72F0"
                     />
                 </TouchableOpacity>
             )}
@@ -146,11 +146,11 @@ const styles = StyleSheet.create({
         }),
     },
     containerFocused: {
-        borderColor: '#3B82F6',
+        borderColor: '#2E72F0',
         backgroundColor: '#F0F9FF', // Slightly blue tint when focused
         ...Platform.select({
             ios: {
-                shadowColor: '#3B82F6',
+                shadowColor: '#2E72F0',
                 shadowOffset: { width: 0, height: 2 },
                 shadowOpacity: 0.1,
                 shadowRadius: 4,

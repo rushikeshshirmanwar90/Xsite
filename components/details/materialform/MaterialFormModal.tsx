@@ -942,7 +942,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                           }),
                           backgroundColor: swipeAnimation.interpolate({
                             inputRange: [0, 0.7, 1],
-                            outputRange: ['#3B82F6', '#10B981', '#10B981'],
+                            outputRange: ['#2E72F0', '#10B981', '#10B981'],
                             extrapolate: 'clamp',
                           }),
                         }
@@ -1030,7 +1030,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                         }],
                         backgroundColor: swipeAnimation.interpolate({
                           inputRange: [0, 0.65, 0.7, 1],
-                          outputRange: ['#3B82F6', '#3B82F6', '#10B981', '#10B981'],
+                          outputRange: ['#2E72F0', '#2E72F0', '#10B981', '#10B981'],
                           extrapolate: 'clamp',
                         }),
                       }
@@ -1125,7 +1125,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                   },
                 ]}
               >
-                <Ionicons name="cube" size={48} color="#3B82F6" />
+                <Ionicons name="cube" size={48} color="#2E72F0" />
               </Animated.View>
               <Text style={styles.loadingTitle}>Adding Materials</Text>
               <Text style={styles.loadingSubtitle}>Please wait while we process your materials</Text>
@@ -1200,11 +1200,11 @@ const styles = StyleSheet.create<Styles>({
     fontWeight: '600' as const,
   },
   floatingSendButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
     borderRadius: 10,
     padding: 16,
     alignItems: 'center' as const,
-    shadowColor: '#3B82F6',
+    shadowColor: '#2E72F0',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -1313,7 +1313,7 @@ const styles = StyleSheet.create<Styles>({
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
     zIndex: 3,
-    shadowColor: '#3B82F6',
+    shadowColor: '#2E72F0',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.5,
     shadowRadius: 8,
@@ -1389,7 +1389,7 @@ const styles = StyleSheet.create<Styles>({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
   },
 });
 

@@ -98,20 +98,34 @@ const MiniSectionsAnalytics: React.FC = () => {
 
       // Fetch mini-sections for this section
       let sectionAliases = [sectionId];
+      let projectFallbackMaterialUsed: any[] = [];
+      let projectFallbackMaterialAvailable: any[] = [];
+      let projectFallbackLabors: any[] = [];
       try {
         const clientId = await getClientId();
         const projectRes = await apiClient.get(`/api/project/${projectId}?clientId=${clientId}`);
         const projectData = projectRes.data?.project || projectRes.data?.data?.project || projectRes.data?.data || projectRes.data;
-        if (projectData && projectData.section && Array.isArray(projectData.section)) {
-            const matchedSec = projectData.section.find((sec: any) => 
-                String(sec._id) === String(sectionId) || String(sec.sectionId) === String(sectionId)
+        if (projectData) {
+          if (projectData.section && Array.isArray(projectData.section)) {
+            const matchedSec = projectData.section.find((sec: any) =>
+              String(sec._id) === String(sectionId) || String(sec.sectionId) === String(sectionId)
             );
             if (matchedSec) {
-                if (matchedSec._id) sectionAliases.push(String(matchedSec._id));
-                if (matchedSec.sectionId) sectionAliases.push(String(matchedSec.sectionId));
-                sectionAliases = [...new Set(sectionAliases)].filter(id => id && id.length === 24);
-                console.log('   ✅ Resolved parent section ID aliases:', sectionAliases);
+              if (matchedSec._id) sectionAliases.push(String(matchedSec._id));
+              if (matchedSec.sectionId) sectionAliases.push(String(matchedSec.sectionId));
+              sectionAliases = [...new Set(sectionAliases)].filter(id => id && id.length === 24);
+              console.log('   ✅ Resolved parent section ID aliases:', sectionAliases);
             }
+          }
+          // Cache full project arrays as fallback for when params are not JSON arrays
+          if (Array.isArray(projectData.MaterialUsed)) projectFallbackMaterialUsed = projectData.MaterialUsed;
+          if (Array.isArray(projectData.MaterialAvailable)) projectFallbackMaterialAvailable = projectData.MaterialAvailable;
+          if (Array.isArray(projectData.Labors)) projectFallbackLabors = projectData.Labors;
+          console.log('   📦 Project API fallback ready:', {
+            materialUsed: projectFallbackMaterialUsed.length,
+            materialAvailable: projectFallbackMaterialAvailable.length,
+            labors: projectFallbackLabors.length,
+          });
         }
       } catch (aliasError) {
         console.warn('   ⚠️ Failed to resolve section aliases:', aliasError);
@@ -140,19 +154,34 @@ const MiniSectionsAnalytics: React.FC = () => {
         console.log('   - Mini-section names:', miniSectionsData.map((ms: any) => ms.name));
       }
       
-      let parsedMaterialUsed = materialUsed
-        ? JSON.parse(Array.isArray(materialUsed) ? materialUsed[0] : materialUsed)
-        : [];
+      const tryParseArray = (param: string | undefined | null): any[] => {
+        if (!param) return [];
+        try {
+          const val = Array.isArray(param) ? param[0] : param;
+          const parsed = JSON.parse(val);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      };
 
-      // Parse materialAvailable from params
-      let parsedMaterialAvailable = materialAvailable
-        ? JSON.parse(Array.isArray(materialAvailable) ? materialAvailable[0] : materialAvailable)
-        : [];
+      let parsedMaterialUsed = tryParseArray(materialUsed);
+      if (parsedMaterialUsed.length === 0 && projectFallbackMaterialUsed.length > 0) {
+        parsedMaterialUsed = projectFallbackMaterialUsed;
+        console.log('   📦 Using materialUsed from project API (param was empty/not an array)');
+      }
 
-      // Parse labors from params
-      let parsedLabors = laborsData
-        ? JSON.parse(Array.isArray(laborsData) ? laborsData[0] : laborsData)
-        : [];
+      let parsedMaterialAvailable = tryParseArray(materialAvailable);
+      if (parsedMaterialAvailable.length === 0 && projectFallbackMaterialAvailable.length > 0) {
+        parsedMaterialAvailable = projectFallbackMaterialAvailable;
+        console.log('   📦 Using materialAvailable from project API (param was empty/not an array)');
+      }
+
+      let parsedLabors = tryParseArray(laborsData);
+      if (parsedLabors.length === 0 && projectFallbackLabors.length > 0) {
+        parsedLabors = projectFallbackLabors;
+        console.log('   📦 Using labors from project API (param was empty/not an array)');
+      }
 
       // CRITICAL FIX: Filter out materials/labor that belong to other sections!
       // This is necessary because the previous screen might pass ALL project materials
@@ -968,7 +997,7 @@ const MiniSectionsAnalytics: React.FC = () => {
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color="#3B82F6" />
+              <Ionicons name="arrow-back" size={24} color="#2E72F0" />
             </TouchableOpacity>
             <View style={styles.projectInfo}>
               <Text style={styles.projectName}>{sectionName}</Text>
@@ -1044,7 +1073,7 @@ const MiniSectionsAnalytics: React.FC = () => {
 
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#3B82F6" />
+            <ActivityIndicator size="large" color="#2E72F0" />
             <Text style={styles.loadingText}>Loading mini-section expenses...</Text>
           </View>
         ) : (miniSections.length === 0 && equipmentExpenses.length === 0 && buildingLaborExpenses.length === 0 && otherCostExpenses.length === 0) || totalExpense === 0 ? (
@@ -1508,7 +1537,7 @@ const styles = StyleSheet.create({
   equipmentCost: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#F59E0B',
+    color: '#EE730C',
   },
   modalContainer: {
     flex: 1,
@@ -1556,7 +1585,7 @@ const styles = StyleSheet.create({
   modalTotalValue: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#F59E0B',
+    color: '#EE730C',
   },
   modalEquipmentItem: {
     backgroundColor: '#fff',
@@ -1582,7 +1611,7 @@ const styles = StyleSheet.create({
   modalEquipmentCost: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#F59E0B',
+    color: '#EE730C',
     marginRight: 8,
   },
   modalEquipmentPercentage: {

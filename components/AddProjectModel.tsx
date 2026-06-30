@@ -1,7 +1,6 @@
 import { Project } from '@/types/project';
 import { AddProjectModalProps, StaffMembers } from '@/types/staff';
 import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef, useState } from 'react';
 
@@ -20,9 +19,187 @@ import {
     View
 } from 'react-native';
 
-const SCROLL_MAX_HEIGHT = Dimensions.get('window').height * 0.5;
 
-const PROJECT_TYPES = ['Residential', 'Commercial', 'Industrial', 'Renovation', 'Infrastructure', 'Other'];
+const PROJECT_TYPES = ['ongoing', 'upcoming', 'completed'];
+
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+interface CustomDatePickerProps {
+    selectedDate: Date | null;
+    onSelect: (date: Date) => void;
+}
+
+const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ selectedDate, onSelect }) => {
+    const today = new Date();
+    const [viewMonth, setViewMonth] = React.useState(() => (selectedDate || today).getMonth());
+    const [viewYear, setViewYear] = React.useState(() => (selectedDate || today).getFullYear());
+
+    React.useEffect(() => {
+        const ref = selectedDate || today;
+        setViewMonth(ref.getMonth());
+        setViewYear(ref.getFullYear());
+    }, []);
+
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const firstDayOfWeek = new Date(viewYear, viewMonth, 1).getDay();
+
+    const prevMonth = () => {
+        if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
+        else setViewMonth(m => m - 1);
+    };
+
+    const nextMonth = () => {
+        if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
+        else setViewMonth(m => m + 1);
+    };
+
+    const cells: (number | null)[] = [];
+    for (let i = 0; i < firstDayOfWeek; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+    while (cells.length % 7 !== 0) cells.push(null);
+
+    const weeks: (number | null)[][] = [];
+    for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+
+    const isSelected = (day: number) =>
+        !!selectedDate &&
+        selectedDate.getDate() === day &&
+        selectedDate.getMonth() === viewMonth &&
+        selectedDate.getFullYear() === viewYear;
+
+    const isToday = (day: number) =>
+        today.getDate() === day &&
+        today.getMonth() === viewMonth &&
+        today.getFullYear() === viewYear;
+
+    return (
+        <View style={dpStyles.container}>
+            <View style={dpStyles.header}>
+                <TouchableOpacity onPress={prevMonth} style={dpStyles.navBtn} activeOpacity={0.7}>
+                    <Ionicons name="chevron-back" size={18} color="#374151" />
+                </TouchableOpacity>
+                <Text style={dpStyles.monthYear}>{MONTH_NAMES[viewMonth]} {viewYear}</Text>
+                <TouchableOpacity onPress={nextMonth} style={dpStyles.navBtn} activeOpacity={0.7}>
+                    <Ionicons name="chevron-forward" size={18} color="#374151" />
+                </TouchableOpacity>
+            </View>
+
+            <View style={dpStyles.dayNamesRow}>
+                {DAY_NAMES.map(d => (
+                    <Text key={d} style={dpStyles.dayName}>{d}</Text>
+                ))}
+            </View>
+
+            {weeks.map((week, wi) => (
+                <View key={wi} style={dpStyles.weekRow}>
+                    {week.map((day, di) => {
+                        const sel = day !== null && isSelected(day);
+                        const tod = day !== null && isToday(day);
+                        return (
+                            <TouchableOpacity
+                                key={di}
+                                style={[
+                                    dpStyles.dayCell,
+                                    sel && dpStyles.dayCellSelected,
+                                    !sel && tod && dpStyles.dayCellToday,
+                                ]}
+                                onPress={() => day !== null && onSelect(new Date(viewYear, viewMonth, day))}
+                                disabled={day === null}
+                                activeOpacity={day === null ? 1 : 0.7}
+                            >
+                                <Text style={[
+                                    dpStyles.dayText,
+                                    sel && dpStyles.dayTextSelected,
+                                    !sel && tod && dpStyles.dayTextToday,
+                                ]}>
+                                    {day !== null ? String(day) : ''}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+            ))}
+        </View>
+    );
+};
+
+const dpStyles = StyleSheet.create({
+    container: {
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        borderRadius: 16,
+        padding: 12,
+        marginTop: -8,
+        marginBottom: 16,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 12,
+    },
+    navBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 10,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    monthYear: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#0F172A',
+    },
+    dayNamesRow: {
+        flexDirection: 'row',
+        marginBottom: 6,
+    },
+    dayName: {
+        flex: 1,
+        textAlign: 'center',
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#94A3B8',
+        paddingVertical: 4,
+    },
+    weekRow: {
+        flexDirection: 'row',
+        marginBottom: 2,
+    },
+    dayCell: {
+        flex: 1,
+        height: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 10,
+    },
+    dayCellSelected: {
+        backgroundColor: '#2E72F0',
+    },
+    dayCellToday: {
+        backgroundColor: '#EAF0FE',
+        borderWidth: 1,
+        borderColor: '#C4D8FC',
+    },
+    dayText: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#374151',
+    },
+    dayTextSelected: {
+        color: '#FFFFFF',
+        fontWeight: '700',
+    },
+    dayTextToday: {
+        color: '#2E72F0',
+        fontWeight: '700',
+    },
+});
 
 const STEPS = [
     { id: 1, label: 'Project Info' },
@@ -56,13 +233,14 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
     const [projectDescription, setProjectDescription] = useState('');
     const [estimatedBudget, setEstimatedBudget] = useState('');
 
-    // Step 2: Project Setup
+    // Step 2: Project Setup (Configurable Slabs & Terrace)
     const [buildingType, setBuildingType] = useState<'single' | 'multiple'>('single');
-    const [startDate, setStartDate] = useState<Date | null>(null);
-    const [showDatePicker, setShowDatePicker] = useState(false);
-    const [projectType, setProjectType] = useState<string | null>(null);
-    const [showProjectTypeMenu, setShowProjectTypeMenu] = useState(false);
-    const [notes, setNotes] = useState('');
+    const [slabsCount, setSlabsCount] = useState(1);
+    const [hasTerrace, setHasTerrace] = useState(true);
+    const [buildings, setBuildings] = useState<Array<{ key: string; name: string; slabsCount: number; hasTerrace: boolean }>>([
+        { key: '1', name: 'Building 1', slabsCount: 1, hasTerrace: true },
+        { key: '2', name: 'Building 2', slabsCount: 1, hasTerrace: true }
+    ]);
 
     // Step 3: Team Assignment
     const [searchQuery, setSearchQuery] = useState('');
@@ -92,13 +270,36 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
         setProjectDescription('');
         setEstimatedBudget('');
         setBuildingType('single');
-        setStartDate(null);
-        setShowDatePicker(false);
-        setProjectType(null);
-        setShowProjectTypeMenu(false);
-        setNotes('');
+        setSlabsCount(1);
+        setHasTerrace(true);
+        setBuildings([
+            { key: '1', name: 'Building 1', slabsCount: 1, hasTerrace: true },
+            { key: '2', name: 'Building 2', slabsCount: 1, hasTerrace: true }
+        ]);
         setSearchQuery('');
         setAssignedTo([]);
+    };
+
+    const addBuildingConfig = () => {
+        setBuildings(prev => [
+            ...prev,
+            {
+                key: Date.now().toString(),
+                name: `Building ${prev.length + 1}`,
+                slabsCount: 1,
+                hasTerrace: true
+            }
+        ]);
+    };
+
+    const deleteBuildingConfig = (key: string) => {
+        if (buildings.length > 1) {
+            setBuildings(prev => prev.filter(b => b.key !== key));
+        }
+    };
+
+    const updateBuildingConfig = (key: string, field: 'name' | 'slabsCount' | 'hasTerrace', value: any) => {
+        setBuildings(prev => prev.map(b => b.key === key ? { ...b, [field]: value } : b));
     };
 
     const startSubmitLoadingAnimation = () => {
@@ -198,13 +399,20 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
             name: projectName.trim(),
             address: projectAddress.trim(),
             assignedStaff: assignedTo,
-            description: projectDescription.trim(),
+            description: projectDescription.trim() || undefined,
             budget: budgetNumber,
             hasOnlyOneBuilding: buildingType === 'single',
-            ...(startDate ? { startDate: startDate.toISOString() } : {}),
-            ...(projectType ? { projectType } : {}),
-            ...(notes.trim() ? { notes: notes.trim() } : {}),
-        };
+            startDate: new Date().toISOString(), // Defaults to project creation date
+            projectType: 'ongoing', // Defaults to ongoing
+            notes: '',
+            slabsCount: buildingType === 'single' ? slabsCount : undefined,
+            hasTerrace: buildingType === 'single' ? hasTerrace : undefined,
+            buildings: buildingType === 'multiple' ? buildings.map(b => ({
+                name: b.name.trim() || 'Building',
+                slabsCount: b.slabsCount,
+                hasTerrace: b.hasTerrace
+            })) : undefined
+        } as any;
 
         try {
             await onAdd(newProject);
@@ -393,7 +601,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                                                 {buildingType === 'single' && <View style={styles.radioInner} />}
                                             </View>
                                             <View style={styles.radioIconChip}>
-                                                <Ionicons name="business-outline" size={18} color="#3B82F6" />
+                                                <Ionicons name="business-outline" size={18} color="#2E72F0" />
                                             </View>
                                             <View style={styles.radioTextBlock}>
                                                 <Text style={styles.radioTitle}>Single Building</Text>
@@ -410,7 +618,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                                                 {buildingType === 'multiple' && <View style={styles.radioInner} />}
                                             </View>
                                             <View style={styles.radioIconChip}>
-                                                <Ionicons name="layers-outline" size={18} color="#3B82F6" />
+                                                <Ionicons name="layers-outline" size={18} color="#2E72F0" />
                                             </View>
                                             <View style={styles.radioTextBlock}>
                                                 <Text style={styles.radioTitle}>Multiple Buildings</Text>
@@ -418,74 +626,132 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                                             </View>
                                         </TouchableOpacity>
 
-                                        <Text style={[styles.fieldLabel, styles.fieldLabelSpaced]}>Project Start Date</Text>
-                                        <TouchableOpacity
-                                            style={styles.iconInputWrap}
-                                            onPress={() => setShowDatePicker(true)}
-                                            activeOpacity={0.7}
-                                        >
-                                            <Ionicons name="calendar-outline" size={17} color="#94A3B8" style={styles.iconInputIcon} />
-                                            <Text style={[styles.dropdownTriggerText, !startDate && styles.placeholderText]}>
-                                                {startDate ? formatDate(startDate) : 'Select start date'}
-                                            </Text>
-                                        </TouchableOpacity>
-                                        {showDatePicker && (
-                                            <DateTimePicker
-                                                value={startDate || new Date()}
-                                                mode="date"
-                                                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                                                onChange={(event, selectedDate) => {
-                                                    setShowDatePicker(Platform.OS === 'ios');
-                                                    if (selectedDate) {
-                                                        setStartDate(selectedDate);
-                                                    }
-                                                }}
-                                            />
-                                        )}
+                                        {buildingType === 'single' ? (
+                                            <View style={styles.buildingConfigCard}>
+                                                <Text style={styles.buildingConfigTitle}>Building Configuration</Text>
+                                                
+                                                {/* Slabs counter */}
+                                                <View style={styles.counterRow}>
+                                                    <View style={styles.counterLabelBlock}>
+                                                        <Text style={styles.counterLabel}>Number of Slabs</Text>
+                                                        <Text style={styles.counterSublabel}>Select total slab sections to track</Text>
+                                                    </View>
+                                                    <View style={styles.counterControlWrap}>
+                                                        <TouchableOpacity
+                                                            style={[styles.counterBtn, slabsCount <= 1 && styles.counterBtnDisabled]}
+                                                            onPress={() => slabsCount > 1 && setSlabsCount(slabsCount - 1)}
+                                                            disabled={slabsCount <= 1}
+                                                            activeOpacity={0.7}
+                                                        >
+                                                            <Ionicons name="remove" size={16} color={slabsCount <= 1 ? "#94A3B8" : "#2E72F0"} />
+                                                        </TouchableOpacity>
+                                                        <Text style={styles.counterValue}>{slabsCount}</Text>
+                                                        <TouchableOpacity
+                                                            style={[styles.counterBtn, slabsCount >= 15 && styles.counterBtnDisabled]}
+                                                            onPress={() => slabsCount < 15 && setSlabsCount(slabsCount + 1)}
+                                                            disabled={slabsCount >= 15}
+                                                            activeOpacity={0.7}
+                                                        >
+                                                            <Ionicons name="add" size={16} color={slabsCount >= 15 ? "#94A3B8" : "#2E72F0"} />
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                </View>
 
-                                        <Text style={[styles.fieldLabel, styles.fieldLabelSpaced]}>Project Type</Text>
-                                        <TouchableOpacity
-                                            style={styles.iconInputWrap}
-                                            onPress={() => setShowProjectTypeMenu(v => !v)}
-                                            activeOpacity={0.7}
-                                        >
-                                            <Ionicons name="grid-outline" size={17} color="#94A3B8" style={styles.iconInputIcon} />
-                                            <Text style={[styles.dropdownTriggerText, !projectType && styles.placeholderText]}>
-                                                {projectType || 'Select project type (optional)'}
-                                            </Text>
-                                            <Ionicons name={showProjectTypeMenu ? 'chevron-up' : 'chevron-down'} size={16} color="#94A3B8" />
-                                        </TouchableOpacity>
-                                        {showProjectTypeMenu && (
-                                            <View style={styles.dropdownMenu}>
-                                                {PROJECT_TYPES.map(type => (
-                                                    <TouchableOpacity
-                                                        key={type}
-                                                        style={styles.dropdownOption}
-                                                        onPress={() => { setProjectType(type); setShowProjectTypeMenu(false); }}
-                                                        activeOpacity={0.7}
-                                                    >
-                                                        <Text style={[
-                                                            styles.dropdownOptionText,
-                                                            projectType === type && styles.dropdownOptionTextSelected,
-                                                        ]}>{type}</Text>
-                                                        {projectType === type && <Ionicons name="checkmark" size={16} color="#3B82F6" />}
-                                                    </TouchableOpacity>
+                                                {/* Terrace checkbox */}
+                                                <TouchableOpacity
+                                                    style={styles.checkboxRow}
+                                                    onPress={() => setHasTerrace(!hasTerrace)}
+                                                    activeOpacity={0.75}
+                                                >
+                                                    <View style={[styles.checkboxBox, hasTerrace && styles.checkboxBoxSelected]}>
+                                                        {hasTerrace && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+                                                    </View>
+                                                    <View style={styles.checkboxLabelBlock}>
+                                                        <Text style={styles.checkboxLabel}>Include Terrace</Text>
+                                                        <Text style={styles.checkboxSublabel}>Auto-create terrace progress section</Text>
+                                                    </View>
+                                                </TouchableOpacity>
+                                            </View>
+                                        ) : (
+                                            <View style={{ marginTop: 12 }}>
+                                                <Text style={styles.sectionLabel}>BUILDINGS CONFIGURATION</Text>
+                                                
+                                                {buildings.map((item, index) => (
+                                                    <View key={item.key} style={styles.buildingConfigCard}>
+                                                        <View style={styles.buildingConfigHeader}>
+                                                            <Text style={styles.buildingConfigCardTitle}>Building {index + 1}</Text>
+                                                            {buildings.length > 1 && (
+                                                                <TouchableOpacity
+                                                                    style={styles.deleteBuildingBtn}
+                                                                    onPress={() => deleteBuildingConfig(item.key)}
+                                                                    activeOpacity={0.7}
+                                                                >
+                                                                    <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                                                                </TouchableOpacity>
+                                                            )}
+                                                        </View>
+
+                                                        <Text style={styles.fieldLabel}>Building Name</Text>
+                                                        <TextInput
+                                                            style={[styles.input, { marginBottom: 12 }]}
+                                                            value={item.name}
+                                                            onChangeText={(text) => updateBuildingConfig(item.key, 'name', text)}
+                                                            placeholder={`Building ${index + 1}`}
+                                                            placeholderTextColor="#9CA3AF"
+                                                        />
+
+                                                        {/* Slabs counter */}
+                                                        <View style={styles.counterRow}>
+                                                            <View style={styles.counterLabelBlock}>
+                                                                <Text style={styles.counterLabel}>Number of Slabs</Text>
+                                                            </View>
+                                                            <View style={styles.counterControlWrap}>
+                                                                <TouchableOpacity
+                                                                    style={[styles.counterBtn, item.slabsCount <= 1 && styles.counterBtnDisabled]}
+                                                                    onPress={() => item.slabsCount > 1 && updateBuildingConfig(item.key, 'slabsCount', item.slabsCount - 1)}
+                                                                    disabled={item.slabsCount <= 1}
+                                                                    activeOpacity={0.7}
+                                                                >
+                                                                    <Ionicons name="remove" size={16} color={item.slabsCount <= 1 ? "#94A3B8" : "#2E72F0"} />
+                                                                </TouchableOpacity>
+                                                                <Text style={styles.counterValue}>{item.slabsCount}</Text>
+                                                                <TouchableOpacity
+                                                                    style={[styles.counterBtn, item.slabsCount >= 15 && styles.counterBtnDisabled]}
+                                                                    onPress={() => item.slabsCount < 15 && updateBuildingConfig(item.key, 'slabsCount', item.slabsCount + 1)}
+                                                                    disabled={item.slabsCount >= 15}
+                                                                    activeOpacity={0.7}
+                                                                >
+                                                                    <Ionicons name="add" size={16} color={item.slabsCount >= 15 ? "#94A3B8" : "#2E72F0"} />
+                                                                </TouchableOpacity>
+                                                            </View>
+                                                        </View>
+
+                                                        {/* Terrace checkbox */}
+                                                        <TouchableOpacity
+                                                            style={styles.checkboxRow}
+                                                            onPress={() => updateBuildingConfig(item.key, 'hasTerrace', !item.hasTerrace)}
+                                                            activeOpacity={0.75}
+                                                        >
+                                                            <View style={[styles.checkboxBox, item.hasTerrace && styles.checkboxBoxSelected]}>
+                                                                {item.hasTerrace && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+                                                            </View>
+                                                            <View style={styles.checkboxLabelBlock}>
+                                                                <Text style={styles.checkboxLabel}>Include Terrace</Text>
+                                                            </View>
+                                                        </TouchableOpacity>
+                                                    </View>
                                                 ))}
+
+                                                <TouchableOpacity
+                                                    style={styles.addBuildingBtnWrap}
+                                                    onPress={addBuildingConfig}
+                                                    activeOpacity={0.8}
+                                                >
+                                                    <Ionicons name="add-circle-outline" size={18} color="#2E72F0" />
+                                                    <Text style={styles.addBuildingBtnText}>Add Another Building</Text>
+                                                </TouchableOpacity>
                                             </View>
                                         )}
-
-                                        <Text style={[styles.fieldLabel, styles.fieldLabelSpaced]}>Notes</Text>
-                                        <TextInput
-                                            style={[styles.input, styles.textArea, focusedField === 'notes' && styles.inputFocused]}
-                                            value={notes}
-                                            onChangeText={setNotes}
-                                            placeholder="Optional — any additional notes"
-                                            placeholderTextColor="#9CA3AF"
-                                            multiline
-                                            textAlignVertical="top"
-                                            onFocus={() => setFocusedField('notes')}
-                                            onBlur={() => setFocusedField(null)}
-                                        />
                                     </View>
                                 )}
 
@@ -529,7 +795,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                                                         <View style={styles.staffTextBlock}>
                                                             <Text style={styles.staffName} numberOfLines={1}>{staff.fullName}</Text>
                                                             <View style={styles.staffStatusRow}>
-                                                                <View style={[styles.staffStatusDot, { backgroundColor: selected ? '#3B82F6' : '#10B981' }]} />
+                                                                <View style={[styles.staffStatusDot, { backgroundColor: selected ? '#2E72F0' : '#10B981' }]} />
                                                                 <Text style={styles.staffStatusText}>{selected ? 'Assigned' : 'Available'}</Text>
                                                             </View>
                                                         </View>
@@ -581,7 +847,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                                     </TouchableOpacity>
                                     <TouchableOpacity style={styles.primaryButtonWrap} onPress={goNext} activeOpacity={0.85}>
                                         <LinearGradient
-                                            colors={['#3B82F6', '#8B5CF6']}
+                                            colors={['#2E72F0', '#8B5CF6']}
                                             style={styles.primaryButtonGradient}
                                             start={{ x: 0, y: 0 }}
                                             end={{ x: 1, y: 0 }}
@@ -599,7 +865,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                                     </TouchableOpacity>
                                     <TouchableOpacity style={styles.primaryButtonWrap} onPress={goNext} activeOpacity={0.85}>
                                         <LinearGradient
-                                            colors={['#3B82F6', '#8B5CF6']}
+                                            colors={['#2E72F0', '#8B5CF6']}
                                             style={styles.primaryButtonGradient}
                                             start={{ x: 0, y: 0 }}
                                             end={{ x: 1, y: 0 }}
@@ -622,7 +888,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                                         disabled={isSubmitting}
                                     >
                                         <LinearGradient
-                                            colors={isSubmitting ? ['#9CA3AF', '#6B7280'] : ['#3B82F6', '#8B5CF6']}
+                                            colors={isSubmitting ? ['#9CA3AF', '#6B7280'] : ['#2E72F0', '#8B5CF6']}
                                             style={styles.primaryButtonGradient}
                                             start={{ x: 0, y: 0 }}
                                             end={{ x: 1, y: 0 }}
@@ -665,9 +931,10 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
     },
     kbWrap: {
-        maxHeight: '92%',
+        height: '95%',
     },
     sheet: {
+        flex: 1,
         backgroundColor: '#FFFFFF',
         borderTopLeftRadius: 28,
         borderTopRightRadius: 28,
@@ -746,12 +1013,12 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     stepCircleDone: {
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
     },
     stepCircleActive: {
         backgroundColor: '#FFFFFF',
         borderWidth: 2,
-        borderColor: '#3B82F6',
+        borderColor: '#2E72F0',
     },
     stepCircleUpcoming: {
         backgroundColor: '#FFFFFF',
@@ -764,7 +1031,7 @@ const styles = StyleSheet.create({
         color: '#94A3B8',
     },
     stepCircleTextActive: {
-        color: '#3B82F6',
+        color: '#2E72F0',
     },
     stepLabel: {
         fontSize: 10.5,
@@ -773,7 +1040,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     stepLabelActive: {
-        color: '#3B82F6',
+        color: '#2E72F0',
         fontWeight: '700',
     },
     stepLineTrack: {
@@ -787,16 +1054,16 @@ const styles = StyleSheet.create({
     },
     stepLineFill: {
         height: '100%',
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
         borderRadius: 2,
     },
 
     // Step content
     stepContentWrap: {
-        flexShrink: 1,
+        flex: 1,
     },
     scroll: {
-        maxHeight: SCROLL_MAX_HEIGHT,
+        flex: 1,
     },
     scrollContent: {
         paddingHorizontal: 20,
@@ -823,7 +1090,7 @@ const styles = StyleSheet.create({
     sectionLabelCount: {
         fontSize: 11.5,
         fontWeight: '700',
-        color: '#3B82F6',
+        color: '#2E72F0',
     },
     fieldLabel: {
         fontSize: 13,
@@ -850,7 +1117,7 @@ const styles = StyleSheet.create({
         paddingTop: 12,
     },
     inputFocused: {
-        borderColor: '#3B82F6',
+        borderColor: '#2E72F0',
         backgroundColor: '#FFFFFF',
     },
     iconInputWrap: {
@@ -918,7 +1185,7 @@ const styles = StyleSheet.create({
         color: '#374151',
     },
     dropdownOptionTextSelected: {
-        color: '#3B82F6',
+        color: '#2E72F0',
         fontWeight: '700',
     },
 
@@ -935,8 +1202,8 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     radioCardSelected: {
-        borderColor: '#3B82F6',
-        backgroundColor: '#EFF6FF',
+        borderColor: '#2E72F0',
+        backgroundColor: '#EAF0FE',
     },
     radioOuter: {
         width: 20,
@@ -948,13 +1215,13 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     radioOuterSelected: {
-        borderColor: '#3B82F6',
+        borderColor: '#2E72F0',
     },
     radioInner: {
         width: 10,
         height: 10,
         borderRadius: 5,
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
     },
     radioIconChip: {
         width: 36,
@@ -992,8 +1259,8 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     staffCardSelected: {
-        borderColor: '#3B82F6',
-        backgroundColor: '#EFF6FF',
+        borderColor: '#2E72F0',
+        backgroundColor: '#EAF0FE',
     },
     avatarCircle: {
         width: 40,
@@ -1004,12 +1271,12 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     avatarCircleSelected: {
-        backgroundColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
     },
     avatarText: {
         fontSize: 13,
         fontWeight: '800',
-        color: '#3B82F6',
+        color: '#2E72F0',
     },
     avatarTextSelected: {
         color: '#FFFFFF',
@@ -1049,8 +1316,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
     },
     checkboxSelected: {
-        backgroundColor: '#3B82F6',
-        borderColor: '#3B82F6',
+        backgroundColor: '#2E72F0',
+        borderColor: '#2E72F0',
     },
     paymentRow: {
         flexDirection: 'row',
@@ -1128,7 +1395,7 @@ const styles = StyleSheet.create({
         flex: 1.4,
         borderRadius: 16,
         overflow: 'hidden',
-        shadowColor: '#3B82F6',
+        shadowColor: '#2E72F0',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 8,
@@ -1145,6 +1412,136 @@ const styles = StyleSheet.create({
         fontSize: 14.5,
         fontWeight: '700',
         color: '#FFFFFF',
+    },
+    buildingConfigCard: {
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 16,
+        marginTop: 12,
+    },
+    buildingConfigHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    buildingConfigCardTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#374151',
+    },
+    deleteBuildingBtn: {
+        padding: 4,
+    },
+    buildingConfigTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#0F172A',
+        marginBottom: 16,
+    },
+    counterRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E2E8F0',
+        marginBottom: 12,
+    },
+    counterLabelBlock: {
+        flex: 1,
+    },
+    counterLabel: {
+        fontSize: 13.5,
+        fontWeight: '600',
+        color: '#374151',
+    },
+    counterSublabel: {
+        fontSize: 11,
+        color: '#94A3B8',
+        marginTop: 2,
+    },
+    counterControlWrap: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    counterBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#EAF0FE',
+        borderWidth: 1,
+        borderColor: '#C4D8FC',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    counterBtnDisabled: {
+        backgroundColor: '#F1F5F9',
+        borderColor: '#E2E8F0',
+    },
+    counterValue: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#1E293B',
+        minWidth: 20,
+        textAlign: 'center',
+    },
+    checkboxRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginTop: 4,
+        paddingVertical: 4,
+    },
+    checkboxBox: {
+        width: 20,
+        height: 20,
+        borderRadius: 6,
+        borderWidth: 2,
+        borderColor: '#CBD5E1',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#FFFFFF',
+    },
+    checkboxBoxSelected: {
+        backgroundColor: '#2E72F0',
+        borderColor: '#2E72F0',
+    },
+    checkboxLabelBlock: {
+        flex: 1,
+    },
+    checkboxLabel: {
+        fontSize: 13.5,
+        fontWeight: '600',
+        color: '#374151',
+    },
+    checkboxSublabel: {
+        fontSize: 11,
+        color: '#94A3B8',
+        marginTop: 2,
+    },
+    addBuildingBtnWrap: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        borderWidth: 1.5,
+        borderColor: '#2E72F0',
+        borderStyle: 'dashed',
+        borderRadius: 16,
+        paddingVertical: 12,
+        marginTop: 4,
+        marginBottom: 16,
+        backgroundColor: '#EAF0FE',
+    },
+    addBuildingBtnText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#2E72F0',
     },
 });
 

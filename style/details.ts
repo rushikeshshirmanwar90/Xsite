@@ -34,7 +34,7 @@ export const styles = StyleSheet.create({
     marginBottom: 16,
   },
   addSpecButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',
@@ -54,7 +54,7 @@ export const styles = StyleSheet.create({
   addSpecButtonSmall: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EAF0FE',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
@@ -128,15 +128,15 @@ export const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
     zIndex: 1000,
-    marginBottom: 8,
+    marginBottom: 4,
   },
   sectionManagerContainer: {
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 10,
   },
   sectionManager: {
     marginTop: 8,
@@ -145,7 +145,7 @@ export const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 10,
   },
   headerLeft: {
     flexDirection: "row",
@@ -164,9 +164,9 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F3F4F6',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#D1D5DB',
   },
@@ -181,7 +181,7 @@ export const styles = StyleSheet.create({
   breadcrumbContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 6,
+    marginBottom: 2,
     flexWrap: "wrap",
   },
   breadcrumbText: {
@@ -202,14 +202,14 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    backgroundColor: '#DBEAFE',
+    backgroundColor: '#C4D8FC',
     borderRadius: 6,
     gap: 4,
   },
   selectSectionText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#3B82F6',
+    color: '#2E72F0',
   },
   sectionDropdownContainer: {
     marginTop: 10,
@@ -261,7 +261,7 @@ export const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "#3B82F6",
+    backgroundColor: "#2E72F0",
     alignItems: "center",
     justifyContent: "center",
     elevation: 8,
@@ -326,8 +326,8 @@ export const styles = StyleSheet.create({
     elevation: 2,
   },
   editingMaterialItem: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#3B82F6",
+    backgroundColor: "#EAF0FE",
+    borderColor: "#2E72F0",
     borderWidth: 1,
   },
   addedMaterialIcon: {
@@ -394,8 +394,8 @@ export const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   templateButtonActive: {
-    backgroundColor: "#3B82F6",
-    borderColor: "#3B82F6",
+    backgroundColor: "#2E72F0",
+    borderColor: "#2E72F0",
   },
   templateButtonText: {
     fontSize: 14,
@@ -501,7 +501,7 @@ export const styles = StyleSheet.create({
     elevation: 2,
   },
   addMaterialButton: {
-    backgroundColor: "#3B82F6",
+    backgroundColor: "#2E72F0",
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: "center",
@@ -776,8 +776,8 @@ export const styles = StyleSheet.create({
     borderColor: '#D1D5DB',
   },
   progressStepActive: {
-    backgroundColor: '#3B82F6',
-    borderColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
+    borderColor: '#2E72F0',
   },
   progressStepNumber: {
     fontSize: 16,
@@ -794,7 +794,7 @@ export const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   progressLineActive: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
   },
   progressLabels: {
     flexDirection: 'row',
@@ -809,7 +809,7 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
   progressLabelActive: {
-    color: '#3B82F6',
+    color: '#2E72F0',
   },
   // Step 2 Review Section Styles
   reviewSection: {
@@ -865,7 +865,7 @@ export const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#3B82F6',
+    borderLeftColor: '#2E72F0',
   },
   summaryItemHeader: {
     flexDirection: 'row',
@@ -875,7 +875,7 @@ export const styles = StyleSheet.create({
   summaryItemNumber: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#3B82F6',
+    color: '#2E72F0',
     marginRight: 12,
   },
   summaryItemName: {
@@ -975,13 +975,13 @@ export const styles = StyleSheet.create({
     zIndex: 1000,
   },
   floatingNextButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
     paddingVertical: 18,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    shadowColor: '#3B82F6',
+    shadowColor: '#2E72F0',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4,
     shadowRadius: 16,
@@ -1018,7 +1018,7 @@ export const styles = StyleSheet.create({
     lineHeight: 20,
   },
   selectSectionButtonLarge: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -1055,13 +1055,13 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 10,
     gap: 8,
     marginTop: 16,
-    shadowColor: '#3B82F6',
+    shadowColor: '#2E72F0',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -1098,10 +1098,10 @@ export const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2E72F0',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#3B82F6',
+    shadowColor: '#2E72F0',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
