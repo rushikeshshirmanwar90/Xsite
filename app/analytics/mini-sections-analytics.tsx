@@ -997,7 +997,7 @@ const MiniSectionsAnalytics: React.FC = () => {
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color="#2E72F0" />
+              <Ionicons name="arrow-back" size={24} color="#3A78B5" />
             </TouchableOpacity>
             <View style={styles.projectInfo}>
               <Text style={styles.projectName}>{sectionName}</Text>
@@ -1031,7 +1031,7 @@ const MiniSectionsAnalytics: React.FC = () => {
             <View style={styles.breakdownStatBox}>
               <View style={styles.breakdownStatItem}>
                 <View style={styles.breakdownStatIconContainer}>
-                  <Ionicons name="cube-outline" size={18} color="#8B5CF6" />
+                  <Ionicons name="cube-outline" size={18} color="#3A78B5" />
                 </View>
                 <View style={styles.breakdownStatInfo}>
                   <Text style={styles.breakdownStatLabel}>Used Materials</Text>
@@ -1059,7 +1059,7 @@ const MiniSectionsAnalytics: React.FC = () => {
               {totalOtherCostExpense > 0 && (
                 <View style={styles.breakdownStatItem}>
                   <View style={styles.breakdownStatIconContainer}>
-                    <Ionicons name="receipt-outline" size={18} color="#8B5CF6" />
+                    <Ionicons name="receipt-outline" size={18} color="#3A78B5" />
                   </View>
                   <View style={styles.breakdownStatInfo}>
                     <Text style={styles.breakdownStatLabel}>Other Costs</Text>
@@ -1073,7 +1073,7 @@ const MiniSectionsAnalytics: React.FC = () => {
 
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#2E72F0" />
+            <ActivityIndicator size="large" color="#3A78B5" />
             <Text style={styles.loadingText}>Loading mini-section expenses...</Text>
           </View>
         ) : (miniSections.length === 0 && equipmentExpenses.length === 0 && buildingLaborExpenses.length === 0 && otherCostExpenses.length === 0) || totalExpense === 0 ? (
@@ -1537,7 +1537,7 @@ const styles = StyleSheet.create({
   equipmentCost: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#EE730C',
+    color: '#F59E0B',
   },
   modalContainer: {
     flex: 1,
@@ -1585,7 +1585,7 @@ const styles = StyleSheet.create({
   modalTotalValue: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#EE730C',
+    color: '#F59E0B',
   },
   modalEquipmentItem: {
     backgroundColor: '#fff',
@@ -1611,7 +1611,7 @@ const styles = StyleSheet.create({
   modalEquipmentCost: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#EE730C',
+    color: '#F59E0B',
     marginRight: 8,
   },
   modalEquipmentPercentage: {
@@ -1750,7 +1750,7 @@ const styles = StyleSheet.create({
   otherCostViewAllText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#8B5CF6',
+    color: '#3A78B5',
   },
   otherCostItem: {
     backgroundColor: '#FAFAFC',
@@ -1775,7 +1775,7 @@ const styles = StyleSheet.create({
   otherCostItemAmount: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#8B5CF6',
+    color: '#3A78B5',
   },
   otherCostItemDescription: {
     fontSize: 13,

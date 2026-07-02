@@ -29,7 +29,7 @@ const DetailsHeader: React.FC<DetailsHeaderProps> = ({ totalCost, onAddPress }) 
         onPress={onAddPress}
         activeOpacity={0.7}
       >
-        <Ionicons name="add-circle-outline" size={28} color="#0EA5E9" />
+        <Ionicons name="add-circle-outline" size={28} color="#3A78B5" />
       </TouchableOpacity>
     </View>
   );

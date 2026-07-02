@@ -3,7 +3,6 @@ import ProjectCard from '@/components/ProjectCard';
 import styles from '@/style/project';
 import { Project } from '@/types/project';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import { SafeAreaView, ScrollView, StatusBar, Text, TouchableOpacity, View } from 'react-native';
 
@@ -17,7 +16,7 @@ const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack }) => {
         <View style={styles.container}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#2E72F0" />
+                    <Ionicons name="arrow-back" size={24} color="#3A78B5" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Project Details</Text>
                 <View style={{ width: 24 }} />
@@ -199,15 +198,10 @@ const App: React.FC = () => {
                     style={styles.addButton}
                     onPress={() => setShowAddModal(true)}
                 >
-                    <LinearGradient
-                        colors={['#2E72F0', '#8B5CF6']}
-                        style={styles.addButtonGradient}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                    >
+                    <View style={[styles.addButtonGradient, { backgroundColor: '#3A78B5' }]}>
                         <Ionicons name="add" size={20} color="white" />
                         <Text style={styles.addButtonText}>Add Project</Text>
-                    </LinearGradient>
+                    </View>
                 </TouchableOpacity>
             </View>
 

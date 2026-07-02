@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
     minWidth: 120,
   },
   debugButton: {
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
   },
   clearButton: {
     backgroundColor: '#EF4444',

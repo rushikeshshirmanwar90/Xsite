@@ -154,7 +154,7 @@ const MaterialDetailsForm: React.FC<MaterialDetailsFormProps> = ({
                     activeOpacity={0.7}
                   >
                     <View style={styles.customUnitOptionContent}>
-                      <Ionicons name="add-circle-outline" size={18} color="#2E72F0" />
+                      <Ionicons name="add-circle-outline" size={18} color="#3A78B5" />
                       <Text style={[sharedStyles.dropdownItemText, styles.customUnitOptionText]}>
                         Enter Custom Unit
                       </Text>
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   customUnitOptionText: {
-    color: '#2E72F0',
+    color: '#3A78B5',
     fontWeight: '600',
   },
   customUnitHint: {

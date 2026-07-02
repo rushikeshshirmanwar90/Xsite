@@ -114,7 +114,7 @@ const StaffNoClientScreen: React.FC<StaffNoClientScreenProps> = ({ staffData }) 
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.iconContainer}>
-          <AlertCircle size={48} color="#EE730C" />
+          <AlertCircle size={48} color="#F59E0B" />
         </View>
         <Text style={styles.title}>No Client Assigned</Text>
         <Text style={styles.subtitle}>
@@ -157,7 +157,7 @@ const StaffNoClientScreen: React.FC<StaffNoClientScreenProps> = ({ staffData }) 
               {staffData._id}
             </Text>
             <TouchableOpacity onPress={handleCopyStaffId} style={styles.copyButton}>
-              <Copy size={16} color="#2E72F0" />
+              <Copy size={16} color="#3A78B5" />
             </TouchableOpacity>
           </View>
         </View>
@@ -166,7 +166,7 @@ const StaffNoClientScreen: React.FC<StaffNoClientScreenProps> = ({ staffData }) 
       {/* QR Code Section */}
       <View style={styles.card}>
         <View style={styles.qrHeader}>
-          <QrCode size={24} color="#2E72F0" />
+          <QrCode size={24} color="#3A78B5" />
           <Text style={styles.cardTitle}>QR Code</Text>
         </View>
         <Text style={styles.qrSubtitle}>
@@ -210,7 +210,7 @@ const StaffNoClientScreen: React.FC<StaffNoClientScreenProps> = ({ staffData }) 
         >
           <RefreshCw
             size={20}
-            color="#2E72F0"
+            color="#3A78B5"
             style={isRefreshing ? styles.rotating : undefined}
           />
           <Text style={styles.secondaryButtonText}>
@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   primaryButton: {
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
   },
   primaryButtonText: {
     color: 'white',
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
     borderColor: '#C4D8FC',
   },
   secondaryButtonText: {
-    color: '#2E72F0',
+    color: '#3A78B5',
     fontSize: 16,
     fontWeight: '600',
   },

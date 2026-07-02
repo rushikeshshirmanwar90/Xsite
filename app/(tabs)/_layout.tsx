@@ -1,6 +1,5 @@
 import { hp, iconSize, isTablet, sp, wp } from '@/utils/responsive'
 import { Ionicons } from '@expo/vector-icons'
-import { LinearGradient } from 'expo-linear-gradient'
 import { Tabs } from 'expo-router'
 import React from 'react'
 import { StyleSheet, View } from 'react-native'
@@ -8,8 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuth } from '@/contexts/AuthContext'
 import { LicenseGuard } from '@/components/LicenseGuard'
 
-// Brand palette — kept intentionally restrained (one blue accent + neutral grays)
-const ACTIVE_COLOR = '#2E72F0'
+const ACTIVE_COLOR   = '#3A78B5'
 const INACTIVE_COLOR = '#94A3B8'
 
 type IoniconName = keyof typeof Ionicons.glyphMap
@@ -55,18 +53,18 @@ const TabLayout = () => {
           tabBarInactiveTintColor: INACTIVE_COLOR,
           tabBarStyle: {
             backgroundColor: '#FFFFFF',
-            borderTopWidth: 0,
+            borderTopWidth: 1,
+            borderTopColor: '#E2E8F0',
             height: tabBarHeight + insets.bottom,
             paddingBottom: insets.bottom,
             paddingTop: sp(10),
-            borderTopLeftRadius: 40,
-            borderTopRightRadius: 40,
-            // Soft floating shadow — large, upward-cast glow
-            shadowColor: '#0F172A',
-            shadowOffset: { width: 0, height: -18 },
-            shadowOpacity: 0.3,
-            shadowRadius: 44,
-            elevation: 40,
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            shadowColor: '#1E293B',
+            shadowOffset: { width: 0, height: -4 },
+            shadowOpacity: 0.06,
+            shadowRadius: 16,
+            elevation: 12,
           },
           tabBarItemStyle: {
             paddingTop: sp(2),
@@ -104,21 +102,16 @@ const TabLayout = () => {
           }}
         />
 
-        {/* 3️⃣ Add Project - elevated gradient center button */}
+        {/* 3️⃣ Add Project - elevated center button */}
         <Tabs.Screen
           name="add-project"
           options={{
-            href: isStaff ? null : '/add-project', // Hide for staff
+            href: isStaff ? null : '/add-project',
             tabBarIcon: ({ focused }) => (
               <View style={styles.centerWrap}>
-                <LinearGradient
-                  colors={focused ? ['#1E40AF', '#2E72F0'] : ['#2E72F0', '#1A54C4']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.centerButton}
-                >
+                <View style={[styles.centerButton, focused && styles.centerButtonFocused]}>
                   <Ionicons name="add" size={iconSize(30)} color="#FFFFFF" />
-                </LinearGradient>
+                </View>
               </View>
             ),
           }}
@@ -173,12 +166,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   iconPillActive: {
-    backgroundColor: '#EAF0FE',
+    backgroundColor: '#DCEEFF',
   },
   centerWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    // Lift the button so it floats above the bar
     marginTop: -hp(18),
   },
   centerButton: {
@@ -187,13 +179,17 @@ const styles = StyleSheet.create({
     borderRadius: wp(27),
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#3A78B5',
     borderWidth: 4,
     borderColor: '#FFFFFF',
-    shadowColor: '#2E72F0',
+    shadowColor: '#3A78B5',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.3,
     shadowRadius: 10,
-    elevation: 10,
+    elevation: 8,
+  },
+  centerButtonFocused: {
+    backgroundColor: '#295E94',
   },
 })
 

@@ -284,8 +284,8 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   templateButtonActive: {
-    backgroundColor: '#0EA5E9',
-    borderColor: '#0EA5E9',
+    backgroundColor: '#3A78B5',
+    borderColor: '#3A78B5',
   },
   templateButtonText: {
     marginLeft: 6,
@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   submitButton: {
-    backgroundColor: '#0EA5E9',
+    backgroundColor: '#3A78B5',
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
@@ -379,7 +379,7 @@ const styles = StyleSheet.create({
   },
   unitText: {
     fontSize: 12,
-    color: '#2E72F0',
+    color: '#3A78B5',
     fontWeight: '500',
   },
   notesInput: {

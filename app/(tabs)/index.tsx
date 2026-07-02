@@ -671,7 +671,7 @@ const Index: React.FC = () => {
                 <TouchableOpacity style={homeStyles.heroNotifButton}
                     onPress={() => router.push('/notification' as any)}
                 >
-                    <Ionicons name="notifications-outline" size={20} color="#EE730C" />
+                    <Ionicons name="notifications-outline" size={20} color="#3A78B5" />
                 </TouchableOpacity>
             </View>
 
@@ -681,7 +681,7 @@ const Index: React.FC = () => {
                     <View style={[styles.qrCodeCard, styles.shareCard]}>
                         <View style={styles.shareHeader}>
                             <View style={styles.shareIconContainer}>
-                                <Ionicons name="qr-code-outline" size={24} color="#2E72F0" />
+                                <Ionicons name="qr-code-outline" size={24} color="#3A78B5" />
                             </View>
                             <View style={styles.shareContent}>
                                 <Text style={styles.shareTitle}>Get Connected</Text>
@@ -763,7 +763,7 @@ const Index: React.FC = () => {
                         <Ionicons
                             name={showCompletedProjects ? "list-outline" : "checkmark-done-outline"}
                             size={14}
-                            color={showCompletedProjects ? "#16A34A" : "#2E72F0"}
+                            color={showCompletedProjects ? "#295E94" : "#3A78B5"}
                         />
                         <Text
                             style={[homeStyles.viewCompletedButtonText, showCompletedProjects && homeStyles.viewCompletedButtonTextActive]}
@@ -781,8 +781,8 @@ const Index: React.FC = () => {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        colors={['#2E72F0']}
-                        tintColor="#2E72F0"
+                        colors={['#3A78B5']}
+                        tintColor="#3A78B5"
                         title="Pull to refresh"
                         titleColor="#64748B"
                     />
@@ -791,7 +791,7 @@ const Index: React.FC = () => {
                 {loading ? (
                     <View style={styles.centerContainer}>
                         <View style={homeStyles.stateIconBadge}>
-                            <Ionicons name="sync" size={40} color="#2E72F0" />
+                            <Ionicons name="sync" size={40} color="#3A78B5" />
                         </View>
                         <Text style={styles.loadingText}>Loading projects...</Text>
                         <Text style={[styles.loadingText, { fontSize: 12, marginTop: 4, color: '#94A3B8' }]}>Please wait...</Text>
@@ -879,7 +879,7 @@ const Index: React.FC = () => {
                                                 <Ionicons
                                                     name={isStaff ? "folder-open-outline" : (showCompletedProjects ? "checkmark-done-circle-outline" : "folder-open-outline")}
                                                     size={40}
-                                                    color="#2E72F0"
+                                                    color="#3A78B5"
                                                 />
                                             </View>
                                             <Text style={styles.emptyText}>
@@ -899,7 +899,7 @@ const Index: React.FC = () => {
                         ) : (
                             <View style={styles.centerContainer}>
                                 <View style={homeStyles.stateIconBadge}>
-                                    <Ionicons name="folder-open-outline" size={40} color="#2E72F0" />
+                                    <Ionicons name="folder-open-outline" size={40} color="#3A78B5" />
                                 </View>
                                 <Text style={styles.emptyText}>No projects found</Text>
                                 <Text style={styles.emptySubText}>
@@ -917,9 +917,9 @@ const Index: React.FC = () => {
             {userIsAdmin && (
                 <FloatingStatsButton
                     stats={[
-                        { icon: 'briefcase', color: '#2E72F0', value: projects.length, label: 'Total Projects' },
-                        { icon: 'pulse', color: '#EE730C', value: projects.filter((p) => !p.isCompleted).length, label: 'Active Projects' },
-                        { icon: 'checkmark-done', color: '#10B981', value: projects.filter((p) => p.isCompleted).length, label: 'Completed' },
+                        { icon: 'briefcase', color: '#3A78B5', value: projects.length, label: 'Total Projects' },
+                        { icon: 'pulse', color: '#3A78B5', value: projects.filter((p) => !p.isCompleted).length, label: 'Active Projects' },
+                        { icon: 'checkmark-done', color: '#22C55E', value: projects.filter((p) => p.isCompleted).length, label: 'Completed' },
                     ]}
                 />
             )}
@@ -956,13 +956,13 @@ const homeStyles = StyleSheet.create({
         width: 46,
         height: 46,
         borderRadius: 15,
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#2E72F0',
+        shadowColor: '#3A78B5',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.18,
-        shadowRadius: 10,
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
         elevation: 3,
     },
     brandLogoText: {
@@ -990,11 +990,11 @@ const homeStyles = StyleSheet.create({
         width: 44,
         height: 44,
         borderRadius: 14,
-        backgroundColor: '#FEF0E3',
+        backgroundColor: '#DCEEFF',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: '#FBCF99',
+        borderColor: '#B8D8F8',
     },
     greetingSection: {
         paddingHorizontal: 20,
@@ -1040,27 +1040,27 @@ const homeStyles = StyleSheet.create({
         paddingVertical: 8,
     },
     viewCompletedButtonActive: {
-        backgroundColor: '#F0FDF4',
-        borderColor: '#BBF7D0',
+        backgroundColor: '#DCEEFF',
+        borderColor: '#B8D8F8',
     },
     viewCompletedButtonText: {
         fontSize: 12,
         fontWeight: '700',
-        color: '#2E72F0',
+        color: '#3A78B5',
     },
     viewCompletedButtonTextActive: {
-        color: '#16A34A',
+        color: '#295E94',
     },
     stateIconBadge: {
         width: 84,
         height: 84,
         borderRadius: 28,
-        backgroundColor: '#EAF0FE',
+        backgroundColor: '#DCEEFF',
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 18,
         alignSelf: 'center',
         borderWidth: 1,
-        borderColor: '#C4D8FC',
+        borderColor: '#B8D8F8',
     },
 });

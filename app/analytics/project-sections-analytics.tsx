@@ -437,7 +437,7 @@ const ProjectSectionsAnalytics: React.FC = () => {
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color="#2E72F0" />
+              <Ionicons name="arrow-back" size={24} color="#3A78B5" />
             </TouchableOpacity>
             <View style={styles.projectInfo}>
               <Text style={styles.projectName}>{projectName}</Text>
@@ -451,21 +451,21 @@ const ProjectSectionsAnalytics: React.FC = () => {
           <Text style={styles.summaryTitle}>Expenses Breakdown</Text>
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
-              <View style={[styles.summaryDot, { backgroundColor: '#2E72F0' }]} />
+              <View style={[styles.summaryDot, { backgroundColor: '#3A78B5' }]} />
               <Text style={styles.summaryLabel}>Materials Used</Text>
             </View>
             <Text style={styles.summaryValue}>{formatCurrency(totalUsed)}</Text>
           </View>
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
-              <View style={[styles.summaryDot, { backgroundColor: '#EE730C' }]} />
+              <View style={[styles.summaryDot, { backgroundColor: '#F59E0B' }]} />
               <Text style={styles.summaryLabel}>Labor Costs</Text>
             </View>
             <Text style={styles.summaryValue}>{formatCurrency(totalLabor)}</Text>
           </View>
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
-              <View style={[styles.summaryDot, { backgroundColor: '#8B5CF6' }]} />
+              <View style={[styles.summaryDot, { backgroundColor: '#3A78B5' }]} />
               <Text style={styles.summaryLabel}>Equipment Costs</Text>
             </View>
             <Text style={styles.summaryValue}>{formatCurrency(totalEquipment)}</Text>
@@ -499,7 +499,7 @@ const ProjectSectionsAnalytics: React.FC = () => {
 
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#2E72F0" />
+            <ActivityIndicator size="large" color="#3A78B5" />
             <Text style={styles.loadingText}>Loading section data...</Text>
           </View>
         ) : sections.length === 0 ? (
@@ -641,11 +641,11 @@ const styles = StyleSheet.create({
   },
   statBoxPrimary: {
     borderWidth: 3,
-    borderColor: '#5DADE2',
+    borderColor: '#E2E8F0',
   },
   statBoxSecondary: {
     borderWidth: 3,
-    borderColor: '#EC7063',
+    borderColor: '#E2E8F0',
   },
   statValue: {
     fontSize: 20,
@@ -781,7 +781,7 @@ const styles = StyleSheet.create({
   },
   summaryTotalValue: {
     fontSize: 16,
-    color: '#2E72F0',
+    color: '#3A78B5',
     fontWeight: '800',
   },
 });

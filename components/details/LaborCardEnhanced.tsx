@@ -33,8 +33,8 @@ const LaborCardEnhanced: React.FC<LaborCardEnhancedProps> = ({
     const getCategoryColor = (category: string): string => {
         const colorMap: { [key: string]: string } = {
             'Civil / Structural Works': '#EF4444',        // Red
-            'Electrical Works': '#EE730C',                // Amber
-            'Plumbing & Sanitary Works': '#2E72F0',       // Blue
+            'Electrical Works': '#F59E0B',                // Amber
+            'Plumbing & Sanitary Works': '#3A78B5',       // Blue
             'Finishing Works': '#EC4899',                 // Pink
             'Mechanical & HVAC Works': '#F97316',         // Orange
             'Fire Fighting & Safety Works': '#DC2626',    // Dark Red

@@ -137,7 +137,7 @@ const ManualStaffAssignModal: React.FC<ManualStaffAssignModalProps> = ({
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
-              <Hash size={24} color="#2E72F0" />
+              <Hash size={24} color="#3A78B5" />
               <Text style={styles.headerTitle}>Assign by Staff ID</Text>
             </View>
             <TouchableOpacity
@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   primaryButton: {
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
   },
   primaryButtonText: {
     color: '#FFFFFF',

@@ -72,7 +72,7 @@ const SectionSelectionPrompt: React.FC<SectionSelectionPromptProps> = ({
                     {/* Header */}
                     <View style={styles.header}>
                         <View style={styles.headerContent}>
-                            <Ionicons name="layers-outline" size={24} color="#2E72F0" />
+                            <Ionicons name="layers-outline" size={24} color="#3A78B5" />
                             <Text style={styles.title}>Select a Mini-Section</Text>
                         </View>
                         <TouchableOpacity onPress={onClose} style={styles.closeButton}>
@@ -100,7 +100,7 @@ const SectionSelectionPrompt: React.FC<SectionSelectionPromptProps> = ({
                     <ScrollView style={styles.sectionsList} showsVerticalScrollIndicator={false}>
                         {loading ? (
                             <View style={styles.loadingContainer}>
-                                <ActivityIndicator size="large" color="#2E72F0" />
+                                <ActivityIndicator size="large" color="#3A78B5" />
                                 <Text style={styles.loadingText}>Loading sections...</Text>
                             </View>
                         ) : sections.length > 0 ? (
@@ -115,7 +115,7 @@ const SectionSelectionPrompt: React.FC<SectionSelectionPromptProps> = ({
                                     activeOpacity={0.7}
                                 >
                                     <View style={styles.sectionIcon}>
-                                        <Ionicons name="cube-outline" size={20} color="#2E72F0" />
+                                        <Ionicons name="cube-outline" size={20} color="#3A78B5" />
                                     </View>
                                     <View style={styles.sectionInfo}>
                                         <Text style={styles.sectionName}>{section.name}</Text>
@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
     },
     sectionName: {
         fontWeight: '600',
-        color: '#2E72F0',
+        color: '#3A78B5',
     },
     description: {
         fontSize: 14,

@@ -281,15 +281,15 @@ const MaterialsAnalytics: React.FC = () => {
 
   const getMaterialColor = (materialName: string) => {
     const name = materialName.toLowerCase();
-    if (name.includes('cement')) return '#8B5CF6';
+    if (name.includes('cement')) return '#3A78B5';
     if (name.includes('brick')) return '#EF4444';
     if (name.includes('steel') || name.includes('rod')) return '#6B7280';
-    if (name.includes('sand')) return '#EE730C';
+    if (name.includes('sand')) return '#F59E0B';
     if (name.includes('paint')) return '#EC4899';
     if (name.includes('tile')) return '#06B6D4';
-    if (name.includes('pipe')) return '#8B5CF6';
+    if (name.includes('pipe')) return '#3A78B5';
     if (name.includes('wood')) return '#84CC16';
-    return '#2E72F0';
+    return '#3A78B5';
   };
 
   const getLaborIconAndColor = (category: string) => {
@@ -299,10 +299,10 @@ const MaterialsAnalytics: React.FC = () => {
       return { icon: 'hammer-outline', color: '#EF4444' };
     }
     if (categoryLower.includes('electrical')) {
-      return { icon: 'flash-outline', color: '#EE730C' };
+      return { icon: 'flash-outline', color: '#F59E0B' };
     }
     if (categoryLower.includes('plumbing') || categoryLower.includes('sanitary')) {
-      return { icon: 'water-outline', color: '#2E72F0' };
+      return { icon: 'water-outline', color: '#3A78B5' };
     }
     if (categoryLower.includes('finishing')) {
       return { icon: 'brush-outline', color: '#EC4899' };
@@ -339,7 +339,7 @@ const MaterialsAnalytics: React.FC = () => {
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color="#2E72F0" />
+              <Ionicons name="arrow-back" size={24} color="#3A78B5" />
             </TouchableOpacity>
             <View style={styles.projectInfo}>
               <Text style={styles.projectName}>{miniSectionName}</Text>
@@ -380,7 +380,7 @@ const MaterialsAnalytics: React.FC = () => {
                 onPress={() => setActiveTab('materials')}
               >
                 <View style={styles.breakdownIconContainer}>
-                  <Ionicons name="cube-outline" size={20} color="#8B5CF6" />
+                  <Ionicons name="cube-outline" size={20} color="#3A78B5" />
                 </View>
                 <View style={styles.breakdownInfo}>
                   <Text style={styles.breakdownLabel}>Materials</Text>
@@ -392,7 +392,7 @@ const MaterialsAnalytics: React.FC = () => {
                 onPress={() => setActiveTab('labor')}
               >
                 <View style={styles.breakdownIconContainer}>
-                  <Ionicons name="people-outline" size={20} color="#EE730C" />
+                  <Ionicons name="people-outline" size={20} color="#F59E0B" />
                 </View>
                 <View style={styles.breakdownInfo}>
                   <Text style={styles.breakdownLabel}>Labor</Text>
@@ -405,7 +405,7 @@ const MaterialsAnalytics: React.FC = () => {
 
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#2E72F0" />
+            <ActivityIndicator size="large" color="#3A78B5" />
             <Text style={styles.loadingText}>Loading materials and labor...</Text>
           </View>
         ) : materials.length === 0 && labors.length === 0 ? (
@@ -623,7 +623,7 @@ const styles = StyleSheet.create({
   },
   breadcrumbTextActive: {
     fontSize: 11,
-    color: '#2E72F0',
+    color: '#3A78B5',
     fontWeight: '600',
   },
   totalCard: {
@@ -919,7 +919,7 @@ const styles = StyleSheet.create({
   laborCost: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#EE730C',
+    color: '#F59E0B',
     marginBottom: 2,
   },
   laborCostLabel: {

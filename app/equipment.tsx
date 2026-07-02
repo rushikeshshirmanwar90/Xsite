@@ -67,20 +67,20 @@ interface ApiResponse<T = any> {
 // Function to get equipment icon and color based on category and type
 const getEquipmentIconAndColor = (category: string, type: string) => {
     const categoryMap: { [key: string]: { icon: keyof typeof Ionicons.glyphMap, color: string } } = {
-        'Earthmoving & Excavation Equipment': { icon: 'construct-outline', color: '#8B5CF6' },
+        'Earthmoving & Excavation Equipment': { icon: 'construct-outline', color: '#3A78B5' },
         'Material Handling & Lifting': { icon: 'arrow-up-outline', color: '#10B981' },
-        'Concrete & Paving Equipment': { icon: 'cube-outline', color: '#EE730C' },
+        'Concrete & Paving Equipment': { icon: 'cube-outline', color: '#F59E0B' },
         'Hauling & Transport Vehicles': { icon: 'car-outline', color: '#EF4444' },
-        'Specialty & Finishing Equipment': { icon: 'settings-outline', color: '#2E72F0' },
+        'Specialty & Finishing Equipment': { icon: 'settings-outline', color: '#3A78B5' },
     };
 
     // Specific equipment type overrides
     const typeMap: { [key: string]: { icon: keyof typeof Ionicons.glyphMap, color: string } } = {
-        'Excavator': { icon: 'construct', color: '#8B5CF6' },
+        'Excavator': { icon: 'construct', color: '#3A78B5' },
         'Tower Crane': { icon: 'arrow-up', color: '#10B981' },
-        'Concrete Mixer Truck': { icon: 'cube', color: '#EE730C' },
+        'Concrete Mixer Truck': { icon: 'cube', color: '#F59E0B' },
         'Dump Truck': { icon: 'car', color: '#EF4444' },
-        'Generator': { icon: 'flash', color: '#2E72F0' },
+        'Generator': { icon: 'flash', color: '#3A78B5' },
         'Compressor': { icon: 'radio', color: '#06B6D4' },
         'Welding Machine': { icon: 'flame', color: '#F97316' },
     };
@@ -237,20 +237,20 @@ const EquipmentManagement = () => {
     // Function to get equipment icon and color based on category and type
     const getEquipmentIconAndColor = (category: string, type: string) => {
         const categoryMap: { [key: string]: { icon: keyof typeof Ionicons.glyphMap, color: string } } = {
-            'Earthmoving & Excavation Equipment': { icon: 'construct-outline', color: '#8B5CF6' },
+            'Earthmoving & Excavation Equipment': { icon: 'construct-outline', color: '#3A78B5' },
             'Material Handling & Lifting': { icon: 'arrow-up-outline', color: '#10B981' },
-            'Concrete & Paving Equipment': { icon: 'cube-outline', color: '#EE730C' },
+            'Concrete & Paving Equipment': { icon: 'cube-outline', color: '#F59E0B' },
             'Hauling & Transport Vehicles': { icon: 'car-outline', color: '#EF4444' },
-            'Specialty & Finishing Equipment': { icon: 'settings-outline', color: '#2E72F0' },
+            'Specialty & Finishing Equipment': { icon: 'settings-outline', color: '#3A78B5' },
         };
 
         // Specific equipment type overrides
         const typeMap: { [key: string]: { icon: keyof typeof Ionicons.glyphMap, color: string } } = {
-            'Excavator': { icon: 'construct', color: '#8B5CF6' },
+            'Excavator': { icon: 'construct', color: '#3A78B5' },
             'Tower Crane': { icon: 'arrow-up', color: '#10B981' },
-            'Concrete Mixer Truck': { icon: 'cube', color: '#EE730C' },
+            'Concrete Mixer Truck': { icon: 'cube', color: '#F59E0B' },
             'Dump Truck': { icon: 'car', color: '#EF4444' },
-            'Generator': { icon: 'flash', color: '#2E72F0' },
+            'Generator': { icon: 'flash', color: '#3A78B5' },
             'Compressor': { icon: 'radio', color: '#06B6D4' },
             'Welding Machine': { icon: 'flame', color: '#F97316' },
         };
@@ -672,8 +672,8 @@ const EquipmentManagement = () => {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        colors={['#EE730C']}
-                        tintColor="#EE730C"
+                        colors={['#F59E0B']}
+                        tintColor="#F59E0B"
                     />
                 }
             >
@@ -709,7 +709,7 @@ const EquipmentManagement = () => {
                                 }) || '0deg'
                             }]
                         }}>
-                            <Ionicons name="sync" size={48} color="#EE730C" />
+                            <Ionicons name="sync" size={48} color="#F59E0B" />
                         </Animated.View>
                         <Text style={styles.noMaterialsTitle}>Loading Equipment...</Text>
                         <Text style={styles.noMaterialsDescription}>
@@ -769,7 +769,7 @@ const EquipmentManagement = () => {
                             onPress={() => handlePageChange(currentPage - 1)}
                             disabled={currentPage === 1}
                         >
-                            <Ionicons name="chevron-back" size={16} color={currentPage === 1 ? "#CBD5E1" : "#EE730C"} />
+                            <Ionicons name="chevron-back" size={16} color={currentPage === 1 ? "#CBD5E1" : "#F59E0B"} />
                         </TouchableOpacity>
 
                         <View style={paginationStyles.pageNumbers}>
@@ -810,7 +810,7 @@ const EquipmentManagement = () => {
                             onPress={() => handlePageChange(currentPage + 1)}
                             disabled={currentPage === totalPages}
                         >
-                            <Ionicons name="chevron-forward" size={16} color={currentPage === totalPages ? "#CBD5E1" : "#EE730C"} />
+                            <Ionicons name="chevron-forward" size={16} color={currentPage === totalPages ? "#CBD5E1" : "#F59E0B"} />
                         </TouchableOpacity>
                     </View>
                 )}
@@ -835,7 +835,7 @@ const EquipmentManagement = () => {
                                 },
                             ]}
                         >
-                            <Ionicons name="construct" size={48} color="#EE730C" />
+                            <Ionicons name="construct" size={48} color="#F59E0B" />
                         </Animated.View>
                         <Text style={loadingStyles.loadingTitle}>Adding Equipment</Text>
                         <Text style={loadingStyles.loadingSubtitle}>Please wait while we process your request...</Text>
@@ -915,7 +915,7 @@ const actionStyles = StyleSheet.create({
     addEquipmentButtonText: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#EE730C',
+        color: '#F59E0B',
     },
     addEquipmentButtonDisabled: {
         backgroundColor: '#F1F5F9',
@@ -1027,7 +1027,7 @@ const equipmentCardStyles = StyleSheet.create({
         fontWeight: '600',
     },
     totalCost: {
-        color: '#EE730C',
+        color: '#F59E0B',
         fontSize: 16,
     },
     notesContainer: {
@@ -1105,8 +1105,8 @@ const paginationStyles = StyleSheet.create({
         alignItems: 'center',
     },
     pageNumberActive: {
-        backgroundColor: '#EE730C',
-        borderColor: '#EE730C',
+        backgroundColor: '#F59E0B',
+        borderColor: '#F59E0B',
     },
     pageNumberText: {
         fontSize: 14,
@@ -1168,7 +1168,7 @@ const loadingStyles = StyleSheet.create({
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#EE730C',
+        backgroundColor: '#F59E0B',
     },
 });
 

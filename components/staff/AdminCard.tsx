@@ -1,6 +1,5 @@
 // components/AdminCard.tsx
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import {
     StyleSheet,
@@ -28,12 +27,6 @@ const AdminCard: React.FC<AdminCardProps> = ({ admin, onPress }) => {
         return (firstName[0] + lastName[0]).toUpperCase();
     };
 
-    const getAdminColor = (): readonly [string, string] => {
-        // Use a consistent admin color scheme (gold/orange for admin)
-        return ['#EE730C', '#D97706'];
-    };
-
-    const avatarColors = getAdminColor();
     const fullName = `${admin.firstName} ${admin.lastName}`;
 
     return (
@@ -44,22 +37,17 @@ const AdminCard: React.FC<AdminCardProps> = ({ admin, onPress }) => {
         >
             <View style={styles.adminCardContent}>
                 <View style={styles.adminInfo}>
-                    <LinearGradient
-                        colors={avatarColors}
-                        style={styles.avatar}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                    >
+                    <View style={styles.avatar}>
                         <Text style={styles.avatarText}>
                             {getInitials(admin.firstName, admin.lastName)}
                         </Text>
-                    </LinearGradient>
+                    </View>
 
                     <View style={styles.adminDetails}>
                         <View style={styles.nameContainer}>
                             <Text style={styles.adminName}>{fullName}</Text>
                             <View style={styles.adminBadge}>
-                                <Ionicons name="shield-checkmark" size={12} color="#EE730C" />
+                                <Ionicons name="shield-checkmark" size={12} color="#3A78B5" />
                                 <Text style={styles.adminBadgeText}>ADMIN</Text>
                             </View>
                         </View>
@@ -117,7 +105,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         borderLeftWidth: 4,
-        borderLeftColor: '#EE730C',
+        borderLeftColor: '#3A78B5',
     },
     adminCardContent: {
         flex: 1,
@@ -135,6 +123,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
+        backgroundColor: '#3A78B5',
     },
     avatarText: {
         color: 'white',
@@ -167,7 +156,7 @@ const styles = StyleSheet.create({
     adminBadgeText: {
         fontSize: 10,
         fontWeight: '700',
-        color: '#EE730C',
+        color: '#3A78B5',
         letterSpacing: 0.5,
     },
     contactInfo: {

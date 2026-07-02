@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
     },
     markAllText: {
         fontSize: 14,
-        color: '#2E72F0',
+        color: '#3A78B5',
         fontWeight: '500',
     },
 });

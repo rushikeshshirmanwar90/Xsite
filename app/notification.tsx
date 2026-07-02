@@ -3,7 +3,6 @@ import { domain } from '@/lib/domain';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from '@/utils/axiosConfig';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -831,22 +830,22 @@ const NotificationPage: React.FC = () => {
     };
 
     const getActivityIcon = (type: string, category: string) => {
-        if (category === 'project') return { name: 'folder', color: '#2E72F0' };
-        if (category === 'section') return { name: 'layers', color: '#8B5CF6' };
+        if (category === 'project') return { name: 'folder', color: '#3A78B5' };
+        if (category === 'section') return { name: 'layers', color: '#3A78B5' };
         if (category === 'mini_section') return { name: 'grid', color: '#10B981' };
         if (category === 'phase') return { name: 'git-branch', color: '#1E293B' };
         if (category === 'staff') return { name: 'people', color: '#EF4444' };
-        if (category === 'labor') return { name: 'hammer', color: '#EE730C' };
+        if (category === 'labor') return { name: 'hammer', color: '#F59E0B' };
         if (category === 'material') return { name: 'cube', color: '#06B6D4' };
-        if (category === 'equipment') return { name: 'construct', color: '#8B5CF6' };
-        if (category === 'other_cost') return { name: 'briefcase', color: '#8B5CF6' };
+        if (category === 'equipment') return { name: 'construct', color: '#3A78B5' };
+        if (category === 'other_cost') return { name: 'briefcase', color: '#3A78B5' };
         return { name: 'information-circle', color: '#6B7280' };
     };
 
     const getMaterialActivityIcon = (activity: 'imported' | 'used' | 'transferred') => {
         if (activity === 'imported') return { name: 'download', color: '#10B981' };
         if (activity === 'used') return { name: 'arrow-forward', color: '#EF4444' };
-        return { name: 'swap-horizontal', color: '#2E72F0' }; // For transferred
+        return { name: 'swap-horizontal', color: '#3A78B5' }; // For transferred
     };
 
     const formatTimeAgo = (dateString: string | undefined | null) => {
@@ -1029,7 +1028,7 @@ const NotificationPage: React.FC = () => {
                                             <View style={styles.laborDescriptionCard}>
                                                 <View style={styles.laborDescriptionAccent} />
                                                 <View style={styles.laborDescriptionContent}>
-                                                    <Ionicons name="document-text-outline" size={14} color="#EE730C" style={{ marginTop: 1 }} />
+                                                    <Ionicons name="document-text-outline" size={14} color="#F59E0B" style={{ marginTop: 1 }} />
                                                     <View style={{ flex: 1 }}>
                                                         <Text style={styles.laborDescriptionLabel}>Work Done</Text>
                                                         <Text style={styles.laborDescriptionText} numberOfLines={3}>{entry.description}</Text>
@@ -1192,7 +1191,7 @@ const NotificationPage: React.FC = () => {
                         <View style={styles.materialActivityFooter}>
                             <View style={styles.userInfo}>
                                 <View style={[styles.userAvatar, { backgroundColor: avatarColor }]}>
-                                    <Text style={[styles.userAvatarText, { color: '#1A54C4' }]}>
+                                    <Text style={[styles.userAvatarText, { color: '#295E94' }]}>
                                         {displayUser.fullName.charAt(0).toUpperCase()}
                                     </Text>
                                 </View>
@@ -1246,16 +1245,16 @@ const NotificationPage: React.FC = () => {
 
     const getMaterialIcon = (materialName: string) => {
         const materialMap: { [key: string]: { icon: string; color: string } } = {
-            'cement': { icon: 'cube-outline', color: '#8B5CF6' },
+            'cement': { icon: 'cube-outline', color: '#3A78B5' },
             'brick': { icon: 'square-outline', color: '#EF4444' },
             'steel': { icon: 'barbell-outline', color: '#6B7280' },
-            'sand': { icon: 'layers-outline', color: '#EE730C' },
+            'sand': { icon: 'layers-outline', color: '#F59E0B' },
             'gravel': { icon: 'diamond-outline', color: '#10B981' },
-            'concrete': { icon: 'cube', color: '#2E72F0' },
+            'concrete': { icon: 'cube', color: '#3A78B5' },
             'wood': { icon: 'leaf-outline', color: '#84CC16' },
             'paint': { icon: 'color-palette-outline', color: '#EC4899' },
             'tile': { icon: 'grid-outline', color: '#06B6D4' },
-            'pipe': { icon: 'ellipse-outline', color: '#8B5CF6' },
+            'pipe': { icon: 'ellipse-outline', color: '#3A78B5' },
         };
 
         const lowerName = materialName.toLowerCase();
@@ -1332,8 +1331,8 @@ const NotificationPage: React.FC = () => {
                         <View style={[
                             styles.activityBadge,
                             {
-                                backgroundColor: isImported ? '#10B981' : isUsed ? '#EF4444' : '#2E72F0',
-                                shadowColor: isImported ? '#10B981' : isUsed ? '#EF4444' : '#2E72F0',
+                                backgroundColor: isImported ? '#10B981' : isUsed ? '#EF4444' : '#3A78B5',
+                                shadowColor: isImported ? '#10B981' : isUsed ? '#EF4444' : '#3A78B5',
                                 shadowOffset: { width: 0, height: 2 },
                                 shadowOpacity: 0.3,
                                 shadowRadius: 4,
@@ -1383,7 +1382,7 @@ const NotificationPage: React.FC = () => {
                         <View style={styles.transferDetailsContainer}>
                             <View style={styles.transferRoute}>
                                 <View style={styles.transferProject}>
-                                    <Ionicons name="folder" size={16} color="#2E72F0" />
+                                    <Ionicons name="folder" size={16} color="#3A78B5" />
                                     <Text style={styles.transferProjectName}>
                                         {activity.transferDetails.fromProject.name}
                                     </Text>
@@ -1403,7 +1402,7 @@ const NotificationPage: React.FC = () => {
                     {activity.contractor_name && (
                         <View style={styles.contractorInfoContainer}>
                             <View style={styles.contractorInfoItem}>
-                                <Ionicons name="person-outline" size={14} color="#8B5CF6" />
+                                <Ionicons name="person-outline" size={14} color="#3A78B5" />
                                 <Text style={styles.contractorLabel}>Contractor:</Text>
                                 <Text style={styles.contractorName}>{activity.contractor_name}</Text>
                             </View>
@@ -1481,7 +1480,7 @@ const NotificationPage: React.FC = () => {
     };
 
     const renderOtherCostActivityItem = (activity: OtherCostActivity) => {
-        const icon = { name: 'briefcase', color: '#8B5CF6' };
+        const icon = { name: 'briefcase', color: '#3A78B5' };
         const totalCost = activity.otherCosts.reduce((sum, o) => sum + (o.totalCost || 0), 0);
         const costCount = activity.otherCosts.length;
 
@@ -1497,8 +1496,8 @@ const NotificationPage: React.FC = () => {
                         <View style={[
                             styles.activityBadge,
                             {
-                                backgroundColor: '#8B5CF6',
-                                shadowColor: '#8B5CF6',
+                                backgroundColor: '#3A78B5',
+                                shadowColor: '#3A78B5',
                                 shadowOffset: { width: 0, height: 2 },
                                 shadowOpacity: 0.3,
                                 shadowRadius: 4,
@@ -1549,12 +1548,12 @@ const NotificationPage: React.FC = () => {
                             <View key={index} style={styles.materialItem}>
                                 <View style={[
                                     styles.materialIconSmall,
-                                    { backgroundColor: '#8B5CF615' }
+                                    { backgroundColor: '#3A78B515' }
                                 ]}>
                                     <Ionicons
                                         name="briefcase-outline"
                                         size={18}
-                                        color="#8B5CF6"
+                                        color="#3A78B5"
                                     />
                                 </View>
                                 <View style={styles.materialDetails}>
@@ -1598,7 +1597,7 @@ const NotificationPage: React.FC = () => {
                     {/* Footer with user info and time ago */}
                     <View style={styles.materialActivityFooter}>
                         <View style={styles.userInfo}>
-                            <View style={[styles.userAvatar, { backgroundColor: '#8B5CF6' }]}>
+                            <View style={[styles.userAvatar, { backgroundColor: '#3A78B5' }]}>
                                 <Text style={styles.userAvatarText}>
                                     {displayUser.fullName.charAt(0).toUpperCase()}
                                 </Text>
@@ -2013,7 +2012,7 @@ const NotificationPage: React.FC = () => {
                         <Ionicons
                             name={selectedVendors.length > 0 ? "funnel" : "funnel-outline"}
                             size={20}
-                            color={selectedVendors.length > 0 ? "#FFFFFF" : "#2E72F0"}
+                            color={selectedVendors.length > 0 ? "#FFFFFF" : "#3A78B5"}
                         />
                         {selectedVendors.length > 0 && (
                             <View style={styles.vendorFilterBadge}>
@@ -2092,7 +2091,7 @@ const NotificationPage: React.FC = () => {
                         <Ionicons
                             name="apps-outline"
                             size={16}
-                            color={materialSubTab === 'all' ? '#8B5CF6' : '#64748B'}
+                            color={materialSubTab === 'all' ? '#3A78B5' : '#64748B'}
                         />
                         <Text style={[styles.subTabText, materialSubTab === 'all' && styles.subTabTextActive]}>
                             All
@@ -2134,7 +2133,7 @@ const NotificationPage: React.FC = () => {
                         <Ionicons
                             name="swap-horizontal-outline"
                             size={16}
-                            color={materialSubTab === 'transferred' ? '#2E72F0' : '#64748B'}
+                            color={materialSubTab === 'transferred' ? '#3A78B5' : '#64748B'}
                         />
                         <Text style={[styles.subTabText, materialSubTab === 'transferred' && styles.subTabTextActive]}>
                             Transferred
@@ -2151,8 +2150,8 @@ const NotificationPage: React.FC = () => {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        colors={['#2E72F0']}
-                        tintColor="#2E72F0"
+                        colors={['#3A78B5']}
+                        tintColor="#3A78B5"
                     />
                 }
             >
@@ -2161,7 +2160,7 @@ const NotificationPage: React.FC = () => {
                         {console.log('🔄 Rendering: LOADING STATE')}
                         <View style={styles.loadingContainer}>
                             <View style={styles.loadingHeader}>
-                                <ActivityIndicator size="large" color="#2E72F0" />
+                                <ActivityIndicator size="large" color="#3A78B5" />
                                 <Text style={styles.loadingText}>Loading activities...</Text>
                             </View>
                             {/* Loading Skeleton */}
@@ -2202,7 +2201,7 @@ const NotificationPage: React.FC = () => {
                         <View style={styles.simpleEmptyState}>
                             {selectedVendors.length > 0 && (activeTab === 'project' || activeTab === 'labor') ? (
                                 <View style={styles.simpleEmptyContainer}>
-                                    <Ionicons name="funnel-outline" size={56} color="#2E72F0" />
+                                    <Ionicons name="funnel-outline" size={56} color="#3A78B5" />
                                     <Text style={styles.simpleEmptyTitle}>
                                         To see {activeTab === 'project' ? 'Project' : 'Labor'} activities, please remove the vendor filter.
                                     </Text>
@@ -2533,7 +2532,7 @@ const NotificationPage: React.FC = () => {
                                     <Ionicons
                                         name="apps-outline"
                                         size={20}
-                                        color={selectedVendors.length === 0 ? "#2E72F0" : "#64748B"}
+                                        color={selectedVendors.length === 0 ? "#3A78B5" : "#64748B"}
                                     />
                                     <Text style={[
                                         styles.vendorItemText,
@@ -2582,7 +2581,7 @@ const NotificationPage: React.FC = () => {
                                                 <Ionicons
                                                     name="person-outline"
                                                     size={20}
-                                                    color={isSelected ? "#8B5CF6" : "#64748B"}
+                                                    color={isSelected ? "#3A78B5" : "#64748B"}
                                                 />
                                                 <Text style={[
                                                     styles.vendorItemText,
@@ -2687,7 +2686,7 @@ const styles = StyleSheet.create({
         position: 'relative',
     },
     vendorFilterButtonActive: {
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
     },
     vendorFilterBadge: {
         position: 'absolute',
@@ -2777,8 +2776,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
     },
     checkboxChecked: {
-        backgroundColor: '#2E72F0',
-        borderColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
+        borderColor: '#3A78B5',
     },
     vendorItemText: {
         fontSize: 15,
@@ -2848,7 +2847,7 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         paddingHorizontal: 20,
         borderRadius: 12,
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
         flex: 1,
     },
     applyFilterButtonText: {
@@ -2878,7 +2877,7 @@ const styles = StyleSheet.create({
         color: '#6B7280',
     },
     tabTextActive: {
-        color: '#2E72F0',
+        color: '#3A78B5',
         fontWeight: '600',
     },
     tabIndicator: {
@@ -2887,7 +2886,7 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         height: 3,
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
         borderTopLeftRadius: 3,
         borderTopRightRadius: 3,
     },
@@ -2918,8 +2917,8 @@ const styles = StyleSheet.create({
     },
     subTabActive: {
         backgroundColor: '#FFFFFF',
-        borderColor: '#2E72F0',
-        shadowColor: '#2E72F0',
+        borderColor: '#3A78B5',
+        shadowColor: '#3A78B5',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
@@ -3169,7 +3168,7 @@ const styles = StyleSheet.create({
     },
     laborDescriptionAccent: {
         width: 3,
-        backgroundColor: '#EE730C',
+        backgroundColor: '#F59E0B',
     },
     laborDescriptionContent: {
         flex: 1,
@@ -3252,7 +3251,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         marginBottom: 12,
         borderLeftWidth: 3,
-        borderLeftColor: '#2E72F0',
+        borderLeftColor: '#3A78B5',
     },
     messageText: {
         flex: 1,
@@ -3277,7 +3276,7 @@ const styles = StyleSheet.create({
         width: 32,
         height: 32,
         borderRadius: 16,
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -3369,7 +3368,7 @@ const styles = StyleSheet.create({
     },
     retryButton: {
         marginTop: 20,
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
         paddingHorizontal: 24,
         paddingVertical: 12,
         borderRadius: 8,
@@ -3392,7 +3391,7 @@ const styles = StyleSheet.create({
         marginTop: 20,
     },
     debugButton: {
-        backgroundColor: '#EE730C',
+        backgroundColor: '#F59E0B',
     },
     emptyStateGradient: {
         padding: 40,
@@ -3430,12 +3429,12 @@ const styles = StyleSheet.create({
     emptyActionButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
         paddingHorizontal: 24,
         paddingVertical: 12,
         borderRadius: 12,
         gap: 8,
-        shadowColor: '#2E72F0',
+        shadowColor: '#3A78B5',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -3583,12 +3582,12 @@ const styles = StyleSheet.create({
     loadMoreButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
         paddingHorizontal: 24,
         paddingVertical: 14,
         borderRadius: 12,
         gap: 8,
-        shadowColor: '#2E72F0',
+        shadowColor: '#3A78B5',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -3599,7 +3598,7 @@ const styles = StyleSheet.create({
     loadMoreButtonSecondary: {
         backgroundColor: '#FFFFFF',
         borderWidth: 2,
-        borderColor: '#2E72F0',
+        borderColor: '#3A78B5',
         shadowColor: '#000',
         shadowOpacity: 0.1,
     },
@@ -3614,7 +3613,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     loadMoreTextSecondary: {
-        color: '#2E72F0',
+        color: '#3A78B5',
     },
     loadMoreHint: {
         marginTop: 12,
@@ -3667,7 +3666,7 @@ const styles = StyleSheet.create({
     },
     paginationButtonText: {
         fontSize: 14,
-        color: '#2E72F0',
+        color: '#3A78B5',
         fontWeight: '500',
     },
     paginationButtonTextDisabled: {
@@ -3689,8 +3688,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     pageNumberButtonActive: {
-        backgroundColor: '#2E72F0',
-        borderColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
+        borderColor: '#3A78B5',
     },
     pageNumberText: {
         fontSize: 14,
@@ -3733,7 +3732,7 @@ const styles = StyleSheet.create({
     },
     singlePageHint: {
         fontSize: 11,
-        color: '#EE730C',
+        color: '#F59E0B',
         fontStyle: 'italic',
         textAlign: 'center',
         marginTop: 4,
@@ -3760,7 +3759,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     paginationBannerBadge: {
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
         paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: 6,
@@ -4019,7 +4018,7 @@ const styles = StyleSheet.create({
     contractorName: {
         fontSize: 13,
         fontWeight: '600',
-        color: '#8B5CF6',
+        color: '#3A78B5',
         flex: 1,
     },
 });

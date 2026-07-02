@@ -34,8 +34,8 @@ const onboardingData: OnboardingSlide[] = [
         description: "Your all-in-one solution for managing construction projects, tracking materials, and monitoring budgets in real-time.",
         icon: "construct-outline",
         backgroundColor: '#F0F4FF',
-        iconColor: '#1A54C4',
-        accentColor: '#2E72F0',
+        iconColor: '#295E94',
+        accentColor: '#3A78B5',
         features: [
             "Manage multiple construction projects",
             "Real-time budget tracking",
@@ -98,7 +98,7 @@ const onboardingData: OnboardingSlide[] = [
         description: "Join thousands of construction professionals who trust Xsite to manage their projects efficiently and profitably.",
         icon: "rocket-outline",
         backgroundColor: '#FFFBEB',
-        iconColor: '#EE730C',
+        iconColor: '#F59E0B',
         accentColor: '#FBBF24',
         features: [
             "Complete audit trail",

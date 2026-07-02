@@ -249,7 +249,7 @@ const AddMaterialCharacteristicsModal: React.FC<AddMaterialCharacteristicsModalP
                 value={hasPipes}
                 onValueChange={setHasPipes}
                 trackColor={{ false: '#CBD5E1', true: '#BAE6FD' }}
-                thumbColor={hasPipes ? '#0EA5E9' : '#f4f3f4'}
+                thumbColor={hasPipes ? '#3A78B5' : '#f4f3f4'}
               />
             </View>
           </View>
@@ -502,7 +502,7 @@ const styles = StyleSheet.create({
   },
   checkboxSelected: {
     backgroundColor: '#E0F2FE',
-    borderColor: '#0EA5E9',
+    borderColor: '#3A78B5',
   },
   checkboxText: {
     fontSize: 14,
@@ -519,7 +519,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   saveButton: {
-    backgroundColor: '#0EA5E9',
+    backgroundColor: '#3A78B5',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,

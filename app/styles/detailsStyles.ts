@@ -309,7 +309,7 @@ export const detailsStyles = StyleSheet.create({
   progressPercentage: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#0EA5E9',
+    color: '#3A78B5',
   },
   progressBarContainer: {
     marginBottom: 16,
@@ -323,7 +323,7 @@ export const detailsStyles = StyleSheet.create({
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#0EA5E9',
+    backgroundColor: '#3A78B5',
     borderRadius: 4,
   },
 
@@ -342,7 +342,7 @@ export const detailsStyles = StyleSheet.create({
     borderColor: '#BAE6FD',
   },
   addCharacteristicsButtonText: {
-    color: '#0EA5E9',
+    color: '#3A78B5',
     fontSize: 14,
     fontWeight: '500',
     marginRight: 6,
@@ -361,7 +361,7 @@ export const detailsStyles = StyleSheet.create({
   viewDetailsButtonText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#0EA5E9',
+    color: '#3A78B5',
     marginRight: 8,
   },
 

@@ -73,7 +73,7 @@ const ActivitiesScreen: React.FC = () => {
         </View>
 
         <TouchableOpacity onPress={onRefresh} style={styles.refreshButton}>
-          <Ionicons name="refresh" size={20} color="#2E72F0" />
+          <Ionicons name="refresh" size={20} color="#3A78B5" />
         </TouchableOpacity>
       </View>
 
@@ -114,8 +114,8 @@ const ActivitiesScreen: React.FC = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#2E72F0']}
-            tintColor="#2E72F0"
+            colors={['#3A78B5']}
+            tintColor="#3A78B5"
           />
         }
       >
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   totalBadge: {
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   filterTabActive: {
-    borderBottomColor: '#2E72F0',
+    borderBottomColor: '#3A78B5',
   },
   filterTabText: {
     fontSize: 14,
@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   filterTabTextActive: {
-    color: '#2E72F0',
+    color: '#3A78B5',
     fontWeight: '600',
   },
   scrollView: {
@@ -385,7 +385,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   retryButton: {
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,

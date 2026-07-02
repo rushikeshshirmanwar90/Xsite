@@ -127,7 +127,7 @@ const MaterialActivityNotifications: React.FC<MaterialActivityNotificationsProps
     const getActivityColor = (activity: 'imported' | 'used' | 'transferred') => {
         if (activity === 'imported') return '#10B981';
         if (activity === 'used') return '#EF4444';
-        return '#2E72F0'; // For transferred
+        return '#3A78B5'; // For transferred
     };
 
     const formatDate = (dateString: string) => {
@@ -261,7 +261,7 @@ const MaterialActivityNotifications: React.FC<MaterialActivityNotificationsProps
                     <View style={styles.header}>
                         <View style={styles.headerLeft}>
                             <View style={styles.headerIconContainer}>
-                                <Ionicons name="notifications" size={24} color="#2E72F0" />
+                                <Ionicons name="notifications" size={24} color="#3A78B5" />
                             </View>
                             <View>
                                 <Text style={styles.title}>Material Activities</Text>
@@ -316,7 +316,7 @@ const MaterialActivityNotifications: React.FC<MaterialActivityNotificationsProps
                     {/* Activities List */}
                     {loading ? (
                         <View style={styles.loadingContainer}>
-                            <ActivityIndicator size="large" color="#2E72F0" />
+                            <ActivityIndicator size="large" color="#3A78B5" />
                             <Text style={styles.loadingText}>Loading activities...</Text>
                         </View>
                     ) : activities.length === 0 ? (
@@ -338,8 +338,8 @@ const MaterialActivityNotifications: React.FC<MaterialActivityNotificationsProps
                                 <RefreshControl
                                     refreshing={refreshing}
                                     onRefresh={onRefresh}
-                                    colors={['#2E72F0']}
-                                    tintColor="#2E72F0"
+                                    colors={['#3A78B5']}
+                                    tintColor="#3A78B5"
                                 />
                             }
                         />
@@ -418,7 +418,7 @@ const styles = StyleSheet.create({
     filterTabActive: {
         backgroundColor: '#EAF0FE',
         borderWidth: 1,
-        borderColor: '#2E72F0',
+        borderColor: '#3A78B5',
     },
     filterTabText: {
         fontSize: 14,
@@ -426,7 +426,7 @@ const styles = StyleSheet.create({
         color: '#64748B',
     },
     filterTabTextActive: {
-        color: '#2E72F0',
+        color: '#3A78B5',
     },
     loadingContainer: {
         flex: 1,
@@ -541,7 +541,7 @@ const styles = StyleSheet.create({
         width: 6,
         height: 6,
         borderRadius: 3,
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
     },
     materialName: {
         flex: 1,

@@ -7,7 +7,6 @@ import { Project as BaseProject, ProjectSection } from '@/types/project';
 import { StaffMembers } from '@/types/staff';
 import { Ionicons } from '@expo/vector-icons';
 import apiClient from '@/utils/axiosConfig';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useFocusEffect } from 'expo-router';
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
@@ -1104,12 +1103,7 @@ const ProjectScreen: React.FC = () => {
                         activeOpacity={0.8}
                         disabled={addingProject}
                     >
-                        <LinearGradient
-                            colors={addingProject ? ['#9CA3AF', '#6B7280'] : ['#2E72F0', '#8B5CF6']}
-                            style={styles.addButtonGradient}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                        >
+                        <View style={[styles.addButtonGradient, { backgroundColor: addingProject ? '#94A3B8' : '#3A78B5' }]}>
                             {addingProject ? (
                                 <Animated.View
                                     style={{
@@ -1129,7 +1123,7 @@ const ProjectScreen: React.FC = () => {
                             <Text style={styles.addButtonText}>
                                 {addingProject ? 'Adding Project...' : 'Add New Project'}
                             </Text>
-                        </LinearGradient>
+                        </View>
                     </TouchableOpacity>
                 )}
 
@@ -1147,8 +1141,8 @@ const ProjectScreen: React.FC = () => {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        colors={['#2E72F0']}
-                        tintColor="#2E72F0"
+                        colors={['#3A78B5']}
+                        tintColor="#3A78B5"
                         title="Pull to refresh"
                         titleColor="#64748b"
                     />
@@ -1157,7 +1151,7 @@ const ProjectScreen: React.FC = () => {
                 {loading ? (
                     <View style={styles.centered}>
                         <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                            <Ionicons name="sync" size={48} color="#2E72F0" />
+                            <Ionicons name="sync" size={48} color="#3A78B5" />
                         </View>
                         <Text style={styles.loadingText}>Loading projects...</Text>
                         <Text style={[styles.loadingText, { fontSize: 12, marginTop: 4, color: '#94A3B8' }]}>Please wait...</Text>
@@ -1444,7 +1438,7 @@ const styles = StyleSheet.create({
     addButton: {
         borderRadius: 12,
         overflow: 'hidden',
-        shadowColor: '#2E72F0',
+        shadowColor: '#3A78B5',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 8,
@@ -1668,7 +1662,7 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingVertical: 12,
         borderRadius: 8,
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
         alignItems: 'center',
         justifyContent: 'center',
     },

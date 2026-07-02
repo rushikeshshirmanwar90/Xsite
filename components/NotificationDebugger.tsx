@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 8,
     borderLeftWidth: 4,
-    borderLeftColor: '#2E72F0',
+    borderLeftColor: '#3A78B5',
   },
   infoTitle: {
     fontSize: 14,
@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   primaryButton: {
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
   },
   testButton: {
     backgroundColor: '#10B981',
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     borderLeftWidth: 4,
-    borderLeftColor: '#EE730C',
+    borderLeftColor: '#F59E0B',
   },
   tipText: {
     fontSize: 14,

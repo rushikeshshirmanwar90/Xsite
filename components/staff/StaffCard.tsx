@@ -1,7 +1,6 @@
 // components/StaffCard.tsx
 import { StaffCardProps } from '@/types/staff';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import {
     StyleSheet,
@@ -15,23 +14,6 @@ const StaffCard: React.FC<StaffCardProps> = ({ staff, onPress, onRemove, showRem
         return (firstName[0] + lastName[0]).toUpperCase();
     };
 
-    const getRandomColor = (id: string | undefined): readonly [string, string] => {
-        const colors: readonly [string, string][] = [
-            ['#2E72F0', '#1D4ED8'],
-            ['#10B981', '#059669'],
-            ['#EE730C', '#D97706'],
-            ['#EF4444', '#DC2626'],
-            ['#8B5CF6', '#7C3AED'],
-            ['#06B6D4', '#0891B2'],
-            ['#84CC16', '#65A30D'],
-            ['#F97316', '#EA580C']
-        ];
-        // Convert string ID to a number for color selection
-        const idNumber = id ? id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
-        return colors[idNumber % colors.length];
-    };
-
-    const avatarColors = getRandomColor(staff._id?.toString());
     const fullName = `${staff.firstName} ${staff.lastName}`;
 
     return (
@@ -42,16 +24,11 @@ const StaffCard: React.FC<StaffCardProps> = ({ staff, onPress, onRemove, showRem
         >
             <View style={styles.staffCardContent}>
                 <View style={styles.staffInfo}>
-                    <LinearGradient
-                        colors={avatarColors}
-                        style={styles.avatar}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                    >
+                    <View style={styles.avatar}>
                         <Text style={styles.avatarText}>
                             {getInitials(staff.firstName, staff.lastName)}
                         </Text>
-                    </LinearGradient>
+                    </View>
 
                     <View style={styles.staffDetails}>
                         <View style={styles.nameRow}>
@@ -189,6 +166,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
+        backgroundColor: '#3A78B5',
     },
     avatarText: {
         color: 'white',
@@ -235,7 +213,7 @@ const styles = StyleSheet.create({
     },
     verifyButtonText: {
         fontSize: 11,
-        color: '#EE730C',
+        color: '#F59E0B',
         fontWeight: '600',
     },
     staffRole: {

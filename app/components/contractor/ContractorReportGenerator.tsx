@@ -266,7 +266,7 @@ const ContractorReportGenerator: React.FC<ContractorReportGeneratorProps> = ({
         th { background:#374151; color:white; padding:10px 12px; text-align:left; font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:0.5px; }
         td { padding:10px; border:1px solid #e2e8f0; font-size:13px; }
         .no-data { text-align:center; padding:30px; color:#64748b; font-style:italic; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:16px; }
-        .section-title { font-size:15px; font-weight:700; color:#1e293b; margin:20px 0 10px 0; padding:10px 14px; background:#f1f5f9; border-left:4px solid #2E72F0; border-radius:4px; }
+        .section-title { font-size:15px; font-weight:700; color:#1e293b; margin:20px 0 10px 0; padding:10px 14px; background:#f1f5f9; border-left:4px solid #3A78B5; border-radius:4px; }
         .summary-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px; }
         .summary-card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; text-align:center; }
         .summary-card h3 { margin:0 0 6px 0; font-size:11px; color:#64748b; font-weight:600; text-transform:uppercase; }
@@ -287,7 +287,7 @@ const ContractorReportGenerator: React.FC<ContractorReportGeneratorProps> = ({
         const paymentHTML = buildPaymentRowsHTML(contractorData?.payments || []);
 
         return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Contractor Report - ${name}</title><style>${commonCSS}
-            .header { text-align:center; margin-bottom:24px; padding:20px; background:linear-gradient(135deg,#2E72F0,#2563eb); color:white; border-radius:12px; }
+            .header { text-align:center; margin-bottom:24px; padding:20px; background:linear-gradient(135deg,#3A78B5,#2563eb); color:white; border-radius:12px; }
             .header h1 { margin:0 0 6px 0; font-size:22px; font-weight:700; }
             .header p { margin:3px 0; font-size:13px; opacity:0.9; }
             .status-badge { display:inline-block; padding:3px 8px; border-radius:4px; font-size:10px; font-weight:600; text-transform:uppercase; ${contractStatus === 'completed' ? 'background:#dcfce7;color:#166534;' : 'background:#fef3c7;color:#92400e;'} }
@@ -365,7 +365,7 @@ const ContractorReportGenerator: React.FC<ContractorReportGeneratorProps> = ({
 
             return `
             <div style="margin-bottom:40px; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden;">
-                <div style="background:linear-gradient(135deg,#1e40af,#2E72F0); padding:16px 20px; color:white;">
+                <div style="background:linear-gradient(135deg,#1e40af,#3A78B5); padding:16px 20px; color:white;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <div>
                             <div style="font-size:18px; font-weight:700;">${name}</div>
@@ -513,7 +513,7 @@ const ContractorReportGenerator: React.FC<ContractorReportGeneratorProps> = ({
                     <View style={styles.header}>
                         <View style={styles.headerLeft}>
                             <View style={styles.headerIcon}>
-                                <Ionicons name="document-text" size={24} color={isProjectMode ? '#2E72F0' : '#10B981'} />
+                                <Ionicons name="document-text" size={24} color={isProjectMode ? '#3A78B5' : '#10B981'} />
                             </View>
                             <View>
                                 <Text style={styles.headerTitle}>
@@ -574,9 +574,9 @@ const ContractorReportGenerator: React.FC<ContractorReportGeneratorProps> = ({
                                             <Ionicons
                                                 name={isAllSelected ? "checkbox" : "square-outline"}
                                                 size={18}
-                                                color="#2E72F0"
+                                                color="#3A78B5"
                                             />
-                                            <Text style={{ fontSize: 13, fontWeight: '700', color: '#2E72F0' }}>
+                                            <Text style={{ fontSize: 13, fontWeight: '700', color: '#3A78B5' }}>
                                                 Select All
                                             </Text>
                                         </TouchableOpacity>
@@ -594,7 +594,7 @@ const ContractorReportGenerator: React.FC<ContractorReportGeneratorProps> = ({
                                                 <Ionicons
                                                     name={isSelected ? "checkbox" : "square-outline"}
                                                     size={22}
-                                                    color={isSelected ? "#2E72F0" : "#94A3B8"}
+                                                    color={isSelected ? "#3A78B5" : "#94A3B8"}
                                                     style={{ marginRight: 10 }}
                                                 />
                                                 <View style={styles.previewContent}>
@@ -646,7 +646,7 @@ const ContractorReportGenerator: React.FC<ContractorReportGeneratorProps> = ({
                                 <View style={styles.previewCard}>
                                     <Text style={styles.previewTitle}>Report Contents</Text>
                                     <View style={styles.previewItem}>
-                                        <Ionicons name="construct-outline" size={20} color="#2E72F0" />
+                                        <Ionicons name="construct-outline" size={20} color="#3A78B5" />
                                         <View style={styles.previewContent}>
                                             <Text style={styles.previewItemTitle}>Work Logs (Day-wise)</Text>
                                             <Text style={styles.previewItemDesc}>
@@ -664,7 +664,7 @@ const ContractorReportGenerator: React.FC<ContractorReportGeneratorProps> = ({
                                         </View>
                                     </View>
                                     <View style={styles.previewItem}>
-                                        <Ionicons name="analytics-outline" size={20} color="#8B5CF6" />
+                                        <Ionicons name="analytics-outline" size={20} color="#3A78B5" />
                                         <View style={styles.previewContent}>
                                             <Text style={styles.previewItemTitle}>Financial Summary</Text>
                                             <Text style={styles.previewItemDesc}>Budget utilization and outstanding amounts</Text>
@@ -676,7 +676,7 @@ const ContractorReportGenerator: React.FC<ContractorReportGeneratorProps> = ({
 
                         {loadingData && (
                             <View style={styles.loadingCard}>
-                                <ActivityIndicator size="small" color="#2E72F0" />
+                                <ActivityIndicator size="small" color="#3A78B5" />
                                 <Text style={styles.loadingText}>Loading data...</Text>
                             </View>
                         )}

@@ -5,7 +5,6 @@ import { addPassword, confirmMail, findUserType, forgetPassword, getUser, login,
 import { generateOTP } from '@/lib/functions';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
@@ -497,22 +496,17 @@ export default function LoginScreen() {
                             }}
                         />
                         <TouchableOpacity
-                            style={styles.button}
+                            style={[styles.button, loading && { opacity: 0.7 }]}
                             onPress={handleGenerateOTP}
                             disabled={loading}
                         >
-                            <LinearGradient
-                                colors={['#2E72F0', '#1A54C4']}
-                                style={styles.buttonGradient}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                            >
+                            <View style={styles.buttonInner}>
                                 {loading ? (
                                     <ActivityIndicator color="white" />
                                 ) : (
                                     <Text style={styles.buttonText}>Next</Text>
                                 )}
-                            </LinearGradient>
+                            </View>
                         </TouchableOpacity>
                     </>
                 );
@@ -539,22 +533,17 @@ export default function LoginScreen() {
                             }}
                         />
                         <TouchableOpacity
-                            style={styles.button}
+                            style={[styles.button, loading && { opacity: 0.7 }]}
                             onPress={handleVerifyOTP}
                             disabled={loading}
                         >
-                            <LinearGradient
-                                colors={['#2E72F0', '#1A54C4']}
-                                style={styles.buttonGradient}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                            >
+                            <View style={styles.buttonInner}>
                                 {loading ? (
                                     <ActivityIndicator color="white" />
                                 ) : (
                                     <Text style={styles.buttonText}>Verify OTP</Text>
                                 )}
-                            </LinearGradient>
+                            </View>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={styles.secondaryButton}
@@ -626,22 +615,17 @@ export default function LoginScreen() {
                         )}
 
                         <TouchableOpacity
-                            style={styles.button}
+                            style={[styles.button, loading && { opacity: 0.7 }]}
                             onPress={!isVerified ? handleSetPassword : handleLogin}
                             disabled={loading}
                         >
-                            <LinearGradient
-                                colors={['#2E72F0', '#1A54C4']}
-                                style={styles.buttonGradient}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                            >
+                            <View style={styles.buttonInner}>
                                 {loading ? (
                                     <ActivityIndicator color="white" />
                                 ) : (
                                     <Text style={styles.buttonText}>{isVerified ? 'Login' : 'Set Password'}</Text>
                                 )}
-                            </LinearGradient>
+                            </View>
                         </TouchableOpacity>
                     </>
                 );
@@ -688,7 +672,7 @@ export default function LoginScreen() {
             {isNavigating && (
                 <View style={styles.navigatingOverlay}>
                     <View style={styles.navigatingContainer}>
-                        <ActivityIndicator size="large" color="#2E72F0" />
+                        <ActivityIndicator size="large" color="#3A78B5" />
                         <Text style={styles.navigatingText}>Redirecting...</Text>
                     </View>
                 </View>
@@ -700,7 +684,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#ffffff',
+        backgroundColor: '#F8FAFC',
     },
     keyboardAvoidingView: {
         flex: 1,
@@ -755,7 +739,7 @@ const styles = StyleSheet.create({
     welcomeText: {
         fontSize: 26,
         fontWeight: 'bold',
-        color: '#1A54C4',
+        color: '#295E94',
         marginBottom: 16,
         textAlign: 'center',
     },
@@ -799,31 +783,34 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         overflow: 'hidden',
         marginTop: 8,
-        shadowColor: '#1A54C4',
+        shadowColor: '#295E94',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
+        shadowOpacity: 0.15,
         shadowRadius: 8,
         elevation: 4,
     },
-    buttonGradient: {
+    buttonInner: {
+        backgroundColor: '#3A78B5',
         paddingVertical: 16,
         alignItems: 'center',
+        borderRadius: 12,
     },
     buttonText: {
         color: 'white',
         fontSize: 16,
-        fontWeight: 'bold',
+        fontWeight: '700',
+        letterSpacing: 0.2,
     },
     secondaryButton: {
         backgroundColor: 'transparent',
         borderWidth: 1,
-        borderColor: '#2E72F0',
+        borderColor: '#3A78B5',
         borderRadius: 12,
         paddingVertical: 15,
         marginTop: 16,
     },
     secondaryButtonText: {
-        color: '#2E72F0',
+        color: '#3A78B5',
         textAlign: 'center',
         fontWeight: 'bold',
     },
@@ -836,7 +823,7 @@ const styles = StyleSheet.create({
         color: '#666',
     },
     signupLink: {
-        color: '#1A54C4',
+        color: '#295E94',
         fontWeight: 'bold',
     },
     emailDisplayContainer: {
@@ -859,7 +846,7 @@ const styles = StyleSheet.create({
     changeEmailButton: {
         paddingHorizontal: 12,
         paddingVertical: 4,
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
         borderRadius: 6,
     },
     changeEmailText: {
@@ -873,7 +860,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     forgetPasswordText: {
-        color: '#2E72F0',
+        color: '#3A78B5',
         fontSize: 14,
         fontWeight: '600',
     },
@@ -903,7 +890,7 @@ const styles = StyleSheet.create({
         marginTop: 16,
         fontSize: 16,
         fontWeight: '600',
-        color: '#2E72F0',
+        color: '#3A78B5',
     },
     registerContainer: {
         flexDirection: 'row',
@@ -922,7 +909,7 @@ const styles = StyleSheet.create({
     },
     registerLink: {
         fontSize: 14,
-        color: '#1A54C4',
+        color: '#295E94',
         fontWeight: '700',
         textDecorationLine: 'underline',
     },

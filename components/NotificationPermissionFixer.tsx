@@ -188,7 +188,7 @@ export default function NotificationPermissionFixer() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Ionicons name="settings-outline" size={24} color="#2E72F0" />
+        <Ionicons name="settings-outline" size={24} color="#3A78B5" />
         <Text style={styles.title}>Notification Permission Fixer</Text>
       </View>
 
@@ -301,13 +301,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   primaryButton: {
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
   },
   successButton: {
     backgroundColor: '#10B981',
   },
   warningButton: {
-    backgroundColor: '#EE730C',
+    backgroundColor: '#F59E0B',
   },
   dangerButton: {
     backgroundColor: '#EF4444',

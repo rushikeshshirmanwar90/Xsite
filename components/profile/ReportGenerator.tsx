@@ -594,7 +594,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
         switch (filter) {
             case 'imported': return '#10B981';
             case 'used': return '#EF4444';
-            default: return '#2E72F0';
+            default: return '#3A78B5';
         }
     };
 
@@ -656,7 +656,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                     <View style={styles.header}>
                         <View style={styles.headerLeft}>
                             <View style={styles.iconContainer}>
-                                <Ionicons name="document-text" size={24} color="#2E72F0" />
+                                <Ionicons name="document-text" size={24} color="#3A78B5" />
                             </View>
                             <View>
                                 <Text style={styles.title}>Generate Report</Text>
@@ -682,7 +682,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                                     onPress={() => setShowStartDatePicker(true)}
                                 >
                                     <View style={styles.dateButtonContent}>
-                                        <Ionicons name="calendar-outline" size={20} color="#2E72F0" />
+                                        <Ionicons name="calendar-outline" size={20} color="#3A78B5" />
                                         <View style={styles.dateButtonText}>
                                             <Text style={styles.dateLabel}>From</Text>
                                             <Text style={styles.dateValue}>{formatDate(startDate)}</Text>
@@ -699,7 +699,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                                     onPress={() => setShowEndDatePicker(true)}
                                 >
                                     <View style={styles.dateButtonContent}>
-                                        <Ionicons name="calendar-outline" size={20} color="#2E72F0" />
+                                        <Ionicons name="calendar-outline" size={20} color="#3A78B5" />
                                         <View style={styles.dateButtonText}>
                                             <Text style={styles.dateLabel}>To</Text>
                                             <Text style={styles.dateValue}>{formatDate(endDate)}</Text>
@@ -794,7 +794,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                                             </View>
                                         </View>
                                         {activityFilter === filter.key && (
-                                            <Ionicons name="checkmark-circle" size={22} color="#2E72F0" />
+                                            <Ionicons name="checkmark-circle" size={22} color="#3A78B5" />
                                         )}
                                     </TouchableOpacity>
                                 ))}
@@ -825,12 +825,12 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                                         <View style={styles.filterButtonLeft}>
                                             <View style={[
                                                 styles.filterButtonIcon,
-                                                { backgroundColor: reportMode === mode.key ? '#2E72F020' : '#F1F5F9' }
+                                                { backgroundColor: reportMode === mode.key ? '#3A78B520' : '#F1F5F9' }
                                             ]}>
                                                 <Ionicons
                                                     name={mode.icon as any}
                                                     size={20}
-                                                    color={reportMode === mode.key ? '#2E72F0' : '#94A3B8'}
+                                                    color={reportMode === mode.key ? '#3A78B5' : '#94A3B8'}
                                                 />
                                             </View>
                                             <View style={styles.filterButtonText}>
@@ -846,7 +846,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                                             </View>
                                         </View>
                                         {reportMode === mode.key && (
-                                            <Ionicons name="checkmark-circle" size={22} color="#2E72F0" />
+                                            <Ionicons name="checkmark-circle" size={22} color="#3A78B5" />
                                         )}
                                     </TouchableOpacity>
                                 ))}
@@ -859,7 +859,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                                 activeOpacity={0.7}
                             >
                                 <View style={styles.advancedToggleLeft}>
-                                    <Ionicons name="options-outline" size={18} color="#2E72F0" />
+                                    <Ionicons name="options-outline" size={18} color="#3A78B5" />
                                     <Text style={styles.advancedToggleText}>Advanced</Text>
                                     <Text style={styles.advancedToggleCount}>
                                         {`${[includedReports.material, includedReports.contractor, includedReports.equipment, includedReports.other].filter(Boolean).length}/4 selected`}
@@ -879,9 +879,9 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                                     </Text>
                                     {[
                                         { key: 'material' as const, label: 'Material Report', description: 'Materials with quantities, costs & who imported them', icon: 'cube', color: '#10B981' },
-                                        { key: 'contractor' as const, label: 'Contractor Report', description: 'Labor / contractor costs', icon: 'people', color: '#EE730C' },
-                                        { key: 'equipment' as const, label: 'Equipment Report', description: 'Equipment usage & costs', icon: 'construct', color: '#2E72F0' },
-                                        { key: 'other' as const, label: 'Other Report', description: 'Miscellaneous / other costs', icon: 'cash', color: '#8B5CF6' }
+                                        { key: 'contractor' as const, label: 'Contractor Report', description: 'Labor / contractor costs', icon: 'people', color: '#F59E0B' },
+                                        { key: 'equipment' as const, label: 'Equipment Report', description: 'Equipment usage & costs', icon: 'construct', color: '#3A78B5' },
+                                        { key: 'other' as const, label: 'Other Report', description: 'Miscellaneous / other costs', icon: 'cash', color: '#3A78B5' }
                                     ].map((type) => {
                                         const checked = includedReports[type.key];
                                         return (
@@ -922,7 +922,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                             
                             {loadingProjects ? (
                                 <View style={styles.loadingContainer}>
-                                    <ActivityIndicator size="small" color="#2E72F0" />
+                                    <ActivityIndicator size="small" color="#3A78B5" />
                                     <Text style={styles.loadingText}>Loading projects...</Text>
                                 </View>
                             ) : (
@@ -963,7 +963,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                                                 </View>
                                             </View>
                                             {selectedProjectId === project._id && (
-                                                <Ionicons name="checkmark-circle" size={22} color="#2E72F0" />
+                                                <Ionicons name="checkmark-circle" size={22} color="#3A78B5" />
                                             )}
                                         </TouchableOpacity>
                                     ))}
@@ -998,7 +998,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                                         <Ionicons 
                                             name={selectedSections.length === projectSections.length ? "checkbox" : "square-outline"} 
                                             size={20} 
-                                            color="#2E72F0" 
+                                            color="#3A78B5" 
                                         />
                                         <Text style={styles.selectAllText}>
                                             {selectedSections.length === projectSections.length ? 'Deselect All' : 'Select All'}
@@ -1007,14 +1007,14 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                                 </View>
 
                                 <View style={styles.sectionFilterNote}>
-                                    <Ionicons name="information-circle" size={16} color="#8B5CF6" />
+                                    <Ionicons name="information-circle" size={16} color="#3A78B5" />
                                     <Text style={styles.sectionFilterNoteText}>
                                         Material imports are project-wide. Only material usage will be filtered by sections.
                                     </Text>
                                 </View>
 
                                 <View style={styles.sectionSelectionInfo}>
-                                    <Ionicons name="layers" size={16} color="#2E72F0" />
+                                    <Ionicons name="layers" size={16} color="#3A78B5" />
                                     <Text style={styles.sectionSelectionInfoText}>
                                         {getSectionSelectionText()}
                                     </Text>
@@ -1033,12 +1033,12 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                                             <View style={styles.sectionButtonLeft}>
                                                 <View style={[
                                                     styles.sectionButtonIcon,
-                                                    { backgroundColor: '#8B5CF620' }
+                                                    { backgroundColor: '#3A78B520' }
                                                 ]}>
                                                     <Ionicons
                                                         name="layers"
                                                         size={18}
-                                                        color="#8B5CF6"
+                                                        color="#3A78B5"
                                                     />
                                                 </View>
                                                 <View style={styles.sectionButtonText}>
@@ -1056,7 +1056,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                                                 </View>
                                             </View>
                                             {selectedSections.includes(section.sectionId || section._id) ? (
-                                                <Ionicons name="checkmark-circle" size={22} color="#8B5CF6" />
+                                                <Ionicons name="checkmark-circle" size={22} color="#3A78B5" />
                                             ) : (
                                                 <Ionicons name="ellipse-outline" size={22} color="#CBD5E1" />
                                             )}
@@ -1071,7 +1071,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                             <Text style={styles.sectionTitle}>Report Preview</Text>
                             <View style={styles.previewCard}>
                                 <View style={styles.previewHeader}>
-                                    <Ionicons name="document-text-outline" size={24} color="#2E72F0" />
+                                    <Ionicons name="document-text-outline" size={24} color="#3A78B5" />
                                     <Text style={styles.previewTitle}>
                                         {reportMode === 'summary' ? 'Summary Report' : 'Detailed Report'}
                                     </Text>
@@ -1312,7 +1312,7 @@ const styles = StyleSheet.create({
     },
     presetButtonText: {
         fontSize: 12,
-        color: '#2E72F0',
+        color: '#3A78B5',
         fontWeight: '600',
     },
     filterButtons: {
@@ -1330,7 +1330,7 @@ const styles = StyleSheet.create({
     },
     filterButtonActive: {
         backgroundColor: '#EAF0FE',
-        borderColor: '#2E72F0',
+        borderColor: '#3A78B5',
     },
     filterButtonLeft: {
         flexDirection: 'row',
@@ -1354,7 +1354,7 @@ const styles = StyleSheet.create({
         color: '#1E293B',
     },
     filterButtonLabelActive: {
-        color: '#2E72F0',
+        color: '#3A78B5',
     },
     filterButtonDescription: {
         fontSize: 12,
@@ -1376,7 +1376,7 @@ const styles = StyleSheet.create({
         padding: 14,
     },
     modeButtonActive: {
-        borderColor: '#2E72F0',
+        borderColor: '#3A78B5',
         backgroundColor: '#EAF0FE',
     },
     // Advanced toggle
@@ -1450,8 +1450,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
     },
     checkboxChecked: {
-        backgroundColor: '#2E72F0',
-        borderColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
+        borderColor: '#3A78B5',
     },
     previewCard: {
         backgroundColor: '#F8FAFC',
@@ -1516,7 +1516,7 @@ const styles = StyleSheet.create({
         flex: 2,
         paddingVertical: 14,
         borderRadius: 12,
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'row',
@@ -1560,7 +1560,7 @@ const styles = StyleSheet.create({
     },
     projectButtonActive: {
         backgroundColor: '#EAF0FE',
-        borderColor: '#2E72F0',
+        borderColor: '#3A78B5',
     },
     projectButtonLeft: {
         flexDirection: 'row',
@@ -1584,7 +1584,7 @@ const styles = StyleSheet.create({
         color: '#1E293B',
     },
     projectButtonLabelActive: {
-        color: '#2E72F0',
+        color: '#3A78B5',
     },
     projectButtonDescription: {
         fontSize: 12,
@@ -1631,7 +1631,7 @@ const styles = StyleSheet.create({
     selectAllText: {
         fontSize: 13,
         fontWeight: '600',
-        color: '#2E72F0',
+        color: '#3A78B5',
     },
     sectionFilterNote: {
         flexDirection: 'row',
@@ -1663,7 +1663,7 @@ const styles = StyleSheet.create({
     },
     sectionSelectionInfoText: {
         fontSize: 13,
-        color: '#2E72F0',
+        color: '#3A78B5',
         fontWeight: '500',
     },
     sectionButtons: {
@@ -1681,7 +1681,7 @@ const styles = StyleSheet.create({
     },
     sectionButtonActive: {
         backgroundColor: '#F5F3FF',
-        borderColor: '#8B5CF6',
+        borderColor: '#3A78B5',
     },
     sectionButtonLeft: {
         flexDirection: 'row',
@@ -1705,7 +1705,7 @@ const styles = StyleSheet.create({
         color: '#1E293B',
     },
     sectionButtonLabelActive: {
-        color: '#8B5CF6',
+        color: '#3A78B5',
     },
     sectionButtonDescription: {
         fontSize: 11,

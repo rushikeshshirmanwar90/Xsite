@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2E72F0',
   },
   laborButton: {
-    backgroundColor: '#EE730C',
+    backgroundColor: '#F59E0B',
   },
   selectorButtonText: {
     color: 'white',

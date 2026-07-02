@@ -150,9 +150,9 @@ const LaborPageModal: React.FC<LaborPageModalProps> = ({
         switch (category) {
             case 'skilled': return '#10B981';
             case 'unskilled': return '#6B7280';
-            case 'semi-skilled': return '#EE730C';
-            case 'supervisor': return '#2E72F0';
-            case 'contractor': return '#8B5CF6';
+            case 'semi-skilled': return '#F59E0B';
+            case 'supervisor': return '#3A78B5';
+            case 'contractor': return '#3A78B5';
             default: return '#6B7280';
         }
     };
@@ -204,7 +204,7 @@ const LaborPageModal: React.FC<LaborPageModalProps> = ({
 
                     {loading ? (
                         <View style={styles.loadingContainer}>
-                            <ActivityIndicator size="large" color="#EE730C" />
+                            <ActivityIndicator size="large" color="#F59E0B" />
                             <Text style={styles.loadingText}>Loading labor entries...</Text>
                         </View>
                     ) : (
@@ -215,7 +215,7 @@ const LaborPageModal: React.FC<LaborPageModalProps> = ({
                                 <RefreshControl
                                     refreshing={refreshing}
                                     onRefresh={handleRefresh}
-                                    colors={['#EE730C']}
+                                    colors={['#F59E0B']}
                                 />
                             }
                         >
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     statValue: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#EE730C',
+        color: '#F59E0B',
         marginBottom: 4,
     },
     statLabel: {
@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
         color: '#1F2937',
     },
     totalCost: {
-        color: '#EE730C',
+        color: '#F59E0B',
     },
     messageContainer: {
         backgroundColor: '#EAF0FE',

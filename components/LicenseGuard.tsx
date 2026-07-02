@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLicenseCheck } from '@/hooks/useLicenseCheck';
 import { useAuth } from '@/contexts/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -32,7 +31,7 @@ export const LicenseGuard: React.FC<LicenseGuardProps> = ({ children }) => {
     if (loading) {
         return (
             <View style={styles.container}>
-                <ActivityIndicator size="large" color="#2E72F0" />
+                <ActivityIndicator size="large" color="#3A78B5" />
                 <Text style={styles.loadingText}>Verifying license...</Text>
             </View>
         );
@@ -42,7 +41,7 @@ export const LicenseGuard: React.FC<LicenseGuardProps> = ({ children }) => {
     if (error) {
         return (
             <View style={styles.container}>
-                <Ionicons name="alert-circle" size={64} color="#EE730C" />
+                <Ionicons name="alert-circle" size={64} color="#F59E0B" />
                 <Text style={styles.errorTitle}>Unable to Verify License</Text>
                 <Text style={styles.errorMessage}>{error}</Text>
                 <View style={styles.errorButtonsContainer}>
@@ -67,10 +66,7 @@ export const LicenseGuard: React.FC<LicenseGuardProps> = ({ children }) => {
     // Block access if license expired
     if (!hasAccess) {
         return (
-            <LinearGradient
-                colors={['#FEF2F2', '#FFFFFF']}
-                style={styles.blockedContainer}
-            >
+            <View style={styles.blockedContainer}>
                 <View style={styles.blockedContent}>
                     {/* Icon */}
                     <View style={styles.iconContainer}>
@@ -123,7 +119,7 @@ export const LicenseGuard: React.FC<LicenseGuardProps> = ({ children }) => {
                                         Linking.openURL('tel:9579896842');
                                     }}
                                 >
-                                    <Ionicons name="call" size={20} color="#2E72F0" />
+                                    <Ionicons name="call" size={20} color="#3A78B5" />
                                     <Text style={styles.callButtonText}>Call Support</Text>
                                 </TouchableOpacity>
                             </>
@@ -131,7 +127,7 @@ export const LicenseGuard: React.FC<LicenseGuardProps> = ({ children }) => {
 
                         {isStaff && (
                             <View style={styles.staffNotice}>
-                                <Ionicons name="information-circle" size={24} color="#2E72F0" />
+                                <Ionicons name="information-circle" size={24} color="#3A78B5" />
                                 <Text style={styles.staffNoticeText}>
                                     Please contact your admin to resolve this issue.
                                 </Text>
@@ -158,7 +154,7 @@ export const LicenseGuard: React.FC<LicenseGuardProps> = ({ children }) => {
                         <Text style={styles.refreshButtonText}>Check Again</Text>
                     </TouchableOpacity>
                 </View>
-            </LinearGradient>
+            </View>
         );
     }
 
@@ -201,7 +197,7 @@ const styles = StyleSheet.create({
     retryButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
         paddingHorizontal: 24,
         paddingVertical: 12,
         borderRadius: 12,
@@ -233,6 +229,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         padding: 20,
+        backgroundColor: '#FEF2F2',
     },
     blockedContent: {
         width: '100%',
@@ -318,12 +315,12 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         gap: 8,
         borderWidth: 2,
-        borderColor: '#2E72F0',
+        borderColor: '#3A78B5',
     },
     callButtonText: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#2E72F0',
+        color: '#3A78B5',
     },
     logoutButton: {
         flexDirection: 'row',

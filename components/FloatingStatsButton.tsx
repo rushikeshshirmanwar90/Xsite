@@ -100,7 +100,7 @@ const FloatingStatsButton: React.FC<FloatingStatsButtonProps> = ({ stats }) => {
                 <Svg width={LINE_W} height={LINE_H}>
                     <Path
                         d={CONNECTOR_PATH}
-                        stroke="#2E72F0"
+                        stroke="#3A78B5"
                         strokeWidth={2}
                         fill="none"
                         strokeLinecap="round"
@@ -111,7 +111,7 @@ const FloatingStatsButton: React.FC<FloatingStatsButtonProps> = ({ stats }) => {
                         cy={NODE_Y}
                         r={5}
                         fill="#FFFFFF"
-                        stroke="#2E72F0"
+                        stroke="#3A78B5"
                         strokeWidth={3}
                     />
                 </Svg>
@@ -200,10 +200,10 @@ const styles = StyleSheet.create({
         width: 56,
         height: 56,
         borderRadius: 28,
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#2E72F0',
+        shadowColor: '#3A78B5',
         shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.35,
         shadowRadius: 12,

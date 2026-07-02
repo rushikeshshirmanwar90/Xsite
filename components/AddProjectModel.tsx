@@ -1,7 +1,6 @@
 import { Project } from '@/types/project';
 import { AddProjectModalProps, StaffMembers } from '@/types/staff';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef, useState } from 'react';
 
 import {
@@ -179,7 +178,7 @@ const dpStyles = StyleSheet.create({
         borderRadius: 10,
     },
     dayCellSelected: {
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
     },
     dayCellToday: {
         backgroundColor: '#EAF0FE',
@@ -196,7 +195,7 @@ const dpStyles = StyleSheet.create({
         fontWeight: '700',
     },
     dayTextToday: {
-        color: '#2E72F0',
+        color: '#3A78B5',
         fontWeight: '700',
     },
 });
@@ -601,7 +600,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                                                 {buildingType === 'single' && <View style={styles.radioInner} />}
                                             </View>
                                             <View style={styles.radioIconChip}>
-                                                <Ionicons name="business-outline" size={18} color="#2E72F0" />
+                                                <Ionicons name="business-outline" size={18} color="#3A78B5" />
                                             </View>
                                             <View style={styles.radioTextBlock}>
                                                 <Text style={styles.radioTitle}>Single Building</Text>
@@ -618,7 +617,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                                                 {buildingType === 'multiple' && <View style={styles.radioInner} />}
                                             </View>
                                             <View style={styles.radioIconChip}>
-                                                <Ionicons name="layers-outline" size={18} color="#2E72F0" />
+                                                <Ionicons name="layers-outline" size={18} color="#3A78B5" />
                                             </View>
                                             <View style={styles.radioTextBlock}>
                                                 <Text style={styles.radioTitle}>Multiple Buildings</Text>
@@ -643,7 +642,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                                                             disabled={slabsCount <= 1}
                                                             activeOpacity={0.7}
                                                         >
-                                                            <Ionicons name="remove" size={16} color={slabsCount <= 1 ? "#94A3B8" : "#2E72F0"} />
+                                                            <Ionicons name="remove" size={16} color={slabsCount <= 1 ? "#94A3B8" : "#3A78B5"} />
                                                         </TouchableOpacity>
                                                         <Text style={styles.counterValue}>{slabsCount}</Text>
                                                         <TouchableOpacity
@@ -652,7 +651,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                                                             disabled={slabsCount >= 15}
                                                             activeOpacity={0.7}
                                                         >
-                                                            <Ionicons name="add" size={16} color={slabsCount >= 15 ? "#94A3B8" : "#2E72F0"} />
+                                                            <Ionicons name="add" size={16} color={slabsCount >= 15 ? "#94A3B8" : "#3A78B5"} />
                                                         </TouchableOpacity>
                                                     </View>
                                                 </View>
@@ -712,7 +711,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                                                                     disabled={item.slabsCount <= 1}
                                                                     activeOpacity={0.7}
                                                                 >
-                                                                    <Ionicons name="remove" size={16} color={item.slabsCount <= 1 ? "#94A3B8" : "#2E72F0"} />
+                                                                    <Ionicons name="remove" size={16} color={item.slabsCount <= 1 ? "#94A3B8" : "#3A78B5"} />
                                                                 </TouchableOpacity>
                                                                 <Text style={styles.counterValue}>{item.slabsCount}</Text>
                                                                 <TouchableOpacity
@@ -721,7 +720,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                                                                     disabled={item.slabsCount >= 15}
                                                                     activeOpacity={0.7}
                                                                 >
-                                                                    <Ionicons name="add" size={16} color={item.slabsCount >= 15 ? "#94A3B8" : "#2E72F0"} />
+                                                                    <Ionicons name="add" size={16} color={item.slabsCount >= 15 ? "#94A3B8" : "#3A78B5"} />
                                                                 </TouchableOpacity>
                                                             </View>
                                                         </View>
@@ -747,7 +746,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                                                     onPress={addBuildingConfig}
                                                     activeOpacity={0.8}
                                                 >
-                                                    <Ionicons name="add-circle-outline" size={18} color="#2E72F0" />
+                                                    <Ionicons name="add-circle-outline" size={18} color="#3A78B5" />
                                                     <Text style={styles.addBuildingBtnText}>Add Another Building</Text>
                                                 </TouchableOpacity>
                                             </View>
@@ -795,7 +794,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                                                         <View style={styles.staffTextBlock}>
                                                             <Text style={styles.staffName} numberOfLines={1}>{staff.fullName}</Text>
                                                             <View style={styles.staffStatusRow}>
-                                                                <View style={[styles.staffStatusDot, { backgroundColor: selected ? '#2E72F0' : '#10B981' }]} />
+                                                                <View style={[styles.staffStatusDot, { backgroundColor: selected ? '#3A78B5' : '#10B981' }]} />
                                                                 <Text style={styles.staffStatusText}>{selected ? 'Assigned' : 'Available'}</Text>
                                                             </View>
                                                         </View>
@@ -845,16 +844,9 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                                     <TouchableOpacity style={styles.secondaryButton} onPress={onClose} activeOpacity={0.7}>
                                         <Text style={styles.secondaryButtonText}>Cancel</Text>
                                     </TouchableOpacity>
-                                    <TouchableOpacity style={styles.primaryButtonWrap} onPress={goNext} activeOpacity={0.85}>
-                                        <LinearGradient
-                                            colors={['#2E72F0', '#8B5CF6']}
-                                            style={styles.primaryButtonGradient}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 0 }}
-                                        >
-                                            <Text style={styles.primaryButtonText}>Next</Text>
-                                            <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />
-                                        </LinearGradient>
+                                    <TouchableOpacity style={[styles.primaryButtonWrap, styles.primaryButtonSolid]} onPress={goNext} activeOpacity={0.85}>
+                                        <Text style={styles.primaryButtonText}>Next</Text>
+                                        <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />
                                     </TouchableOpacity>
                                 </>
                             ) : currentStep === 2 ? (
@@ -863,16 +855,9 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                                         <Ionicons name="arrow-back" size={16} color="#374151" />
                                         <Text style={styles.secondaryButtonText}>Back</Text>
                                     </TouchableOpacity>
-                                    <TouchableOpacity style={styles.primaryButtonWrap} onPress={goNext} activeOpacity={0.85}>
-                                        <LinearGradient
-                                            colors={['#2E72F0', '#8B5CF6']}
-                                            style={styles.primaryButtonGradient}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 0 }}
-                                        >
-                                            <Text style={styles.primaryButtonText}>Next</Text>
-                                            <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />
-                                        </LinearGradient>
+                                    <TouchableOpacity style={[styles.primaryButtonWrap, styles.primaryButtonSolid]} onPress={goNext} activeOpacity={0.85}>
+                                        <Text style={styles.primaryButtonText}>Next</Text>
+                                        <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />
                                     </TouchableOpacity>
                                 </>
                             ) : (
@@ -882,37 +867,30 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                                         <Text style={styles.secondaryButtonText}>Back</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity
-                                        style={[styles.primaryButtonWrap, { flex: 1.6 }]}
+                                        style={[styles.primaryButtonWrap, styles.primaryButtonSolid, { flex: 1.6, opacity: isSubmitting ? 0.7 : 1 }]}
                                         onPress={handleSubmit}
                                         activeOpacity={0.85}
                                         disabled={isSubmitting}
                                     >
-                                        <LinearGradient
-                                            colors={isSubmitting ? ['#9CA3AF', '#6B7280'] : ['#2E72F0', '#8B5CF6']}
-                                            style={styles.primaryButtonGradient}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 0 }}
-                                        >
-                                            {isSubmitting ? (
-                                                <Animated.View
-                                                    style={{
-                                                        transform: [{
-                                                            rotate: submitLoadingAnimation.interpolate({
-                                                                inputRange: [0, 1],
-                                                                outputRange: ['0deg', '360deg'],
-                                                            }),
-                                                        }],
-                                                    }}
-                                                >
-                                                    <Ionicons name="sync" size={18} color="white" />
-                                                </Animated.View>
-                                            ) : (
-                                                <>
-                                                    <Text style={styles.primaryButtonText}>Create Project</Text>
-                                                    <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />
-                                                </>
-                                            )}
-                                        </LinearGradient>
+                                        {isSubmitting ? (
+                                            <Animated.View
+                                                style={{
+                                                    transform: [{
+                                                        rotate: submitLoadingAnimation.interpolate({
+                                                            inputRange: [0, 1],
+                                                            outputRange: ['0deg', '360deg'],
+                                                        }),
+                                                    }],
+                                                }}
+                                            >
+                                                <Ionicons name="sync" size={18} color="white" />
+                                            </Animated.View>
+                                        ) : (
+                                            <>
+                                                <Text style={styles.primaryButtonText}>Create Project</Text>
+                                                <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />
+                                            </>
+                                        )}
                                     </TouchableOpacity>
                                 </>
                             )}
@@ -1013,12 +991,12 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     stepCircleDone: {
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
     },
     stepCircleActive: {
         backgroundColor: '#FFFFFF',
         borderWidth: 2,
-        borderColor: '#2E72F0',
+        borderColor: '#3A78B5',
     },
     stepCircleUpcoming: {
         backgroundColor: '#FFFFFF',
@@ -1031,7 +1009,7 @@ const styles = StyleSheet.create({
         color: '#94A3B8',
     },
     stepCircleTextActive: {
-        color: '#2E72F0',
+        color: '#3A78B5',
     },
     stepLabel: {
         fontSize: 10.5,
@@ -1040,7 +1018,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     stepLabelActive: {
-        color: '#2E72F0',
+        color: '#3A78B5',
         fontWeight: '700',
     },
     stepLineTrack: {
@@ -1054,7 +1032,7 @@ const styles = StyleSheet.create({
     },
     stepLineFill: {
         height: '100%',
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
         borderRadius: 2,
     },
 
@@ -1090,7 +1068,7 @@ const styles = StyleSheet.create({
     sectionLabelCount: {
         fontSize: 11.5,
         fontWeight: '700',
-        color: '#2E72F0',
+        color: '#3A78B5',
     },
     fieldLabel: {
         fontSize: 13,
@@ -1117,7 +1095,7 @@ const styles = StyleSheet.create({
         paddingTop: 12,
     },
     inputFocused: {
-        borderColor: '#2E72F0',
+        borderColor: '#3A78B5',
         backgroundColor: '#FFFFFF',
     },
     iconInputWrap: {
@@ -1185,7 +1163,7 @@ const styles = StyleSheet.create({
         color: '#374151',
     },
     dropdownOptionTextSelected: {
-        color: '#2E72F0',
+        color: '#3A78B5',
         fontWeight: '700',
     },
 
@@ -1202,7 +1180,7 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     radioCardSelected: {
-        borderColor: '#2E72F0',
+        borderColor: '#3A78B5',
         backgroundColor: '#EAF0FE',
     },
     radioOuter: {
@@ -1215,13 +1193,13 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     radioOuterSelected: {
-        borderColor: '#2E72F0',
+        borderColor: '#3A78B5',
     },
     radioInner: {
         width: 10,
         height: 10,
         borderRadius: 5,
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
     },
     radioIconChip: {
         width: 36,
@@ -1259,7 +1237,7 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     staffCardSelected: {
-        borderColor: '#2E72F0',
+        borderColor: '#3A78B5',
         backgroundColor: '#EAF0FE',
     },
     avatarCircle: {
@@ -1271,12 +1249,12 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     avatarCircleSelected: {
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
     },
     avatarText: {
         fontSize: 13,
         fontWeight: '800',
-        color: '#2E72F0',
+        color: '#3A78B5',
     },
     avatarTextSelected: {
         color: '#FFFFFF',
@@ -1316,8 +1294,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
     },
     checkboxSelected: {
-        backgroundColor: '#2E72F0',
-        borderColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
+        borderColor: '#3A78B5',
     },
     paymentRow: {
         flexDirection: 'row',
@@ -1395,7 +1373,7 @@ const styles = StyleSheet.create({
         flex: 1.4,
         borderRadius: 16,
         overflow: 'hidden',
-        shadowColor: '#2E72F0',
+        shadowColor: '#3A78B5',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 8,
@@ -1407,6 +1385,15 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         gap: 8,
         paddingVertical: 14,
+    },
+    primaryButtonSolid: {
+        backgroundColor: '#3A78B5',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 14,
+        borderRadius: 16,
     },
     primaryButtonText: {
         fontSize: 14.5,
@@ -1508,8 +1495,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
     },
     checkboxBoxSelected: {
-        backgroundColor: '#2E72F0',
-        borderColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
+        borderColor: '#3A78B5',
     },
     checkboxLabelBlock: {
         flex: 1,
@@ -1530,7 +1517,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         gap: 8,
         borderWidth: 1.5,
-        borderColor: '#2E72F0',
+        borderColor: '#3A78B5',
         borderStyle: 'dashed',
         borderRadius: 16,
         paddingVertical: 12,
@@ -1541,7 +1528,7 @@ const styles = StyleSheet.create({
     addBuildingBtnText: {
         fontSize: 14,
         fontWeight: '700',
-        color: '#2E72F0',
+        color: '#3A78B5',
     },
 });
 

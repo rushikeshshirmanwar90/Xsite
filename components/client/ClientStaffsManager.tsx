@@ -135,7 +135,7 @@ const ClientStaffsManager: React.FC<ClientStaffsManagerProps> = ({
         <View style={styles.staffInfo}>
           <View style={styles.staffHeader}>
             <View style={styles.staffIcon}>
-              <Ionicons name="person" size={20} color="#2E72F0" />
+              <Ionicons name="person" size={20} color="#3A78B5" />
             </View>
             <View style={styles.staffDetails}>
               <Text style={styles.staffName}>{item.staffName}</Text>
@@ -172,7 +172,7 @@ const ClientStaffsManager: React.FC<ClientStaffsManagerProps> = ({
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2E72F0" />
+        <ActivityIndicator size="large" color="#3A78B5" />
         <Text style={styles.loadingText}>Loading staff members...</Text>
       </View>
     );
@@ -196,8 +196,8 @@ const ClientStaffsManager: React.FC<ClientStaffsManagerProps> = ({
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#2E72F0']}
-            tintColor="#2E72F0"
+            colors={['#3A78B5']}
+            tintColor="#3A78B5"
           />
         }
         contentContainerStyle={staffs.length === 0 ? styles.emptyContainer : undefined}

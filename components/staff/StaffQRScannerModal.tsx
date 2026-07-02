@@ -392,7 +392,7 @@ const StaffQRScannerModal: React.FC<StaffQRScannerModalProps> = ({
     return (
       <Modal visible={visible} animationType="slide" transparent={false}>
         <View style={styles.container}>
-          <ActivityIndicator size="large" color="#2E72F0" />
+          <ActivityIndicator size="large" color="#3A78B5" />
           <Text style={styles.loadingText}>Loading camera...</Text>
         </View>
       </Modal>
@@ -504,7 +504,7 @@ const StaffQRScannerModal: React.FC<StaffQRScannerModalProps> = ({
         {isAssigning && (
           <View style={styles.loadingOverlay}>
             <View style={styles.loadingCard}>
-              <ActivityIndicator size="large" color="#2E72F0" />
+              <ActivityIndicator size="large" color="#3A78B5" />
               <Text style={styles.loadingCardText}>
                 {scanned ? 'Assigning staff member...' : 'Detecting QR code...'}
               </Text>
@@ -726,7 +726,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   closeButton: {
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
     paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 8,
@@ -774,7 +774,7 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
   rescanButton: {
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
     paddingHorizontal: 32,
     paddingVertical: 14,
     borderRadius: 10,

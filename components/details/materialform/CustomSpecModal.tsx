@@ -127,7 +127,7 @@ const styles = StyleSheet.create<Styles>({
     marginBottom: 16,
   },
   addSpecButton: {
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
     borderRadius: 10,
     padding: 14,
     alignItems: 'center' as const,

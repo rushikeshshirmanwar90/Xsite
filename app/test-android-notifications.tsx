@@ -81,7 +81,7 @@ export default function TestAndroidNotifications() {
       case 'fail':
         return '#EF4444';
       case 'warning':
-        return '#EE730C';
+        return '#F59E0B';
       default:
         return '#6B7280';
     }

@@ -24,7 +24,7 @@ export const MATERIAL_TEMPLATES: Record<string, MaterialTemplate> = {
     unit: 'meter',
     specFields: ['diameter', 'material'],
     icon: 'flash-outline',
-    color: '#EE730C',
+    color: '#F59E0B',
   },
   electric_wire: {
     name: 'Electric Wire',
@@ -32,7 +32,7 @@ export const MATERIAL_TEMPLATES: Record<string, MaterialTemplate> = {
     unit: 'meter',
     specFields: ['sqmm', 'meter', 'material', 'color'],
     icon: 'flash-outline',
-    color: '#EE730C',
+    color: '#F59E0B',
   },
   plumbing_pipe: {
     name: 'Plumbing Pipe',
@@ -40,7 +40,7 @@ export const MATERIAL_TEMPLATES: Record<string, MaterialTemplate> = {
     unit: 'meter',
     specFields: ['itemType', 'diameter', 'material'],
     icon: 'water-outline',
-    color: '#2E72F0',
+    color: '#3A78B5',
   },
   granite_sheet: {
     name: 'Granite Sheet',
@@ -48,7 +48,7 @@ export const MATERIAL_TEMPLATES: Record<string, MaterialTemplate> = {
     unit: 'sheets',
     specFields: ['size', 'thickness', 'color'],
     icon: 'cube-outline',
-    color: '#8B5CF6',
+    color: '#3A78B5',
   },
   wall_putty: {
     name: 'Wall Putty',
@@ -104,7 +104,7 @@ export const SAMPLE_IMPORTED_MATERIALS: Material[] = [
     price: 25000,
     date: '15/1/2024',
     icon: 'cube-outline',
-    color: '#8B5CF6',
+    color: '#3A78B5',
   },
   // Add more sample materials as needed
 ];
@@ -119,7 +119,7 @@ export const SAMPLE_USED_MATERIALS: Material[] = [
     price: 20000,
     date: '16/1/2024',
     icon: 'cube-outline',
-    color: '#8B5CF6',
+    color: '#3A78B5',
   },
   // Add more sample used materials as needed
 ];

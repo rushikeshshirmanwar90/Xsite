@@ -42,18 +42,18 @@ const OPTION_CONFIG: Record<string, { icon: string; color: string; bg: string; l
   contractor:        { icon: 'people',         color: '#16A34A', bg: '#F0FDF4', label: 'Contractor'         },
   equipmentCost:     { icon: 'hardware-chip',  color: '#2563EB', bg: '#EAF0FE', label: 'Equipment'          },
   otherCost:         { icon: 'cash',           color: '#E11D48', bg: '#FFF1F2', label: 'Other'              },
-  report:            { icon: 'bar-chart',      color: '#EE730C', bg: '#FEF0E3', label: 'Cost Report'        },
+  report:            { icon: 'bar-chart',      color: '#F59E0B', bg: '#FEF0E3', label: 'Cost Report'        },
 };
 
 const MATERIAL_SUB_OPTIONS = [
   { key: 'available', icon: 'cube-outline',      color: '#7C3AED', bg: '#FAF5FF', label: 'Material Available', desc: 'View all imported materials' },
   { key: 'used',      icon: 'construct-outline', color: '#D97706', bg: '#FFFBEB', label: 'Material Used',      desc: 'View material consumption' },
-  { key: 'analysis',  icon: 'bar-chart-outline', color: '#2E72F0', bg: '#EAF0FE', label: 'Analysis',           desc: 'Stock levels & cost breakdown PDF' },
+  { key: 'analysis',  icon: 'bar-chart-outline', color: '#3A78B5', bg: '#EAF0FE', label: 'Analysis',           desc: 'Stock levels & cost breakdown PDF' },
 ];
 
 const REPORT_SUB_OPTIONS = [
   { key: 'materialAnalysis', icon: 'cube-outline',         color: '#7C3AED', bg: '#FAF5FF', label: 'Material Analysis Report',  desc: 'Stock levels, costs & usage breakdown' },
-  { key: 'equipmentCost',    icon: 'hardware-chip-outline', color: '#2E72F0', bg: '#EAF0FE', label: 'Equipment Cost Report',      desc: 'Equipment expenses & details' },
+  { key: 'equipmentCost',    icon: 'hardware-chip-outline', color: '#3A78B5', bg: '#EAF0FE', label: 'Equipment Cost Report',      desc: 'Equipment expenses & details' },
   { key: 'contractor',       icon: 'people-outline',        color: '#16A34A', bg: '#F0FDF4', label: 'Contractor Report',          desc: 'Labour & contractor summary' },
   { key: 'otherCost',        icon: 'cash-outline',          color: '#E11D48', bg: '#FFF1F2', label: 'Other Cost Report',          desc: 'Miscellaneous expenses' },
 ];
@@ -135,7 +135,7 @@ const ReportGeneratingOverlay: React.FC<{ visible: boolean; label: string }> = (
           {/* Animated icon ring */}
           <Animated.View style={[rStyles.iconRing, { transform: [{ scale: pulseAnim }] }]}>
             <Animated.View style={{ transform: [{ rotate }] }}>
-              <Ionicons name="bar-chart" size={40} color="#2E72F0" />
+              <Ionicons name="bar-chart" size={40} color="#3A78B5" />
             </Animated.View>
             <View style={rStyles.iconOrbitDot} />
           </Animated.View>
@@ -213,9 +213,9 @@ const SectionAccordionItem: React.FC<{
 
   const rotate = chevron.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
 
-  const statusColor = isCompleted ? '#16A34A' : '#2E72F0';
+  const statusColor = isCompleted ? '#16A34A' : '#3A78B5';
   const statusBg    = isCompleted ? '#F0FDF4' : '#EAF0FE';
-  const accentColor = isCompleted ? '#22C55E' : '#2E72F0';
+  const accentColor = isCompleted ? '#22C55E' : '#3A78B5';
 
   return (
     <Animated.View style={[styles.sectionCard, { transform: [{ scale: scaleAnim }] }]}>
@@ -266,7 +266,7 @@ const SectionAccordionItem: React.FC<{
         {/* Chevron */}
         <Animated.View style={[styles.chevronWrap, { transform: [{ rotate }] }]}>
           <View style={styles.chevronCircle}>
-            <Ionicons name="chevron-down" size={16} color="#2E72F0" />
+            <Ionicons name="chevron-down" size={16} color="#3A78B5" />
           </View>
         </Animated.View>
       </TouchableOpacity>
@@ -277,7 +277,7 @@ const SectionAccordionItem: React.FC<{
           <View style={styles.optionsDivider} />
           <View style={styles.optionsGrid}>
             {options.map((option) => {
-              const cfg = OPTION_CONFIG[option.key] || { icon: 'ellipsis-horizontal', color: '#2E72F0', bg: '#EAF0FE', label: option.label };
+              const cfg = OPTION_CONFIG[option.key] || { icon: 'ellipsis-horizontal', color: '#3A78B5', bg: '#EAF0FE', label: option.label };
               return (
                 <TouchableOpacity
                   key={option.key}
@@ -584,7 +584,7 @@ const ProjectSections = () => {
     const totalBudget = selected.reduce((s,c)=>s+(c.totalAmount||0),0);
     const totalPaid   = selected.reduce((s,c)=>s+(c.totalPaid||0),0);
     const totalWork   = selected.reduce((s,c)=>s+(c.usedAmount||0),0);
-    const css = `body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:20px;background:#fff;color:#1e293b;line-height:1.4;}table{width:100%;border-collapse:collapse;margin-bottom:16px;background:white;box-shadow:0 1px 3px rgba(0,0,0,0.1);}th{background:#374151;color:white;padding:10px 12px;text-align:left;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;}td{padding:10px;border:1px solid #e2e8f0;font-size:13px;}.no-data{text-align:center;padding:30px;color:#64748b;font-style:italic;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:16px;}.section-title{font-size:15px;font-weight:700;color:#1e293b;margin:20px 0 10px 0;padding:10px 14px;background:#f1f5f9;border-left:4px solid #2E72F0;border-radius:4px;}.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}.summary-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center;}.summary-card h3{margin:0 0 6px 0;font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;}.summary-card p{margin:0;font-size:16px;font-weight:700;color:#1e293b;}.footer{margin-top:40px;padding:16px;background:#f8fafc;border-radius:8px;text-align:center;font-size:12px;color:#64748b;}`;
+    const css = `body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:20px;background:#fff;color:#1e293b;line-height:1.4;}table{width:100%;border-collapse:collapse;margin-bottom:16px;background:white;box-shadow:0 1px 3px rgba(0,0,0,0.1);}th{background:#374151;color:white;padding:10px 12px;text-align:left;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;}td{padding:10px;border:1px solid #e2e8f0;font-size:13px;}.no-data{text-align:center;padding:30px;color:#64748b;font-style:italic;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:16px;}.section-title{font-size:15px;font-weight:700;color:#1e293b;margin:20px 0 10px 0;padding:10px 14px;background:#f1f5f9;border-left:4px solid #3A78B5;border-radius:4px;}.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}.summary-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center;}.summary-card h3{margin:0 0 6px 0;font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;}.summary-card p{margin:0;font-size:16px;font-weight:700;color:#1e293b;}.footer{margin-top:40px;padding:16px;background:#f8fafc;border-radius:8px;text-align:center;font-size:12px;color:#64748b;}`;
     const sections = selected.map(c=>{
       const staffName = getContractorDisplayName(c);
       const contractName = c.contractType || 'Contract';
@@ -592,7 +592,7 @@ const ProjectSections = () => {
       const outstanding = Math.max(0,(c.usedAmount||0)-(c.totalPaid||0));
       const statusStyle = c.status==='completed'?'background:#dcfce7;color:#166534;':'background:#fef3c7;color:#92400e;';
       return `<div style="margin-bottom:36px;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
-        <div style="background:#2E72F0;padding:16px 20px;color:white;">
+        <div style="background:#3A78B5;padding:16px 20px;color:white;">
           <div style="font-size:18px;font-weight:700;">${contractName}</div>
           <div style="font-size:12px;opacity:0.85;margin-top:3px;">${staffName} &nbsp;•&nbsp; <span style="display:inline-block;${statusStyle}padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;text-transform:uppercase;">${c.status||'active'}</span></div>
         </div>
@@ -604,7 +604,7 @@ const ProjectSections = () => {
           ${(c.payments||[]).length?`<table><thead><tr><th>Type</th><th>Notes</th><th style="text-align:right;">Amount</th></tr></thead><tbody>${paymentRowsHTML(c.payments)}</tbody></table>`:'<div class="no-data">No payments recorded.</div>'}
         </div></div>`;
     }).join('');
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Contractor Report</title><style>${css}.main-header{text-align:center;margin-bottom:24px;padding:20px;background:#2E72F0;color:white;border-radius:12px;}.main-header h1{margin:0 0 6px 0;font-size:24px;font-weight:700;}.main-header p{margin:3px 0;font-size:13px;opacity:0.9;}</style></head><body>
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Contractor Report</title><style>${css}.main-header{text-align:center;margin-bottom:24px;padding:20px;background:#3A78B5;color:white;border-radius:12px;}.main-header h1{margin:0 0 6px 0;font-size:24px;font-weight:700;}.main-header p{margin:3px 0;font-size:13px;opacity:0.9;}</style></head><body>
       <div class="main-header"><h1>Contractor Report</h1><p><strong>${name as string}</strong></p><p>${selected.length} Contractor${selected.length!==1?'s':''} selected</p><p>Generated: ${now}</p></div>
       ${selected.length>1?`<div style="margin-bottom:24px;"><h2 style="font-size:16px;font-weight:700;margin-bottom:12px;">Project Summary</h2><div class="summary-grid"><div class="summary-card"><h3>Total Budget</h3><p>${fmtCurrency(totalBudget)}</p></div><div class="summary-card"><h3>Work Done</h3><p>${fmtCurrency(totalWork)}</p></div><div class="summary-card"><h3>Total Paid</h3><p style="color:#059669;">${fmtCurrency(totalPaid)}</p></div><div class="summary-card"><h3>Contractors</h3><p>${selected.length}</p></div></div></div>`:''}
       ${sections}
@@ -846,8 +846,8 @@ const ProjectSections = () => {
             {/* Stock report */}
             <TouchableOpacity onPress={handleGenerateStockReport} style={styles.reportBtn} disabled={generatingStockReport} activeOpacity={0.8}>
               {generatingStockReport
-                ? <ActivityIndicator size="small" color="#2E72F0" />
-                : <Ionicons name="stats-chart" size={20} color="#2E72F0" />}
+                ? <ActivityIndicator size="small" color="#3A78B5" />
+                : <Ionicons name="stats-chart" size={20} color="#3A78B5" />}
             </TouchableOpacity>
           </View>
 
@@ -876,8 +876,8 @@ const ProjectSections = () => {
         {totalCount > 0 && (
           <View style={styles.summaryRow}>
             <View style={[styles.summaryPill, { backgroundColor: '#EAF0FE' }]}>
-              <Ionicons name="layers" size={14} color="#2E72F0" />
-              <Text style={[styles.summaryPillText, { color: '#2E72F0' }]}>{totalCount} Sections</Text>
+              <Ionicons name="layers" size={14} color="#3A78B5" />
+              <Text style={[styles.summaryPillText, { color: '#3A78B5' }]}>{totalCount} Sections</Text>
             </View>
             <View style={[styles.summaryPill, { backgroundColor: '#F0FDF4' }]}>
               <Ionicons name="checkmark-circle" size={14} color="#16A34A" />
@@ -914,7 +914,7 @@ const ProjectSections = () => {
           /* Empty state */
           <View style={styles.emptyState}>
             <View style={styles.emptyIconWrap}>
-              <Ionicons name="folder-open" size={48} color="#2E72F0" />
+              <Ionicons name="folder-open" size={48} color="#3A78B5" />
             </View>
             <Text style={styles.emptyTitle}>No Sections Yet</Text>
             <Text style={styles.emptySubtitle}>
@@ -1040,7 +1040,7 @@ const ProjectSections = () => {
       {isGeneratingReport && (
         <View style={pickerStyles.generatingOverlay}>
           <View style={pickerStyles.generatingCard}>
-            <Ionicons name="document-text" size={40} color="#2E72F0" />
+            <Ionicons name="document-text" size={40} color="#3A78B5" />
             <Text style={pickerStyles.generatingTitle}>Generating PDF...</Text>
             <Text style={pickerStyles.generatingSubtitle}>Fetching work logs & building report</Text>
           </View>
@@ -1165,7 +1165,7 @@ const ProjectSections = () => {
             <View style={styles.modalInputGroup}>
               <Text style={styles.modalInputLabel}>Section Name <Text style={{ color: '#EF4444' }}>*</Text></Text>
               <View style={styles.modalInputWrap}>
-                <Ionicons name="bookmark-outline" size={18} color="#2E72F0" style={{ marginRight: 10 }} />
+                <Ionicons name="bookmark-outline" size={18} color="#3A78B5" style={{ marginRight: 10 }} />
                 <TextInput
                   style={styles.modalInput}
                   placeholder="e.g., Tower A, Building 1, Wing B"
@@ -1191,7 +1191,7 @@ const ProjectSections = () => {
                     onPress={() => setNewSectionType(t.key)}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name={t.icon as any} size={18} color={newSectionType === t.key ? '#2E72F0' : '#64748B'} />
+                    <Ionicons name={t.icon as any} size={18} color={newSectionType === t.key ? '#3A78B5' : '#64748B'} />
                     <Text style={[styles.typeChipText, newSectionType === t.key && styles.typeChipTextActive]}>
                       {t.label}
                     </Text>
@@ -1237,9 +1237,9 @@ const styles = StyleSheet.create({
   progressBlock:      { paddingHorizontal: 16, marginTop: 14 },
   progressLabelRow:   { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 7 },
   progressLabel:      { fontSize: 12, color: '#64748B', fontWeight: '500' },
-  progressPct:        { fontSize: 12, fontWeight: '800', color: '#2E72F0' },
+  progressPct:        { fontSize: 12, fontWeight: '800', color: '#3A78B5' },
   progressTrack:      { height: 8, backgroundColor: '#EAF0FE', borderRadius: 99, overflow: 'hidden' },
-  progressFill:       { height: '100%', borderRadius: 99, backgroundColor: '#2E72F0' },
+  progressFill:       { height: '100%', borderRadius: 99, backgroundColor: '#3A78B5' },
 
   // Scroll
   scrollView:         { flex: 1 },
@@ -1303,7 +1303,7 @@ const styles = StyleSheet.create({
   emptyTitle:         { fontSize: 20, fontWeight: '800', color: '#0F172A', marginBottom: 8, letterSpacing: -0.3 },
   emptySubtitle:      { fontSize: 14, color: '#64748B', textAlign: 'center', lineHeight: 22, maxWidth: '80%', marginBottom: 28 },
   emptyAddBtn:        { borderRadius: 14, overflow: 'hidden' },
-  emptyAddBtnInner:   { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14, paddingHorizontal: 28, backgroundColor: '#2E72F0' },
+  emptyAddBtnInner:   { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14, paddingHorizontal: 28, backgroundColor: '#3A78B5' },
   emptyAddBtnText:    { fontSize: 15, fontWeight: '700', color: '#FFFFFF', letterSpacing: 0.3 },
 
   // Completion button
@@ -1320,13 +1320,13 @@ const styles = StyleSheet.create({
     borderColor: '#E0E7FF',
   },
   completionBtnDone:      { borderColor: '#BBF7D0', backgroundColor: '#F0FDF4' },
-  completionBtnText:      { fontSize: 15, fontWeight: '700', color: '#2E72F0' },
+  completionBtnText:      { fontSize: 15, fontWeight: '700', color: '#3A78B5' },
   completionBtnTextDone:  { color: '#16A34A' },
 
   // FAB
   fab:      { position: 'absolute', bottom: 32, right: 24 },
-  fabInner: { borderRadius: 20, overflow: 'hidden', shadowColor: '#2E72F0', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 10 },
-  fabSolid: { width: 60, height: 60, borderRadius: 20, justifyContent: 'center', alignItems: 'center', backgroundColor: '#2E72F0' },
+  fabInner: { borderRadius: 20, overflow: 'hidden', shadowColor: '#3A78B5', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 10 },
+  fabSolid: { width: 60, height: 60, borderRadius: 20, justifyContent: 'center', alignItems: 'center', backgroundColor: '#3A78B5' },
 
   // Modal
   modalOverlay:   { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'flex-end' },
@@ -1352,9 +1352,9 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     borderRadius: 14,
   },
-  typeChipActive:     { backgroundColor: '#EAF0FE', borderColor: '#2E72F0' },
+  typeChipActive:     { backgroundColor: '#EAF0FE', borderColor: '#3A78B5' },
   typeChipText:       { fontSize: 12, fontWeight: '600', color: '#64748B' },
-  typeChipTextActive: { color: '#2E72F0' },
+  typeChipTextActive: { color: '#3A78B5' },
   // Report sub-options
   reportOptionsGrid:   { gap: 10, marginBottom: 8 },
   reportOptionCard: {
@@ -1377,7 +1377,7 @@ const styles = StyleSheet.create({
   modalCancelBtn:  { flex: 1, paddingVertical: 15, backgroundColor: '#F8FAFC', borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
   modalCancelText: { fontSize: 15, fontWeight: '700', color: '#64748B' },
   modalAddBtn:     { flex: 1.5, borderRadius: 14, overflow: 'hidden' },
-  modalAddBtnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 15, backgroundColor: '#2E72F0' },
+  modalAddBtnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 15, backgroundColor: '#3A78B5' },
   modalAddText:    { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
 });
 
@@ -1424,7 +1424,7 @@ const rStyles = StyleSheet.create({
     width: 14,
     height: 14,
     borderRadius: 7,
-    backgroundColor: '#EE730C',
+    backgroundColor: '#F59E0B',
     borderWidth: 2,
     borderColor: '#FFFFFF',
   },
@@ -1485,7 +1485,7 @@ const rStyles = StyleSheet.create({
   },
   dotActive: {
     width: 26,
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
   },
 });
 
@@ -1510,15 +1510,15 @@ const pickerStyles = StyleSheet.create({
   subtitle: { fontSize: 13, color: '#64748B', fontWeight: '500', marginTop: 3 },
   closeBtn: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
   selectAllRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 4 },
-  selectAllText: { fontSize: 14, fontWeight: '700', color: '#2E72F0' },
+  selectAllText: { fontSize: 14, fontWeight: '700', color: '#3A78B5' },
   dividerLine: { height: 1, backgroundColor: '#E2E8F0', marginBottom: 8 },
   checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
-  checkboxChecked: { backgroundColor: '#2E72F0', borderColor: '#2E72F0' },
+  checkboxChecked: { backgroundColor: '#3A78B5', borderColor: '#3A78B5' },
   contractorRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 14, padding: 14, marginBottom: 8 },
   contractorRowSelected: { backgroundColor: '#EAF0FE', borderColor: '#C4D8FC' },
   cardText: { flex: 1 },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#EAF0FE', borderWidth: 1, borderColor: '#C4D8FC', alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 16, fontWeight: '700', color: '#2E72F0' },
+  avatarText: { fontSize: 16, fontWeight: '700', color: '#3A78B5' },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 3, flexWrap: 'wrap' },
   contractorName: { fontSize: 14, fontWeight: '700', color: '#0F172A', flex: 1 },
   contractorMeta: { fontSize: 12, color: '#64748B', fontWeight: '500' },
@@ -1529,7 +1529,7 @@ const pickerStyles = StyleSheet.create({
   statusActiveText: { color: '#15803D' },
   statusDoneText: { color: '#4338CA' },
   footer: { paddingTop: 12, borderTopWidth: 1, borderColor: '#E2E8F0' },
-  generateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#2E72F0', borderRadius: 14, paddingVertical: 15 },
+  generateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#3A78B5', borderRadius: 14, paddingVertical: 15 },
   generateBtnDisabled: { backgroundColor: '#CBD5E1' },
   generateBtnText: { fontSize: 15, fontWeight: '700', color: '#fff', letterSpacing: 0.2 },
   generatingOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(10,18,38,0.6)', alignItems: 'center', justifyContent: 'center', zIndex: 9999 },

@@ -105,7 +105,7 @@ const ManagePaymentModal: React.FC<ManagePaymentModalProps> = ({ visible, onClos
                                 return (
                                     <View key={project.projectId} style={styles.projectRow}>
                                         <View style={styles.projectInfo}>
-                                            <Ionicons name="folder-outline" size={16} color="#2E72F0" />
+                                            <Ionicons name="folder-outline" size={16} color="#3A78B5" />
                                             <Text style={styles.projectName} numberOfLines={1}>
                                                 {project.projectName}
                                             </Text>

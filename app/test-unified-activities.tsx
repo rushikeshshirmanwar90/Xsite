@@ -230,7 +230,7 @@ const TestUnifiedActivitiesScreen: React.FC = () => {
             </View>
           ) : isLoading ? (
             <View style={styles.statusCard}>
-              <Ionicons name="hourglass" size={24} color="#EE730C" />
+              <Ionicons name="hourglass" size={24} color="#F59E0B" />
               <View style={styles.statusContent}>
                 <Text style={styles.statusTitle}>Loading Activities...</Text>
                 <Text style={styles.statusDescription}>Fetching activities from both APIs</Text>

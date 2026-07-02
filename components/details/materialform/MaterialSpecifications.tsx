@@ -158,7 +158,7 @@ const MaterialSpecifications: React.FC<MaterialSpecificationsProps> = ({
                             activeOpacity={0.7}
                           >
                             <View style={styles.customSpecOptionContent}>
-                              <Ionicons name="create-outline" size={18} color="#2E72F0" />
+                              <Ionicons name="create-outline" size={18} color="#3A78B5" />
                               <Text style={[sharedStyles.dropdownItemText, styles.customSpecOptionText]}>
                                 Enter Custom Value
                               </Text>
@@ -262,7 +262,7 @@ const styles = StyleSheet.create<Styles>({
   addSpecButtonSmallText: {
     fontSize: 13,
     fontWeight: '600' as const,
-    color: '#2E72F0',
+    color: '#3A78B5',
   },
   dropdownScrollView: {
     maxHeight: 200,
@@ -304,7 +304,7 @@ const styles = StyleSheet.create<Styles>({
     gap: 8,
   },
   customSpecOptionText: {
-    color: '#2E72F0',
+    color: '#3A78B5',
     fontWeight: '600' as const,
   },
   customSpecHint: {

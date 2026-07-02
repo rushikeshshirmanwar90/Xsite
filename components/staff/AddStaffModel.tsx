@@ -2,7 +2,6 @@
 import { roles } from '@/data/staff';
 import { AddStaffModalProps, Staff } from '@/types/staff';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import {
     Alert,
@@ -203,7 +202,7 @@ const AddStaffModal: React.FC<AddStaffModalProps> = ({ visible, onClose, onAdd }
                                                     {roleOption}
                                                 </Text>
                                                 {role === roleOption && (
-                                                    <Ionicons name="checkmark" size={16} color="#2E72F0" />
+                                                    <Ionicons name="checkmark" size={16} color="#3A78B5" />
                                                 )}
                                             </TouchableOpacity>
                                         ))}
@@ -218,15 +217,10 @@ const AddStaffModal: React.FC<AddStaffModalProps> = ({ visible, onClose, onAdd }
                             <Text style={styles.cancelButtonText}>Cancel</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-                            <LinearGradient
-                                colors={['#2E72F0', '#8B5CF6']}
-                                style={styles.submitButtonGradient}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                            >
+                            <View style={[styles.submitButtonGradient, { backgroundColor: '#3A78B5' }]}>
                                 <Ionicons name="add" size={18} color="white" />
                                 <Text style={styles.submitButtonText}>Add Staff</Text>
-                            </LinearGradient>
+                            </View>
                         </TouchableOpacity>
                     </View>
                 </View>

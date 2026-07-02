@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
     color: '#4B5563',
   },
   actionButton: {
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
     padding: 12,
     borderRadius: 6,
     alignItems: 'center',

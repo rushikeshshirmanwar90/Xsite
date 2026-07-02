@@ -52,7 +52,7 @@ const styles = StyleSheet.create<Styles>({
     justifyContent: 'center' as const,
   },
   progressStepActive: {
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
   },
   progressStepNumber: {
     fontSize: 16,
@@ -69,7 +69,7 @@ const styles = StyleSheet.create<Styles>({
     marginHorizontal: 8,
   },
   progressLineActive: {
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
   },
   progressLabels: {
     flexDirection: 'row' as const,
@@ -82,7 +82,7 @@ const styles = StyleSheet.create<Styles>({
     textAlign: 'center' as const,
   },
   progressLabelActive: {
-    color: '#2E72F0',
+    color: '#3A78B5',
     fontWeight: '600' as const,
   },
 });

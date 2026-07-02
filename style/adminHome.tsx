@@ -410,8 +410,8 @@ export const styles = StyleSheet.create({
         backgroundColor: '#fff',
     },
     checkboxSelected: {
-        backgroundColor: '#2E72F0',
-        borderColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
+        borderColor: '#3A78B5',
     },
 
     // Staff assignment styles
@@ -526,8 +526,8 @@ export const styles = StyleSheet.create({
         alignItems: 'center',
     },
     singleBuildingCheckboxBoxSelected: {
-        backgroundColor: '#2E72F0',
-        borderColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
+        borderColor: '#3A78B5',
     },
 
     // Centered container and state texts for loading/empty/error states
@@ -562,7 +562,7 @@ export const styles = StyleSheet.create({
         marginTop: 10,
         paddingHorizontal: 20,
         paddingVertical: 10,
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
         borderRadius: 5,
     },
     retryButtonText: {
@@ -596,12 +596,12 @@ export const styles = StyleSheet.create({
     avatarContainer: {
         width: 48,
         height: 48,
-        backgroundColor: '#0EA5E9',
+        backgroundColor: '#3A78B5',
         borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 12,
-        shadowColor: '#0EA5E9',
+        shadowColor: '#3A78B5',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 8,
@@ -686,7 +686,7 @@ export const styles = StyleSheet.create({
     sectionDivider: {
         width: 40,
         height: 3,
-        backgroundColor: '#0EA5E9',
+        backgroundColor: '#3A78B5',
         borderRadius: 2,
     },
     toggleButton: {
@@ -701,16 +701,16 @@ export const styles = StyleSheet.create({
         gap: 6,
     },
     toggleButtonActive: {
-        backgroundColor: '#F0FDF4',
-        borderColor: '#86EFAC',
+        backgroundColor: '#DCEEFF',
+        borderColor: '#B8D8F8',
     },
     toggleButtonText: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#6B7280',
+        color: '#64748B',
     },
     toggleButtonTextActive: {
-        color: '#10B981',
+        color: '#295E94',
     },
     clientNameContainer: {
         flexDirection: 'row',
@@ -737,11 +737,11 @@ export const styles = StyleSheet.create({
         right: 24,
         width: 56,
         height: 56,
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
         borderRadius: 28,
         alignItems: 'center' as const,
         justifyContent: 'center' as const,
-        shadowColor: '#2E72F0',
+        shadowColor: '#3A78B5',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -787,7 +787,7 @@ export const styles = StyleSheet.create({
         paddingVertical: 10,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#2E72F0',
+        borderColor: '#3A78B5',
         backgroundColor: '#FFFFFF',
     },
     paginationButtonDisabled: {
@@ -797,7 +797,7 @@ export const styles = StyleSheet.create({
     paginationButtonText: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#2E72F0',
+        color: '#3A78B5',
         marginHorizontal: 4,
     },
     paginationButtonTextDisabled: {
@@ -819,8 +819,8 @@ export const styles = StyleSheet.create({
         borderColor: '#E5E7EB',
     },
     pageNumberButtonActive: {
-        backgroundColor: '#2E72F0',
-        borderColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
+        borderColor: '#3A78B5',
     },
     pageNumberText: {
         fontSize: 14,
@@ -857,7 +857,7 @@ export const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
         paddingHorizontal: 20,
         paddingVertical: 12,
         borderRadius: 10,
@@ -905,7 +905,7 @@ export const styles = StyleSheet.create({
     shareCard: {
         borderColor: '#C4D8FC',
         backgroundColor: '#F8FAFC',
-        shadowColor: '#2E72F0',
+        shadowColor: '#3A78B5',
         shadowOpacity: 0.1,
     },
     shareHeader: {
@@ -974,7 +974,7 @@ export const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
         paddingHorizontal: 20,
         paddingVertical: 12,
         borderRadius: 10,
@@ -1046,9 +1046,9 @@ export const styles = StyleSheet.create({
     notificationStatusBar: {
         paddingHorizontal: 20,
         paddingVertical: 8,
-        backgroundColor: '#F0FDF4',
+        backgroundColor: '#DCEEFF',
         borderBottomWidth: 1,
-        borderBottomColor: '#DCFCE7',
+        borderBottomColor: '#B8D8F8',
     },
     notificationStatusIndicator: {
         flexDirection: 'row',
@@ -1060,11 +1060,11 @@ export const styles = StyleSheet.create({
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#10B981',
+        backgroundColor: '#3A78B5',
     },
     notificationStatusText: {
         fontSize: 12,
         fontWeight: '500',
-        color: '#059669',
+        color: '#295E94',
     },
 })

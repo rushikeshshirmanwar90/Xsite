@@ -603,7 +603,7 @@ export default function ContractorScreen() {
     }).join('');
   };
 
-  const baseCSS = `body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:20px;background:#fff;color:#1e293b;line-height:1.4;}table{width:100%;border-collapse:collapse;margin-bottom:16px;background:white;box-shadow:0 1px 3px rgba(0,0,0,0.1);}th{background:#374151;color:white;padding:10px 12px;text-align:left;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;}td{padding:10px;border:1px solid #e2e8f0;font-size:13px;}.no-data{text-align:center;padding:30px;color:#64748b;font-style:italic;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:16px;}.section-title{font-size:15px;font-weight:700;color:#1e293b;margin:20px 0 10px 0;padding:10px 14px;background:#f1f5f9;border-left:4px solid #2E72F0;border-radius:4px;}.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}.summary-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center;}.summary-card h3{margin:0 0 6px 0;font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;}.summary-card p{margin:0;font-size:16px;font-weight:700;color:#1e293b;}.footer{margin-top:40px;padding:16px;background:#f8fafc;border-radius:8px;text-align:center;font-size:12px;color:#64748b;}`;
+  const baseCSS = `body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:20px;background:#fff;color:#1e293b;line-height:1.4;}table{width:100%;border-collapse:collapse;margin-bottom:16px;background:white;box-shadow:0 1px 3px rgba(0,0,0,0.1);}th{background:#374151;color:white;padding:10px 12px;text-align:left;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;}td{padding:10px;border:1px solid #e2e8f0;font-size:13px;}.no-data{text-align:center;padding:30px;color:#64748b;font-style:italic;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:16px;}.section-title{font-size:15px;font-weight:700;color:#1e293b;margin:20px 0 10px 0;padding:10px 14px;background:#f1f5f9;border-left:4px solid #3A78B5;border-radius:4px;}.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}.summary-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center;}.summary-card h3{margin:0 0 6px 0;font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;}.summary-card p{margin:0;font-size:16px;font-weight:700;color:#1e293b;}.footer{margin-top:40px;padding:16px;background:#f8fafc;border-radius:8px;text-align:center;font-size:12px;color:#64748b;}`;
 
   const buildReportHTML = (selected: any[], laborMap: Record<string, any[]>) => {
     const now = new Date().toLocaleDateString('en-IN', { weekday:'long', day:'2-digit', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' } as any);
@@ -618,7 +618,7 @@ export default function ContractorScreen() {
       const statusStyle = c.status==='completed' ? 'background:#dcfce7;color:#166534;' : 'background:#fef3c7;color:#92400e;';
       return `
         <div style="margin-bottom:36px;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
-          <div style="background:#2E72F0;padding:16px 20px;color:white;">
+          <div style="background:#3A78B5;padding:16px 20px;color:white;">
             <div style="font-size:18px;font-weight:700;">${name}</div>
             <div style="font-size:12px;opacity:0.85;margin-top:3px;">${c.contractType||'Contract'} &nbsp;•&nbsp; <span style="display:inline-block;${statusStyle}padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;text-transform:uppercase;">${c.status||'active'}</span></div>
           </div>
@@ -637,7 +637,7 @@ export default function ContractorScreen() {
         </div>`;
     }).join('');
 
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Contractor Report</title><style>${baseCSS}.main-header{text-align:center;margin-bottom:24px;padding:20px;background:#2E72F0;color:white;border-radius:12px;}.main-header h1{margin:0 0 6px 0;font-size:24px;font-weight:700;}.main-header p{margin:3px 0;font-size:13px;opacity:0.9;}</style></head><body>
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Contractor Report</title><style>${baseCSS}.main-header{text-align:center;margin-bottom:24px;padding:20px;background:#3A78B5;color:white;border-radius:12px;}.main-header h1{margin:0 0 6px 0;font-size:24px;font-weight:700;}.main-header p{margin:3px 0;font-size:13px;opacity:0.9;}</style></head><body>
       <div class="main-header"><h1>Contractor Report</h1><p><strong>${projectName}</strong></p><p>${selected.length} Contractor${selected.length!==1?'s':''} selected</p><p>Generated: ${now}</p></div>
       ${selected.length > 1 ? `<div style="margin-bottom:24px;"><h2 style="font-size:16px;font-weight:700;margin-bottom:12px;">Project Summary</h2><div class="summary-grid"><div class="summary-card"><h3>Total Budget</h3><p>${formatCurrency(totalBudget)}</p></div><div class="summary-card"><h3>Work Done</h3><p>${formatCurrency(totalWork)}</p></div><div class="summary-card"><h3>Total Paid</h3><p style="color:#059669;">${formatCurrency(totalPaid)}</p></div><div class="summary-card"><h3>Contractors</h3><p>${selected.length}</p></div></div></div>` : ''}
       ${contractorSections}
@@ -706,14 +706,14 @@ export default function ContractorScreen() {
           activeOpacity={0.7}
           disabled={contractors.length === 0}
         >
-          <Ionicons name="document-text-outline" size={20} color={contractors.length === 0 ? '#94A3B8' : '#2E72F0'} />
+          <Ionicons name="document-text-outline" size={20} color={contractors.length === 0 ? '#94A3B8' : '#3A78B5'} />
         </TouchableOpacity>
       </View>
 
       {/* Main List */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2E72F0" />
+          <ActivityIndicator size="large" color="#3A78B5" />
           <Text style={styles.loadingText}>Loading contractors...</Text>
         </View>
       ) : (
@@ -1217,7 +1217,7 @@ export default function ContractorScreen() {
       {isGeneratingReport && (
         <View style={pickerStyles.generatingOverlay}>
           <View style={pickerStyles.generatingCard}>
-            <Ionicons name="document-text" size={40} color="#2E72F0" />
+            <Ionicons name="document-text" size={40} color="#3A78B5" />
             <Text style={pickerStyles.generatingTitle}>Generating PDF...</Text>
             <Text style={pickerStyles.generatingSubtitle}>Fetching work logs & building report</Text>
           </View>
@@ -1396,7 +1396,7 @@ const styles = StyleSheet.create({
   manageButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1A54C4',
+    backgroundColor: '#295E94',
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
@@ -1543,7 +1543,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   cardEditBtnText: {
-    color: '#1A54C4',
+    color: '#295E94',
     fontSize: 13,
     fontWeight: '600',
   },
@@ -1638,7 +1638,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   dropdownActive: {
-    borderColor: '#2E72F0',
+    borderColor: '#3A78B5',
     backgroundColor: '#FFFFFF',
   },
   selectorText: {
@@ -1704,7 +1704,7 @@ const styles = StyleSheet.create({
     flex: 2,
     paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2272,7 +2272,7 @@ const modalStyles = StyleSheet.create({
     backgroundColor: '#059669',
   },
   reactivateBtn: {
-    backgroundColor: '#1A54C4',
+    backgroundColor: '#295E94',
   },
   downloadBtn: {
     backgroundColor: '#10B981',
@@ -2298,7 +2298,7 @@ const modalStyles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   activeTabButton: {
-    borderBottomColor: '#2E72F0',
+    borderBottomColor: '#3A78B5',
   },
   tabButtonText: {
     fontSize: 14,
@@ -2306,7 +2306,7 @@ const modalStyles = StyleSheet.create({
     color: '#64748B',
   },
   activeTabButtonText: {
-    color: '#2E72F0',
+    color: '#3A78B5',
   },
   summaryCard: {
     backgroundColor: '#FFFFFF',
@@ -2343,7 +2343,7 @@ const modalStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
     paddingVertical: 12,
     borderRadius: 10,
   },
@@ -2663,7 +2663,7 @@ const pickerStyles = StyleSheet.create({
   selectAllText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#2E72F0',
+    color: '#3A78B5',
   },
   dividerLine: {
     height: 1,
@@ -2682,8 +2682,8 @@ const pickerStyles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   checkboxChecked: {
-    backgroundColor: '#2E72F0',
-    borderColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
+    borderColor: '#3A78B5',
   },
   // Contractor rows
   contractorRow: {
@@ -2717,7 +2717,7 @@ const pickerStyles = StyleSheet.create({
   avatarText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#2E72F0',
+    color: '#3A78B5',
   },
   nameRow: {
     flexDirection: 'row',
@@ -2770,7 +2770,7 @@ const pickerStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
     borderRadius: 14,
     paddingVertical: 15,
   },

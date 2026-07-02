@@ -395,7 +395,7 @@ const SectionManager: React.FC<SectionManagerProps> = ({
                 style={[styles.iconButton, compact && styles.compactIconButton]}
                 onPress={() => handleEditSection(currentSection)}
               >
-                <MaterialIcons name="edit" size={compact ? 13 : 20} color="#2E72F0" />
+                <MaterialIcons name="edit" size={compact ? 13 : 20} color="#3A78B5" />
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.iconButton, compact && styles.compactIconButton]}
@@ -626,7 +626,7 @@ const styles = StyleSheet.create({
     margin: 1,
   },
   addSectionButton: {
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
     height: 40,
     width: 40,
     borderRadius: 8,
@@ -640,7 +640,7 @@ const styles = StyleSheet.create({
     margin: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
   },
   emptyState: {
     backgroundColor: '#fff',
@@ -656,7 +656,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   addButton: {
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 8,

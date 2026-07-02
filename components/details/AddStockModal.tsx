@@ -174,7 +174,7 @@ const AddStockModal: React.FC<AddStockModalProps> = ({
 
                     {/* Info Box */}
                     <View style={styles.infoBox}>
-                        <Ionicons name="information-circle" size={20} color="#2E72F0" />
+                        <Ionicons name="information-circle" size={20} color="#3A78B5" />
                         <Text style={styles.infoText}>
                             {mergeIfExists 
                                 ? 'Quantity will be added to existing material if specs match'

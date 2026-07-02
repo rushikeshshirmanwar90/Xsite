@@ -261,8 +261,8 @@ const Details = () => {
             switch (material.category.toLowerCase()) {
               case 'steel':
                 iconName = 'construction';
-                iconColor = '#2E72F0';
-                categoryColor = '#2E72F0';
+                iconColor = '#3A78B5';
+                categoryColor = '#3A78B5';
                 break;
               case 'brick':
                 iconName = 'foundation';
@@ -271,8 +271,8 @@ const Details = () => {
                 break;
               case 'electrical':
                 iconName = 'electrical-services';
-                iconColor = '#EE730C';
-                categoryColor = '#EE730C';
+                iconColor = '#F59E0B';
+                categoryColor = '#F59E0B';
                 break;
               case 'plumbing':
                 iconName = 'plumbing';
@@ -281,8 +281,8 @@ const Details = () => {
                 break;
               case 'granite':
                 iconName = 'dashboard';
-                iconColor = '#8B5CF6';
-                categoryColor = '#8B5CF6';
+                iconColor = '#3A78B5';
+                categoryColor = '#3A78B5';
                 break;
               case 'wall putty':
                 iconName = 'format-paint';
@@ -428,7 +428,7 @@ const Details = () => {
                     <Text style={styles.addCharacteristicsButtonText}>
                       Add Material Characteristics
                     </Text>
-                    <Ionicons name="add-circle" size={16} color="#0EA5E9" />
+                    <Ionicons name="add-circle" size={16} color="#3A78B5" />
                   </TouchableOpacity>
                 )}
 
@@ -437,7 +437,7 @@ const Details = () => {
                   onPress={() => handleViewDetails(material)}
                 >
                   <Text style={styles.viewDetailsButtonText}>View Details</Text>
-                  <Ionicons name="chevron-forward" size={14} color="#0EA5E9" />
+                  <Ionicons name="chevron-forward" size={14} color="#3A78B5" />
                 </TouchableOpacity>
               </Animated.View>
             );

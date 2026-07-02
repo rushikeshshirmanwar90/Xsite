@@ -81,7 +81,7 @@ const ClientDetailsPage: React.FC = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2E72F0" />
+          <ActivityIndicator size="large" color="#3A78B5" />
           <Text style={styles.loadingText}>Loading client details...</Text>
         </View>
       </SafeAreaView>
@@ -110,7 +110,7 @@ const ClientDetailsPage: React.FC = () => {
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
             <View style={styles.infoIconContainer}>
-              <Ionicons name="business-outline" size={20} color="#2E72F0" />
+              <Ionicons name="business-outline" size={20} color="#3A78B5" />
             </View>
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Company Name</Text>
@@ -120,7 +120,7 @@ const ClientDetailsPage: React.FC = () => {
 
           <View style={styles.infoRow}>
             <View style={styles.infoIconContainer}>
-              <Ionicons name="mail-outline" size={20} color="#2E72F0" />
+              <Ionicons name="mail-outline" size={20} color="#3A78B5" />
             </View>
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Email</Text>
@@ -130,7 +130,7 @@ const ClientDetailsPage: React.FC = () => {
 
           <View style={styles.infoRow}>
             <View style={styles.infoIconContainer}>
-              <Ionicons name="call-outline" size={20} color="#2E72F0" />
+              <Ionicons name="call-outline" size={20} color="#3A78B5" />
             </View>
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Phone Number</Text>
@@ -140,7 +140,7 @@ const ClientDetailsPage: React.FC = () => {
 
           <View style={styles.infoRow}>
             <View style={styles.infoIconContainer}>
-              <Ionicons name="location-outline" size={20} color="#2E72F0" />
+              <Ionicons name="location-outline" size={20} color="#3A78B5" />
             </View>
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Address</Text>
@@ -166,7 +166,7 @@ const ClientDetailsPage: React.FC = () => {
 
           <View style={styles.statCard}>
             <View style={styles.statIconContainer}>
-              <Ionicons name="calendar" size={24} color="#EE730C" />
+              <Ionicons name="calendar" size={24} color="#F59E0B" />
             </View>
             <Text style={styles.statValue}>
               {new Date(client.createdAt).toLocaleDateString()}
@@ -210,7 +210,7 @@ const ClientDetailsPage: React.FC = () => {
           <Ionicons 
             name="information-circle-outline" 
             size={20} 
-            color={activeTab === 'info' ? '#2E72F0' : '#6B7280'} 
+            color={activeTab === 'info' ? '#3A78B5' : '#6B7280'} 
           />
           <Text style={[styles.tabText, activeTab === 'info' && styles.activeTabText]}>
             Information
@@ -224,7 +224,7 @@ const ClientDetailsPage: React.FC = () => {
           <Ionicons 
             name="people-outline" 
             size={20} 
-            color={activeTab === 'staffs' ? '#2E72F0' : '#6B7280'} 
+            color={activeTab === 'staffs' ? '#3A78B5' : '#6B7280'} 
           />
           <Text style={[styles.tabText, activeTab === 'staffs' && styles.activeTabText]}>
             Staff ({client.staffs?.length || 0})
@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2E72F0',
+    color: '#3A78B5',
   },
   headerContent: {
     flex: 1,
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
   },
   activeTab: {
     borderBottomWidth: 2,
-    borderBottomColor: '#2E72F0',
+    borderBottomColor: '#3A78B5',
   },
   tabText: {
     fontSize: 14,
@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   activeTabText: {
-    color: '#2E72F0',
+    color: '#3A78B5',
   },
   tabContent: {
     flex: 1,

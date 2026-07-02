@@ -43,7 +43,7 @@ const OnboardingDemo: React.FC = () => {
     return (
         <View style={styles.container}>
             <View style={styles.card}>
-                <Ionicons name="information-circle-outline" size={48} color="#2E72F0" />
+                <Ionicons name="information-circle-outline" size={48} color="#3A78B5" />
                 <Text style={styles.title}>Onboarding Status</Text>
                 
                 <View style={styles.statusContainer}>
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 20,
         fontWeight: '700',
-        color: '#1A54C4', // Indigo
+        color: '#295E94', // Indigo
         marginTop: 16,
         marginBottom: 16,
     },
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
     version: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#1A54C4',
+        color: '#295E94',
         backgroundColor: '#EAF0FE',
         paddingHorizontal: 8,
         paddingVertical: 2,

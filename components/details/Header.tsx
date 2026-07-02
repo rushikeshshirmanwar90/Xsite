@@ -216,9 +216,9 @@ const Header: React.FC<HeaderProps> = ({
                             activeOpacity={0.7}
                         >
                             {isGeneratingReport ? (
-                                <Ionicons name="sync" size={18} color="#2E72F0" />
+                                <Ionicons name="sync" size={18} color="#3A78B5" />
                             ) : (
-                                <Ionicons name="document-text-outline" size={20} color="#2E72F0" />
+                                <Ionicons name="document-text-outline" size={20} color="#3A78B5" />
                             )}
                         </TouchableOpacity>
                     )}

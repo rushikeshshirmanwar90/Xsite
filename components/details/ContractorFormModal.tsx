@@ -274,7 +274,7 @@ export const ContractorFormModal: React.FC<ContractorFormModalProps> = ({
               }}
             >
               {loadingStaff ? (
-                <ActivityIndicator size="small" color="#2E72F0" style={{ marginRight: 8 }} />
+                <ActivityIndicator size="small" color="#3A78B5" style={{ marginRight: 8 }} />
               ) : null}
               <Text style={[styles.selectorText, !selectedStaffId && styles.selectorPlaceholderText]}>
                 {selectedStaffObj
@@ -324,7 +324,7 @@ export const ContractorFormModal: React.FC<ContractorFormModalProps> = ({
                           <Text style={styles.staffMetaText}>{staff.role} • {staff.phoneNumber}</Text>
                         </View>
                         {selectedStaffId === staff._id && (
-                          <Ionicons name="checkmark" size={18} color="#2E72F0" />
+                          <Ionicons name="checkmark" size={18} color="#3A78B5" />
                         )}
                       </TouchableOpacity>
                     ))}
@@ -379,7 +379,7 @@ export const ContractorFormModal: React.FC<ContractorFormModalProps> = ({
                     >
                       <Text style={styles.categoryText}>{cat}</Text>
                       {selectedCategory === cat && (
-                        <Ionicons name="checkmark" size={18} color="#2E72F0" />
+                        <Ionicons name="checkmark" size={18} color="#3A78B5" />
                       )}
                     </TouchableOpacity>
                   ))}
@@ -420,7 +420,7 @@ export const ContractorFormModal: React.FC<ContractorFormModalProps> = ({
                   <Ionicons
                     name={option.icon as any}
                     size={20}
-                    color={paymentSchedule === option.value ? '#2E72F0' : '#94A3B8'}
+                    color={paymentSchedule === option.value ? '#3A78B5' : '#94A3B8'}
                   />
                   <Text
                     style={[
@@ -440,7 +440,7 @@ export const ContractorFormModal: React.FC<ContractorFormModalProps> = ({
                   </Text>
                   {paymentSchedule === option.value && (
                     <View style={styles.scheduleCheck}>
-                      <Ionicons name="checkmark-circle" size={18} color="#2E72F0" />
+                      <Ionicons name="checkmark-circle" size={18} color="#3A78B5" />
                     </View>
                   )}
                 </TouchableOpacity>
@@ -550,7 +550,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   dropdownActive: {
-    borderColor: '#2E72F0',
+    borderColor: '#3A78B5',
     backgroundColor: '#FFFFFF',
   },
   disabledDropdownSelector: {
@@ -663,7 +663,7 @@ const styles = StyleSheet.create({
     flex: 2,
     paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -688,7 +688,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   scheduleOptionSelected: {
-    borderColor: '#2E72F0',
+    borderColor: '#3A78B5',
     backgroundColor: '#EAF0FE',
   },
   scheduleLabel: {
@@ -707,7 +707,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   scheduleDescSelected: {
-    color: '#2E72F0',
+    color: '#3A78B5',
   },
   scheduleCheck: {
     position: 'absolute',

@@ -2,7 +2,6 @@ import { Project } from '@/types/project';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, Alert, Modal } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { domain } from '@/lib/domain';
 import apiClient from '@/utils/axiosConfig';
 import { toast } from 'sonner-native';
@@ -155,7 +154,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userT
 
     // const statusColor = getStatusColor(project.status);
 
-    const statusColor = project.isAccessible === false ? '#EF4444' : projectCompleted ? '#10B981' : '#2E72F0';
+    const statusColor = project.isAccessible === false ? '#EF4444' : projectCompleted ? '#22C55E' : '#3A78B5';
     const statusLabel = project.isAccessible === false ? 'Blocked' : projectCompleted ? 'Completed' : 'In Progress';
     const statusPillBg = project.isAccessible === false ? styles.statusPillBlocked : projectCompleted ? styles.statusPillCompleted : styles.statusPillOngoing;
     const progressColor = budgetProgress > 90 ? '#EF4444' : budgetProgress > 70 ? '#F59E0B' : '#10B981';
@@ -175,13 +174,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userT
     return (
         <View style={styles.cardShadowWrap}>
             <View style={styles.card}>
-                {/* Blue accent bar across the top of every card */}
-                <LinearGradient
-                    colors={['#2E72F0', '#1A54C4']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.topAccentBar}
-                />
+                {/* Solid primary accent bar */}
+                <View style={styles.topAccentBar} />
 
                 {/* Corner badge: project status pill, anchored top-right; options button sits below it */}
                 <View style={[styles.cornerBadge, statusPillBg]}>
@@ -204,13 +198,13 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userT
                             {/* Row 1: location icon + name/address */}
                             <View style={styles.row}>
                                 <View style={styles.rowIconChip}>
-                                    <Ionicons name="location" size={16} color="#2E72F0" />
+                                    <Ionicons name="location" size={16} color="#3A78B5" />
                                 </View>
                                 <View style={styles.rowTextBlock}>
                                     <View style={styles.titleLine}>
                                         <Text style={styles.rowPrimaryText} numberOfLines={1}>{project.name}</Text>
                                         {projectPinned && userType === 'admin' && (
-                                            <Ionicons name="bookmark" size={13} color="#EE730C" style={styles.pinIcon} />
+                                            <Ionicons name="bookmark" size={13} color="#3A78B5" style={styles.pinIcon} />
                                         )}
                                     </View>
                                     <View style={styles.addressLine}>
@@ -222,8 +216,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userT
 
                             {/* Row 2: manager/team icon + names/role */}
                             <View style={styles.row}>
-                                <View style={[styles.rowIconChip, { backgroundColor: 'rgba(245,158,11,0.10)' }]}>
-                                    <Ionicons name="person" size={16} color="#D97706" />
+                                <View style={styles.rowIconChip}>
+                                    <Ionicons name="person" size={16} color="#3A78B5" />
                                 </View>
                                 <View style={styles.rowTextBlock}>
                                     <Text style={styles.rowPrimaryText} numberOfLines={1}>{staffNames}</Text>
@@ -237,8 +231,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userT
                     {/* Row 3 (optional): client */}
                     {project.clientName && (
                         <View style={styles.row}>
-                            <View style={[styles.rowIconChip, { backgroundColor: 'rgba(99,102,241,0.10)' }]}>
-                                <Ionicons name="briefcase" size={16} color="#2E72F0" />
+                            <View style={styles.rowIconChip}>
+                                <Ionicons name="briefcase" size={16} color="#3A78B5" />
                             </View>
                             <View style={styles.rowTextBlock}>
                                 <Text style={styles.rowPrimaryText} numberOfLines={1}>{project.clientName}</Text>
@@ -344,10 +338,10 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewDetails, userT
                                 disabled={isUpdatingPin}
                                 activeOpacity={0.7}
                             >
-                                <Ionicons 
-                                    name={projectPinned ? "bookmark" : "bookmark-outline"} 
-                                    size={20} 
-                                    color={projectPinned ? "#EE730C" : "#6B7280"} 
+                                <Ionicons
+                                    name={projectPinned ? "bookmark" : "bookmark-outline"}
+                                    size={20}
+                                    color={projectPinned ? "#3A78B5" : "#64748B"}
                                 />
                                 <Text style={[
                                     styles.optionText,
@@ -409,6 +403,7 @@ const styles = StyleSheet.create({
     topAccentBar: {
         height: 4,
         width: '100%',
+        backgroundColor: '#3A78B5',
     },
     cardInner: {
         padding: 18,
@@ -423,7 +418,7 @@ const styles = StyleSheet.create({
         width: 32,
         height: 32,
         borderRadius: 10,
-        backgroundColor: 'rgba(59,130,246,0.10)',
+        backgroundColor: '#DCEEFF',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -464,11 +459,13 @@ const styles = StyleSheet.create({
         zIndex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#DCEEFF',
         borderRadius: 999,
         paddingHorizontal: 9,
         paddingVertical: 4,
         gap: 4,
+        borderWidth: 1,
+        borderColor: '#B8D8F8',
     },
     cornerOptionsButton: {
         position: 'absolute',
@@ -481,13 +478,13 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     statusPillOngoing: {
-        backgroundColor: 'rgba(59,130,246,0.10)',
+        backgroundColor: '#DCEEFF',
     },
     statusPillCompleted: {
-        backgroundColor: 'rgba(16,185,129,0.10)',
+        backgroundColor: '#F0FDF4',
     },
     statusPillBlocked: {
-        backgroundColor: 'rgba(239,68,68,0.10)',
+        backgroundColor: '#FEF2F2',
     },
     statusDot: {
         width: 6,
@@ -580,7 +577,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
         paddingVertical: 13,
         borderRadius: 14,
         gap: 8,
@@ -650,10 +647,10 @@ const styles = StyleSheet.create({
         color: '#10B981',
     },
     optionTextPinned: {
-        color: '#EE730C',
+        color: '#3A78B5',
     },
     optionTextFeatured: {
-        color: '#2E72F0',
+        color: '#3A78B5',
     },
     optionTextDisabled: {
         color: '#9CA3AF',

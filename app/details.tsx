@@ -158,7 +158,7 @@ const SwipeableMiniSection = ({
                             backgroundColor: selectedMiniSection === section._id ? '#EAF0FE' : '#FFFFFF',
                             borderRadius: 9,
                             borderWidth: selectedMiniSection === section._id ? 2 : 1,
-                            borderColor: selectedMiniSection === section._id ? '#2E72F0' : '#E2E8F0',
+                            borderColor: selectedMiniSection === section._id ? '#3A78B5' : '#E2E8F0',
                             shadowColor: '#000',
                             shadowOffset: { width: 0, height: 1 },
                             shadowOpacity: 0.04,
@@ -209,7 +209,7 @@ const SwipeableMiniSection = ({
                                 style={{
                                     fontSize: 12,
                                     fontWeight: '600',
-                                    color: selectedMiniSection === section._id ? '#2E72F0' : '#374151',
+                                    color: selectedMiniSection === section._id ? '#3A78B5' : '#374151',
                                     marginBottom: 1,
                                 }}
                                 numberOfLines={1}
@@ -226,7 +226,7 @@ const SwipeableMiniSection = ({
 
                         {/* Selection Indicator */}
                         {selectedMiniSection === section._id && (
-                            <Ionicons name="checkmark-circle" size={18} color="#2E72F0" />
+                            <Ionicons name="checkmark-circle" size={18} color="#3A78B5" />
                         )}
                     </TouchableOpacity>
                 </Animated.View>
@@ -253,7 +253,7 @@ const PhaseListRow = ({
             style={{
                 flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 13,
                 borderRadius: 12, borderWidth: isActive ? 2 : 1,
-                borderColor: isActive ? '#2E72F0' : '#E2E8F0',
+                borderColor: isActive ? '#3A78B5' : '#E2E8F0',
                 backgroundColor: isActive ? '#EAF0FE' : '#FFFFFF', marginBottom: 8,
                 shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2, elevation: 1,
             }}
@@ -267,7 +267,7 @@ const PhaseListRow = ({
                 <Ionicons name={meta?.icon as any || 'ellipse-outline'} size={18} color={meta?.color || '#94A3B8'} />
             </View>
             <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: isActive ? '#2E72F0' : '#1E293B' }}>{phase.name}</Text>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: isActive ? '#3A78B5' : '#1E293B' }}>{phase.name}</Text>
                 <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>
                     {meta?.label} · {phase.progress}% complete
                     {phase.subPhases?.length > 0 ? ` · ${phase.subPhases.length} sub-phases` : ''}
@@ -279,7 +279,7 @@ const PhaseListRow = ({
                 </View>
                 <Text style={{ fontSize: 11, fontWeight: '700', color: meta?.color || '#94A3B8', marginTop: 3 }}>{phase.progress}%</Text>
             </View>
-            {isActive && <Ionicons name="checkmark-circle" size={20} color="#2E72F0" style={{ marginLeft: 8 }} />}
+            {isActive && <Ionicons name="checkmark-circle" size={20} color="#3A78B5" style={{ marginLeft: 8 }} />}
         </TouchableOpacity>
     );
 };
@@ -2551,16 +2551,16 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     // Function to get material icon and color based on material name
     const getMaterialIconAndColor = (materialName: string) => {
         const materialMap: { [key: string]: { icon: keyof typeof import('@expo/vector-icons').Ionicons.glyphMap, color: string } } = {
-            'cement': { icon: 'cube-outline', color: '#8B5CF6' },
+            'cement': { icon: 'cube-outline', color: '#3A78B5' },
             'brick': { icon: 'square-outline', color: '#EF4444' },
             'steel': { icon: 'barbell-outline', color: '#6B7280' },
-            'sand': { icon: 'layers-outline', color: '#EE730C' },
+            'sand': { icon: 'layers-outline', color: '#F59E0B' },
             'gravel': { icon: 'diamond-outline', color: '#10B981' },
-            'concrete': { icon: 'cube', color: '#2E72F0' },
+            'concrete': { icon: 'cube', color: '#3A78B5' },
             'wood': { icon: 'leaf-outline', color: '#84CC16' },
             'paint': { icon: 'color-palette-outline', color: '#EC4899' },
             'tile': { icon: 'grid-outline', color: '#06B6D4' },
-            'pipe': { icon: 'ellipse-outline', color: '#8B5CF6' },
+            'pipe': { icon: 'ellipse-outline', color: '#3A78B5' },
         };
 
         const lowerName = materialName.toLowerCase();
@@ -4553,7 +4553,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                             {/* Add Button */}
                                             <TouchableOpacity
                                                 style={{
-                                                    backgroundColor: '#2E72F0',
+                                                    backgroundColor: '#3A78B5',
                                                     width: 30,
                                                     height: 30,
                                                     borderRadius: 7,
@@ -4632,7 +4632,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                             const activePhase = activePhaseFromTracker || defaultPhaseObject;
                             const STATUS_META: Record<string, { label: string; color: string }> = {
                                 NOT_STARTED: { label: 'Not Started', color: '#94A3B8' },
-                                IN_PROGRESS: { label: 'In Progress', color: '#2E72F0' },
+                                IN_PROGRESS: { label: 'In Progress', color: '#3A78B5' },
                                 ON_HOLD: { label: 'On Hold', color: '#F59E0B' },
                                 COMPLETED: { label: 'Completed', color: '#10B981' },
                             };
@@ -4653,7 +4653,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                             backgroundColor: '#EAF0FE',
                                             alignItems: 'center', justifyContent: 'center', marginRight: 9,
                                         }}>
-                                            <Ionicons name="construct-outline" size={16} color="#2E72F0" />
+                                            <Ionicons name="construct-outline" size={16} color="#3A78B5" />
                                         </View>
                                         <View style={{ flex: 1 }}>
                                             <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
@@ -4675,7 +4675,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                 <Text style={{ fontSize: 16, fontWeight: '800', color: '#1E293B', marginRight: 6, flexShrink: 1 }} numberOfLines={1}>
                                                     {activePhase.name}
                                                 </Text>
-                                                <Text style={{ fontSize: 12, fontWeight: '600', color: '#2E72F0' }}>
+                                                <Text style={{ fontSize: 12, fontWeight: '600', color: '#3A78B5' }}>
                                                     Change ›
                                                 </Text>
                                             </TouchableOpacity>
@@ -4722,8 +4722,8 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                                     style={{
                                                                         flex: 1, alignItems: 'center', paddingVertical: 8,
                                                                         borderRadius: 8, borderWidth: 1,
-                                                                        borderColor: isSelected ? STATUS_META[activePhase.status]?.color || '#2E72F0' : '#E2E8F0',
-                                                                        backgroundColor: isSelected ? (STATUS_META[activePhase.status]?.color || '#2E72F0') + '15' : 'transparent',
+                                                                        borderColor: isSelected ? STATUS_META[activePhase.status]?.color || '#3A78B5' : '#E2E8F0',
+                                                                        backgroundColor: isSelected ? (STATUS_META[activePhase.status]?.color || '#3A78B5') + '15' : 'transparent',
                                                                     }}
                                                                     onPress={() => updatePhaseProgress(activePhase, pct)}
                                                                     disabled={isSaving}
@@ -4731,7 +4731,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                                 >
                                                                     <Text style={{
                                                                         fontSize: 12, fontWeight: '700',
-                                                                        color: isSelected ? STATUS_META[activePhase.status]?.color || '#2E72F0' : '#64748B',
+                                                                        color: isSelected ? STATUS_META[activePhase.status]?.color || '#3A78B5' : '#64748B',
                                                                     }}>{pct}%</Text>
                                                                 </TouchableOpacity>
                                                             );
@@ -4796,8 +4796,8 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                                                     style={{
                                                                                         flex: 1, alignItems: 'center', paddingVertical: 5,
                                                                                         borderRadius: 6, borderWidth: 1,
-                                                                                        borderColor: sp.progress === pct ? spMeta?.color || '#2E72F0' : '#E2E8F0',
-                                                                                        backgroundColor: sp.progress === pct ? (spMeta?.color || '#2E72F0') + '15' : 'transparent',
+                                                                                        borderColor: sp.progress === pct ? spMeta?.color || '#3A78B5' : '#E2E8F0',
+                                                                                        backgroundColor: sp.progress === pct ? (spMeta?.color || '#3A78B5') + '15' : 'transparent',
                                                                                     }}
                                                                                     onPress={() => updateSubPhaseProgress(activePhase, sp, pct)}
                                                                                     disabled={isSaving}
@@ -4805,7 +4805,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                                                 >
                                                                                     <Text style={{
                                                                                         fontSize: 11, fontWeight: '700',
-                                                                                        color: sp.progress === pct ? spMeta?.color || '#2E72F0' : '#64748B',
+                                                                                        color: sp.progress === pct ? spMeta?.color || '#3A78B5' : '#64748B',
                                                                                     }}>{pct}%</Text>
                                                                                 </TouchableOpacity>
                                                                             ))}
@@ -4859,7 +4859,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                     }) || '0deg'
                                 }]
                             }}>
-                                <Ionicons name="sync" size={48} color="#2E72F0" />
+                                <Ionicons name="sync" size={48} color="#3A78B5" />
                             </Animated.View>
                             <Text style={styles.noMaterialsTitle}>Loading Materials...</Text>
                             <Text style={styles.noMaterialsDescription}>
@@ -4884,13 +4884,13 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                         flexDirection: 'row',
                                                         alignItems: 'center',
                                                         justifyContent: 'center',
-                                                        backgroundColor: '#2E72F0',
+                                                        backgroundColor: '#3A78B5',
                                                         paddingVertical: 12,
                                                         paddingHorizontal: 24,
                                                         borderRadius: 10,
                                                         gap: 8,
                                                         marginTop: 8,
-                                                        shadowColor: '#2E72F0',
+                                                        shadowColor: '#3A78B5',
                                                         shadowOffset: { width: 0, height: 4 },
                                                         shadowOpacity: 0.3,
                                                         shadowRadius: 8,
@@ -5004,13 +5004,13 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                             flexDirection: 'row',
                                             alignItems: 'center',
                                             justifyContent: 'center',
-                                            backgroundColor: '#2E72F0',
+                                            backgroundColor: '#3A78B5',
                                             paddingVertical: 12,
                                             paddingHorizontal: 24,
                                             borderRadius: 10,
                                             gap: 8,
                                             marginTop: 8,
-                                            shadowColor: '#2E72F0',
+                                            shadowColor: '#3A78B5',
                                             shadowOffset: { width: 0, height: 4 },
                                             shadowOpacity: 0.3,
                                             shadowRadius: 8,
@@ -5050,7 +5050,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                             }) || '0deg'
                                         }]
                                     }}>
-                                        <Ionicons name="sync" size={20} color="#2E72F0" />
+                                        <Ionicons name="sync" size={20} color="#3A78B5" />
                                     </Animated.View>
                                     <Text style={paginationStyles.loadingText}>Loading page...</Text>
                                 </View>
@@ -5070,7 +5070,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                     <Ionicons
                                         name="chevron-back"
                                         size={20}
-                                        color={(currentPage === 1 || apiLoading) ? '#CBD5E1' : '#2E72F0'}
+                                        color={(currentPage === 1 || apiLoading) ? '#CBD5E1' : '#3A78B5'}
                                     />
                                     <Text style={[
                                         paginationStyles.paginationButtonText,
@@ -5149,7 +5149,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                     <Ionicons
                                         name="chevron-forward"
                                         size={20}
-                                        color={(currentPage === totalPages || apiLoading) ? '#CBD5E1' : '#2E72F0'}
+                                        color={(currentPage === totalPages || apiLoading) ? '#CBD5E1' : '#3A78B5'}
                                     />
                                 </TouchableOpacity>
                             </View>
@@ -5251,7 +5251,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                             style={sectionStyles.dateButton}
                             onPress={() => setShowStartPicker(true)}
                         >
-                            <Ionicons name="calendar" size={20} color="#2E72F0" />
+                            <Ionicons name="calendar" size={20} color="#3A78B5" />
                             <Text style={sectionStyles.dateButtonText}>
                                 {customStartDate.toLocaleDateString()}
                             </Text>
@@ -5262,7 +5262,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                             style={sectionStyles.dateButton}
                             onPress={() => setShowEndPicker(true)}
                         >
-                            <Ionicons name="calendar" size={20} color="#2E72F0" />
+                            <Ionicons name="calendar" size={20} color="#3A78B5" />
                             <Text style={sectionStyles.dateButtonText}>
                                 {customEndDate.toLocaleDateString()}
                             </Text>
@@ -5617,12 +5617,12 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
                             <TouchableOpacity
                                 style={{
-                                    backgroundColor: '#2E72F0',
+                                    backgroundColor: '#3A78B5',
                                     paddingVertical: 12,
                                     paddingHorizontal: 20,
                                     borderRadius: 10,
                                     alignItems: 'center',
-                                    shadowColor: '#2E72F0',
+                                    shadowColor: '#3A78B5',
                                     shadowOffset: { width: 0, height: 1 },
                                     shadowOpacity: 0.15,
                                     shadowRadius: 2,
@@ -5785,7 +5785,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                             <Ionicons
                                 name={sectionCompleted ? "refresh-circle" : "checkmark-circle"}
                                 size={48}
-                                color={sectionCompleted ? "#EE730C" : "#059669"}
+                                color={sectionCompleted ? "#F59E0B" : "#059669"}
                             />
                             <Text style={confirmModalStyles.modalTitle}>
                                 {sectionCompleted ? 'Reopen Section?' : 'Complete Section?'}
@@ -5907,7 +5907,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                     backgroundColor: !selectedMiniSection ? '#EAF0FE' : '#FFFFFF',
                                     borderRadius: 9,
                                     borderWidth: !selectedMiniSection ? 2 : 1,
-                                    borderColor: !selectedMiniSection ? '#2E72F0' : '#E2E8F0',
+                                    borderColor: !selectedMiniSection ? '#3A78B5' : '#E2E8F0',
                                     marginBottom: 8,
                                     shadowColor: '#000',
                                     shadowOffset: { width: 0, height: 1 },
@@ -5924,7 +5924,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                     width: 28,
                                     height: 28,
                                     borderRadius: 14,
-                                    backgroundColor: !selectedMiniSection ? '#2E72F0' : '#F3F4F6',
+                                    backgroundColor: !selectedMiniSection ? '#3A78B5' : '#F3F4F6',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     marginRight: 8,
@@ -5939,7 +5939,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                     <Text style={{
                                         fontSize: 12,
                                         fontWeight: '600',
-                                        color: !selectedMiniSection ? '#2E72F0' : '#374151',
+                                        color: !selectedMiniSection ? '#3A78B5' : '#374151',
                                         marginBottom: 1,
                                     }}>
                                         All Sections
@@ -5952,7 +5952,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                     </Text>
                                 </View>
                                 {!selectedMiniSection && (
-                                    <Ionicons name="checkmark-circle" size={18} color="#2E72F0" />
+                                    <Ionicons name="checkmark-circle" size={18} color="#3A78B5" />
                                 )}
                             </TouchableOpacity>
 
@@ -6061,7 +6061,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                 const miniSec = getActiveMiniSection();
                                 const STATUS_META: Record<string, { label: string; color: string; icon: string }> = {
                                     NOT_STARTED: { label: 'Not Started', color: '#94A3B8', icon: 'ellipse-outline' },
-                                    IN_PROGRESS: { label: 'In Progress', color: '#2E72F0', icon: 'time-outline' },
+                                    IN_PROGRESS: { label: 'In Progress', color: '#3A78B5', icon: 'time-outline' },
                                     ON_HOLD: { label: 'On Hold', color: '#F59E0B', icon: 'pause-circle-outline' },
                                     COMPLETED: { label: 'Completed', color: '#10B981', icon: 'checkmark-circle-outline' },
                                 };
@@ -6109,13 +6109,13 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                 style={{
                                                     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
                                                     gap: 8, marginTop: 8, paddingVertical: 12,
-                                                    borderRadius: 12, borderWidth: 1.5, borderColor: '#2E72F0',
+                                                    borderRadius: 12, borderWidth: 1.5, borderColor: '#3A78B5',
                                                     borderStyle: 'dashed', backgroundColor: '#EAF0FE',
                                                 }}
                                                 activeOpacity={0.7}
                                             >
-                                                <Ionicons name="add-circle-outline" size={18} color="#2E72F0" />
-                                                <Text style={{ fontSize: 14, fontWeight: '700', color: '#2E72F0' }}>Add Next Phase</Text>
+                                                <Ionicons name="add-circle-outline" size={18} color="#3A78B5" />
+                                                <Text style={{ fontSize: 14, fontWeight: '700', color: '#3A78B5' }}>Add Next Phase</Text>
                                             </TouchableOpacity>
                                         )}
                                     </>
@@ -6138,7 +6138,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         {phaseChangeTarget && (() => {
                             const STATUS_META: Record<string, { label: string; color: string; icon: string }> = {
                                 NOT_STARTED: { label: 'Not Started', color: '#94A3B8', icon: 'ellipse-outline' },
-                                IN_PROGRESS: { label: 'In Progress', color: '#2E72F0', icon: 'time-outline' },
+                                IN_PROGRESS: { label: 'In Progress', color: '#3A78B5', icon: 'time-outline' },
                                 ON_HOLD: { label: 'On Hold', color: '#F59E0B', icon: 'pause-circle-outline' },
                                 COMPLETED: { label: 'Completed', color: '#10B981', icon: 'checkmark-circle-outline' },
                             };
@@ -6176,13 +6176,13 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                     <View style={{ alignItems: 'center', marginBottom: 14 }}>
                                         <View style={{
                                             width: 56, height: 56, borderRadius: 28,
-                                            backgroundColor: (isBlocked ? '#EE730C' : targetMeta?.color || '#2E72F0') + '18',
+                                            backgroundColor: (isBlocked ? '#F59E0B' : targetMeta?.color || '#3A78B5') + '18',
                                             alignItems: 'center', justifyContent: 'center', marginBottom: 12,
                                         }}>
                                             <Ionicons
                                                 name={isBlocked ? 'alert-circle-outline' : 'swap-horizontal-outline'}
                                                 size={28}
-                                                color={isBlocked ? '#EE730C' : targetMeta?.color || '#2E72F0'}
+                                                color={isBlocked ? '#F59E0B' : targetMeta?.color || '#3A78B5'}
                                             />
                                         </View>
                                         <Text style={{ fontSize: 17, fontWeight: '800', color: '#1E293B' }}>Switch Phase?</Text>
@@ -6202,7 +6202,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                         <Ionicons name="arrow-forward" size={18} color="#CBD5E1" style={{ marginHorizontal: 8 }} />
                                         <View style={{ flex: 1, alignItems: 'center' }}>
                                             <Text style={{ fontSize: 10, color: '#94A3B8', fontWeight: '600', textTransform: 'uppercase' }}>To</Text>
-                                            <Text style={{ fontSize: 13, fontWeight: '700', color: '#2E72F0', marginTop: 2 }} numberOfLines={1}>
+                                            <Text style={{ fontSize: 13, fontWeight: '700', color: '#3A78B5', marginTop: 2 }} numberOfLines={1}>
                                                 {phaseChangeTarget.name}
                                             </Text>
                                         </View>
@@ -6224,7 +6224,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
                                     <SwipeToConfirmBar
                                         label={isBlocked ? 'Slide to switch anyway' : 'Slide to confirm'}
-                                        color={isBlocked ? '#EE730C' : '#2E72F0'}
+                                        color={isBlocked ? '#F59E0B' : '#3A78B5'}
                                         onConfirm={confirmSwitch}
                                     />
                                 </View>
@@ -6247,7 +6247,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         const activePhase = getActivePhaseForMiniSection();
                         const STATUS_META: Record<string, { label: string; color: string; icon: string }> = {
                             NOT_STARTED: { label: 'Not Started', color: '#94A3B8', icon: 'ellipse-outline' },
-                            IN_PROGRESS: { label: 'In Progress', color: '#2E72F0', icon: 'time-outline' },
+                            IN_PROGRESS: { label: 'In Progress', color: '#3A78B5', icon: 'time-outline' },
                             ON_HOLD: { label: 'On Hold', color: '#F59E0B', icon: 'pause-circle-outline' },
                             COMPLETED: { label: 'Completed', color: '#10B981', icon: 'checkmark-circle-outline' },
                         };
@@ -6308,7 +6308,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                     }}
                                                     activeOpacity={0.7}
                                                 >
-                                                    <Ionicons name="add-circle-outline" size={18} color="#2E72F0" />
+                                                    <Ionicons name="add-circle-outline" size={18} color="#3A78B5" />
                                                     <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: '#1E293B' }}>{name}</Text>
                                                     <Ionicons name="chevron-forward" size={15} color="#94A3B8" />
                                                 </TouchableOpacity>
@@ -6341,7 +6341,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                         />
                                         <TouchableOpacity
                                             style={{
-                                                backgroundColor: customPhaseName.trim() ? '#2E72F0' : '#E2E8F0',
+                                                backgroundColor: customPhaseName.trim() ? '#3A78B5' : '#E2E8F0',
                                                 paddingHorizontal: 16, borderRadius: 10, justifyContent: 'center',
                                             }}
                                             onPress={() => customPhaseName.trim() && addPhaseToTracker(customPhaseName.trim())}
@@ -6529,7 +6529,7 @@ const actionStyles = StyleSheet.create({
         gap: 6,
     },
     completionToggleButtonUndo: {
-        backgroundColor: '#EE730C',
+        backgroundColor: '#F59E0B',
     },
     completionToggleButtonText: {
         fontSize: 14,
@@ -6689,7 +6689,7 @@ const sectionStyles = StyleSheet.create({
         paddingVertical: 10,
         paddingHorizontal: 20,
         borderRadius: 8,
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
     },
     modalApplyText: {
         fontSize: 15,
@@ -6749,7 +6749,7 @@ const paginationStyles = StyleSheet.create({
     },
     paginationButtonText: {
         fontSize: 14,
-        color: '#2E72F0',
+        color: '#3A78B5',
         fontWeight: '500',
     },
     paginationButtonTextDisabled: {
@@ -6771,8 +6771,8 @@ const paginationStyles = StyleSheet.create({
         justifyContent: 'center',
     },
     pageNumberButtonActive: {
-        backgroundColor: '#2E72F0',
-        borderColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
+        borderColor: '#3A78B5',
     },
     pageNumberText: {
         fontSize: 14,
@@ -6856,7 +6856,7 @@ const loadingStyles = StyleSheet.create({
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
     },
 });
 
@@ -6962,7 +6962,7 @@ const confirmModalStyles = StyleSheet.create({
         justifyContent: 'center',
     },
     confirmButtonReopen: {
-        backgroundColor: '#EE730C',
+        backgroundColor: '#F59E0B',
     },
     confirmButtonText: {
         fontSize: 16,

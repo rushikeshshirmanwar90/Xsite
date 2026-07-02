@@ -101,7 +101,7 @@ const OtherCostAnalytics: React.FC = () => {
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color="#2E72F0" />
+              <Ionicons name="arrow-back" size={24} color="#3A78B5" />
             </TouchableOpacity>
             <View style={styles.projectInfo}>
               <Text style={styles.projectName}>Other Costs</Text>
@@ -121,7 +121,7 @@ const OtherCostAnalytics: React.FC = () => {
 
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#8B5CF6" />
+            <ActivityIndicator size="large" color="#3A78B5" />
             <Text style={styles.loadingText}>Loading other cost details...</Text>
           </View>
         ) : details.length === 0 ? (
@@ -137,7 +137,7 @@ const OtherCostAnalytics: React.FC = () => {
             {/* Total Expense Card */}
             <View style={styles.totalCard}>
               <View style={styles.totalIconContainer}>
-                <Ionicons name="receipt" size={32} color="#8B5CF6" />
+                <Ionicons name="receipt" size={32} color="#3A78B5" />
               </View>
               <View style={styles.totalInfo}>
                 <Text style={styles.totalLabel}>TOTAL OTHER COSTS</Text>
@@ -186,7 +186,7 @@ const OtherCostAnalytics: React.FC = () => {
               <View key={entry._id} style={styles.detailCard}>
                 <View style={styles.detailHeader}>
                   <View style={styles.detailIcon}>
-                    <Ionicons name="cash-outline" size={24} color="#8B5CF6" />
+                    <Ionicons name="cash-outline" size={24} color="#3A78B5" />
                   </View>
                   <View style={styles.detailInfo}>
                     <Text style={styles.detailTitle} numberOfLines={1}>{entry.title}</Text>
@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#8B5CF6',
+    color: '#3A78B5',
     marginBottom: 4,
   },
   totalSubtext: {
@@ -416,7 +416,7 @@ const styles = StyleSheet.create({
   detailCost: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#8B5CF6',
+    color: '#3A78B5',
     marginLeft: 8,
   },
   descriptionContainer: {

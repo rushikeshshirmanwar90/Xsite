@@ -13,9 +13,9 @@ import Svg, {
 } from 'react-native-svg';
 
 export const PieChartColors20 = [
-    { primary: '#5DADE2', secondary: '#3498DB' }, // blue
-    { primary: '#EC7063', secondary: '#E74C3C' }, // red
-    { primary: '#F39C12', secondary: '#F1C40F' }, // yellow
+    { primary: '#E2E8F0', secondary: '#3498DB' }, // blue
+    { primary: '#E2E8F0', secondary: '#E74C3C' }, // red
+    { primary: '#F59E0B', secondary: '#F1C40F' }, // yellow
     { primary: '#58D68D', secondary: '#28B463' }, // green
     { primary: '#AF7AC5', secondary: '#8E44AD' }, // purple
     { primary: '#48C9B0', secondary: '#16A085' }, // teal

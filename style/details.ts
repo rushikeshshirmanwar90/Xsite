@@ -34,7 +34,7 @@ export const styles = StyleSheet.create({
     marginBottom: 16,
   },
   addSpecButton: {
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',
@@ -209,7 +209,7 @@ export const styles = StyleSheet.create({
   selectSectionText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#2E72F0',
+    color: '#3A78B5',
   },
   sectionDropdownContainer: {
     marginTop: 10,
@@ -261,7 +261,7 @@ export const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "#2E72F0",
+    backgroundColor: "#3A78B5",
     alignItems: "center",
     justifyContent: "center",
     elevation: 8,
@@ -327,7 +327,7 @@ export const styles = StyleSheet.create({
   },
   editingMaterialItem: {
     backgroundColor: "#EAF0FE",
-    borderColor: "#2E72F0",
+    borderColor: "#3A78B5",
     borderWidth: 1,
   },
   addedMaterialIcon: {
@@ -394,8 +394,8 @@ export const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   templateButtonActive: {
-    backgroundColor: "#2E72F0",
-    borderColor: "#2E72F0",
+    backgroundColor: "#3A78B5",
+    borderColor: "#3A78B5",
   },
   templateButtonText: {
     fontSize: 14,
@@ -501,7 +501,7 @@ export const styles = StyleSheet.create({
     elevation: 2,
   },
   addMaterialButton: {
-    backgroundColor: "#2E72F0",
+    backgroundColor: "#3A78B5",
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: "center",
@@ -776,8 +776,8 @@ export const styles = StyleSheet.create({
     borderColor: '#D1D5DB',
   },
   progressStepActive: {
-    backgroundColor: '#2E72F0',
-    borderColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
+    borderColor: '#3A78B5',
   },
   progressStepNumber: {
     fontSize: 16,
@@ -794,7 +794,7 @@ export const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   progressLineActive: {
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
   },
   progressLabels: {
     flexDirection: 'row',
@@ -809,7 +809,7 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
   progressLabelActive: {
-    color: '#2E72F0',
+    color: '#3A78B5',
   },
   // Step 2 Review Section Styles
   reviewSection: {
@@ -865,7 +865,7 @@ export const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#2E72F0',
+    borderLeftColor: '#3A78B5',
   },
   summaryItemHeader: {
     flexDirection: 'row',
@@ -875,7 +875,7 @@ export const styles = StyleSheet.create({
   summaryItemNumber: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#2E72F0',
+    color: '#3A78B5',
     marginRight: 12,
   },
   summaryItemName: {
@@ -975,13 +975,13 @@ export const styles = StyleSheet.create({
     zIndex: 1000,
   },
   floatingNextButton: {
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
     paddingVertical: 18,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    shadowColor: '#2E72F0',
+    shadowColor: '#3A78B5',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4,
     shadowRadius: 16,
@@ -1018,7 +1018,7 @@ export const styles = StyleSheet.create({
     lineHeight: 20,
   },
   selectSectionButtonLarge: {
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -1055,13 +1055,13 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 10,
     gap: 8,
     marginTop: 16,
-    shadowColor: '#2E72F0',
+    shadowColor: '#3A78B5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -1098,10 +1098,10 @@ export const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#2E72F0',
+    shadowColor: '#3A78B5',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,

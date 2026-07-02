@@ -311,10 +311,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#2E72F0',
   },
   sectionButton: {
-    backgroundColor: '#8B5CF6',
+    backgroundColor: '#3A78B5',
   },
   miniButton: {
-    backgroundColor: '#EE730C',
+    backgroundColor: '#F59E0B',
   },
   clearButton: {
     backgroundColor: '#EF4444',

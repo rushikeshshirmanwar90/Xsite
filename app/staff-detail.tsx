@@ -191,13 +191,13 @@ const StaffDetailScreen: React.FC = () => {
             case 'create':
                 return '#10B981'; // Green
             case 'update':
-                return '#2E72F0'; // Blue
+                return '#3A78B5'; // Blue
             case 'delete':
                 return '#EF4444'; // Red
             case 'assign':
-                return '#8B5CF6'; // Purple
+                return '#3A78B5'; // Purple
             case 'import':
-                return '#EE730C'; // Orange
+                return '#F59E0B'; // Orange
             default:
                 return '#6B7280'; // Gray
         }
@@ -270,14 +270,14 @@ const StaffDetailScreen: React.FC = () => {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        colors={['#2E72F0']}
-                        tintColor="#2E72F0"
+                        colors={['#3A78B5']}
+                        tintColor="#3A78B5"
                     />
                 }
             >
                 {loading ? (
                     <View style={styles.centerContainer}>
-                        <ActivityIndicator size="large" color="#2E72F0" />
+                        <ActivityIndicator size="large" color="#3A78B5" />
                         <Text style={styles.loadingText}>Loading activities...</Text>
                     </View>
                 ) : error ? (
@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
         width: 60,
         height: 60,
         borderRadius: 30,
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 16,
@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
     },
     staffRole: {
         fontSize: 14,
-        color: '#2E72F0',
+        color: '#3A78B5',
         fontWeight: '500',
         marginBottom: 2,
     },
@@ -455,7 +455,7 @@ const styles = StyleSheet.create({
     activityCountNumber: {
         fontSize: 24,
         fontWeight: '700',
-        color: '#2E72F0',
+        color: '#3A78B5',
     },
     activityCountLabel: {
         fontSize: 12,
@@ -487,7 +487,7 @@ const styles = StyleSheet.create({
         marginTop: 16,
         paddingHorizontal: 24,
         paddingVertical: 12,
-        backgroundColor: '#2E72F0',
+        backgroundColor: '#3A78B5',
         borderRadius: 8,
     },
     retryButtonText: {

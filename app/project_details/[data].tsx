@@ -455,7 +455,7 @@ const styles = StyleSheet.create({
   },
   legendItemSelected: {
     backgroundColor: '#F0F7FF',
-    borderColor: '#5DADE2',
+    borderColor: '#E2E8F0',
   },
   legendLeft: {
     flexDirection: 'row',
@@ -530,15 +530,15 @@ const styles = StyleSheet.create({
   },
   statBoxPrimary: {
     borderWidth: 3,
-    borderColor: '#5DADE2',
+    borderColor: '#E2E8F0',
   },
   statBoxSecondary: {
     borderWidth: 3,
-    borderColor: '#EC7063',
+    borderColor: '#E2E8F0',
   },
   statBoxTertiary: {
     borderWidth: 3,
-    borderColor: '#F39C12',
+    borderColor: '#F59E0B',
   },
   statIcon: {
     marginBottom: 8,

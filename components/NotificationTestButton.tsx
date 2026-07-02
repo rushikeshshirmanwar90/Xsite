@@ -30,7 +30,7 @@ const NotificationTestButton: React.FC = () => {
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,

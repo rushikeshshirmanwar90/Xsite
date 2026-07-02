@@ -1007,7 +1007,7 @@ const ComprehensivePushTokenTest: React.FC = () => {
       case 'pending':
         return <Ionicons name="ellipse-outline" size={16} color="#9CA3AF" />;
       case 'running':
-        return <ActivityIndicator size="small" color="#2E72F0" />;
+        return <ActivityIndicator size="small" color="#3A78B5" />;
       case 'success':
         return <Ionicons name="checkmark-circle" size={16} color="#10B981" />;
       case 'warning':
@@ -1022,11 +1022,11 @@ const ComprehensivePushTokenTest: React.FC = () => {
       case 'pending':
         return '#9CA3AF';
       case 'running':
-        return '#2E72F0';
+        return '#3A78B5';
       case 'success':
         return '#10B981';
       case 'warning':
-        return '#EE730C';
+        return '#F59E0B';
       case 'error':
         return '#EF4444';
     }
@@ -1039,7 +1039,7 @@ const ComprehensivePushTokenTest: React.FC = () => {
     const isRunning = suite.status === 'running';
 
     if (isRunning) {
-      return <ActivityIndicator size="small" color="#2E72F0" />;
+      return <ActivityIndicator size="small" color="#3A78B5" />;
     } else if (hasError) {
       return <Ionicons name="close-circle" size={20} color="#EF4444" />;
     } else if (hasWarning) {
@@ -1203,7 +1203,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryButton: {
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
   },
   secondaryButton: {
     backgroundColor: '#FFFFFF',

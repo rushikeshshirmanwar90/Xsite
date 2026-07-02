@@ -26,7 +26,7 @@ const NotificationBanners: React.FC<NotificationBannersProps> = ({
             {/* Pending Approvals Alert */}
             {pendingApprovals > 0 && (
                 <View style={styles.approvalAlert}>
-                    <Ionicons name="alert-circle" size={20} color="#EE730C" />
+                    <Ionicons name="alert-circle" size={20} color="#F59E0B" />
                     <Text style={styles.approvalAlertText}>
                         {pendingApprovals} request{pendingApprovals > 1 ? 's' : ''} pending your approval
                     </Text>

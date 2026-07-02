@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F9FF',
     borderRadius: 8,
     borderLeftWidth: 3,
-    borderLeftColor: '#0EA5E9',
+    borderLeftColor: '#3A78B5',
   },
   characteristicsTitle: {
     fontSize: 14,

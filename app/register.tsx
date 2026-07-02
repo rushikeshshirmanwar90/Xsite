@@ -5,7 +5,6 @@ import { generateOTP } from '@/lib/functions';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from '@/utils/axiosConfig';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState, useEffect } from 'react';
@@ -325,7 +324,7 @@ export default function RegisterScreen() {
                         <View style={styles.formContainer}>
                             <View style={styles.headerSection}>
                                 <Animated.View style={[styles.iconContainer, { transform: [{ scale: scaleAnim }] }]}>
-                                    <Ionicons name="person-add" size={32} color="#2E72F0" />
+                                    <Ionicons name="person-add" size={32} color="#3A78B5" />
                                 </Animated.View>
                                 <Text style={styles.welcomeText}>Create Staff Account</Text>
                                 <Text style={styles.stepDescription}>
@@ -403,7 +402,7 @@ export default function RegisterScreen() {
                                             toast.info('Email verification reset. You can now enter a different email address');
                                         }}
                                     >
-                                        <Ionicons name="mail" size={16} color="#2E72F0" />
+                                        <Ionicons name="mail" size={16} color="#3A78B5" />
                                         <Text style={styles.changeEmailButtonVerifiedText}>Change Email</Text>
                                     </TouchableOpacity>
                                 )}
@@ -416,10 +415,10 @@ export default function RegisterScreen() {
                                         disabled={sendingOtp || !email.trim()}
                                     >
                                         {sendingOtp ? (
-                                            <ActivityIndicator size="small" color="#2E72F0" />
+                                            <ActivityIndicator size="small" color="#3A78B5" />
                                         ) : (
                                             <>
-                                                <Ionicons name="mail-outline" size={18} color="#2E72F0" />
+                                                <Ionicons name="mail-outline" size={18} color="#3A78B5" />
                                                 <Text style={styles.verifyButtonText}>Verify Email</Text>
                                             </>
                                         )}
@@ -431,7 +430,7 @@ export default function RegisterScreen() {
                                     <View style={styles.otpContainer}>
                                         {/* Email Display */}
                                         <View style={styles.emailDisplayContainer}>
-                                            <MaterialIcons name="email" size={16} color="#2E72F0" />
+                                            <MaterialIcons name="email" size={16} color="#3A78B5" />
                                             <Text style={styles.emailDisplayText}>
                                                 Verifying: {email}
                                             </Text>
@@ -518,16 +517,11 @@ export default function RegisterScreen() {
                             <View style={styles.buttonSection}>
                                 {/* Register Button */}
                                 <TouchableOpacity
-                                    style={styles.button}
+                                    style={[styles.button, loading && { opacity: 0.7 }]}
                                     onPress={handleRegister}
                                     disabled={loading}
                                 >
-                                    <LinearGradient
-                                        colors={['#2E72F0', '#1A54C4']}
-                                        style={styles.buttonGradient}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 1 }}
-                                    >
+                                    <View style={styles.buttonInner}>
                                         {loading ? (
                                             <ActivityIndicator color="white" />
                                         ) : (
@@ -536,7 +530,7 @@ export default function RegisterScreen() {
                                                 <Text style={styles.buttonText}>Create Account</Text>
                                             </>
                                         )}
-                                    </LinearGradient>
+                                    </View>
                                 </TouchableOpacity>
 
                                 {/* Back to Login */}
@@ -544,7 +538,7 @@ export default function RegisterScreen() {
                                     style={styles.secondaryButton}
                                     onPress={() => router.back()}
                                 >
-                                    <Ionicons name="arrow-back" size={18} color="#2E72F0" style={{ marginRight: 8 }} />
+                                    <Ionicons name="arrow-back" size={18} color="#3A78B5" style={{ marginRight: 8 }} />
                                     <Text style={styles.secondaryButtonText}>Back to Login</Text>
                                 </TouchableOpacity>
                             </View>
@@ -557,7 +551,7 @@ export default function RegisterScreen() {
             {isNavigating && (
                 <View style={styles.navigatingOverlay}>
                     <View style={styles.navigatingContainer}>
-                        <ActivityIndicator size="large" color="#2E72F0" />
+                        <ActivityIndicator size="large" color="#3A78B5" />
                         <Text style={styles.navigatingText}>Setting up your account...</Text>
                     </View>
                 </View>
@@ -630,7 +624,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 16,
-        shadowColor: '#2E72F0',
+        shadowColor: '#3A78B5',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.1,
         shadowRadius: 8,
@@ -737,7 +731,7 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
     dropdownItemTextActive: {
-        color: '#2E72F0',
+        color: '#3A78B5',
         fontWeight: '700',
     },
     helperText: {
@@ -749,7 +743,7 @@ const styles = StyleSheet.create({
     button: {
         borderRadius: 16,
         overflow: 'hidden',
-        shadowColor: '#2E72F0',
+        shadowColor: '#3A78B5',
         shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.25,
         shadowRadius: 12,
@@ -761,6 +755,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'center',
     },
+    buttonInner: {
+        backgroundColor: '#3A78B5',
+        paddingVertical: 18,
+        alignItems: 'center',
+        flexDirection: 'row',
+        justifyContent: 'center',
+        borderRadius: 16,
+    },
     buttonText: {
         color: 'white',
         fontSize: 18,
@@ -769,7 +771,7 @@ const styles = StyleSheet.create({
     secondaryButton: {
         backgroundColor: 'transparent',
         borderWidth: 2,
-        borderColor: '#2E72F0',
+        borderColor: '#3A78B5',
         borderRadius: 16,
         paddingVertical: 16,
         flexDirection: 'row',
@@ -777,7 +779,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     secondaryButtonText: {
-        color: '#2E72F0',
+        color: '#3A78B5',
         fontSize: 16,
         fontWeight: '600',
     },
@@ -787,19 +789,19 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         backgroundColor: '#EAF0FE',
         borderWidth: 2,
-        borderColor: '#2E72F0',
+        borderColor: '#3A78B5',
         borderRadius: 16,
         paddingVertical: 14,
         marginBottom: 16,
         gap: 8,
-        shadowColor: '#2E72F0',
+        shadowColor: '#3A78B5',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
         elevation: 2,
     },
     verifyButtonText: {
-        color: '#2E72F0',
+        color: '#3A78B5',
         fontSize: 15,
         fontWeight: '600',
     },
@@ -849,13 +851,13 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: 'transparent',
         borderWidth: 2,
-        borderColor: '#2E72F0',
+        borderColor: '#3A78B5',
         borderRadius: 16,
         paddingVertical: 14,
         alignItems: 'center',
     },
     resendButtonText: {
-        color: '#2E72F0',
+        color: '#3A78B5',
         fontSize: 15,
         fontWeight: '600',
     },
@@ -882,19 +884,19 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         backgroundColor: '#EAF0FE',
         borderWidth: 2,
-        borderColor: '#2E72F0',
+        borderColor: '#3A78B5',
         borderRadius: 16,
         paddingVertical: 12,
         marginBottom: 16,
         gap: 6,
-        shadowColor: '#2E72F0',
+        shadowColor: '#3A78B5',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
         elevation: 2,
     },
     changeEmailButtonVerifiedText: {
-        color: '#2E72F0',
+        color: '#3A78B5',
         fontSize: 14,
         fontWeight: '600',
     },
@@ -949,7 +951,7 @@ const styles = StyleSheet.create({
         marginTop: 20,
         fontSize: 17,
         fontWeight: '600',
-        color: '#2E72F0',
+        color: '#3A78B5',
         textAlign: 'center',
     },
 });

@@ -654,7 +654,7 @@ const AnalyticsDashboard: React.FC = () => {
           onPress={handlePhasesBackPress}
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={18} color="#2E72F0" />
+          <Ionicons name="arrow-back" size={18} color="#3A78B5" />
           <Text style={styles.backButtonText}>Back to Projects</Text>
         </TouchableOpacity>
 
@@ -695,13 +695,13 @@ const AnalyticsDashboard: React.FC = () => {
             onPress={handlePhasesBackPress}
             style={styles.backButton}
           >
-            <Ionicons name="arrow-back" size={18} color="#2E72F0" />
+            <Ionicons name="arrow-back" size={18} color="#3A78B5" />
             <Text style={styles.backButtonText}>
               {isSingleSectionProject ? "Back to Projects" : "Back to Sections"}
             </Text>
           </TouchableOpacity>
           <View style={styles.loadingContainer}>
-            <Ionicons name="sync" size={36} color="#2E72F0" />
+            <Ionicons name="sync" size={36} color="#3A78B5" />
             <Text style={styles.loadingText}>Loading building phases...</Text>
           </View>
         </View>
@@ -717,7 +717,7 @@ const AnalyticsDashboard: React.FC = () => {
             onPress={handlePhasesBackPress}
             style={styles.backButton}
           >
-            <Ionicons name="arrow-back" size={18} color="#2E72F0" />
+            <Ionicons name="arrow-back" size={18} color="#3A78B5" />
             <Text style={styles.backButtonText}>
               {isSingleSectionProject ? "Back to Projects" : "Back to Sections"}
             </Text>
@@ -750,7 +750,7 @@ const AnalyticsDashboard: React.FC = () => {
           onPress={handlePhasesBackPress}
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={18} color="#2E72F0" />
+          <Ionicons name="arrow-back" size={18} color="#3A78B5" />
           <Text style={styles.backButtonText}>
             {isSingleSectionProject ? "Back to Projects" : "Back to Sections"}
           </Text>
@@ -774,7 +774,7 @@ const AnalyticsDashboard: React.FC = () => {
               Total Mini-sections: <Text style={{ fontWeight: '700', color: '#1E293B' }}>{miniSections.length}</Text>
             </Text>
             <Text style={styles.sectionStatText}>
-              Tracked: <Text style={{ fontWeight: '700', color: '#2E72F0' }}>{activeTrackers.length}</Text>
+              Tracked: <Text style={{ fontWeight: '700', color: '#3A78B5' }}>{activeTrackers.length}</Text>
             </Text>
           </View>
         </View>
@@ -944,8 +944,8 @@ const AnalyticsDashboard: React.FC = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#2E72F0']}
-            tintColor="#2E72F0"
+            colors={['#3A78B5']}
+            tintColor="#3A78B5"
             title="Pull to refresh"
             titleColor="#64748B"
           />
@@ -961,41 +961,17 @@ const AnalyticsDashboard: React.FC = () => {
               </Text>
             </View>
           </View>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <TouchableOpacity
-              style={[styles.refreshButton, (refreshing || loading) && { opacity: 0.5 }]}
-              onPress={onRefresh}
-              disabled={refreshing || loading}
-            >
-              <Ionicons
-                name={refreshing ? "sync" : "refresh"}
-                size={22}
-                color={(refreshing || loading) ? "#94A3B8" : "#2E72F0"}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.refreshButton, { backgroundColor: '#FEF3C7' }]}
-              onPress={async () => {
-                console.log('\n🐛 MANUAL DEBUG TRIGGER');
-                console.log('========================');
-                try {
-                  const clientId = await getClientId();
-                  console.log('🔍 Client ID:', clientId);
-                  
-                  if (clientId) {
-                    console.log('🔍 Calling fetchProjects...');
-                    await fetchProjects(true);
-                  } else {
-                    console.log('❌ No client ID found!');
-                  }
-                } catch (err) {
-                  console.log('❌ Debug error:', err);
-                }
-              }}
-            >
-              <Ionicons name="bug" size={22} color="#EE730C" />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={[styles.refreshButton, (refreshing || loading) && { opacity: 0.5 }]}
+            onPress={onRefresh}
+            disabled={refreshing || loading}
+          >
+            <Ionicons
+              name={refreshing ? "sync" : "refresh"}
+              size={22}
+              color={(refreshing || loading) ? "#94A3B8" : "#3A78B5"}
+            />
+          </TouchableOpacity>
         </View>
 
         {/* Segmented Tab Selector */}
@@ -1027,7 +1003,7 @@ const AnalyticsDashboard: React.FC = () => {
                 })
               }]
             }}>
-              <Ionicons name="sync" size={48} color="#2E72F0" />
+              <Ionicons name="sync" size={48} color="#3A78B5" />
             </Animated.View>
             <Text style={styles.loadingText}>Loading data...</Text>
             <Text style={[styles.loadingText, { fontSize: 12, marginTop: 4 }]}>Please wait...</Text>
@@ -1123,7 +1099,7 @@ export default AnalyticsDashboard;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F3F7',
+    backgroundColor: '#F8FAFC',
   },
   scrollView: {
     flex: 1,
@@ -1145,13 +1121,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: '700',
-    color: '#2C3E50',
+    color: '#1E293B',
     letterSpacing: 1,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: '#95A5A6',
+    color: '#64748B',
     fontWeight: '500',
   },
   header: {
@@ -1223,7 +1199,7 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     marginTop: 20,
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -1288,30 +1264,30 @@ const styles = StyleSheet.create({
     bottom: 8,
     width: 30,
     height: 3,
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
     borderRadius: 2,
   },
   statBoxPrimary: {
-    borderWidth: 3,
-    borderColor: '#5DADE2',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   statBoxSecondary: {
-    borderWidth: 3,
-    borderColor: '#EC7063',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   statBoxTertiary: {
-    borderWidth: 3,
-    borderColor: '#F39C12',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   statValue: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#2C3E50',
+    color: '#1E293B',
     marginBottom: 6,
   },
   statLabel: {
     fontSize: 11,
-    color: '#95A5A6',
+    color: '#64748B',
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -1384,7 +1360,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   sectionPercentageBadge: {
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
@@ -1403,7 +1379,7 @@ const styles = StyleSheet.create({
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
     borderRadius: 5,
   },
   sectionStatsRow: {
@@ -1526,13 +1502,13 @@ const styles = StyleSheet.create({
   timelineDotInProgress: {
     backgroundColor: '#EAF0FE',
     borderWidth: 2,
-    borderColor: '#2E72F0',
+    borderColor: '#3A78B5',
   },
   innerDotInProgress: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
   },
   timelineLine: {
     width: 2,
@@ -1558,7 +1534,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   timelinePhaseNameInProgress: {
-    color: '#2E72F0',
+    color: '#3A78B5',
     fontWeight: '700',
   },
   phaseStatusPill: {
@@ -1590,8 +1566,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   activeTabButton: {
-    backgroundColor: '#2E72F0',
-    shadowColor: '#2E72F0',
+    backgroundColor: '#3A78B5',
+    shadowColor: '#3A78B5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -1623,7 +1599,7 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#2E72F0',
+    color: '#3A78B5',
   },
 
   // ── Project / Section List Cards ────────────────────────────────────

@@ -57,7 +57,7 @@ const AddedMaterialsList: React.FC<AddedMaterialsListProps> = ({
               onPress={() => onEdit(index)}
               activeOpacity={0.7}
             >
-              <Text style={styles.actionButtonText}> <Edit size={16} color="#2E72F0" /> </Text>
+              <Text style={styles.actionButtonText}> <Edit size={16} color="#3A78B5" /> </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.removeMaterialButton}
@@ -99,7 +99,7 @@ const styles = StyleSheet.create<Styles>({
     borderColor: 'transparent',
   },
   editingMaterialItem: {
-    borderColor: '#2E72F0',
+    borderColor: '#3A78B5',
     backgroundColor: '#EAF0FE',
   },
   materialIcon: {
