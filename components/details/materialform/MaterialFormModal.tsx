@@ -22,6 +22,7 @@ import { toast } from 'sonner-native';
 import AddMaterialsStep from './AddMaterialsStep';
 import { MATERIAL_TEMPLATES } from './constants';
 import CustomSpecModal from './CustomSpecModal';
+import PaymentStep, { PaymentStatus } from './PaymentStep';
 import ProgressIndicator from './ProgressIndicator';
 import ReviewPurposeStep from './ReviewPurposeStep';
 import { CustomSpec, InternalMaterial, MaterialFormData } from './types';
@@ -79,7 +80,9 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   const [editingMaterialIndex, setEditingMaterialIndex] = useState<number | null>(null);
   const [purposeMessage, setPurposeMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showAddForm, setShowAddForm] = useState(true); // New state to control form visibility
+  const [showAddForm, setShowAddForm] = useState(true);
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('unpaid');
+  const [amountPaid, setAmountPaid] = useState('');
   
   // Loading animation states
   const [isAddingMaterials, setIsAddingMaterials] = useState(false);
@@ -161,11 +164,16 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     return hasValidMaterials;
   };
 
-  // Safety check: If we're on step 1 but have no materials, go back to step 0
+  // Safety check: If we're past step 0 with no materials, snap back to step 0
   React.useEffect(() => {
     const currentMaterials = addedMaterialsRef.current;
-    if (currentStep === 1 && currentMaterials.length === 0) {
-      handlePreviousStep();
+    if (currentStep > 0 && currentMaterials.length === 0) {
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+      setCurrentStep(0);
     }
   }, [currentStep]);
 
@@ -441,168 +449,138 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   };
 
   const handleNextStep = () => {
-    if (addedMaterials.length === 0) {
-      Alert.alert('Error', 'Please add at least one material');
-      return;
+    if (currentStep === 0) {
+      if (addedMaterials.length === 0) {
+        Alert.alert('Error', 'Please add at least one material');
+        return;
+      }
+      Animated.timing(slideAnim, {
+        toValue: -SCREEN_WIDTH,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => setCurrentStep(1));
+    } else if (currentStep === 1) {
+      if (!purposeMessageRef.current.trim()) {
+        Alert.alert(
+          'Purpose Required',
+          'Please describe what these materials are needed for. This helps with project tracking.',
+          [{ text: 'OK', style: 'default' }]
+        );
+        return;
+      }
+      Animated.timing(slideAnim, {
+        toValue: -SCREEN_WIDTH * 2,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => setCurrentStep(2));
     }
-
-    Animated.timing(slideAnim, {
-      toValue: -SCREEN_WIDTH,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      setCurrentStep(1);
-    });
   };
 
   const handlePreviousStep = () => {
-    Animated.timing(slideAnim, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-    setCurrentStep(0);
+    if (currentStep === 2) {
+      Animated.timing(slideAnim, {
+        toValue: -SCREEN_WIDTH,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+      setCurrentStep(1);
+    } else {
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+      setCurrentStep(0);
+    }
   };
 
   const handleSendRequest = async () => {
     const currentPurposeMessage = purposeMessageRef.current;
     const currentAddedMaterials = getCurrentMaterials();
-    
-    // Check if materials are added first - use multiple validation approaches
-    const canSubmit = canSubmitMaterials();
-    if (!canSubmit) {
-      // Fallback: Check if we're on step 1 and the UI shows materials
-      // This might indicate a state sync issue
-      if (currentStep === 1 && retryAttemptRef.current < 2) {
-        retryAttemptRef.current += 1;
-        
-        // Force a state refresh and try again after a delay
-        setTimeout(() => {
-          const recoveredMaterials = getCurrentMaterials();
-          
-          if (recoveredMaterials && recoveredMaterials.length > 0) {
-            // Retry the submission with recovered materials
-            handleSendRequest();
-            return;
-          } else {
-            retryAttemptRef.current = 0; // Reset for next time
-            Alert.alert(
-              'No Materials Added',
-              'Please add at least one material before submitting. Go back to the first step to add materials.',
-              [
-                { text: 'Go Back', onPress: () => handlePreviousStep(), style: 'default' },
-                { text: 'Cancel', style: 'cancel' }
-              ]
-            );
-          }
-        }, 200);
-        return;
-      }
-      
+
+    if (!canSubmitMaterials()) {
       Alert.alert(
         'No Materials Added',
-        'Please add at least one material before submitting. Go back to the first step to add materials.',
-        [
-          { text: 'Go Back', onPress: () => handlePreviousStep(), style: 'default' },
-          { text: 'Cancel', style: 'cancel' }
-        ]
-      );
-      return;
-    }
-    
-    if (!currentPurposeMessage.trim()) {
-      Alert.alert(
-        'Purpose Required', 
-        'Please describe what these materials are needed for. This helps with project tracking and material management.',
-        [{ text: 'OK', style: 'default' }]
+        'Please go back and add at least one material.',
+        [{ text: 'Go Back', onPress: () => { slideAnim.setValue(0); setCurrentStep(0); } }]
       );
       return;
     }
 
-    if (isSubmitting) {
-      return; // Prevent double submission
+    if (paymentStatus === 'partial') {
+      const paid = parseFloat(amountPaid);
+      if (!amountPaid || isNaN(paid) || paid <= 0) {
+        Alert.alert('Amount Required', 'Please enter the amount paid.');
+        return;
+      }
+      const totalBatchCost = currentAddedMaterials.reduce(
+        (sum, m) => sum + m.perUnitCost * m.quantity, 0
+      );
+      if (paid > totalBatchCost) {
+        Alert.alert('Invalid Amount', 'Amount paid cannot exceed total material cost.');
+        return;
+      }
     }
 
-    const formattedMaterials = currentAddedMaterials.map((material) => ({
-      materialName: material.name,
-      unit: material.unit,
-      qnt: material.quantity,
-      specs: material.specs || {},
-      perUnitCost: material.perUnitCost || 0,
-      mergeIfExists: true,
-      contractor_name: material.contractor_name || '', // ✅ NEW: Include contractor name
-    }));
+    if (isSubmitting) return;
 
-    // 🔍 DEBUG: Log current added materials before formatting
-    console.log('🏗️ Current Added Materials Debug:', {
-      materialsCount: currentAddedMaterials.length,
-      materials: currentAddedMaterials.map(m => ({
-        name: m.name,
-        contractor_name: m.contractor_name,
-        hasContractorName: !!m.contractor_name,
-      })),
+    const totalBatchCost = currentAddedMaterials.reduce(
+      (sum, m) => sum + m.perUnitCost * m.quantity, 0
+    );
+    const paidTotal = paymentStatus === 'full'
+      ? totalBatchCost
+      : (parseFloat(amountPaid) || 0);
+
+    const formattedMaterials = currentAddedMaterials.map((material) => {
+      const matCost = material.perUnitCost * material.quantity;
+      let matAmountPaid = 0;
+      if (paymentStatus === 'full') {
+        matAmountPaid = matCost;
+      } else if (paymentStatus === 'partial' && totalBatchCost > 0) {
+        matAmountPaid = (matCost / totalBatchCost) * paidTotal;
+      }
+      return {
+        materialName: material.name,
+        unit: material.unit,
+        qnt: material.quantity,
+        specs: material.specs || {},
+        perUnitCost: material.perUnitCost || 0,
+        mergeIfExists: true,
+        contractor_name: material.contractor_name || '',
+        paymentStatus,
+        amountPaid: matAmountPaid,
+      };
     });
-
-    // 🔍 DEBUG: Log formatted materials to verify contractor_name
-    console.log('🏗️ Formatted Materials Debug:', {
-      materialsCount: formattedMaterials.length,
-      materials: formattedMaterials.map(m => ({
-        materialName: m.materialName,
-        contractor_name: m.contractor_name,
-        hasContractorName: !!m.contractor_name,
-      })),
-    });
-
-    // Final validation before API call
-    if (formattedMaterials.length === 0) {
-      Alert.alert(
-        'Error',
-        'No materials to submit. Please add materials first.',
-        [{ text: 'Go Back', onPress: () => handlePreviousStep() }]
-      );
-      return;
-    }
 
     try {
       setIsSubmitting(true);
-      startLoadingAnimation(); // Start loading animation
-      
-      // Reset retry counter on successful attempt
-      retryAttemptRef.current = 0;
-      
-      // Show only one loading toast - no success toast after
+      startLoadingAnimation();
+
       const materialCount = formattedMaterials.length;
       loadingToastRef.current = toast.loading(
         `Adding ${materialCount} material${materialCount > 1 ? 's' : ''}...`
       );
-      
-      // Close the modal immediately to show the loading state
+
       handleClose(true);
-      
-      // Call onSubmit and wait for it to complete (including material refresh)
+
       await onSubmit(formattedMaterials, currentPurposeMessage);
-      
-      // Simply dismiss loading toast - let parent handle success message
+
       if (loadingToastRef.current) {
         toast.dismiss(loadingToastRef.current);
         loadingToastRef.current = null;
       }
-      
     } catch (error) {
       console.error('Error submitting materials:', error);
-      
-      // Dismiss loading toast and show single error message only on error
+
       if (loadingToastRef.current) {
         toast.dismiss(loadingToastRef.current);
         loadingToastRef.current = null;
       }
-      
-      // Show error toast only if submission fails
+
       toast.error('Failed to add materials. Please try again.');
-      
     } finally {
       setIsSubmitting(false);
-      stopLoadingAnimation(); // Stop loading animation
+      stopLoadingAnimation();
     }
   };
 
@@ -743,7 +721,9 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       updateAddedMaterials([]);
       setPurposeMessage('');
       purposeMessageRef.current = '';
-      setShowAddForm(true); // Reset form visibility
+      setShowAddForm(true);
+      setPaymentStatus('unpaid');
+      setAmountPaid('');
       resetForm();
       setCurrentStep(0);
       slideAnim.setValue(0);
@@ -767,16 +747,16 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
             text: 'Discard',
             style: 'destructive',
             onPress: () => {
-              // Clean up loading toast
               if (loadingToastRef.current) {
                 toast.dismiss(loadingToastRef.current);
                 loadingToastRef.current = null;
               }
-              
               updateAddedMaterials([]);
               setPurposeMessage('');
               purposeMessageRef.current = '';
-              setShowAddForm(true); // Reset form visibility
+              setShowAddForm(true);
+              setPaymentStatus('unpaid');
+              setAmountPaid('');
               resetForm();
               setCurrentStep(0);
               slideAnim.setValue(0);
@@ -797,7 +777,9 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       updateAddedMaterials([]);
       setPurposeMessage('');
       purposeMessageRef.current = '';
-      setShowAddForm(true); // Reset form visibility
+      setShowAddForm(true);
+      setPaymentStatus('unpaid');
+      setAmountPaid('');
       resetForm();
       setCurrentStep(0);
       slideAnim.setValue(0);
@@ -903,7 +885,32 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                   const newMaterials = addedMaterials.filter((_, i) => i !== index);
                   updateAddedMaterials(newMaterials);
                 }}
-                onSubmit={handleSendRequest}
+                onSubmit={handleNextStep}
+              />
+            </Animated.View>
+
+            <Animated.View
+              style={[
+                {
+                  position: 'absolute',
+                  top: 0,
+                  left: SCREEN_WIDTH * 2,
+                  right: -SCREEN_WIDTH * 2,
+                  bottom: 0,
+                  width: SCREEN_WIDTH,
+                  backgroundColor: '#F8FAFC',
+                },
+                { transform: [{ translateX: slideAnim }] }
+              ]}
+            >
+              <PaymentStep
+                paymentStatus={paymentStatus}
+                amountPaid={amountPaid}
+                totalCost={addedMaterials.reduce((sum, m) => sum + m.perUnitCost * m.quantity, 0)}
+                onPaymentStatusChange={setPaymentStatus}
+                onAmountPaidChange={setAmountPaid}
+                onBack={handlePreviousStep}
+                onClose={handleClose}
               />
             </Animated.View>
           </View>
@@ -926,7 +933,36 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
 
           {currentStep === 1 && addedMaterials.length > 0 && (
             <View style={styles.floatingButtonContainer}>
-              {/* PhonePe-style Swipe to Submit */}
+              <TouchableOpacity
+                style={styles.floatingNextButton}
+                onPress={handleNextStep}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.floatingNextButtonText}>
+                  Next: Payment →
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {currentStep === 2 && (
+            <View style={styles.floatingButtonContainer}>
+              <TouchableOpacity
+                style={[styles.floatingSendButton, isSubmitting && styles.floatingSendButtonDisabled]}
+                onPress={handleSendRequest}
+                activeOpacity={0.8}
+                disabled={isSubmitting}
+              >
+                <Text style={styles.floatingSendButtonText}>
+                  {isSubmitting ? 'Submitting...' : 'Submit Materials'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Unused swipe-to-submit container kept for animation refs */}
+          {false && currentStep === 99 && addedMaterials.length > 0 && (
+            <View style={styles.floatingButtonContainer}>
               <View style={styles.swipeToSubmitContainer}>
                 {/* Progress indicator above swipe */}
                 <View style={styles.swipeProgressContainer}>

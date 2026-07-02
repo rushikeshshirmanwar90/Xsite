@@ -64,6 +64,22 @@ const slabSortOrder = (name: string): number => {
 const sortMiniSections = <T extends { name?: string }>(sections: T[]): T[] =>
     [...sections].sort((a, b) => slabSortOrder(a.name || '') - slabSortOrder(b.name || ''));
 
+// Pagination removed from the UI — fetch the full project material list in one
+// request instead of paging. API caps `limit` at 5000 server-side.
+const MATERIALS_FETCH_LIMIT = 5000;
+
+// Normalizes a material's specs (grade/size/brand/etc.) into a stable, order-independent
+// string so materials sharing a name but with different specs are keyed separately instead
+// of being merged into one card.
+const buildSpecsKey = (specs: any): string => {
+    if (!specs || typeof specs !== 'object' || Object.keys(specs).length === 0) return '';
+    return Object.keys(specs)
+        .sort()
+        .filter(k => specs[k] !== null && specs[k] !== undefined && specs[k] !== '')
+        .map(k => `${k}:${specs[k]}`)
+        .join('|');
+};
+
 const SwipeableMiniSection = ({
     section,
     selectedMiniSection,
@@ -694,7 +710,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
         }
     };
 
-    const fetchMaterials = async (page: number = 1, limit: number = 10, forceRefresh: boolean = false) => {
+    const fetchMaterials = async (page: number = 1, limit: number = MATERIALS_FETCH_LIMIT, forceRefresh: boolean = false) => {
         if (!projectId) {
             return;
         }
@@ -874,6 +890,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     sectionId: material.sectionId,
                     miniSectionId: material.miniSectionId,
                     contractor_name: material.contractor_name || undefined, // ✅ Pre-fill vendor in Add Stock modal
+                    // Keep undefined when never recorded, so the card shows no payment badge
+                    paymentStatus: material.paymentStatus, // ✅ Vendor payment state (undefined if not recorded)
+                    amountPaid: material.amountPaid !== undefined ? Number(material.amountPaid) : undefined,
                     createdAt: material.createdAt,
                     addedAt: material.addedAt
                 };
@@ -916,6 +935,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     sectionId: material.sectionId,
                     miniSectionId: material.miniSectionId,
                     contractor_name: material.contractor_name || undefined, // ✅ Pass contractor_name for vendor pre-fill
+                    // Keep undefined when never recorded, so the card shows no payment badge
+                    paymentStatus: material.paymentStatus, // ✅ Vendor payment state (undefined if not recorded)
+                    amountPaid: material.amountPaid !== undefined ? Number(material.amountPaid) : undefined,
                     createdAt: material.createdAt,
                     addedAt: material.addedAt
                 };
@@ -1036,7 +1058,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
     const reloadMaterials = async (page: number = 1, forceRefresh: boolean = true) => {
         // Always force refresh by default to avoid cache issues
-        await fetchMaterials(page, 10, forceRefresh);
+        await fetchMaterials(page, MATERIALS_FETCH_LIMIT, forceRefresh);
     };
 
     // ─── Construction Tracker Phase Handlers ────────────────────────────────
@@ -1326,34 +1348,37 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     };
 
     const ignoreMaterial = async (materialKey: string, materialName: string) => {
+        // Optimistic update so the UI reacts immediately.
+        setIgnoredMaterials(prev => prev.includes(materialKey) ? prev : [...prev, materialKey]);
+        setLowStockMaterials(prev => prev.filter(item => item.materialKey !== materialKey));
+
         try {
-            const updatedIgnored = [...ignoredMaterials, materialKey];
-            setIgnoredMaterials(updatedIgnored);
-
-            // Save to AsyncStorage for persistence
-            await AsyncStorage.setItem(
-                `ignored_materials_${projectId}`,
-                JSON.stringify(updatedIgnored)
-            );
-
-            // Remove from low stock materials
-            setLowStockMaterials(prev => prev.filter(item => item.materialKey !== materialKey));
+            // Persisted server-side (on the project) so the dismissal is shared
+            // across every device viewing this project, not just this one.
+            const response = await apiClient.post('/api/material/ignore', {
+                projectId,
+                materialKey,
+            });
+            const ignored = response.data?.data?.ignoredLowStockMaterials;
+            if (Array.isArray(ignored)) {
+                setIgnoredMaterials(ignored);
+            }
 
             toast.success(`${materialName} will no longer show low stock alerts`);
         } catch (error) {
             console.error('❌ Error ignoring material:', error);
+            // Roll back the optimistic update since the server didn't persist it
+            setIgnoredMaterials(prev => prev.filter(key => key !== materialKey));
             toast.error('Failed to ignore material');
         }
     };
 
-    // Function to load ignored materials from storage
+    // Function to load ignored materials from the server (shared across devices)
     const loadIgnoredMaterials = async () => {
         try {
-            const stored = await AsyncStorage.getItem(`ignored_materials_${projectId}`);
-            if (stored) {
-                const ignored = safeJsonParse(stored, []);
-                setIgnoredMaterials(ignored);
-            }
+            const response = await apiClient.get(`/api/material/ignore?projectId=${projectId}`);
+            const ignored = response.data?.data?.ignoredLowStockMaterials;
+            setIgnoredMaterials(Array.isArray(ignored) ? ignored : []);
         } catch (error) {
             console.error('❌ Error loading ignored materials:', error);
         }
@@ -1479,17 +1504,19 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     };
 
     // ✅ NEW: Helper function to calculate section-aware material totals
-    const calculateMaterialTotals = (materialName: string, materialUnit: string, isUsedTab: boolean) => {
+    const calculateMaterialTotals = (materialName: string, materialUnit: string, isUsedTab: boolean, materialSpecs?: any) => {
         const availableMaterials = materials?.available || [];
         const usedMaterials = materials?.used || [];
+        const specsKey = buildSpecsKey(materialSpecs);
+        const matchesSpecs = (m: any) => buildSpecsKey(m.specs) === specsKey;
 
         // Project-wide calculations (always consistent)
         const projectWideAvailable = availableMaterials
-            .filter(m => m.name === materialName && m.unit === materialUnit)
+            .filter(m => m.name === materialName && m.unit === materialUnit && matchesSpecs(m))
             .reduce((sum, m) => sum + m.quantity, 0);
 
         const projectWideUsed = usedMaterials
-            .filter(m => m.name === materialName && m.unit === materialUnit)
+            .filter(m => m.name === materialName && m.unit === materialUnit && matchesSpecs(m))
             .reduce((sum, m) => sum + m.quantity, 0);
 
         const projectWideTotalImported = projectWideAvailable + projectWideUsed;
@@ -1501,6 +1528,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 .filter(m =>
                     m.name === materialName &&
                     m.unit === materialUnit &&
+                    matchesSpecs(m) &&
                     m.miniSectionId === selectedMiniSection
                 )
                 .reduce((sum, m) => sum + m.quantity, 0);
@@ -1788,15 +1816,6 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
         // Key on name + unit + specs — so materials sharing a name but with different
         // specs (e.g. different grade/size/brand) get their own row instead of being merged.
-        const buildSpecsKey = (specs: any) => {
-            if (!specs || typeof specs !== 'object' || Object.keys(specs).length === 0) return '';
-            return Object.keys(specs)
-                .sort()
-                .filter(k => specs[k] !== null && specs[k] !== undefined && specs[k] !== '')
-                .map(k => `${k}:${specs[k]}`)
-                .join('|');
-        };
-
         const grouped: { [key: string]: { name: string; unit: string; specs: Record<string, any>; currentlyAvailable: number; totalUsed: number; importedCost: number; purchasers: Set<string> } } = {};
 
         const getGroup = (entryName: string, entryUnit: string, entrySpecs: any) => {
@@ -2549,27 +2568,32 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     };
 
     // Function to get material icon and color based on material name
+    // Icon shape still varies by material type, but the color is fixed to the app's
+    // primary blue for every material so the cards read consistently instead of
+    // rainbow-colored.
+    const MATERIAL_ICON_COLOR = '#3A78B5';
+
     const getMaterialIconAndColor = (materialName: string) => {
-        const materialMap: { [key: string]: { icon: keyof typeof import('@expo/vector-icons').Ionicons.glyphMap, color: string } } = {
-            'cement': { icon: 'cube-outline', color: '#3A78B5' },
-            'brick': { icon: 'square-outline', color: '#EF4444' },
-            'steel': { icon: 'barbell-outline', color: '#6B7280' },
-            'sand': { icon: 'layers-outline', color: '#F59E0B' },
-            'gravel': { icon: 'diamond-outline', color: '#10B981' },
-            'concrete': { icon: 'cube', color: '#3A78B5' },
-            'wood': { icon: 'leaf-outline', color: '#84CC16' },
-            'paint': { icon: 'color-palette-outline', color: '#EC4899' },
-            'tile': { icon: 'grid-outline', color: '#06B6D4' },
-            'pipe': { icon: 'ellipse-outline', color: '#3A78B5' },
+        const materialIconMap: { [key: string]: keyof typeof import('@expo/vector-icons').Ionicons.glyphMap } = {
+            'cement': 'cube-outline',
+            'brick': 'square-outline',
+            'steel': 'barbell-outline',
+            'sand': 'layers-outline',
+            'gravel': 'diamond-outline',
+            'concrete': 'cube',
+            'wood': 'leaf-outline',
+            'paint': 'color-palette-outline',
+            'tile': 'grid-outline',
+            'pipe': 'ellipse-outline',
         };
 
         const lowerName = materialName.toLowerCase();
-        for (const [key, value] of Object.entries(materialMap)) {
+        for (const [key, icon] of Object.entries(materialIconMap)) {
             if (lowerName.includes(key)) {
-                return value;
+                return { icon, color: MATERIAL_ICON_COLOR };
             }
         }
-        return { icon: 'cube-outline' as keyof typeof import('@expo/vector-icons').Ionicons.glyphMap, color: '#6B7280' };
+        return { icon: 'cube-outline' as keyof typeof import('@expo/vector-icons').Ionicons.glyphMap, color: MATERIAL_ICON_COLOR };
     };
 
     // Function to check for low stock materials
@@ -2587,7 +2611,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
 
         groupedMaterials.forEach((group: any) => {
-            const materialKey = `${group.name}-${group.unit}`;
+            const materialKey = `${group.name}-${group.unit}-${buildSpecsKey(group.specs)}`;
 
             // Skip if this material is ignored
             if (ignoredMaterials.includes(materialKey)) {
@@ -2640,12 +2664,12 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
         return lowStockItems;
     };
 
-    // Load project materials on mount (LIMIT: 10 items per page)
+    // Load project materials on mount (full list — no pagination)
     useEffect(() => {
         // Set mounted flag
         isMountedRef.current = true;
 
-        fetchMaterials(1, 10, true); // ✅ OPTIMIZED: 10 items per page for better UX
+        fetchMaterials(1, MATERIALS_FETCH_LIMIT, true);
         loadInitialCompletionStatus(); // Load completion status on mount
         loadIgnoredMaterials(); // Load ignored materials from storage
         loadAlertDismissalTime(); // ✅ NEW: Load alert dismissal timestamp
@@ -2945,11 +2969,12 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             }
 
             materialsArray.forEach((material, index) => {
-                // ✅ SIMPLIFIED: Create grouping key with just name and unit for now
-                // This avoids issues with price/vendor mismatches between available and used materials
-                const key = `${material.name}-${material.unit}`;
+                // Key on name + unit + specs — materials sharing a name but with different
+                // specs (e.g. different grade/size/brand) get their own card instead of merging.
+                const specsKey = buildSpecsKey(material.specs);
+                const key = `${material.name}-${material.unit}-${specsKey}`;
 
-                console.log(`🔑 SIMPLE GROUPING KEY: ${material.name} | Key: ${key} | Quantity: ${material.quantity}`);
+                console.log(`🔑 GROUPING KEY: ${material.name} | Key: ${key} | Quantity: ${material.quantity}`);
 
                 if (!grouped[key]) {
                     grouped[key] = {
@@ -2969,6 +2994,10 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         currentlyAvailable: 0,
                         miniSectionId: material.miniSectionId,
                         contractor_name: (material as any).contractor_name || undefined, // ✅ vendor pre-fill
+                        // ✅ Payment aggregation across all batches (variants) in this group
+                        amountPaid: 0,
+                        paymentTotalCost: 0,
+                        hasPaymentInfo: false, // true once any batch has a recorded payment status
                     };
                 } else {
                     // ✅ CRITICAL FIX: Update to most recent date when grouping
@@ -2990,7 +3019,20 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     cost: material.price,
                     miniSectionId: material.miniSectionId,
                     contractor_name: (material as any).contractor_name || undefined,
+                    paymentStatus: (material as any).paymentStatus, // undefined if not recorded
+                    amountPaid: (material as any).amountPaid,
                 });
+
+                // ✅ Accumulate vendor payment across this group's batches — but only for
+                // batches that actually have a recorded payment status. Denominator uses the
+                // batch's stored totalCost (stable — usage decrements qnt but not
+                // totalCost/amountPaid, and fully-used batches drop out entirely), so the
+                // paid-vs-purchased ratio stays correct as material is consumed.
+                if ((material as any).paymentStatus) {
+                    grouped[key].hasPaymentInfo = true;
+                    grouped[key].amountPaid += Number((material as any).amountPaid) || 0;
+                    grouped[key].paymentTotalCost += Number(material.totalCost) || 0;
+                }
 
                 // Debug logging for grouping
                 if (__DEV__) {
@@ -3021,7 +3063,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 console.log(`   Is used tab: ${isUsedTab}`);
 
                 // ✅ Use helper function for consistent calculations
-                const totals = calculateMaterialTotals(group.name, group.unit, isUsedTab);
+                const totals = calculateMaterialTotals(group.name, group.unit, isUsedTab, group.specs);
 
                 console.log(`📊 CALCULATION RESULTS: ${group.name}`);
                 console.log(`   Project-wide Available: ${totals.currentlyAvailable}`);
@@ -3058,6 +3100,26 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     console.warn(`⚠️ MATHEMATICAL INCONSISTENCY DETECTED for ${group.name}:`);
                     console.warn(`   totalImported (${group.totalImported}) < totalUsed (${group.totalUsed}) + currentlyAvailable (${group.currentlyAvailable})`);
                     console.warn(`   This should not happen with the new logic!`);
+                }
+
+                // ✅ Derive the group's overall vendor payment status from the aggregated
+                // amountPaid vs the batches' total purchase cost — but ONLY when at least one
+                // batch actually recorded payment. Otherwise leave paymentStatus undefined so
+                // the card shows no payment badge (rather than a misleading "Unpaid").
+                if (group.hasPaymentInfo) {
+                    const paidTotal = Number(group.amountPaid) || 0;
+                    const costTotal = Number(group.paymentTotalCost) || 0;
+                    if (costTotal > 0 && paidTotal >= costTotal - 0.01) {
+                        group.paymentStatus = 'full';
+                    } else if (paidTotal > 0) {
+                        group.paymentStatus = 'partial';
+                    } else {
+                        group.paymentStatus = 'unpaid';
+                    }
+                    group.amountRemaining = Math.max(0, costTotal - paidTotal);
+                } else {
+                    group.paymentStatus = undefined;
+                    group.amountRemaining = 0;
                 }
             });
 
@@ -3946,62 +4008,12 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
         return getGroupedMaterialsWithCompleteData(currentMaterials, isUsedTab);
     };
 
-    const itemsPerPage = 10; // Items per page for pagination (API level)
-    const currentPage = activeTab === 'imported'
-        ? (materials?.pagination?.available?.currentPage || 1)
-        : (materials?.pagination?.used?.currentPage || 1);
-
-    // Use API pagination data directly
-    const totalPages = activeTab === 'imported'
-        ? (materials?.pagination?.available?.totalPages || 1)
-        : (materials?.pagination?.used?.totalPages || 1);
-
     const totalItems = activeTab === 'imported'
         ? (materials?.pagination?.available?.totalItems || 0)
         : (materials?.pagination?.used?.totalItems || 0);
 
-    const apiLoading = materials?.loading || false;
-
-    // ✅ CRITICAL FIX: Calculate actual displayed groups after grouping
-    const groupedMaterialsCount = getGroupedData().length;
-    const displayMaterials = activeTab === 'imported'
-        ? (materials?.available || [])
-        : (materials?.used || []);
-
-    // ✅ PAGINATION VISIBILITY: Only show pagination if there are actually more pages
-    // AND if we have enough grouped materials to warrant pagination
-    const shouldShowPagination = !materials?.loading && totalPages > 1 && groupedMaterialsCount > 0;
-
-    const startItem = totalItems > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0;
-    const endItem = totalItems > 0 ? Math.min(currentPage * itemsPerPage, totalItems) : 0;
-
-    // ✅ FIXED: Enhanced page change handler with better error handling
-    const handlePageChange = async (page: number) => {
-
-        // Validate page number
-        if (page < 1 || page > totalPages) {
-            console.warn(`⚠️ Invalid page number: ${page} (valid range: 1-${totalPages})`);
-            toast.error(`Invalid page number. Please select a page between 1 and ${totalPages}.`);
-            return;
-        }
-
-        if (materials.loading) {
-            return;
-        }
-
-        try {
-            scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-
-            await fetchMaterials(page, 10, true);
-
-        } catch (error) {
-            console.error(`❌ Failed to load page ${page}:`, error);
-            toast.error(`Failed to load page ${page}. Please try again.`);
-        }
-    };
-
     useEffect(() => {
-        fetchMaterials(1, 10, true);
+        fetchMaterials(1, MATERIALS_FETCH_LIMIT, true);
 
         // ✅ CRITICAL FIX: Refresh mini-sections when switching to "used" tab
         if (activeTab === 'used') {
@@ -4143,6 +4155,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             perUnitCost: material.perUnitCost, // ✅ FIXED: Use perUnitCost instead of cost
             mergeIfExists: material.mergeIfExists !== undefined ? material.mergeIfExists : true,
             contractor_name: material.contractor_name || '', // ✅ NEW: Include contractor_name
+            // ✅ NEW: Carry payment status/amount from the PaymentStep through to the API
+            paymentStatus: material.paymentStatus || 'unpaid',
+            amountPaid: Number(material.amountPaid) || 0,
         }));
 
 
@@ -4835,17 +4850,12 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                             )}
                         </Text>
 
-                        {/* Material count and pagination info */}
+                        {/* Material count */}
                         {!materials.loading && totalItems > 0 && (
                             <View style={paginationStyles.infoContainer}>
                                 <Text style={paginationStyles.infoText}>
-                                    Showing {startItem}-{endItem} of {totalItems} {activeTab === 'used' ? 'used materials' : 'available materials'}
+                                    {totalItems} {activeTab === 'used' ? 'used materials' : 'available materials'}
                                 </Text>
-                                {totalPages > 1 && (
-                                    <Text style={paginationStyles.pageInfo}>
-                                        Page {currentPage} of {totalPages}
-                                    </Text>
-                                )}
                             </View>
                         )}
                     </View>
@@ -4967,6 +4977,8 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                             userType={currentUserType}
                                             onRefresh={() => reloadMaterials(1, true)}
                                             canEdit={!user?.role && (material.totalUsed || 0) === 0}
+                                            lowStockThreshold={lowStockThreshold}
+                                            isIgnored={ignoredMaterials.includes(`${material.name}-${material.unit}-${buildSpecsKey(material.specs)}`)}
                                         />
                                     ))}
                                 </View>
@@ -4988,6 +5000,8 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                 userType={currentUserType}
                                 onRefresh={() => reloadMaterials(1, true)}
                                 canEdit={!user?.role && (material.totalUsed || 0) === 0}
+                                lowStockThreshold={lowStockThreshold}
+                                isIgnored={ignoredMaterials.includes(`${material.name}-${material.unit}-${buildSpecsKey(material.specs)}`)}
                             />
                         ))
                     ) : (
@@ -5037,129 +5051,6 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         </View>
                     )}
 
-                    {/* Pagination Controls */}
-                    {shouldShowPagination && (
-                        <View style={paginationStyles.paginationContainer}>
-                            {apiLoading && (
-                                <View style={paginationStyles.loadingContainer}>
-                                    <Animated.View style={{
-                                        transform: [{
-                                            rotate: cardAnimations[0]?.interpolate({
-                                                inputRange: [0, 1],
-                                                outputRange: ['0deg', '360deg'],
-                                            }) || '0deg'
-                                        }]
-                                    }}>
-                                        <Ionicons name="sync" size={20} color="#3A78B5" />
-                                    </Animated.View>
-                                    <Text style={paginationStyles.loadingText}>Loading page...</Text>
-                                </View>
-                            )}
-
-                            <View style={[paginationStyles.paginationControls, apiLoading && { opacity: 0.5 }]}>
-                                {/* Previous Button */}
-                                <TouchableOpacity
-                                    style={[
-                                        paginationStyles.paginationButton,
-                                        (currentPage === 1 || apiLoading) && paginationStyles.paginationButtonDisabled
-                                    ]}
-                                    onPress={() => handlePageChange(currentPage - 1)}
-                                    disabled={currentPage === 1 || apiLoading}
-                                    activeOpacity={0.7}
-                                >
-                                    <Ionicons
-                                        name="chevron-back"
-                                        size={20}
-                                        color={(currentPage === 1 || apiLoading) ? '#CBD5E1' : '#3A78B5'}
-                                    />
-                                    <Text style={[
-                                        paginationStyles.paginationButtonText,
-                                        (currentPage === 1 || apiLoading) && paginationStyles.paginationButtonTextDisabled
-                                    ]}>
-                                        Previous
-                                    </Text>
-                                </TouchableOpacity>
-
-                                {/* Page Numbers */}
-                                <View style={paginationStyles.pageNumbersContainer}>
-                                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                                        // Show first page, last page, current page, and pages around current
-                                        const showPage = page === 1 ||
-                                            page === totalPages ||
-                                            Math.abs(page - currentPage) <= 1;
-
-                                        if (!showPage && page !== 2 && page !== totalPages - 1) {
-                                            // Show ellipsis for gaps
-                                            if (page === 2 && currentPage > 4) {
-                                                return (
-                                                    <Text key={`ellipsis-${page}`} style={paginationStyles.ellipsis}>
-                                                        ...
-                                                    </Text>
-                                                );
-                                            }
-                                            if (page === totalPages - 1 && currentPage < totalPages - 3) {
-                                                return (
-                                                    <Text key={`ellipsis-${page}`} style={paginationStyles.ellipsis}>
-                                                        ...
-                                                    </Text>
-                                                );
-                                            }
-                                            return null;
-                                        }
-
-                                        return (
-                                            <TouchableOpacity
-                                                key={page}
-                                                style={[
-                                                    paginationStyles.pageNumberButton,
-                                                    page === currentPage && paginationStyles.pageNumberButtonActive,
-                                                    apiLoading && { opacity: 0.5 }
-                                                ]}
-                                                onPress={() => handlePageChange(page)}
-                                                disabled={apiLoading}
-                                                activeOpacity={0.7}
-                                            >
-                                                <Text style={[
-                                                    paginationStyles.pageNumberText,
-                                                    page === currentPage && paginationStyles.pageNumberTextActive
-                                                ]}>
-                                                    {page}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        );
-                                    })}
-                                </View>
-
-                                {/* Next Button */}
-                                <TouchableOpacity
-                                    style={[
-                                        paginationStyles.paginationButton,
-                                        (currentPage === totalPages || apiLoading) && paginationStyles.paginationButtonDisabled
-                                    ]}
-                                    onPress={() => handlePageChange(currentPage + 1)}
-                                    disabled={currentPage === totalPages || apiLoading}
-                                    activeOpacity={0.7}
-                                >
-                                    <Text style={[
-                                        paginationStyles.paginationButtonText,
-                                        (currentPage === totalPages || apiLoading) && paginationStyles.paginationButtonTextDisabled
-                                    ]}>
-                                        Next
-                                    </Text>
-                                    <Ionicons
-                                        name="chevron-forward"
-                                        size={20}
-                                        color={(currentPage === totalPages || apiLoading) ? '#CBD5E1' : '#3A78B5'}
-                                    />
-                                </TouchableOpacity>
-                            </View>
-
-                            {/* Items per page info */}
-                            <Text style={paginationStyles.itemsPerPageText}>
-                                {itemsPerPage} items per page
-                            </Text>
-                        </View>
-                    )}
                 </View>
             </ScrollView>
 
@@ -5580,35 +5471,67 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                         </Text>
                                     </View>
 
-                                    {/* Improved Don't Show Again Button */}
-                                    <TouchableOpacity
-                                        style={{
-                                            flexDirection: 'row',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            backgroundColor: '#F1F5F9',
-                                            paddingVertical: 8,
-                                            paddingHorizontal: 12,
-                                            borderRadius: 8,
-                                            borderWidth: 1,
-                                            borderColor: '#E2E8F0',
-                                        }}
-                                        onPress={() => {
-                                            ignoreMaterial(material.materialKey, material.name);
-                                            // Remove from current modal display
-                                            setLowStockMaterials(prev => prev.filter(m => m.materialKey !== material.materialKey));
-                                        }}
-                                        activeOpacity={0.7}
-                                    >
-                                        <Ionicons name="eye-off-outline" size={14} color="#64748B" style={{ marginRight: 6 }} />
-                                        <Text style={{
-                                            color: '#64748B',
-                                            fontSize: 12,
-                                            fontWeight: '600'
-                                        }}>
-                                            Don't alert me about this material
-                                        </Text>
-                                    </TouchableOpacity>
+                                    {/* Ignore / Add Stock Buttons */}
+                                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                                        <TouchableOpacity
+                                            style={{
+                                                flex: 1,
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                backgroundColor: '#F1F5F9',
+                                                paddingVertical: 8,
+                                                paddingHorizontal: 12,
+                                                borderRadius: 8,
+                                                borderWidth: 1,
+                                                borderColor: '#E2E8F0',
+                                            }}
+                                            onPress={() => {
+                                                ignoreMaterial(material.materialKey, material.name);
+                                                // Remove from current modal display
+                                                setLowStockMaterials(prev => prev.filter(m => m.materialKey !== material.materialKey));
+                                            }}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Ionicons name="eye-off-outline" size={14} color="#64748B" style={{ marginRight: 6 }} />
+                                            <Text style={{
+                                                color: '#64748B',
+                                                fontSize: 12,
+                                                fontWeight: '600'
+                                            }}>
+                                                Ignore
+                                            </Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            style={{
+                                                flex: 1,
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                backgroundColor: '#EAF0FE',
+                                                paddingVertical: 8,
+                                                paddingHorizontal: 12,
+                                                borderRadius: 8,
+                                                borderWidth: 1,
+                                                borderColor: '#3A78B5',
+                                            }}
+                                            onPress={() => {
+                                                setShowLowStockAlert(false);
+                                                setShowMaterialForm(true);
+                                            }}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Ionicons name="add-circle" size={14} color="#3A78B5" style={{ marginRight: 6 }} />
+                                            <Text style={{
+                                                color: '#3A78B5',
+                                                fontSize: 12,
+                                                fontWeight: '600'
+                                            }}>
+                                                Add Stock
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
                             ))}
                         </ScrollView>
@@ -6713,96 +6636,6 @@ const paginationStyles = StyleSheet.create({
         fontSize: 14,
         color: '#64748B',
         fontWeight: '500',
-    },
-    pageInfo: {
-        fontSize: 14,
-        color: '#64748B',
-        fontWeight: '500',
-    },
-    paginationContainer: {
-        marginTop: 24,
-        paddingTop: 20,
-        borderTopWidth: 1,
-        borderTopColor: '#E2E8F0',
-        alignItems: 'center',
-        gap: 12,
-    },
-    paginationControls: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 16,
-    },
-    paginationButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        borderRadius: 8,
-        backgroundColor: '#F8FAFC',
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-        gap: 4,
-    },
-    paginationButtonDisabled: {
-        backgroundColor: '#F1F5F9',
-        borderColor: '#E2E8F0',
-    },
-    paginationButtonText: {
-        fontSize: 14,
-        color: '#3A78B5',
-        fontWeight: '500',
-    },
-    paginationButtonTextDisabled: {
-        color: '#CBD5E1',
-    },
-    pageNumbersContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    pageNumberButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 8,
-        backgroundColor: '#F8FAFC',
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    pageNumberButtonActive: {
-        backgroundColor: '#3A78B5',
-        borderColor: '#3A78B5',
-    },
-    pageNumberText: {
-        fontSize: 14,
-        color: '#64748B',
-        fontWeight: '500',
-    },
-    pageNumberTextActive: {
-        color: '#FFFFFF',
-        fontWeight: '600',
-    },
-    ellipsis: {
-        fontSize: 14,
-        color: '#64748B',
-        paddingHorizontal: 8,
-    },
-    itemsPerPageText: {
-        fontSize: 12,
-        color: '#94A3B8',
-        fontStyle: 'italic',
-    },
-    loadingContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginBottom: 12,
-    },
-    loadingText: {
-        fontSize: 14,
-        color: '#64748B',
-        fontStyle: 'italic',
     },
 });
 

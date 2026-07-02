@@ -1,6 +1,7 @@
 import { domain } from '@/lib/domain';
 import { getClientId } from '@/functions/clientId';
 import { ProjectSection } from '@/types/project';
+import { isAdmin, isStaff, StaffUser, useUser } from '@/hooks/useUser';
 import { Ionicons } from '@expo/vector-icons';
 import apiClient from '@/utils/axiosConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -190,7 +191,12 @@ const SectionAccordionItem: React.FC<{
   isLoadingCompletion: boolean;
   options: SectionOption[];
   onToggle: () => void;
-}> = ({ section, index, isExpanded, isCompleted, isLoadingCompletion, options, onToggle }) => {
+  materialExpanded: boolean;
+  materialSubOptions: typeof MATERIAL_SUB_OPTIONS;
+  onMaterialSubOption: (key: string) => void;
+  reportExpanded: boolean;
+  onReportSubOption: (key: string) => void;
+}> = ({ section, index, isExpanded, isCompleted, isLoadingCompletion, options, onToggle, materialExpanded, materialSubOptions, onMaterialSubOption, reportExpanded, onReportSubOption }) => {
   const chevron  = useRef(new Animated.Value(isExpanded ? 1 : 0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -278,19 +284,54 @@ const SectionAccordionItem: React.FC<{
           <View style={styles.optionsGrid}>
             {options.map((option) => {
               const cfg = OPTION_CONFIG[option.key] || { icon: 'ellipsis-horizontal', color: '#3A78B5', bg: '#EAF0FE', label: option.label };
+              const isMat    = option.key === 'material';
+              const isReport = option.key === 'report';
+              const subOpen  = (isMat && materialExpanded) || (isReport && reportExpanded);
+              const subItems = isMat ? materialSubOptions : isReport ? REPORT_SUB_OPTIONS : [];
+              const onSubPress = isMat ? onMaterialSubOption : onReportSubOption;
+
               return (
-                <TouchableOpacity
-                  key={option.key}
-                  style={styles.optionChip}
-                  activeOpacity={0.75}
-                  onPress={option.onPress}
-                >
-                  <View style={[styles.optionChipIcon, { backgroundColor: cfg.bg }]}>
-                    <Ionicons name={cfg.icon as any} size={20} color={cfg.color} />
-                  </View>
-                  <Text style={styles.optionChipLabel}>{cfg.label}</Text>
-                  <Ionicons name="chevron-forward" size={14} color="#CBD5E1" />
-                </TouchableOpacity>
+                <View key={option.key}>
+                  <TouchableOpacity
+                    style={[styles.optionChip, subOpen && subDd.chipOpen]}
+                    activeOpacity={0.75}
+                    onPress={option.onPress}
+                  >
+                    <View style={[styles.optionChipIcon, { backgroundColor: cfg.bg }]}>
+                      <Ionicons name={cfg.icon as any} size={20} color={cfg.color} />
+                    </View>
+                    <Text style={styles.optionChipLabel}>{cfg.label}</Text>
+                    <Ionicons
+                      name={(isMat || isReport) ? (subOpen ? 'chevron-up' : 'chevron-down') : 'chevron-forward'}
+                      size={14}
+                      color={subOpen ? cfg.color : '#CBD5E1'}
+                    />
+                  </TouchableOpacity>
+
+                  {subOpen && subItems.length > 0 && (
+                    <View style={subDd.list}>
+                      {subItems.map((sub, i) => (
+                        <View key={sub.key}>
+                          {i > 0 && <View style={subDd.sep} />}
+                          <TouchableOpacity
+                            style={subDd.item}
+                            activeOpacity={0.75}
+                            onPress={() => onSubPress(sub.key)}
+                          >
+                            <View style={[subDd.icon, { backgroundColor: sub.bg }]}>
+                              <Ionicons name={sub.icon as any} size={16} color={sub.color} />
+                            </View>
+                            <View style={subDd.text}>
+                              <Text style={subDd.label}>{sub.label}</Text>
+                              <Text style={subDd.desc}>{sub.desc}</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={13} color="#CBD5E1" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
               );
             })}
           </View>
@@ -317,16 +358,20 @@ const ProjectSections = () => {
   const [generatingStockReport, setGeneratingStockReport] = useState(false);
   const [expandedSectionId, setExpandedSectionId] = useState<string | null>(null);
   const [resolvedClientId, setResolvedClientId]   = useState<string>('');
-  const [showReportModal, setShowReportModal]         = useState(false);
-  const [reportModalSection, setReportModalSection]   = useState<ProjectSection | null>(null);
-  const [showMaterialModal, setShowMaterialModal]     = useState(false);
-  const [materialModalSection, setMaterialModalSection] = useState<ProjectSection | null>(null);
+  const [expandedMaterialSectionId, setExpandedMaterialSectionId] = useState<string | null>(null);
+  const [expandedReportSectionId, setExpandedReportSectionId]     = useState<string | null>(null);
   const [contractorList, setContractorList]             = useState<any[]>([]);
   const [showContractorPicker, setShowContractorPicker] = useState(false);
   const [selectedForReport, setSelectedForReport]       = useState<Set<string>>(new Set());
   const [isGeneratingReport, setIsGeneratingReport]     = useState(false);
   const [reportGenerating, setReportGenerating]   = useState(false);
   const [reportGeneratingLabel, setReportGeneratingLabel] = useState('');
+
+  // Permission helpers
+  const { user } = useUser();
+  const userIsAdmin = isAdmin(user);
+  const staffPermissions: string[] = isStaff(user) ? ((user as StaffUser).permissions || []) : [];
+  const hasPermission = (permission: string) => userIsAdmin || staffPermissions.includes(permission);
 
   // FAB pulse
   const fabPulse = useRef(new Animated.Value(1)).current;
@@ -426,16 +471,13 @@ const ProjectSections = () => {
     router.push({ pathname: '../other-cost', params: { projectId: id as string, projectName: name as string } });
   };
 
-  const handleReportOption = async (key: string) => {
-    setShowReportModal(false);
-    if (!reportModalSection) return;
+  const handleReportOption = async (key: string, section: ProjectSection) => {
+    setExpandedReportSectionId(null);
 
     const opt = REPORT_SUB_OPTIONS.find(o => o.key === key);
     setReportGeneratingLabel(opt?.label ?? 'Report');
 
-    // Give the report sub-options modal time to finish its close animation
-    // before mounting the overlay and starting network requests.
-    await new Promise(r => setTimeout(r, 250));
+    await new Promise(r => setTimeout(r, 120));
     setReportGenerating(true);
 
     switch (key) {
@@ -449,7 +491,7 @@ const ProjectSections = () => {
           const res = await apiClient.get('/api/equipment', {
             params: {
               projectId: id as string,
-              projectSectionId: reportModalSection?._id || reportModalSection?.sectionId,
+              projectSectionId: section._id || section.sectionId,
               status: 'active'
             }
           });
@@ -470,7 +512,7 @@ const ProjectSections = () => {
           } catch {}
 
           const pdfGen = new PDFReportGenerator({}, { name: userName });
-          const sectionTitle = reportModalSection?.name ? `${name} - ${reportModalSection.name}` : (name as string || 'Project');
+          const sectionTitle = section?.name ? `${name} - ${section.name}` : (name as string || 'Project');
           await pdfGen.generateEquipmentCostReport(equipmentList, sectionTitle);
         } catch (error: any) {
           toast.error(error?.message || 'Failed to generate equipment report. Please try again.');
@@ -643,13 +685,48 @@ const ProjectSections = () => {
     }
   };
 
-  const getSectionOptions = (section: ProjectSection): SectionOption[] => [
-    { key: 'material',      label: 'Material',      icon: 'cube-outline',         onPress: () => { setMaterialModalSection(section); setShowMaterialModal(true); } },
-    { key: 'contractor',    label: 'Contractor',    icon: 'people-outline',       onPress: () => goToContractor(section) },
-    { key: 'equipmentCost', label: 'Equipment', icon: 'hardware-chip-outline', onPress: () => goToEquipment(section) },
-    { key: 'otherCost',     label: 'Other',     icon: 'cash-outline',         onPress: () => goToOtherCost() },
-    { key: 'report',        label: 'Cost Report',   icon: 'bar-chart-outline',    onPress: () => { setReportModalSection(section); setShowReportModal(true); } },
-  ];
+  const getSectionOptions = (section: ProjectSection, sectionKey: string): SectionOption[] => {
+    const options: SectionOption[] = [];
+    if (hasPermission('addMaterial') || hasPermission('addMaterialUsage'))
+      options.push({ key: 'material',      label: 'Material',    icon: 'cube-outline',          onPress: () => setExpandedMaterialSectionId(prev => prev === sectionKey ? null : sectionKey) });
+    if (hasPermission('contractor'))
+      options.push({ key: 'contractor',    label: 'Contractor',  icon: 'people-outline',        onPress: () => goToContractor(section) });
+    if (hasPermission('addEquipmentCost'))
+      options.push({ key: 'equipmentCost', label: 'Equipment',   icon: 'hardware-chip-outline', onPress: () => goToEquipment(section) });
+    if (hasPermission('addOtherCost'))
+      options.push({ key: 'otherCost',     label: 'Other',       icon: 'cash-outline',          onPress: () => goToOtherCost() });
+    if (hasPermission('generateReport'))
+      options.push({ key: 'report',        label: 'Cost Report', icon: 'bar-chart-outline',     onPress: () => setExpandedReportSectionId(prev => prev === sectionKey ? null : sectionKey) });
+    return options;
+  };
+
+  const handleMaterialSubOption = (key: string, section: ProjectSection) => {
+    setExpandedMaterialSectionId(null);
+    if (key === 'available') {
+      goToMaterials(section, 'imported');
+    } else if (key === 'used') {
+      goToMaterials(section, 'used');
+    } else if (key === 'analysis') {
+      router.push({
+        pathname: '../analytics/mini-sections-analytics',
+        params: {
+          projectId: id as string,
+          projectName: name as string,
+          sectionId: section._id || section.sectionId,
+          sectionName: section.name,
+          materialUsed: materialUsed as string,
+          materialAvailable: materialAvailable as string,
+        },
+      });
+    }
+  };
+
+  const getFilteredMaterialSubOptions = () => MATERIAL_SUB_OPTIONS.filter(opt => {
+    if (opt.key === 'available') return hasPermission('addMaterial');
+    if (opt.key === 'used')      return hasPermission('addMaterialUsage');
+    if (opt.key === 'analysis')  return hasPermission('generateReport');
+    return userIsAdmin;
+  });
 
   const toggleSection = (sectionKey: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.create(240, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
@@ -905,8 +982,13 @@ const ProjectSections = () => {
                 isExpanded={isExpanded}
                 isCompleted={isCompleted}
                 isLoadingCompletion={isLoadingCompletion}
-                options={getSectionOptions(section)}
+                options={getSectionOptions(section, sectionKey)}
                 onToggle={() => toggleSection(sectionKey)}
+                materialExpanded={expandedMaterialSectionId === sectionKey}
+                materialSubOptions={getFilteredMaterialSubOptions()}
+                onMaterialSubOption={(key) => handleMaterialSubOption(key, section)}
+                reportExpanded={expandedReportSectionId === sectionKey}
+                onReportSubOption={(key) => handleReportOption(key, section)}
               />
             );
           })
@@ -1046,102 +1128,6 @@ const ProjectSections = () => {
           </View>
         </View>
       )}
-
-      {/* ── Material Sub-Options Modal ───────────────────────────────────────── */}
-      <Modal visible={showMaterialModal} animationType="slide" transparent onRequestClose={() => setShowMaterialModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHandle} />
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>Material</Text>
-                <Text style={styles.modalSubtitle}>Select an option to view or analyse</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowMaterialModal(false)} style={styles.modalCloseBtn}>
-                <Ionicons name="close" size={22} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.reportOptionsGrid}>
-              {MATERIAL_SUB_OPTIONS.map(opt => (
-                <TouchableOpacity
-                  key={opt.key}
-                  style={styles.reportOptionCard}
-                  activeOpacity={0.75}
-                  onPress={() => {
-                    setShowMaterialModal(false);
-                    if (opt.key === 'available') {
-                      materialModalSection && goToMaterials(materialModalSection, 'imported');
-                    } else if (opt.key === 'used') {
-                      materialModalSection && goToMaterials(materialModalSection, 'used');
-                    } else if (opt.key === 'analysis') {
-                      if (materialModalSection) {
-                        setShowMaterialModal(false);
-                        router.push({
-                          pathname: '../analytics/mini-sections-analytics',
-                          params: {
-                            projectId: id as string,
-                            projectName: name as string,
-                            sectionId: materialModalSection._id || materialModalSection.sectionId,
-                            sectionName: materialModalSection.name,
-                            materialUsed: materialUsed as string,
-                            materialAvailable: materialAvailable as string,
-                          },
-                        });
-                      }
-                    }
-                  }}
-                >
-                  <View style={[styles.reportOptionIcon, { backgroundColor: opt.bg }]}>
-                    <Ionicons name={opt.icon as any} size={24} color={opt.color} />
-                  </View>
-                  <View style={styles.reportOptionText}>
-                    <Text style={styles.reportOptionLabel}>{opt.label}</Text>
-                    <Text style={styles.reportOptionDesc}>{opt.desc}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ── Report Sub-Options Modal ─────────────────────────────────────────── */}
-      <Modal visible={showReportModal} animationType="slide" transparent onRequestClose={() => setShowReportModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHandle} />
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>Generate Report</Text>
-                <Text style={styles.modalSubtitle}>Select a report type to generate</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowReportModal(false)} style={styles.modalCloseBtn}>
-                <Ionicons name="close" size={22} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.reportOptionsGrid}>
-              {REPORT_SUB_OPTIONS.map(opt => (
-                <TouchableOpacity
-                  key={opt.key}
-                  style={styles.reportOptionCard}
-                  activeOpacity={0.75}
-                  onPress={() => handleReportOption(opt.key)}
-                >
-                  <View style={[styles.reportOptionIcon, { backgroundColor: opt.bg }]}>
-                    <Ionicons name={opt.icon as any} size={24} color={opt.color} />
-                  </View>
-                  <View style={styles.reportOptionText}>
-                    <Text style={styles.reportOptionLabel}>{opt.label}</Text>
-                    <Text style={styles.reportOptionDesc}>{opt.desc}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* ── Add Section Modal ─────────────────────────────────────────────────── */}
       <Modal visible={showAddModal} animationType="slide" transparent onRequestClose={() => setShowAddModal(false)}>
@@ -1379,6 +1365,47 @@ const styles = StyleSheet.create({
   modalAddBtn:     { flex: 1.5, borderRadius: 14, overflow: 'hidden' },
   modalAddBtnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 15, backgroundColor: '#3A78B5' },
   modalAddText:    { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
+});
+
+// ─── Material sub-dropdown styles ─────────────────────────────────────────────
+const subDd = StyleSheet.create({
+  chipOpen: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    borderBottomWidth: 0,
+  },
+  list: {
+    borderWidth: 1,
+    borderTopWidth: 0,
+    borderColor: '#EEF2F8',
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+    overflow: 'hidden',
+    marginBottom: 0,
+  },
+  sep: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginHorizontal: 14,
+  },
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    backgroundColor: '#FFFFFF',
+  },
+  icon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  text: { flex: 1 },
+  label: { fontSize: 13, fontWeight: '600', color: '#1E293B' },
+  desc: { fontSize: 11, color: '#94A3B8', marginTop: 1 },
 });
 
 export default ProjectSections;

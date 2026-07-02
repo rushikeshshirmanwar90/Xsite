@@ -23,6 +23,7 @@ export interface Staff {
   clientId?: string;
   emailVerified?: boolean;
   emailVerifiedAt?: string;
+  permissions?: string[];
 }
 
 export interface StaffMembers {

@@ -1,327 +1,186 @@
-// components/StaffCard.tsx
 import { StaffCardProps } from '@/types/staff';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import {
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-const StaffCard: React.FC<StaffCardProps> = ({ staff, onPress, onRemove, showRemoveButton = false, onManagePayment }) => {
-    const getInitials = (firstName: string, lastName: string): string => {
-        return (firstName[0] + lastName[0]).toUpperCase();
-    };
+const ROLE_COLOR: Record<string, { color: string; bg: string }> = {
+    'site-engineer': { color: '#2563EB', bg: '#EAF0FE' },
+    'supervisor':    { color: '#16A34A', bg: '#F0FDF4' },
+    'manager':       { color: '#7C3AED', bg: '#FAF5FF' },
+};
 
-    const fullName = `${staff.firstName} ${staff.lastName}`;
+const StaffCard: React.FC<StaffCardProps & { isExpanded?: boolean }> = ({ staff, onPress, isExpanded = false }) => {
+    const initials = (staff.firstName[0] + staff.lastName[0]).toUpperCase();
+    const roleStyle = ROLE_COLOR[staff.role] ?? { color: '#3A78B5', bg: '#EAF0FE' };
+    const projectCount = staff.assignedProjects?.length ?? 0;
 
     return (
         <TouchableOpacity
-            style={styles.staffCard}
+            style={[
+                styles.card,
+                isExpanded && styles.cardExpanded,
+            ]}
             onPress={onPress}
-            activeOpacity={0.7}
+            activeOpacity={0.75}
         >
-            <View style={styles.staffCardContent}>
-                <View style={styles.staffInfo}>
-                    <View style={styles.avatar}>
-                        <Text style={styles.avatarText}>
-                            {getInitials(staff.firstName, staff.lastName)}
-                        </Text>
-                    </View>
+            {/* Left accent */}
+            <View style={[styles.accent, { backgroundColor: roleStyle.color }]} />
 
-                    <View style={styles.staffDetails}>
-                        <View style={styles.nameRow}>
-                            <Text style={styles.staffName}>{fullName}</Text>
-                            {staff.emailVerified && (
-                                <View style={styles.verifiedBadge}>
-                                    <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                                    <Text style={styles.verifiedText}>Verified</Text>
-                                </View>
-                            )}
-                        </View>
-                        <Text style={styles.staffRole}>{staff.role}</Text>
+            {/* Avatar */}
+            <View style={[styles.avatar, { backgroundColor: roleStyle.bg }]}>
+                <Text style={[styles.avatarText, { color: roleStyle.color }]}>{initials}</Text>
+            </View>
 
-                        <View style={styles.contactInfo}>
-                            <View style={styles.contactItem}>
-                                <Ionicons name="call" size={12} color="#6B7280" />
-                                <Text style={styles.contactText}>{staff.phoneNumber}</Text>
-                            </View>
-
-                            <View style={styles.contactItem}>
-                                <Ionicons 
-                                    name={staff.emailVerified ? "mail" : "mail-outline"} 
-                                    size={12} 
-                                    color={staff.emailVerified ? "#10B981" : "#6B7280"} 
-                                />
-                                <Text style={[
-                                    styles.contactText,
-                                    staff.emailVerified && styles.verifiedEmail
-                                ]} numberOfLines={1}>
-                                    {staff.email}
-                                </Text>
-                            </View>
-                        </View>
-                    </View>
-                </View>
-
-                <View style={styles.projectsSection}>
-                    <Text style={styles.projectsLabel}>
-                        Assigned Projects ({staff.assignedProjects.length})
+            {/* Info */}
+            <View style={styles.info}>
+                <View style={styles.nameRow}>
+                    <Text style={styles.name} numberOfLines={1}>
+                        {staff.firstName} {staff.lastName}
                     </Text>
-                    {staff.assignedProjects.length > 0 ? (
-                        <View style={styles.projectsList}>
-                            {staff.assignedProjects.slice(0, 2).map((project, index) => (
-                                <View key={index} style={styles.projectTag}>
-                                    <Text style={styles.projectTagText} numberOfLines={1}>
-                                        {project.projectName}
-                                    </Text>
-                                    {!!project.monthlyPayment && (
-                                        <Text style={styles.projectTagPayment}>
-                                            ₹{project.monthlyPayment.toLocaleString('en-IN')}/mo
-                                        </Text>
-                                    )}
-                                </View>
-                            ))}
-                            {staff.assignedProjects.length > 2 && (
-                                <View style={[styles.projectTag, styles.moreProjectsTag]}>
-                                    <Text style={styles.moreProjectsText}>
-                                        +{staff.assignedProjects.length - 2}
-                                    </Text>
-                                </View>
-                            )}
-                        </View>
-                    ) : (
-                        <Text style={styles.noProjectsText}>No projects assigned</Text>
-                    )}
-                    {staff.assignedProjects.some(p => !!p.monthlyPayment) && (
-                        <Text style={styles.totalPaymentText}>
-                            Total monthly: ₹{staff.assignedProjects
-                                .reduce((sum, p) => sum + (p.monthlyPayment || 0), 0)
-                                .toLocaleString('en-IN')}
-                        </Text>
+                    {staff.emailVerified && (
+                        <Ionicons name="checkmark-circle" size={15} color="#10B981" />
                     )}
                 </View>
 
-                {onManagePayment && staff.assignedProjects.length > 0 && (
-                    <TouchableOpacity
-                        style={styles.managePaymentButton}
-                        onPress={(e) => {
-                            e.stopPropagation();
-                            onManagePayment(staff);
-                        }}
-                        activeOpacity={0.7}
-                    >
-                        <Ionicons name="cash-outline" size={16} color="#059669" />
-                        <Text style={styles.managePaymentButtonText}>Manage Payment</Text>
-                    </TouchableOpacity>
+                <View style={[styles.rolePill, { backgroundColor: roleStyle.bg }]}>
+                    <Text style={[styles.roleText, { color: roleStyle.color }]}>
+                        {staff.role}
+                    </Text>
+                </View>
+
+                <View style={styles.meta}>
+                    <View style={styles.metaItem}>
+                        <Ionicons name="call-outline" size={12} color="#94A3B8" />
+                        <Text style={styles.metaText}>{staff.phoneNumber}</Text>
+                    </View>
+                    <View style={styles.metaItem}>
+                        <Ionicons name="mail-outline" size={12} color="#94A3B8" />
+                        <Text style={styles.metaText} numberOfLines={1}>{staff.email}</Text>
+                    </View>
+                </View>
+
+                {projectCount > 0 && (
+                    <View style={styles.projectRow}>
+                        <Ionicons name="folder-outline" size={12} color="#64748B" />
+                        <Text style={styles.projectText}>
+                            {projectCount} project{projectCount !== 1 ? 's' : ''} assigned
+                        </Text>
+                    </View>
                 )}
             </View>
 
-            <View style={styles.cardAction}>
-                {showRemoveButton && onRemove && (
-                    <TouchableOpacity
-                        style={styles.removeButton}
-                        onPress={(e) => {
-                            e.stopPropagation();
-                            onRemove(staff);
-                        }}
-                        activeOpacity={0.7}
-                    >
-                        <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                    </TouchableOpacity>
-                )}
-                <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+            {/* Expand indicator */}
+            <View style={[styles.expandBtn, isExpanded && { backgroundColor: roleStyle.bg }]}>
+                <Ionicons
+                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                    size={16}
+                    color={isExpanded ? roleStyle.color : '#94A3B8'}
+                />
             </View>
         </TouchableOpacity>
     );
 };
 
 const styles = StyleSheet.create({
-    staffCard: {
-        backgroundColor: 'white',
-        borderRadius: 16,
-        marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
-        elevation: 3,
+    card: {
         flexDirection: 'row',
         alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        marginBottom: 10,
+        overflow: 'hidden',
+        shadowColor: '#1E293B',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.06,
+        shadowRadius: 10,
+        elevation: 2,
     },
-    staffCardContent: {
-        flex: 1,
-        padding: 16,
+    cardExpanded: {
+        borderBottomLeftRadius: 0,
+        borderBottomRightRadius: 0,
+        marginBottom: 0,
+        shadowOpacity: 0,
+        elevation: 0,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E2E8F0',
     },
-    staffInfo: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        marginBottom: 12,
+    accent: {
+        width: 4,
+        alignSelf: 'stretch',
     },
     avatar: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
+        width: 46,
+        height: 46,
+        borderRadius: 14,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 12,
-        backgroundColor: '#3A78B5',
+        marginHorizontal: 14,
     },
     avatarText: {
-        color: 'white',
-        fontSize: 16,
-        fontWeight: 'bold',
+        fontSize: 17,
+        fontWeight: '800',
     },
-    staffDetails: {
+    info: {
         flex: 1,
+        paddingVertical: 14,
+        paddingRight: 4,
+        gap: 5,
     },
     nameRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 4,
-    },
-    staffName: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#111827',
-        flex: 1,
-    },
-    verifiedBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#ECFDF5',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-        gap: 4,
-    },
-    verifiedText: {
-        fontSize: 11,
-        color: '#10B981',
-        fontWeight: '600',
-    },
-    verifyButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#FEF3C7',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-        gap: 4,
-    },
-    verifyButtonText: {
-        fontSize: 11,
-        color: '#F59E0B',
-        fontWeight: '600',
-    },
-    staffRole: {
-        fontSize: 14,
-        color: '#6B7280',
-        fontWeight: '500',
-        marginBottom: 8,
-    },
-    contactInfo: {
-        gap: 4,
-    },
-    contactItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    contactText: {
-        fontSize: 12,
-        color: '#6B7280',
-        marginLeft: 6,
-        flex: 1,
-    },
-    verifiedEmail: {
-        color: '#10B981',
-        fontWeight: '500',
-    },
-    projectsSection: {
-        borderTopWidth: 1,
-        borderTopColor: '#F3F4F6',
-        paddingTop: 12,
-    },
-    managePaymentButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 6,
-        marginTop: 12,
-        paddingVertical: 9,
-        borderRadius: 8,
-        backgroundColor: '#ECFDF5',
-        borderWidth: 1,
-        borderColor: '#A7F3D0',
-    },
-    managePaymentButtonText: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#059669',
-    },
-    projectsLabel: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#374151',
-        marginBottom: 8,
-    },
-    projectsList: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
         gap: 6,
     },
-    projectTag: {
-        backgroundColor: '#EBF8FF',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 6,
-        maxWidth: 120,
-    },
-    projectTagText: {
-        fontSize: 11,
-        color: '#1E40AF',
-        fontWeight: '500',
-    },
-    projectTagPayment: {
-        fontSize: 10,
-        color: '#059669',
+    name: {
+        fontSize: 15,
         fontWeight: '700',
+        color: '#0F172A',
+        flexShrink: 1,
+    },
+    rolePill: {
+        alignSelf: 'flex-start',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 8,
+    },
+    roleText: {
+        fontSize: 11,
+        fontWeight: '700',
+        textTransform: 'capitalize',
+    },
+    meta: {
+        gap: 3,
         marginTop: 2,
     },
-    totalPaymentText: {
-        fontSize: 12,
-        color: '#059669',
-        fontWeight: '700',
-        marginTop: 8,
-    },
-    moreProjectsTag: {
-        backgroundColor: '#F3F4F6',
-    },
-    moreProjectsText: {
-        fontSize: 11,
-        color: '#6B7280',
-        fontWeight: '600',
-    },
-    noProjectsText: {
-        fontSize: 12,
-        color: '#9CA3AF',
-        fontStyle: 'italic',
-    },
-    cardAction: {
-        paddingRight: 16,
-        paddingLeft: 8,
+    metaItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 5,
     },
-    removeButton: {
-        padding: 8,
-        borderRadius: 8,
-        backgroundColor: '#FEF2F2',
+    metaText: {
+        fontSize: 12,
+        color: '#64748B',
+        flexShrink: 1,
+    },
+    projectRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        marginTop: 2,
+    },
+    projectText: {
+        fontSize: 12,
+        color: '#64748B',
+        fontWeight: '500',
+    },
+    expandBtn: {
+        width: 30,
+        height: 30,
+        borderRadius: 10,
+        backgroundColor: '#F1F5F9',
         justifyContent: 'center',
         alignItems: 'center',
+        marginRight: 14,
     },
 });
 

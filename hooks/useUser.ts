@@ -35,6 +35,7 @@ export interface StaffUser {
     assignedAt: string;
     status: "active" | "completed" | "paused";
   }>;
+  permissions?: string[];
 }
 
 export interface CustomerUser {

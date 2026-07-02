@@ -18,6 +18,9 @@ export interface Material {
   addedAt?: string;
   createdAt?: string;
   updatedAt?: string;
+  contractor_name?: string;
+  paymentStatus?: 'full' | 'partial' | 'unpaid'; // Vendor payment state for this batch
+  amountPaid?: number; // Amount already paid to the vendor for this batch
 }
 
 export interface MaterialEntry {

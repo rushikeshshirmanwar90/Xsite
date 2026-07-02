@@ -385,7 +385,7 @@ export default function ContractorScreen() {
 
         {/* Action button */}
         <TouchableOpacity
-          style={[cStyles.actionBtn, { backgroundColor: isActive ? '#0F172A' : '#F1F5F9' }]}
+          style={[cStyles.actionBtn, { backgroundColor: isActive ? '#3A78B5' : '#F1F5F9' }]}
           onPress={() => handleManagePress(item)}
           activeOpacity={0.8}
         >
@@ -733,7 +733,7 @@ export default function ContractorScreen() {
               }}
             >
               <View style={contractorBanner.iconWrap}>
-                <Ionicons name="people" size={24} color="#16A34A" />
+                <Ionicons name="people" size={24} color="#3A78B5" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={contractorBanner.eyebrow}>Staff Contracts</Text>
@@ -747,7 +747,7 @@ export default function ContractorScreen() {
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <View style={styles.emptyIconContainer}>
-                <Ionicons name="people-outline" size={56} color="#BBF7D0" />
+                <Ionicons name="people-outline" size={56} color="#C4D8FC" />
               </View>
               <Text style={styles.emptyTitle}>No Contractors Yet</Text>
               <Text style={styles.emptySubtitle}>
@@ -2005,7 +2005,7 @@ const mStyles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 8,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#3A78B5',
   },
   solidBtnText: { fontSize: 12, fontWeight: '600', color: '#FFFFFF' },
   tabBar: {
@@ -2053,7 +2053,7 @@ const mStyles = StyleSheet.create({
     gap: 6,
     marginHorizontal: 20,
     marginBottom: 14,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#3A78B5',
     paddingVertical: 13,
     borderRadius: 12,
   },
@@ -2541,8 +2541,8 @@ const pStyles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   typePillActive: {
-    backgroundColor: '#0F172A',
-    borderColor: '#0F172A',
+    backgroundColor: '#3A78B5',
+    borderColor: '#3A78B5',
   },
   typePillText: {
     fontSize: 13,
@@ -2589,7 +2589,7 @@ const pStyles = StyleSheet.create({
     flex: 2,
     paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#3A78B5',
     alignItems: 'center',
   },
   submitText: {
@@ -2827,9 +2827,9 @@ const contractorBanner = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 14,
     marginBottom: 6,
-    backgroundColor: '#F0FDF4',
+    backgroundColor: '#EAF0FE',
     borderWidth: 1,
-    borderColor: '#BBF7D0',
+    borderColor: '#C4D8FC',
     borderRadius: 14,
     paddingVertical: 14,
     paddingHorizontal: 16,
@@ -2842,7 +2842,7 @@ const contractorBanner = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#BBF7D0',
+    borderColor: '#C4D8FC',
     flexShrink: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -2853,7 +2853,7 @@ const contractorBanner = StyleSheet.create({
   eyebrow: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#16A34A',
+    color: '#3A78B5',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 2,
@@ -2867,7 +2867,7 @@ const contractorBanner = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: '#16A34A',
+    backgroundColor: '#3A78B5',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,

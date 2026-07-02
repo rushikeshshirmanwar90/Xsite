@@ -19,7 +19,9 @@ import apiClient from '@/utils/axiosConfig';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
     FlatList,
+    Modal,
     StatusBar,
     StyleSheet,
     Text,
@@ -27,10 +29,20 @@ import {
     TouchableOpacity,
     Alert,
     RefreshControl,
+    ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { staffStorage } from '@/utils/staffStorage';
 import { toast } from 'sonner-native';
+
+const ALL_PERMISSIONS = [
+    { key: 'addMaterial',      label: 'Add Material',    icon: 'cube-outline',          color: '#7C3AED', bg: '#FAF5FF' },
+    { key: 'addMaterialUsage', label: 'Material Usage',  icon: 'construct-outline',     color: '#D97706', bg: '#FFFBEB' },
+    { key: 'addOtherCost',     label: 'Other Cost',      icon: 'cash-outline',          color: '#E11D48', bg: '#FFF1F2' },
+    { key: 'addEquipmentCost', label: 'Equipment Cost',  icon: 'hardware-chip-outline', color: '#2563EB', bg: '#EAF0FE' },
+    { key: 'contractor',       label: 'Contractor',      icon: 'people-outline',        color: '#16A34A', bg: '#F0FDF4' },
+    { key: 'generateReport',   label: 'Generate Report', icon: 'bar-chart-outline',     color: '#F59E0B', bg: '#FEF0E3' },
+];
 
 interface Admin {
     _id?: string;
@@ -63,6 +75,15 @@ const StaffManagement: React.FC = () => {
     const [clientData, setClientData] = useState<ClientData | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+
+    // Inline dropdown
+    const [expandedStaffId, setExpandedStaffId] = useState<string | null>(null);
+
+    // Permissions modal
+    const [showPermissionsModal, setShowPermissionsModal] = useState(false);
+    const [permissionsStaff, setPermissionsStaff] = useState<Staff | null>(null);
+    const [activePermissions, setActivePermissions] = useState<string[]>([]);
+    const [savingPermissions, setSavingPermissions] = useState(false);
 
     // Get user role for access control
     const { user } = useUser();
@@ -480,16 +501,50 @@ const StaffManagement: React.FC = () => {
     };
 
     const handleStaffPress = (staff: Staff) => {
-        // Navigate to staff detail page with staff data
-        console.log('Staff selected:', `${staff.firstName} ${staff.lastName}`);
+        setExpandedStaffId(prev => (prev === staff._id ? null : (staff._id ?? null)));
+    };
 
-        // Navigate to staff detail screen with staff data as params
-        router.push({
-            pathname: '/staff-detail',
-            params: {
-                staff: JSON.stringify(staff)
-            }
-        });
+    const handleViewActivity = (staff: Staff) => {
+        router.push({ pathname: '/staff-detail', params: { staff: JSON.stringify(staff) } });
+    };
+
+    const handleManagePermissionsPress = (staff: Staff) => {
+        setPermissionsStaff(staff);
+        setActivePermissions(staff.permissions || []);
+        setShowPermissionsModal(true);
+    };
+
+    const handleManagePaymentPress = (staff: Staff) => {
+        handleManagePayment(staff);
+    };
+
+    const handleRemoveFromSheet = (staff: Staff) => {
+        handleRemoveStaff(staff);
+    };
+
+    const togglePermission = (key: string) => {
+        setActivePermissions(prev =>
+            prev.includes(key) ? prev.filter(p => p !== key) : [...prev, key]
+        );
+    };
+
+    const savePermissions = async () => {
+        if (savingPermissions || !permissionsStaff?._id || !clientId) return;
+        setSavingPermissions(true);
+        try {
+            await apiClient.put(
+                `/api/users/staff?id=${permissionsStaff._id}&clientId=${clientId}`,
+                { permissions: activePermissions }
+            );
+            toast.success('Permissions updated');
+            setShowPermissionsModal(false);
+            setLoading(true);
+            await fetchStaffAndAdminData();
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message || 'Failed to update permissions');
+        } finally {
+            setSavingPermissions(false);
+        }
     };
 
     const handleRemoveStaff = async (staff: Staff) => {
@@ -746,22 +801,92 @@ const StaffManagement: React.FC = () => {
                     </View>
                 );
             
-            case 'staff':
+            case 'staff': {
+                const staffData: Staff = item.data;
+                const filteredProjects = filterStaffProjectsByClient(staffData);
+                const isExpanded = expandedStaffId === staffData._id;
                 return (
                     <View style={styles.staffContainer}>
                         <StaffCard
-                            staff={{
-                                ...item.data,
-                                // Filter assignedProjects to only show projects for current client
-                                assignedProjects: filterStaffProjectsByClient(item.data)
-                            }}
-                            onPress={() => handleStaffPress(item.data)}
-                            onRemove={handleRemoveStaff}
-                            showRemoveButton={userIsAdmin}
-                            onManagePayment={userIsAdmin ? handleManagePayment : undefined}
+                            staff={{ ...staffData, assignedProjects: filteredProjects }}
+                            onPress={() => handleStaffPress(staffData)}
+                            isExpanded={isExpanded}
                         />
+                        {isExpanded && (
+                            <View style={dd.dropdown}>
+                                {/* Projects — shown directly */}
+                                {filteredProjects.length > 0 && (
+                                    <View style={dd.projSection}>
+                                        <Text style={dd.projTitle}>Assigned Projects</Text>
+                                        {filteredProjects.map((p, i) => (
+                                            <View key={p.projectId ?? i} style={dd.projRow}>
+                                                <Ionicons
+                                                    name={p.status === 'active' ? 'folder' : 'folder-open'}
+                                                    size={13}
+                                                    color={p.status === 'active' ? '#3A78B5' : '#94A3B8'}
+                                                />
+                                                <Text
+                                                    style={[dd.projName, p.status !== 'active' && { color: '#94A3B8' }]}
+                                                    numberOfLines={1}
+                                                >
+                                                    {p.projectName}
+                                                </Text>
+                                                {p.status !== 'active' ? (
+                                                    <View style={proj.closedTag}>
+                                                        <Text style={proj.closedTagText}>{p.status}</Text>
+                                                    </View>
+                                                ) : !!p.monthlyPayment && (
+                                                    <Text style={proj.payAmt}>
+                                                        ₹{p.monthlyPayment.toLocaleString('en-IN')}/mo
+                                                    </Text>
+                                                )}
+                                            </View>
+                                        ))}
+                                    </View>
+                                )}
+
+                                {/* Action list */}
+                                <View style={dd.list}>
+                                    <TouchableOpacity style={dd.item} onPress={() => handleViewActivity(staffData)} activeOpacity={0.7}>
+                                        <Ionicons name="time-outline" size={18} color="#3A78B5" />
+                                        <Text style={dd.label}>View Activity</Text>
+                                        <Ionicons name="chevron-forward" size={14} color="#CBD5E1" />
+                                    </TouchableOpacity>
+
+                                    {userIsAdmin && <View style={dd.sep} />}
+
+                                    {userIsAdmin && (
+                                        <TouchableOpacity style={dd.item} onPress={() => handleManagePermissionsPress(staffData)} activeOpacity={0.7}>
+                                            <Ionicons name="shield-checkmark-outline" size={18} color="#7C3AED" />
+                                            <Text style={dd.label}>Manage Permissions</Text>
+                                            <Ionicons name="chevron-forward" size={14} color="#CBD5E1" />
+                                        </TouchableOpacity>
+                                    )}
+
+                                    {userIsAdmin && filteredProjects.length > 0 && <View style={dd.sep} />}
+
+                                    {userIsAdmin && filteredProjects.length > 0 && (
+                                        <TouchableOpacity style={dd.item} onPress={() => handleManagePaymentPress(staffData)} activeOpacity={0.7}>
+                                            <Ionicons name="cash-outline" size={18} color="#16A34A" />
+                                            <Text style={dd.label}>Manage Payment</Text>
+                                            <Ionicons name="chevron-forward" size={14} color="#CBD5E1" />
+                                        </TouchableOpacity>
+                                    )}
+
+                                    {userIsAdmin && <View style={dd.sep} />}
+
+                                    {userIsAdmin && (
+                                        <TouchableOpacity style={dd.item} onPress={() => handleRemoveFromSheet(staffData)} activeOpacity={0.7}>
+                                            <Ionicons name="trash-outline" size={18} color="#E11D48" />
+                                            <Text style={[dd.label, { color: '#E11D48' }]}>Remove Staff</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            </View>
+                        )}
                     </View>
                 );
+            }
             
             case 'staffEmpty':
                 return (
@@ -844,6 +969,76 @@ const StaffManagement: React.FC = () => {
                 staff={paymentStaff}
                 onPaymentUpdated={handlePaymentUpdated}
             />
+
+            {/* ── Permissions Modal ───────────────────────────────────────── */}
+            <Modal
+                visible={showPermissionsModal}
+                animationType="slide"
+                transparent
+                onRequestClose={() => setShowPermissionsModal(false)}
+            >
+                <View style={sheet.overlay}>
+                    <TouchableOpacity
+                        style={sheet.backdropFill}
+                        activeOpacity={1}
+                        onPress={() => setShowPermissionsModal(false)}
+                    />
+                <View style={[sheet.container, perm.container]}>
+                    <View style={sheet.handle} />
+
+                    <View style={perm.header}>
+                        <View>
+                            <Text style={perm.title}>Permissions</Text>
+                            {permissionsStaff && (
+                                <Text style={perm.subtitle}>
+                                    {permissionsStaff.firstName} {permissionsStaff.lastName}
+                                </Text>
+                            )}
+                        </View>
+                        <TouchableOpacity onPress={() => setShowPermissionsModal(false)} style={perm.closeBtn}>
+                            <Ionicons name="close" size={20} color="#64748B" />
+                        </TouchableOpacity>
+                    </View>
+
+                    <ScrollView showsVerticalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                        {ALL_PERMISSIONS.map(p => {
+                            const active = activePermissions.includes(p.key);
+                            return (
+                                <TouchableOpacity
+                                    key={p.key}
+                                    style={[perm.chip, active && { backgroundColor: p.bg, borderColor: p.color }]}
+                                    onPress={() => togglePermission(p.key)}
+                                    activeOpacity={0.75}
+                                >
+                                    <View style={[perm.chipIcon, { backgroundColor: active ? p.bg : '#F1F5F9' }]}>
+                                        <Ionicons name={p.icon as any} size={18} color={active ? p.color : '#94A3B8'} />
+                                    </View>
+                                    <Text style={[perm.chipLabel, active && { color: p.color, fontWeight: '700' }]}>
+                                        {p.label}
+                                    </Text>
+                                    {active
+                                        ? <Ionicons name="checkmark-circle" size={20} color={p.color} />
+                                        : <Ionicons name="ellipse-outline" size={20} color="#CBD5E1" />
+                                    }
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </ScrollView>
+
+                    <TouchableOpacity
+                        style={[perm.saveBtn, savingPermissions && perm.saveBtnDisabled]}
+                        onPress={savePermissions}
+                        disabled={savingPermissions}
+                        activeOpacity={0.85}
+                    >
+                        {savingPermissions
+                            ? <ActivityIndicator size="small" color="#fff" />
+                            : <Text style={perm.saveBtnText}>Save Changes</Text>
+                        }
+                    </TouchableOpacity>
+                </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -889,6 +1084,290 @@ const styles = StyleSheet.create({
     staffContainer: {
         paddingHorizontal: 20,
         paddingVertical: 4,
+    },
+});
+
+// ── Action Sheet Styles ────────────────────────────────────────────────────────
+const sheet = StyleSheet.create({
+    overlay: {
+        flex: 1,
+        backgroundColor: 'rgba(10,18,38,0.45)',
+        justifyContent: 'flex-end',
+    },
+    backdropFill: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+    },
+    container: {
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingHorizontal: 20,
+        paddingBottom: 36,
+        paddingTop: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -6 },
+        shadowOpacity: 0.08,
+        shadowRadius: 20,
+        elevation: 20,
+    },
+    handle: {
+        width: 36,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: '#E2E8F0',
+        alignSelf: 'center',
+        marginBottom: 18,
+    },
+    profile: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        paddingBottom: 16,
+    },
+    profileAvatar: {
+        width: 44,
+        height: 44,
+        borderRadius: 14,
+        backgroundColor: '#EAF0FE',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    profileAvatarText: {
+        fontSize: 16,
+        fontWeight: '800',
+        color: '#3A78B5',
+    },
+    profileName: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#0F172A',
+    },
+    profileRole: {
+        fontSize: 12,
+        color: '#64748B',
+        marginTop: 2,
+        textTransform: 'capitalize',
+    },
+    divider: {
+        height: 1,
+        backgroundColor: '#F1F5F9',
+        marginVertical: 8,
+    },
+    action: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 14,
+        paddingVertical: 13,
+    },
+    actionIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    actionText: {
+        flex: 1,
+    },
+    actionLabel: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#0F172A',
+    },
+    actionSub: {
+        fontSize: 12,
+        color: '#94A3B8',
+        marginTop: 1,
+    },
+    scroll: {
+        maxHeight: 520,
+    },
+    cancelBtn: {
+        marginTop: 10,
+        paddingVertical: 14,
+        borderRadius: 14,
+        backgroundColor: '#F8FAFC',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    cancelText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#64748B',
+    },
+});
+
+// ── Projects Dropdown Styles ───────────────────────────────────────────────────
+const proj = StyleSheet.create({
+    payAmt: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#16A34A',
+    },
+    closedTag: {
+        backgroundColor: '#F1F5F9',
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    closedTagText: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: '#64748B',
+        textTransform: 'capitalize',
+    },
+});
+
+// ── Inline dropdown styles ─────────────────────────────────────────────────────
+const dd = StyleSheet.create({
+    dropdown: {
+        marginBottom: 10,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderTopWidth: 0,
+        borderColor: '#E2E8F0',
+        borderBottomLeftRadius: 16,
+        borderBottomRightRadius: 16,
+        paddingHorizontal: 12,
+        paddingTop: 12,
+        paddingBottom: 14,
+        gap: 10,
+        shadowColor: '#1E293B',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.06,
+        shadowRadius: 10,
+        elevation: 2,
+    },
+    projSection: {
+        gap: 6,
+    },
+    projTitle: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#94A3B8',
+        textTransform: 'uppercase',
+        letterSpacing: 0.8,
+        marginBottom: 2,
+    },
+    projRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingVertical: 7,
+        paddingHorizontal: 10,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
+    },
+    projName: {
+        flex: 1,
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#1E293B',
+    },
+    list: {
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        overflow: 'hidden',
+        backgroundColor: '#FFFFFF',
+    },
+    item: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        paddingVertical: 13,
+        paddingHorizontal: 14,
+        backgroundColor: '#FFFFFF',
+    },
+    label: {
+        flex: 1,
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#1E293B',
+    },
+    sep: {
+        height: 1,
+        backgroundColor: '#F1F5F9',
+        marginHorizontal: 14,
+    },
+});
+
+// ── Permissions Modal Styles ───────────────────────────────────────────────────
+const perm = StyleSheet.create({
+    container: {
+        paddingBottom: 40,
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 16,
+    },
+    title: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: '#0F172A',
+        letterSpacing: -0.3,
+    },
+    subtitle: {
+        fontSize: 13,
+        color: '#64748B',
+        marginTop: 2,
+    },
+    closeBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 10,
+        backgroundColor: '#F1F5F9',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    chip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        paddingVertical: 13,
+        paddingHorizontal: 14,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 14,
+        borderWidth: 1.5,
+        borderColor: '#E2E8F0',
+        marginBottom: 8,
+    },
+    chipIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: 11,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    chipLabel: {
+        flex: 1,
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#64748B',
+    },
+    saveBtn: {
+        backgroundColor: '#3A78B5',
+        borderRadius: 14,
+        paddingVertical: 15,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    saveBtnDisabled: {
+        backgroundColor: '#94A3B8',
+    },
+    saveBtnText: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#FFFFFF',
     },
 });
 

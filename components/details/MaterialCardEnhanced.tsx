@@ -10,6 +10,8 @@ interface MaterialVariant {
     cost: number;
     miniSectionId?: string;
     contractor_name?: string;
+    paymentStatus?: 'full' | 'partial' | 'unpaid';
+    amountPaid?: number;
 }
 
 interface GroupedMaterial {
@@ -26,6 +28,12 @@ interface GroupedMaterial {
     totalUsed?: number; // Total quantity used so far
     currentlyAvailable?: number; // ✅ NEW: Currently available quantity
     miniSectionId?: string;
+    contractor_name?: string; // Vendor/contractor (group-level fallback)
+    // ✅ Vendor payment (aggregated across this group's batches)
+    paymentStatus?: 'full' | 'partial' | 'unpaid';
+    amountPaid?: number; // Total paid to the vendor across all batches
+    paymentTotalCost?: number; // Total purchase cost across all batches
+    amountRemaining?: number; // Outstanding amount still owed
 }
 
 interface MiniSection {
@@ -51,7 +59,12 @@ interface MaterialCardEnhancedProps {
     userType?: string; // Add userType prop to control transfer button visibility
     onRefresh?: () => void; // Add refresh callback
     canEdit?: boolean; // Admin-only edit, allowed only when material is unused
+    lowStockThreshold?: number; // % of total purchase remaining at/below which stock is flagged low
+    isIgnored?: boolean; // Low stock alert dismissed by the user for this material — hides the Low Stock badge
 }
+
+// App's primary blue, used for every spec chip.
+const SPEC_CHIP_COLOR = { bg: '#EAF0FE', text: '#3A78B5' };
 
 const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
     material,
@@ -65,6 +78,8 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
     userType = 'staff', // Default to 'staff' if not provided
     onRefresh, // Add refresh callback
     canEdit = false, // Admin-only edit, allowed only when material is unused
+    lowStockThreshold = 10,
+    isIgnored = false,
 }) => {
     // ✅ DEBUG: Log material values being passed to component
     console.log(`\n🎯 MATERIAL CARD DEBUG: ${material.name}`);
@@ -125,6 +140,11 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
     const [addStockQuantity, setAddStockQuantity] = useState('');
     const [addStockCost, setAddStockCost] = useState('');
     const [addStockVendor, setAddStockVendor] = useState('');
+
+    // Do Payment functionality states
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [paymentInput, setPaymentInput] = useState('');
+    const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
     // Edit Stock functionality states (admin-only, unused materials)
     const [showEditModal, setShowEditModal] = useState(false);
@@ -499,6 +519,66 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
         ];
     };
 
+    // Do Payment functionality — records a vendor payment against this material's
+    // outstanding balance across all of its batches (variants).
+    const handleOpenPaymentModal = () => {
+        // Default the input to the full outstanding amount for a quick "pay in full".
+        setPaymentInput(amountRemaining > 0 ? String(Math.round(amountRemaining)) : '');
+        setShowPaymentModal(true);
+    };
+
+    const handleRecordPayment = async () => {
+        const amount = parseFloat(paymentInput);
+        if (!amount || Number.isNaN(amount) || amount <= 0) {
+            Alert.alert('Invalid Amount', 'Please enter a valid payment amount greater than 0.');
+            return;
+        }
+        if (amount > amountRemaining + 0.01) {
+            Alert.alert(
+                'Amount Too High',
+                `Payment cannot exceed the outstanding amount of ₹${amountRemaining.toLocaleString('en-IN')}.`
+            );
+            return;
+        }
+        if (isSubmittingPayment) return;
+
+        try {
+            setIsSubmittingPayment(true);
+            const { getClientId } = await import('@/functions/clientId');
+            const clientId = await getClientId();
+            if (!clientId || !currentProjectId) {
+                Alert.alert('Error', 'Missing project or client information.');
+                return;
+            }
+
+            // All batches in this group; the backend applies the payment only to the
+            // ones that still have an outstanding balance.
+            const materialIds = (material.variants || []).map(v => v._id).filter(Boolean);
+
+            const res = await apiClient.post('/api/material/payment', {
+                projectId: currentProjectId,
+                clientId,
+                materialIds,
+                amountPaid: amount,
+            });
+
+            if (res.data?.success) {
+                setShowPaymentModal(false);
+                setPaymentInput('');
+                Alert.alert('Payment Recorded', res.data?.message || 'Payment recorded successfully.');
+                onRefresh?.();
+            } else {
+                Alert.alert('Error', res.data?.error || 'Failed to record payment.');
+            }
+        } catch (error: any) {
+            console.error('❌ Error recording payment:', error);
+            const msg = error?.response?.data?.error || error?.message || 'Failed to record payment.';
+            Alert.alert('Error', msg);
+        } finally {
+            setIsSubmittingPayment(false);
+        }
+    };
+
     // Add Stock functionality
     const handleOpenAddStockModal = () => {
         setShowOptionsMenu(false);
@@ -613,6 +693,57 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
 
     // Transfer functionality - REMOVED
 
+    // Low stock check — only meaningful on the imported/available tab, where the
+    // remaining quantity is what's actually left in stock.
+    const totalPurchased = material.totalImported || material.totalQuantity || 0;
+    const remainingQty = material.currentlyAvailable !== undefined && material.currentlyAvailable !== null
+        ? material.currentlyAvailable
+        : material.totalQuantity;
+    const stockPercentage = totalPurchased > 0 ? (remainingQty / totalPurchased) * 100 : 100;
+    const isLowStock = !isIgnored && activeTab === 'imported' && totalPurchased > 0 && stockPercentage <= lowStockThreshold;
+
+    // Vendor payment status — surfaced on the imported/available tab where purchases
+    // (and therefore vendor payments) actually happen. Only shown when payment was
+    // actually recorded; materials with no payment data stay badge-free. Falls back to
+    // per-variant data for materials fetched before group-level aggregation existed.
+    const definedVariantStatuses = (material.variants || [])
+        .map(v => v.paymentStatus)
+        .filter((s): s is 'full' | 'partial' | 'unpaid' => !!s);
+    const derivedFromVariants: 'full' | 'partial' | 'unpaid' | undefined =
+        definedVariantStatuses.length === 0
+            ? undefined
+            : definedVariantStatuses.every(s => s === definedVariantStatuses[0])
+                ? definedVariantStatuses[0]
+                : 'partial';
+    const paymentStatus: 'full' | 'partial' | 'unpaid' | undefined =
+        material.paymentStatus || derivedFromVariants;
+    const amountPaid = material.amountPaid !== undefined
+        ? material.amountPaid
+        : (material.variants || []).reduce((sum, v) => sum + (Number(v.amountPaid) || 0), 0);
+    const amountRemaining = material.amountRemaining ?? 0;
+    const PAYMENT_CONFIG = {
+        full:    { label: 'Fully Paid',     icon: 'checkmark-circle' as const, color: '#10B981', bg: '#ECFDF5', border: '#A7F3D0' },
+        partial: { label: 'Partially Paid', icon: 'time-outline' as const,     color: '#F59E0B', bg: '#FFFBEB', border: '#FDE68A' },
+        unpaid:  { label: 'Unpaid',         icon: 'alert-circle-outline' as const, color: '#EF4444', bg: '#FEF2F2', border: '#FECACA' },
+    };
+    const paymentCfg = paymentStatus ? PAYMENT_CONFIG[paymentStatus] : null;
+    // Only render on the imported tab and only when a payment status was recorded.
+    const showPayment = activeTab === 'imported' && !!paymentCfg;
+
+    // Vendor/contractor name shown under the material name. A grouped material can
+    // hold batches from different vendors, so collapse to the single name when they
+    // all match, otherwise show the vendor count.
+    const vendorNames = Array.from(new Set(
+        (material.variants || [])
+            .map(v => (v.contractor_name || '').trim())
+            .filter(Boolean)
+    ));
+    const vendorLabel = vendorNames.length === 0
+        ? (material.contractor_name || '').trim()
+        : vendorNames.length === 1
+            ? vendorNames[0]
+            : `${vendorNames.length} vendors`;
+
     return (
         <>
             <Animated.View
@@ -636,11 +767,19 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                     <View style={styles.materialHeader}>
                         <View style={styles.materialTitleSection}>
                             <View style={[styles.iconContainer, { backgroundColor: material.color + '20' }]}>
-                                <Ionicons name={material.icon} size={24} color={material.color} />
+                                <Ionicons name={material.icon} size={18} color={material.color} />
                             </View>
                             <View style={styles.materialTitleInfo}>
                                 <View style={styles.materialNameRow}>
                                     <Text style={styles.materialNameText}>{material.name}</Text>
+                                    {!!vendorLabel && (
+                                        <View style={styles.vendorRow}>
+                                            <Ionicons name="person-outline" size={12} color="#2563EB" />
+                                            <Text style={styles.vendorText} numberOfLines={1}>
+                                                {vendorLabel}
+                                            </Text>
+                                        </View>
+                                    )}
                                 </View>
                                 {showMiniSectionLabel && material.miniSectionId && (
                                     <View style={styles.miniSectionBadge}>
@@ -685,7 +824,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                     <View style={styles.statsSection}>
                         <View style={styles.statsRow}>
                             <View style={styles.statItem}>
-                                <Text style={styles.statLabel}>Total Imported</Text>
+                                <Text style={styles.statLabel}>Total Purchase</Text>
                                 <Text style={styles.statValue}>
                                     {material.totalImported || material.totalQuantity || 0} {material.unit}
                                 </Text>
@@ -693,61 +832,51 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                             <View style={styles.statDivider} />
                             <View style={styles.statItem}>
                                 <Text style={styles.statLabel}>
-                                    {activeTab === 'used' ? 'Quantity Used' : 'Currently Available'}
+                                    {activeTab === 'used' ? 'Still Available' : 'Total Used'}
                                 </Text>
-                                <Text style={[
-                                    styles.statValue,
-                                    activeTab === 'used' ? styles.statValueUsed : styles.statValueAvailable
-                                ]}>
-                                    {activeTab === 'used' 
-                                        ? material.totalQuantity  // In used tab, totalQuantity = used quantity
-                                        : (material.currentlyAvailable !== undefined && material.currentlyAvailable !== null 
-                                            ? material.currentlyAvailable 
-                                            : material.totalQuantity)  // In imported tab, show currently available or fallback to totalQuantity
+                                <Text style={styles.statValue}>
+                                    {activeTab === 'used'
+                                        ? (material.currentlyAvailable !== undefined && material.currentlyAvailable !== null
+                                            ? material.currentlyAvailable
+                                            : Math.max(0, (material.totalImported || material.totalQuantity) - (material.totalUsed || 0)))  // Calculate remaining
+                                        : (material.totalUsed !== undefined && material.totalUsed !== null
+                                            ? material.totalUsed
+                                            : 0)  // In imported tab, show total used
                                     } {material.unit}
                                 </Text>
                             </View>
                             <View style={styles.statDivider} />
                             <View style={styles.statItem}>
                                 <Text style={styles.statLabel}>
-                                    {activeTab === 'used' ? 'Still Available' : 'Used So Far'}
+                                    {activeTab === 'used' ? 'Quantity Used' : 'Remaining Material'}
                                 </Text>
-                                <Text style={[
-                                    styles.statValue,
-                                    activeTab === 'used' ? styles.statValueAvailable : styles.statValueUsed
-                                ]}>
-                                    {activeTab === 'used'
-                                        ? (material.currentlyAvailable !== undefined && material.currentlyAvailable !== null 
-                                            ? material.currentlyAvailable 
-                                            : Math.max(0, (material.totalImported || material.totalQuantity) - (material.totalUsed || 0)))  // Calculate remaining
-                                        : (material.totalUsed !== undefined && material.totalUsed !== null 
-                                            ? material.totalUsed 
-                                            : 0)  // In imported tab, show total used
-                                    } {material.unit}
-                                </Text>
+                                <View style={styles.statValueWithIcon}>
+                                    {isLowStock && (
+                                        <Ionicons name="warning" size={12} color="#EF4444" style={styles.statAlertIcon} />
+                                    )}
+                                    <Text style={[styles.statValue, isLowStock && styles.statValueAlert]}>
+                                        {activeTab === 'used'
+                                            ? material.totalQuantity  // In used tab, totalQuantity = used quantity
+                                            : (material.currentlyAvailable !== undefined && material.currentlyAvailable !== null
+                                                ? material.currentlyAvailable
+                                                : material.totalQuantity)  // In imported tab, show currently available or fallback to totalQuantity
+                                        } {material.unit}
+                                    </Text>
+                                </View>
                             </View>
                         </View>
 
-                        {/* Progress Bar - Only show in imported tab */}
-                        {activeTab === 'imported' && (
-                            <View style={styles.progressBarContainer}>
-                                <View style={styles.progressBarBackground}>
-                                    <View
-                                        style={[
-                                            styles.progressBarFill,
-                                            {
-                                                width: material.totalImported && material.totalImported > 0
-                                                    ? `${Math.min(((material.currentlyAvailable || material.totalQuantity) / material.totalImported) * 100, 100)}%`
-                                                    : '100%'
-                                            }
-                                        ]}
-                                    />
-                                </View>
-                                <Text style={styles.progressPercentage}>
-                                    {material.totalImported && material.totalImported > 0
-                                        ? `${Math.round(((material.currentlyAvailable || material.totalQuantity) / material.totalImported) * 100)}% remaining`
-                                        : '100% remaining'}
-                                </Text>
+                        {/* Specifications - shown in place of the old progress bar */}
+                        {material.specs && Object.keys(material.specs).length > 0 && (
+                            <View style={styles.specsRow}>
+                                {Object.entries(material.specs).map(([key, value], index) => (
+                                    <View key={index} style={[styles.specChip, { backgroundColor: SPEC_CHIP_COLOR.bg }]}>
+                                        <Text style={[styles.specChipText, { color: SPEC_CHIP_COLOR.text }]}>
+                                            <Text style={styles.specChipKey}>{key}: </Text>
+                                            {value}
+                                        </Text>
+                                    </View>
+                                ))}
                             </View>
                         )}
 
@@ -799,27 +928,61 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 </Text>
                             </View>
                         </View>
-                    </View>
 
-                    {/* Specifications Section - Below cost */}
-                    {material.specs && Object.keys(material.specs).length > 0 && (
-                        <View style={styles.specsSection}>
-                            <View style={styles.specsSectionHeader}>
-                                <Ionicons name="information-circle-outline" size={16} color="#6B7280" />
-                                <Text style={styles.specsSectionTitle}>Specifications</Text>
-                            </View>
-                            <View style={styles.specsContainer}>
-                                {Object.entries(material.specs).map(([key, value], index) => (
-                                    <View key={index} style={styles.specItem}>
-                                        <Text style={styles.specKey}>{key}:</Text>
-                                        <Text style={styles.specValue}>{value}</Text>
+                        {/* Vendor payment status — shows how much of this material's
+                            purchase cost has been paid to the vendor. The "Do Payment"
+                            action lives inside the tag itself when a balance is due. */}
+                        {showPayment && paymentCfg && (
+                            <View style={[styles.paymentRow, { backgroundColor: paymentCfg.bg, borderColor: paymentCfg.border }]}>
+                                <View style={styles.paymentLeft}>
+                                    <Ionicons name={paymentCfg.icon} size={16} color={paymentCfg.color} />
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[styles.paymentLabel, { color: paymentCfg.color }]} numberOfLines={1}>
+                                            {paymentCfg.label}
+                                        </Text>
+                                        {paymentStatus === 'partial' ? (
+                                            <Text style={styles.paymentAmount} numberOfLines={1}>
+                                                ₹{Number(amountPaid).toLocaleString('en-IN')} paid
+                                                {amountRemaining > 0 ? ` · ₹${Number(amountRemaining).toLocaleString('en-IN')} due` : ''}
+                                            </Text>
+                                        ) : paymentStatus === 'unpaid' ? (
+                                            <Text style={styles.paymentAmount} numberOfLines={1}>
+                                                ₹{Number(amountRemaining).toLocaleString('en-IN')} due
+                                            </Text>
+                                        ) : (
+                                            <Text style={styles.paymentAmount} numberOfLines={1}>
+                                                ₹{Number(amountPaid).toLocaleString('en-IN')}
+                                            </Text>
+                                        )}
                                     </View>
-                                ))}
+                                </View>
+
+                                {/* Do Payment — inline, only when there is an outstanding balance */}
+                                {(paymentStatus === 'partial' || paymentStatus === 'unpaid') && (
+                                    <TouchableOpacity
+                                        style={[styles.doPaymentButton, { borderColor: paymentCfg.color }]}
+                                        onPress={handleOpenPaymentModal}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="card-outline" size={14} color={paymentCfg.color} />
+                                        <Text style={[styles.doPaymentButtonText, { color: paymentCfg.color }]} numberOfLines={1}>Pay</Text>
+                                    </TouchableOpacity>
+                                )}
                             </View>
-                        </View>
-                    )}
+                        )}
 
-
+                        {/* Add Stock - moved out of the options menu onto the card itself */}
+                        {activeTab === 'imported' && (
+                            <TouchableOpacity
+                                style={styles.addStockButton}
+                                onPress={handleOpenAddStockModal}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="add-circle" size={16} color="#3A78B5" />
+                                <Text style={styles.addStockButtonText}>Add more material</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
                 </View>
             </Animated.View>
 
@@ -1005,18 +1168,6 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
 
                         <TouchableOpacity
                             style={styles.optionItem}
-                            onPress={handleOpenAddStockModal}
-                            activeOpacity={0.7}
-                        >
-                            <Ionicons name="add-circle" size={20} color="#059669" />
-                            <Text style={styles.optionText}>Add Stock</Text>
-                            <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
-                        </TouchableOpacity>
-
-                        <View style={styles.optionDivider} />
-                        
-                        <TouchableOpacity
-                            style={styles.optionItem}
                             onPress={handleOpenTransferModal}
                             activeOpacity={0.7}
                         >
@@ -1192,6 +1343,111 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 (!transferQuantity || parseFloat(transferQuantity) <= 0) && styles.transferButtonTextDisabled
                             ]}>
                                 Transfer Material
+                            </Text>
+                        </TouchableOpacity>
+                    </ScrollView>
+                </View>
+            </Modal>
+
+            {/* Do Payment Modal */}
+            <Modal
+                visible={showPaymentModal}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setShowPaymentModal(false)}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalHeader}>
+                        <TouchableOpacity onPress={() => setShowPaymentModal(false)}>
+                            <Ionicons name="close" size={24} color="#374151" />
+                        </TouchableOpacity>
+                        <Text style={styles.modalTitle}>Record Payment</Text>
+                        <View style={{ width: 24 }} />
+                    </View>
+
+                    <ScrollView style={styles.modalContent} keyboardShouldPersistTaps="handled">
+                        {/* Material Info */}
+                        <View style={styles.usageMaterialInfo}>
+                            <View style={[styles.iconContainerLarge, { backgroundColor: material.color + '20' }]}>
+                                <Ionicons name={material.icon} size={24} color={material.color} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.usageMaterialName}>{material.name}</Text>
+                                <Text style={styles.usageMaterialSpecs}>Vendor payment</Text>
+                            </View>
+                        </View>
+
+                        {/* Payment summary */}
+                        <View style={styles.paymentSummaryCard}>
+                            <View style={styles.paymentSummaryRow}>
+                                <Text style={styles.paymentSummaryLabel}>Total Cost</Text>
+                                <Text style={styles.paymentSummaryValue}>
+                                    ₹{Number(material.paymentTotalCost ?? 0).toLocaleString('en-IN')}
+                                </Text>
+                            </View>
+                            <View style={styles.paymentSummaryRow}>
+                                <Text style={styles.paymentSummaryLabel}>Already Paid</Text>
+                                <Text style={[styles.paymentSummaryValue, { color: '#10B981' }]}>
+                                    ₹{Number(amountPaid).toLocaleString('en-IN')}
+                                </Text>
+                            </View>
+                            <View style={styles.paymentSummaryDivider} />
+                            <View style={styles.paymentSummaryRow}>
+                                <Text style={[styles.paymentSummaryLabel, { fontWeight: '700', color: '#1E293B' }]}>Outstanding</Text>
+                                <Text style={[styles.paymentSummaryValue, { color: '#EF4444', fontSize: 16 }]}>
+                                    ₹{Number(amountRemaining).toLocaleString('en-IN')}
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* Amount input */}
+                        <View style={styles.inputSection}>
+                            <Text style={styles.inputLabel}>Payment Amount (₹) *</Text>
+                            <TextInput
+                                style={styles.quantityInput}
+                                value={paymentInput}
+                                onChangeText={setPaymentInput}
+                                keyboardType="decimal-pad"
+                                placeholder="Enter amount"
+                                placeholderTextColor="#9CA3AF"
+                            />
+                        </View>
+
+                        {/* Quick pay-full chip */}
+                        {amountRemaining > 0 && (
+                            <TouchableOpacity
+                                style={styles.payFullChip}
+                                onPress={() => setPaymentInput(String(Math.round(amountRemaining)))}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="cash-outline" size={14} color="#3A78B5" />
+                                <Text style={styles.payFullChipText}>
+                                    Pay full · ₹{Number(amountRemaining).toLocaleString('en-IN')}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+
+                        {/* Confirm button */}
+                        <TouchableOpacity
+                            style={[
+                                styles.confirmButton,
+                                (!paymentInput || parseFloat(paymentInput) <= 0 || isSubmittingPayment) && styles.confirmButtonDisabled,
+                                { marginTop: 20 },
+                            ]}
+                            onPress={handleRecordPayment}
+                            disabled={!paymentInput || parseFloat(paymentInput) <= 0 || isSubmittingPayment}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons
+                                name="checkmark-circle"
+                                size={18}
+                                color={paymentInput && parseFloat(paymentInput) > 0 && !isSubmittingPayment ? '#FFFFFF' : '#9CA3AF'}
+                            />
+                            <Text style={[
+                                styles.confirmButtonText,
+                                (!paymentInput || parseFloat(paymentInput) <= 0 || isSubmittingPayment) && styles.confirmButtonTextDisabled,
+                            ]}>
+                                {isSubmittingPayment ? 'Recording...' : 'Record Payment'}
                             </Text>
                         </TouchableOpacity>
                     </ScrollView>
@@ -1523,22 +1779,22 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
 const styles = StyleSheet.create({
     materialCard: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        marginBottom: 16,
+        borderRadius: 12,
+        marginBottom: 10,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 3,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+        elevation: 2,
     },
     cardContent: {
-        padding: 16,
+        padding: 10,
     },
     materialHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
-        marginBottom: 16,
+        marginBottom: 8,
     },
     materialTitleSection: {
         flexDirection: 'row',
@@ -1546,12 +1802,12 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     iconContainer: {
-        width: 48,
-        height: 48,
-        borderRadius: 12,
+        width: 34,
+        height: 34,
+        borderRadius: 9,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 12,
+        marginRight: 8,
     },
     iconContainerLarge: {
         width: 64,
@@ -1567,10 +1823,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         flexWrap: 'wrap',
-        marginBottom: 2,
     },
     materialNameText: {
-        fontSize: 18,
+        fontSize: 15,
         fontWeight: '600',
         color: '#1F2937',
         marginRight: 8,
@@ -1592,23 +1847,56 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#EAF0FE',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 6,
-        marginTop: 4,
-        marginBottom: 2,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 5,
+        marginTop: 2,
         alignSelf: 'flex-start',
         gap: 4,
     },
     miniSectionText: {
-        fontSize: 11,
+        fontSize: 10,
         color: '#3A78B5',
         fontWeight: '600',
     },
+    vendorRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'center',
+        gap: 4,
+        flexShrink: 1,
+        backgroundColor: '#EFF6FF',
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 8,
+    },
+    vendorText: {
+        fontSize: 11,
+        color: '#2563EB',
+        fontWeight: '600',
+        letterSpacing: 0.1,
+        flexShrink: 1,
+    },
     variantCountText: {
-        fontSize: 12,
+        fontSize: 11,
         color: '#6B7280',
         fontWeight: '500',
+    },
+    lowStockBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FEE2E2',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 5,
+        gap: 3,
+    },
+    lowStockBadgeText: {
+        fontSize: 10,
+        color: '#EF4444',
+        fontWeight: '700',
     },
     dateContainer: {
         alignItems: 'flex-end',
@@ -1616,7 +1904,7 @@ const styles = StyleSheet.create({
     headerActions: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 6,
     },
     optionsButton: {
         padding: 4,
@@ -1624,19 +1912,20 @@ const styles = StyleSheet.create({
         backgroundColor: '#F3F4F6',
     },
     dateText: {
-        fontSize: 12,
+        fontSize: 11,
         color: '#9CA3AF',
     },
     statsSection: {
-        marginBottom: 16,
+        marginBottom: 8,
     },
     statsRow: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#F9FAFB',
-        padding: 12,
-        borderRadius: 12,
-        marginBottom: 12,
+        paddingVertical: 6,
+        paddingHorizontal: 8,
+        borderRadius: 8,
+        marginBottom: 8,
     },
     statItem: {
         flex: 1,
@@ -1644,47 +1933,32 @@ const styles = StyleSheet.create({
     },
     statDivider: {
         width: 1,
-        height: 40,
+        height: 28,
         backgroundColor: '#E5E7EB',
-        marginHorizontal: 8,
+        marginHorizontal: 6,
     },
     statLabel: {
-        fontSize: 11,
+        fontSize: 10,
         color: '#6B7280',
-        marginBottom: 4,
+        marginBottom: 1,
         textAlign: 'center',
     },
     statValue: {
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: '600',
-        color: '#1F2937',
+        color: '#3A78B5',
         textAlign: 'center',
     },
-    statValueAvailable: {
-        color: '#059669',
-    },
-    statValueUsed: {
+    statValueAlert: {
         color: '#EF4444',
     },
-    progressBarContainer: {
-        marginBottom: 12,
+    statValueWithIcon: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
-    progressBarBackground: {
-        height: 8,
-        backgroundColor: '#E5E7EB',
-        borderRadius: 4,
-        overflow: 'hidden',
-        marginBottom: 6,
-    },
-    progressBarFill: {
-        height: '100%',
-        backgroundColor: '#059669',
-        borderRadius: 4,
-    },
-    progressPercentage: {
-        fontSize: 11,
-        color: '#6B7280',
-        textAlign: 'right',
+    statAlertIcon: {
+        marginRight: 3,
     },
     costSection: {
         backgroundColor: '#F8FAFC',
@@ -1711,7 +1985,8 @@ const styles = StyleSheet.create({
     costSectionCompact: {
         flexDirection: 'row',
         backgroundColor: '#F8FAFC',
-        padding: 8,
+        paddingVertical: 6,
+        paddingHorizontal: 8,
         borderRadius: 6,
         alignItems: 'center',
     },
@@ -1721,7 +1996,7 @@ const styles = StyleSheet.create({
     },
     costDivider: {
         width: 1,
-        height: 24,
+        height: 20,
         backgroundColor: '#E5E7EB',
         marginHorizontal: 8,
     },
@@ -1729,70 +2004,141 @@ const styles = StyleSheet.create({
         fontSize: 10,
         color: '#6B7280',
         fontWeight: '500',
-        marginBottom: 2,
+        marginBottom: 1,
     },
     costValueCompact: {
         fontSize: 12,
         fontWeight: '600',
         color: '#1F2937',
     },
-    // Specifications section styles
-    specsSection: {
-        marginTop: 12,
-        backgroundColor: '#FEFEFE',
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-        padding: 12,
-    },
-    specsSectionHeader: {
+    // Compact inline specification chips (replaces the old boxed specs section)
+    specsRow: {
         flexDirection: 'row',
-        alignItems: 'center',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        gap: 4,
         marginBottom: 8,
-        gap: 6,
     },
-    specsSectionTitle: {
-        fontSize: 13,
+    specChip: {
+        borderRadius: 20,
+        paddingHorizontal: 9,
+        paddingVertical: 4,
+    },
+    specChipText: {
+        fontSize: 11,
         fontWeight: '600',
-        color: '#374151',
     },
-    specsContainer: {
-        gap: 6,
-    },
-    specItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    specKey: {
-        fontSize: 12,
-        color: '#6B7280',
+    specChipKey: {
         fontWeight: '500',
         textTransform: 'capitalize',
-        minWidth: 60,
+        opacity: 0.75,
     },
-    specValue: {
-        fontSize: 12,
-        color: '#1F2937',
-        fontWeight: '600',
-        flex: 1,
+    paymentRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        marginTop: 10,
+        gap: 8,
     },
-    addUsageButton: {
+    doPaymentButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#F0FDF4',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderRadius: 12,
+        backgroundColor: '#FFFFFF',
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 16,
         borderWidth: 1,
-        borderColor: '#059669',
-        gap: 8,
+        gap: 4,
+        flexShrink: 0,
     },
-    addUsageButtonText: {
+    doPaymentButtonText: {
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    paymentSummaryCard: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        marginBottom: 20,
+        gap: 10,
+    },
+    paymentSummaryRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    paymentSummaryLabel: {
+        fontSize: 13,
+        color: '#64748B',
+        fontWeight: '500',
+    },
+    paymentSummaryValue: {
         fontSize: 14,
+        fontWeight: '700',
+        color: '#1E293B',
+    },
+    paymentSummaryDivider: {
+        height: 1,
+        backgroundColor: '#E2E8F0',
+    },
+    payFullChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        gap: 6,
+        backgroundColor: '#EAF0FE',
+        borderWidth: 1,
+        borderColor: '#3A78B5',
+        borderRadius: 20,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        marginTop: 10,
+    },
+    payFullChipText: {
+        fontSize: 12,
         fontWeight: '600',
-        color: '#059669',
+        color: '#3A78B5',
+    },
+    paymentLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        flex: 1,
+    },
+    paymentLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    paymentAmount: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#64748B',
+        marginTop: 1,
+    },
+    addStockButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#EAF0FE',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#3A78B5',
+        gap: 6,
+        marginTop: 8,
+    },
+    addStockButtonText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#3A78B5',
     },
     modalContainer: {
         flex: 1,

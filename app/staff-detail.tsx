@@ -48,10 +48,10 @@ interface GroupedActivities {
 const StaffDetailScreen: React.FC = () => {
     const router = useRouter();
     const params = useLocalSearchParams();
-    
+
     // Parse staff data from params
     const staff: Staff = JSON.parse(params.staff as string);
-    
+
     const [activities, setActivities] = useState<Activity[]>([]);
     const [groupedActivities, setGroupedActivities] = useState<GroupedActivities>({});
     const [loading, setLoading] = useState(true);
@@ -264,7 +264,7 @@ const StaffDetailScreen: React.FC = () => {
             </View>
 
             {/* Activities List */}
-            <ScrollView 
+            <ScrollView
                 style={styles.activitiesList}
                 refreshControl={
                     <RefreshControl
@@ -274,6 +274,7 @@ const StaffDetailScreen: React.FC = () => {
                         tintColor="#3A78B5"
                     />
                 }
+                contentContainerStyle={styles.scrollContent}
             >
                 {loading ? (
                     <View style={styles.centerContainer}>
@@ -464,6 +465,9 @@ const styles = StyleSheet.create({
     },
     activitiesList: {
         flex: 1,
+    },
+    scrollContent: {
+        flexGrow: 1,
     },
     centerContainer: {
         flex: 1,

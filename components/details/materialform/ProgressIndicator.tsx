@@ -16,10 +16,15 @@ const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({ currentStep }) =>
         <View style={[styles.progressStep, currentStep >= 1 && styles.progressStepActive]}>
           <Text style={[styles.progressStepNumber, currentStep >= 1 && styles.progressStepNumberActive]}>2</Text>
         </View>
+        <View style={[styles.progressLine, currentStep >= 2 && styles.progressLineActive]} />
+        <View style={[styles.progressStep, currentStep >= 2 && styles.progressStepActive]}>
+          <Text style={[styles.progressStepNumber, currentStep >= 2 && styles.progressStepNumberActive]}>3</Text>
+        </View>
       </View>
       <View style={styles.progressLabels}>
         <Text style={[styles.progressLabel, currentStep >= 0 && styles.progressLabelActive]}>Add Materials</Text>
-        <Text style={[styles.progressLabel, currentStep >= 1 && styles.progressLabelActive]}>Review & Purpose</Text>
+        <Text style={[styles.progressLabel, currentStep >= 1 && styles.progressLabelActive]}>Review</Text>
+        <Text style={[styles.progressLabel, currentStep >= 2 && styles.progressLabelActive]}>Payment</Text>
       </View>
     </View>
   );
@@ -63,7 +68,7 @@ const styles = StyleSheet.create<Styles>({
     color: '#fff',
   },
   progressLine: {
-    width: 80,
+    width: 60,
     height: 2,
     backgroundColor: '#E2E8F0',
     marginHorizontal: 8,
@@ -76,7 +81,7 @@ const styles = StyleSheet.create<Styles>({
     justifyContent: 'space-between' as const,
   },
   progressLabel: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#64748B',
     flex: 1,
     textAlign: 'center' as const,
