@@ -923,8 +923,7 @@ const ProjectSections = () => {
         {sections && sections.length > 0 ? (
           sections.map((section, index) => {
             const sectionId  = section.sectionId || section._id;
-            const isCompleted = sectionCompleti
-            ons[sectionId] || false;
+            const isCompleted = sectionCompletions[sectionId] || false;
             const isLoadingCompletion = isLoadingSectionCompletions && !Object.prototype.hasOwnProperty.call(sectionCompletions, sectionId);
             const sectionKey = sectionId || String(index);
             const isExpanded = expandedSectionId === sectionKey;

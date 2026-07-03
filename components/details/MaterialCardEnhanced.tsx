@@ -746,16 +746,26 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
             ? vendorNames[0]
             : `${vendorNames.length} vendors`;
 
-    // Which construction phase(s) this used material went to (e.g. "Slab Work: 40 bags").
-    // Batches recorded before phase-tagging existed (or that couldn't be tagged) are
-    // simply omitted rather than lumped into a fake "General" bucket.
-    const phaseTotals: Record<string, number> = {};
+    // Which mini-section (e.g. "Foundation", "First Slab") this used material went to —
+    // the physical location, not the construction work-phase. Batches with no
+    // mini-section recorded are simply omitted rather than lumped into a fake bucket.
+    const sectionTotals: Record<string, number> = {};
     (material.variants || []).forEach(v => {
-        if (v.phaseName) {
-            phaseTotals[v.phaseName] = (phaseTotals[v.phaseName] || 0) + (Number(v.quantity) || 0);
+        if (v.miniSectionId) {
+            const sectionName = getMiniSectionName(v.miniSectionId);
+            sectionTotals[sectionName] = (sectionTotals[sectionName] || 0) + (Number(v.quantity) || 0);
         }
     });
-    const usedForList = Object.entries(phaseTotals).map(([phaseName, qty]) => ({ phaseName, qty }));
+    const usedForList = Object.entries(sectionTotals).map(([phaseName, qty]) => ({ phaseName, qty }));
+
+    // Which vendor(s) this available material was purchased from (e.g. "ABC Traders: 40 bags").
+    const vendorTotals: Record<string, number> = {};
+    (material.variants || []).forEach(v => {
+        if (v.contractor_name) {
+            vendorTotals[v.contractor_name] = (vendorTotals[v.contractor_name] || 0) + (Number(v.quantity) || 0);
+        }
+    });
+    const purchasedFromList = Object.entries(vendorTotals).map(([vendorName, qty]) => ({ vendorName, qty }));
 
     return (
         <>
@@ -786,8 +796,10 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 <View style={styles.materialTitleInfo}>
                                     <Text style={styles.materialNameText}>{material.name}</Text>
 
-                                    {/* Meta row — mini-section, variant count (vendor shown in the detail popup instead) */}
-                                    {((showMiniSectionLabel && material.miniSectionId) || material.variants.length > 1) && (
+                                    {/* Meta row — mini-section, variant count. Available tab only; vendor and
+                                        spec details (brand, grade, weight, type, color, etc.) now live in the
+                                        detail popup instead of the compact card. */}
+                                    {activeTab === 'imported' && ((showMiniSectionLabel && material.miniSectionId) || material.variants.length > 1) && (
                                         <View style={styles.metaRow}>
                                             {showMiniSectionLabel && material.miniSectionId && (
                                                 <View style={styles.miniSectionBadge}>
@@ -802,21 +814,6 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                                     {material.variants.length} variants
                                                 </Text>
                                             )}
-                                        </View>
-                                    )}
-
-                                    {/* Specifications — under the name so the material is fully
-                                        identified before the numbers */}
-                                    {material.specs && Object.keys(material.specs).length > 0 && (
-                                        <View style={styles.specsRow}>
-                                            {Object.entries(material.specs).map(([key, value], index) => (
-                                                <View key={index} style={[styles.specChip, { backgroundColor: SPEC_CHIP_COLOR.bg }]}>
-                                                    <Text style={[styles.specChipText, { color: SPEC_CHIP_COLOR.text }]}>
-                                                        <Text style={styles.specChipKey}>{key}: </Text>
-                                                        {value}
-                                                    </Text>
-                                                </View>
-                                            ))}
                                         </View>
                                     )}
                                 </View>
@@ -932,9 +929,6 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 </View>
                                 <View style={{ flex: 1 }}>
                                     <Text style={detailStyles.title}>{material.name}</Text>
-                                    {!!vendorLabel && (
-                                        <Text style={detailStyles.subtitle} numberOfLines={1}>{vendorLabel}</Text>
-                                    )}
                                 </View>
                                 <TouchableOpacity style={detailStyles.closeBtn} onPress={() => setShowDetailPopup(false)}>
                                     <Ionicons name="close" size={20} color="#64748B" />
@@ -954,23 +948,11 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 </View>
                             )}
 
-                            {/* Meta info — last activity date, location, batch count */}
+                            {/* Meta info — last activity date */}
                             <View style={detailStyles.metaInfoRow}>
                                 <View style={detailStyles.metaInfoItem}>
                                     <Ionicons name="calendar-outline" size={13} color="#94A3B8" />
                                     <Text style={detailStyles.metaInfoText}>{formatDate(material.date)}</Text>
-                                </View>
-                                {showMiniSectionLabel && material.miniSectionId && (
-                                    <View style={detailStyles.metaInfoItem}>
-                                        <Ionicons name="location-outline" size={13} color="#94A3B8" />
-                                        <Text style={detailStyles.metaInfoText}>{getMiniSectionName(material.miniSectionId)}</Text>
-                                    </View>
-                                )}
-                                <View style={detailStyles.metaInfoItem}>
-                                    <Ionicons name="layers-outline" size={13} color="#94A3B8" />
-                                    <Text style={detailStyles.metaInfoText}>
-                                        {material.variants.length} {material.variants.length === 1 ? 'batch' : 'batches'}
-                                    </Text>
                                 </View>
                             </View>
 
@@ -1063,12 +1045,12 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 </View>
                             )}
 
-                            {/* Used for — which construction phase/work this material went to.
+                            {/* Used At — where (which construction phase) this material was used.
                                 Always shown on the used tab; falls back to a note when older
                                 usage records predate phase-tagging. */}
                             {activeTab === 'used' && (
                                 <View style={detailStyles.usedForSection}>
-                                    <Text style={detailStyles.usedForTitle}>Used For</Text>
+                                    <Text style={detailStyles.usedForTitle}>Used At</Text>
                                     {usedForList.length > 0 ? (
                                         usedForList.map(entry => (
                                             <View key={entry.phaseName} style={detailStyles.usedForRow}>
@@ -1088,44 +1070,27 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 </View>
                             )}
 
-                            {/* Batch breakdown — each purchase/usage batch behind this card's totals */}
-                            {material.variants.length > 0 && (
-                                <View style={detailStyles.batchSection}>
-                                    <Text style={detailStyles.usedForTitle}>
-                                        {activeTab === 'used' ? 'Usage Batches' : 'Stock Batches'}
-                                    </Text>
-                                    {material.variants.map((v, i) => (
-                                        <View key={v._id || i} style={detailStyles.batchRow}>
-                                            <View style={detailStyles.batchRowTop}>
-                                                <Text style={detailStyles.batchQty}>{v.quantity} {material.unit}</Text>
-                                                <Text style={detailStyles.batchCost}>
-                                                    ₹{Number(v.cost || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}/{material.unit}
-                                                </Text>
+                            {/* Purchased From — which vendor(s) this available material came from.
+                                Mirrors the "Used At" section on the used tab. */}
+                            {activeTab === 'imported' && (
+                                <View style={detailStyles.usedForSection}>
+                                    <Text style={detailStyles.usedForTitle}>Purchased From</Text>
+                                    {purchasedFromList.length > 0 ? (
+                                        purchasedFromList.map(entry => (
+                                            <View key={entry.vendorName} style={detailStyles.usedForRow}>
+                                                <Ionicons name="person-outline" size={14} color="#64748B" />
+                                                <Text style={detailStyles.usedForLabel}>{entry.vendorName}</Text>
+                                                <Text style={detailStyles.usedForValue}>{entry.qty} {material.unit}</Text>
                                             </View>
-                                            <View style={detailStyles.batchRowMeta}>
-                                                {!!v.contractor_name && (
-                                                    <View style={detailStyles.batchMetaChip}>
-                                                        <Ionicons name="person-outline" size={11} color="#2563EB" />
-                                                        <Text style={detailStyles.batchMetaText} numberOfLines={1}>{v.contractor_name}</Text>
-                                                    </View>
-                                                )}
-                                                {activeTab === 'used' && !!v.phaseName && (
-                                                    <View style={detailStyles.batchMetaChip}>
-                                                        <Ionicons name="hammer-outline" size={11} color="#64748B" />
-                                                        <Text style={detailStyles.batchMetaText} numberOfLines={1}>{v.phaseName}</Text>
-                                                    </View>
-                                                )}
-                                                {activeTab === 'imported' && !!v.paymentStatus && (
-                                                    <View style={[detailStyles.batchMetaChip, { backgroundColor: PAYMENT_CONFIG[v.paymentStatus].bg }]}>
-                                                        <Ionicons name={PAYMENT_CONFIG[v.paymentStatus].icon} size={11} color={PAYMENT_CONFIG[v.paymentStatus].color} />
-                                                        <Text style={[detailStyles.batchMetaText, { color: PAYMENT_CONFIG[v.paymentStatus].color }]} numberOfLines={1}>
-                                                            {PAYMENT_CONFIG[v.paymentStatus].label}
-                                                        </Text>
-                                                    </View>
-                                                )}
-                                            </View>
+                                        ))
+                                    ) : (
+                                        <View style={detailStyles.usedForRow}>
+                                            <Ionicons name="information-circle-outline" size={14} color="#94A3B8" />
+                                            <Text style={[detailStyles.usedForLabel, { color: '#94A3B8', fontStyle: 'italic' }]}>
+                                                No vendor recorded for this material
+                                            </Text>
                                         </View>
-                                    ))}
+                                    )}
                                 </View>
                             )}
 
@@ -1133,14 +1098,6 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 records with nothing to add/edit/transfer */}
                             {activeTab === 'imported' && (
                                 <View style={detailStyles.actions}>
-                                    <TouchableOpacity
-                                        style={detailStyles.actionBtn}
-                                        activeOpacity={0.75}
-                                        onPress={() => { setShowDetailPopup(false); handleOpenAddStockModal(); }}
-                                    >
-                                        <Ionicons name="add-circle-outline" size={18} color="#3A78B5" />
-                                        <Text style={detailStyles.actionBtnText}>Add More</Text>
-                                    </TouchableOpacity>
                                     {canEdit && (
                                         <TouchableOpacity
                                             style={detailStyles.actionBtn}
@@ -2004,25 +1961,6 @@ const styles = StyleSheet.create({
         color: '#3A78B5',
         fontWeight: '600',
     },
-    vendorRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        flexShrink: 1,
-        backgroundColor: '#EFF6FF',
-        borderWidth: 1,
-        borderColor: '#BFDBFE',
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 8,
-    },
-    vendorText: {
-        fontSize: 11,
-        color: '#2563EB',
-        fontWeight: '600',
-        letterSpacing: 0.1,
-        flexShrink: 1,
-    },
     variantCountText: {
         fontSize: 11,
         color: '#6B7280',
@@ -2857,52 +2795,6 @@ const detailStyles = StyleSheet.create({
         fontSize: 12,
         color: '#94A3B8',
         fontWeight: '500',
-    },
-    batchSection: {
-        marginBottom: 14,
-        gap: 8,
-    },
-    batchRow: {
-        backgroundColor: '#F8FAFC',
-        borderRadius: 10,
-        paddingVertical: 9,
-        paddingHorizontal: 12,
-        gap: 6,
-    },
-    batchRowTop: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    batchQty: {
-        fontSize: 13.5,
-        fontWeight: '700',
-        color: '#1F2937',
-    },
-    batchCost: {
-        fontSize: 12.5,
-        color: '#3A78B5',
-        fontWeight: '600',
-    },
-    batchRowMeta: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 6,
-    },
-    batchMetaChip: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        backgroundColor: '#EFF6FF',
-        borderRadius: 7,
-        paddingHorizontal: 7,
-        paddingVertical: 3,
-        maxWidth: '100%',
-    },
-    batchMetaText: {
-        fontSize: 11,
-        color: '#2563EB',
-        fontWeight: '600',
     },
 });
 

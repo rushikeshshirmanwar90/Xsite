@@ -29,7 +29,6 @@ interface AddMaterialsStepProps {
   onAddMaterial: () => void;
   onEditMaterial: (index: number) => void;
   onRemoveMaterial: (index: number) => void;
-  onShowAddForm: () => void;
   onCancelEdit: () => void;
   onClose: () => void;
   vendorSuggestions?: string[];
@@ -56,7 +55,6 @@ const AddMaterialsStep: React.FC<AddMaterialsStepProps> = ({
   onAddMaterial,
   onEditMaterial,
   onRemoveMaterial,
-  onShowAddForm,
   onCancelEdit,
   onClose,
   vendorSuggestions = [],
@@ -106,25 +104,6 @@ const AddMaterialsStep: React.FC<AddMaterialsStepProps> = ({
           <Text style={styles.emptyStateDescription}>
             Start by adding your first material using the form below
           </Text>
-        </View>
-      )}
-
-      {/* Show "Add More Material" button when form is hidden and materials exist */}
-      {!showAddForm && addedMaterials.length > 0 && (
-        <View style={styles.addMoreButtonContainer}>
-          <View style={styles.separatorContainer}>
-            <View style={styles.separatorLine} />
-            <Text style={styles.separatorText}>Ready to add more?</Text>
-            <View style={styles.separatorLine} />
-          </View>
-          <TouchableOpacity
-            style={styles.addMoreButton}
-            onPress={onShowAddForm}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="add-circle" size={20} color="#fff" style={{ marginRight: 8 }} />
-            <Text style={styles.addMoreButtonText}>Add More Material</Text>
-          </TouchableOpacity>
         </View>
       )}
 
@@ -184,8 +163,8 @@ const AddMaterialsStep: React.FC<AddMaterialsStepProps> = ({
                 onPress={onAddMaterial}
                 activeOpacity={0.8}
               >
-                <Ionicons name="add" size={20} color="#fff" style={{ marginRight: 8 }} />
-                <Text style={styles.addMaterialButtonText}>Add Material</Text>
+                <Text style={styles.addMaterialButtonText}>Next</Text>
+                <Ionicons name="arrow-forward" size={20} color="#fff" style={{ marginLeft: 8 }} />
               </TouchableOpacity>
             )}
           </View>
@@ -217,47 +196,6 @@ const styles = StyleSheet.create<Styles>({
     elevation: 4,
   },
   addMaterialButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600' as const,
-  },
-  addMoreButtonContainer: {
-    marginVertical: 20,
-    alignItems: 'center' as const,
-  },
-  separatorContainer: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    marginBottom: 16,
-    paddingHorizontal: 20,
-  },
-  separatorLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E2E8F0',
-  },
-  separatorText: {
-    marginHorizontal: 16,
-    fontSize: 14,
-    color: '#64748B',
-    fontWeight: '500' as const,
-  },
-  addMoreButton: {
-    backgroundColor: '#10B981',
-    borderRadius: 10,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    alignItems: 'center' as const,
-    flexDirection: 'row' as const,
-    justifyContent: 'center' as const,
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-    minWidth: 200,
-  },
-  addMoreButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600' as const,

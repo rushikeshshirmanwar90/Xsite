@@ -436,12 +436,6 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     }, 100);
   };
 
-  const handleShowAddForm = () => {
-    setShowAddForm(true);
-    resetForm();
-    setEditingMaterialIndex(null);
-  };
-
   const handleCancelEdit = () => {
     setEditingMaterialIndex(null);
     setShowAddForm(false);
@@ -853,7 +847,6 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                   const newMaterials = addedMaterials.filter((_, i) => i !== index);
                   updateAddedMaterials(newMaterials);
                 }}
-                onShowAddForm={handleShowAddForm}
                 onCancelEdit={handleCancelEdit}
                 onClose={handleClose}
                 vendorSuggestions={vendorSuggestions}

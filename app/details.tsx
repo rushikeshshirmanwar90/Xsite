@@ -38,6 +38,77 @@ const FOUNDATION_PHASES = ['Excavation', 'PCC', 'Footing Reinforcement', 'Footin
 const FLOOR_PHASES = ['Column Work', 'Slab Work', 'Brickwork', 'Electrical Concealed', 'Plumbing Concealed', 'Plastering', 'Waterproofing', 'Flooring', 'Putty', 'Painting', 'Doors & Windows', 'Electrical Fixtures', 'Plumbing Fixtures', 'Finishing', 'Completed'];
 const TERRACE_PHASES = ['Slab Work', 'Waterproofing', 'Parapet Wall', 'Water Tank Work', 'Solar Installation', 'Terrace Finishing', 'Completed'];
 
+// Material Available / Material Used filter dropdown option lists
+const AVAILABLE_SORT_OPTIONS: { key: 'name-asc' | 'name-desc' | null; label: string }[] = [
+    { key: null, label: 'Default' },
+    { key: 'name-asc', label: 'Name (A–Z)' },
+    { key: 'name-desc', label: 'Name (Z–A)' },
+];
+const PAYMENT_FILTER_OPTIONS: { key: 'all' | 'full' | 'partial' | 'unpaid'; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'full', label: 'Fully Paid' },
+    { key: 'partial', label: 'Partially Paid' },
+    { key: 'unpaid', label: 'Unpaid' },
+];
+const USED_SORT_OPTIONS: { key: 'date-newest' | 'date-oldest' | 'name-asc' | 'name-desc'; label: string }[] = [
+    { key: 'date-newest', label: 'Newest First' },
+    { key: 'date-oldest', label: 'Oldest First' },
+    { key: 'name-asc', label: 'Name (A–Z)' },
+    { key: 'name-desc', label: 'Name (Z–A)' },
+];
+
+const dropdownStyles = StyleSheet.create({
+    trigger: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 6,
+        backgroundColor: '#EAF0FE',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 8,
+        flexShrink: 1,
+    },
+    triggerText: {
+        fontSize: 12.5,
+        fontWeight: '700',
+        color: '#3A78B5',
+        flexShrink: 1,
+    },
+    fullScreenBackdrop: {
+        flex: 1,
+    },
+    floatingMenu: {
+        position: 'absolute',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 10,
+        paddingVertical: 4,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 12,
+    },
+    menuItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+    },
+    menuItemText: {
+        fontSize: 15,
+        fontWeight: '500',
+        color: '#1F2937',
+    },
+    menuItemTextActive: {
+        color: '#3A78B5',
+        fontWeight: '700',
+    },
+});
+
 const phaseTemplateForSection = (sectionName: string): string[] => {
     const lower = (sectionName || '').toLowerCase();
     if (lower.includes('foundation')) return FOUNDATION_PHASES;
@@ -421,6 +492,41 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     const [customEndDate, setCustomEndDate] = useState<Date>(new Date());
     const [showStartPicker, setShowStartPicker] = useState(false);
     const [showEndPicker, setShowEndPicker] = useState(false);
+
+    // Material Available — sort by name, filter by vendor payment status
+    const [availableSortOrder, setAvailableSortOrder] = useState<'name-asc' | 'name-desc' | null>(null);
+    const [availablePaymentFilter, setAvailablePaymentFilter] = useState<'all' | 'full' | 'partial' | 'unpaid'>('all');
+    const [showAvailableSortMenu, setShowAvailableSortMenu] = useState(false);
+    const [showAvailablePaymentMenu, setShowAvailablePaymentMenu] = useState(false);
+
+    // Material Used — sort by name or date, filter to a single selected date
+    const [usedSortOrder, setUsedSortOrder] = useState<'name-asc' | 'name-desc' | 'date-oldest' | 'date-newest'>('date-newest');
+    const [usedDateFilter, setUsedDateFilter] = useState<Date | null>(null);
+    const [showUsedDatePicker, setShowUsedDatePicker] = useState(false);
+    const [showUsedSortMenu, setShowUsedSortMenu] = useState(false);
+
+    // Dropdown menus render in a Modal anchored to the trigger's measured on-screen
+    // position — inside the ScrollView, an absolutely positioned menu near the
+    // bottom of a scrolled page gets clipped/pushed off-screen; a Modal escapes
+    // that entirely and always stays within the visible viewport.
+    type MenuAnchor = { x: number; y: number; width: number };
+    const availableSortTriggerRef = useRef<any>(null);
+    const availablePaymentTriggerRef = useRef<any>(null);
+    const usedSortTriggerRef = useRef<any>(null);
+    const [availableSortMenuAnchor, setAvailableSortMenuAnchor] = useState<MenuAnchor | null>(null);
+    const [availablePaymentMenuAnchor, setAvailablePaymentMenuAnchor] = useState<MenuAnchor | null>(null);
+    const [usedSortMenuAnchor, setUsedSortMenuAnchor] = useState<MenuAnchor | null>(null);
+
+    const openDropdown = (
+        ref: React.RefObject<any>,
+        setAnchor: (a: MenuAnchor) => void,
+        setOpen: (v: boolean) => void,
+    ) => {
+        ref.current?.measureInWindow((x: number, y: number, width: number, height: number) => {
+            setAnchor({ x, y: y + height + 4, width });
+            setOpen(true);
+        });
+    };
 
     // Simple dropdown state - now using modal instead of dropdown
     const [showSectionModal, setShowSectionModal] = useState(false);
@@ -2997,10 +3103,11 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         currentlyAvailable: 0,
                         miniSectionId: material.miniSectionId,
                         contractor_name: (material as any).contractor_name || undefined, // ✅ vendor pre-fill
-                        // ✅ Payment aggregation across all batches (variants) in this group
+                        // ✅ Payment aggregation across all batches (variants) in this group.
+                        // Batches with no recorded payment default to "unpaid" (0 paid) rather
+                        // than being excluded from the total, so every card shows a status.
                         amountPaid: 0,
                         paymentTotalCost: 0,
-                        hasPaymentInfo: false, // true once any batch has a recorded payment status
                     };
                 } else {
                     // ✅ CRITICAL FIX: Update to most recent date when grouping
@@ -3028,16 +3135,13 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     phaseName: (material as any).phaseName || undefined,
                 });
 
-                // ✅ Accumulate vendor payment across this group's batches — but only for
-                // batches that actually have a recorded payment status. Denominator uses the
-                // batch's stored totalCost (stable — usage decrements qnt but not
-                // totalCost/amountPaid, and fully-used batches drop out entirely), so the
-                // paid-vs-purchased ratio stays correct as material is consumed.
-                if ((material as any).paymentStatus) {
-                    grouped[key].hasPaymentInfo = true;
-                    grouped[key].amountPaid += Number((material as any).amountPaid) || 0;
-                    grouped[key].paymentTotalCost += Number(material.totalCost) || 0;
-                }
+                // ✅ Accumulate vendor payment across this group's batches. Every batch's
+                // cost counts toward the total (denominator uses the batch's stored
+                // totalCost — stable, since usage decrements qnt but not totalCost/amountPaid
+                // — so the paid-vs-purchased ratio stays correct as material is consumed).
+                // Batches with no recorded amountPaid contribute 0, so they read as unpaid.
+                grouped[key].amountPaid += Number((material as any).amountPaid) || 0;
+                grouped[key].paymentTotalCost += Number(material.totalCost) || 0;
 
                 // Debug logging for grouping
                 if (__DEV__) {
@@ -3108,10 +3212,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 }
 
                 // ✅ Derive the group's overall vendor payment status from the aggregated
-                // amountPaid vs the batches' total purchase cost — but ONLY when at least one
-                // batch actually recorded payment. Otherwise leave paymentStatus undefined so
-                // the card shows no payment badge (rather than a misleading "Unpaid").
-                if (group.hasPaymentInfo) {
+                // amountPaid vs the batches' total purchase cost. Materials with no payment
+                // ever recorded default to "unpaid" with the full cost shown as due.
+                {
                     const paidTotal = Number(group.amountPaid) || 0;
                     const costTotal = Number(group.paymentTotalCost) || 0;
                     if (costTotal > 0 && paidTotal >= costTotal - 0.01) {
@@ -3122,9 +3225,6 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         group.paymentStatus = 'unpaid';
                     }
                     group.amountRemaining = Math.max(0, costTotal - paidTotal);
-                } else {
-                    group.paymentStatus = undefined;
-                    group.amountRemaining = 0;
                 }
             });
 
@@ -4073,12 +4173,52 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
         }
     }, [activeTab, selectedMiniSection]);
 
+    // A single selected calendar date filters used materials down to just that day —
+    // compares by local calendar date, not the raw timestamp.
+    const filterByUsedDate = (materialsList: Material[]) => {
+        if (!usedDateFilter) return materialsList;
+        return materialsList.filter(material => {
+            const dateStr = material.createdAt || material.addedAt || material.date;
+            const date = new Date(dateStr);
+            if (isNaN(date.getTime())) return false;
+            return date.toDateString() === usedDateFilter.toDateString();
+        });
+    };
+
+    // Flat, name-sorted view of used materials (bypasses date grouping — used when
+    // the A–Z / Z–A sort is active instead of the oldest/newest date sort).
+    const getUsedSortedByName = () => {
+        const materials = filterByUsedDate(getCurrentData());
+        const grouped = getGroupedMaterialsWithCompleteData(materials, true);
+        return [...grouped].sort((a: any, b: any) =>
+            usedSortOrder === 'name-desc' ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name)
+        );
+    };
+
+    // Material Available — sort by name and/or filter down to a single vendor
+    // payment status. A material with no recorded payment reads as "unpaid".
+    const getAvailableFilteredSorted = () => {
+        let list = getGroupedMaterialsWithCompleteData(materials?.available || [], false);
+
+        if (availablePaymentFilter !== 'all') {
+            list = list.filter((m: any) => (m.paymentStatus || 'unpaid') === availablePaymentFilter);
+        }
+
+        if (availableSortOrder === 'name-asc') {
+            list = [...list].sort((a: any, b: any) => a.name.localeCompare(b.name));
+        } else if (availableSortOrder === 'name-desc') {
+            list = [...list].sort((a: any, b: any) => b.name.localeCompare(a.name));
+        }
+
+        return list;
+    };
+
     const getGroupedByDate = () => {
         if (activeTab !== 'used') {
             return null;
         }
 
-        const materials = getCurrentData();
+        const materials = filterByUsedDate(getCurrentData());
         const groupedByDate: { [date: string]: Material[] } = {};
 
         materials.forEach(material => {
@@ -4110,7 +4250,8 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
         });
 
         const sortedDates = Object.keys(groupedByDate).sort((a, b) => {
-            return b.localeCompare(a); // ISO dates can be sorted alphabetically
+            // ISO dates can be sorted alphabetically
+            return usedSortOrder === 'date-oldest' ? a.localeCompare(b) : b.localeCompare(a);
         });
 
         return sortedDates.map(date => ({
@@ -4539,6 +4680,79 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 contentContainerStyle={styles.scrollContent}
             >
 
+                {/* Compact Filters - Only visible in "Material Available" tab */}
+                {activeTab === 'imported' && (
+                    <View style={sectionStyles.filtersContainer}>
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                            <TouchableOpacity
+                                ref={availableSortTriggerRef}
+                                onPress={() => openDropdown(availableSortTriggerRef, setAvailableSortMenuAnchor, setShowAvailableSortMenu)}
+                                style={[dropdownStyles.trigger, { flex: 1 }]}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={dropdownStyles.triggerText} numberOfLines={1}>
+                                    Sort: {AVAILABLE_SORT_OPTIONS.find(o => o.key === availableSortOrder)?.label}
+                                </Text>
+                                <Ionicons name={showAvailableSortMenu ? 'chevron-up' : 'chevron-down'} size={14} color="#3A78B5" />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                ref={availablePaymentTriggerRef}
+                                onPress={() => openDropdown(availablePaymentTriggerRef, setAvailablePaymentMenuAnchor, setShowAvailablePaymentMenu)}
+                                style={[dropdownStyles.trigger, { flex: 1 }]}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={dropdownStyles.triggerText} numberOfLines={1}>
+                                    Payment: {PAYMENT_FILTER_OPTIONS.find(o => o.key === availablePaymentFilter)?.label}
+                                </Text>
+                                <Ionicons name={showAvailablePaymentMenu ? 'chevron-up' : 'chevron-down'} size={14} color="#3A78B5" />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
+
+                <Modal visible={showAvailableSortMenu} transparent animationType="fade" onRequestClose={() => setShowAvailableSortMenu(false)}>
+                    <TouchableOpacity style={dropdownStyles.fullScreenBackdrop} activeOpacity={1} onPress={() => setShowAvailableSortMenu(false)}>
+                        {availableSortMenuAnchor && (
+                            <View style={[dropdownStyles.floatingMenu, { top: availableSortMenuAnchor.y, left: availableSortMenuAnchor.x, width: availableSortMenuAnchor.width }]}>
+                                {AVAILABLE_SORT_OPTIONS.map(opt => (
+                                    <TouchableOpacity
+                                        key={String(opt.key)}
+                                        style={dropdownStyles.menuItem}
+                                        onPress={() => { setAvailableSortOrder(opt.key); setShowAvailableSortMenu(false); }}
+                                    >
+                                        <Text style={[dropdownStyles.menuItemText, availableSortOrder === opt.key && dropdownStyles.menuItemTextActive]}>
+                                            {opt.label}
+                                        </Text>
+                                        {availableSortOrder === opt.key && <Ionicons name="checkmark" size={16} color="#3A78B5" />}
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
+                    </TouchableOpacity>
+                </Modal>
+
+                <Modal visible={showAvailablePaymentMenu} transparent animationType="fade" onRequestClose={() => setShowAvailablePaymentMenu(false)}>
+                    <TouchableOpacity style={dropdownStyles.fullScreenBackdrop} activeOpacity={1} onPress={() => setShowAvailablePaymentMenu(false)}>
+                        {availablePaymentMenuAnchor && (
+                            <View style={[dropdownStyles.floatingMenu, { top: availablePaymentMenuAnchor.y, left: availablePaymentMenuAnchor.x, width: availablePaymentMenuAnchor.width }]}>
+                                {PAYMENT_FILTER_OPTIONS.map(opt => (
+                                    <TouchableOpacity
+                                        key={opt.key}
+                                        style={dropdownStyles.menuItem}
+                                        onPress={() => { setAvailablePaymentFilter(opt.key); setShowAvailablePaymentMenu(false); }}
+                                    >
+                                        <Text style={[dropdownStyles.menuItemText, availablePaymentFilter === opt.key && dropdownStyles.menuItemTextActive]}>
+                                            {opt.label}
+                                        </Text>
+                                        {availablePaymentFilter === opt.key && <Ionicons name="checkmark" size={16} color="#3A78B5" />}
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
+                    </TouchableOpacity>
+                </Modal>
+
                 {/* Compact Filters - Only visible in "Used Materials" tab */}
                 {activeTab === 'used' && (
                     <View style={sectionStyles.filtersContainer}>
@@ -4697,6 +4911,79 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                 </View>
                             )}
                         </View>
+
+                        {/* Sort by name or date, and jump to a specific day */}
+                        <View style={{ marginTop: 8 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <TouchableOpacity
+                                    ref={usedSortTriggerRef}
+                                    onPress={() => openDropdown(usedSortTriggerRef, setUsedSortMenuAnchor, setShowUsedSortMenu)}
+                                    style={[dropdownStyles.trigger, { flex: 1 }]}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={dropdownStyles.triggerText} numberOfLines={1}>
+                                        Sort: {USED_SORT_OPTIONS.find(o => o.key === usedSortOrder)?.label}
+                                    </Text>
+                                    <Ionicons name={showUsedSortMenu ? 'chevron-up' : 'chevron-down'} size={14} color="#3A78B5" />
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    onPress={() => setShowUsedDatePicker(true)}
+                                    style={{
+                                        flexDirection: 'row', alignItems: 'center', gap: 4,
+                                        paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8,
+                                        backgroundColor: usedDateFilter ? '#3A78B5' : '#EAF0FE',
+                                    }}
+                                >
+                                    <Ionicons name="calendar-outline" size={13} color={usedDateFilter ? '#fff' : '#3A78B5'} />
+                                    <Text style={{ fontSize: 12, fontWeight: '700', color: usedDateFilter ? '#fff' : '#3A78B5' }}>
+                                        {usedDateFilter ? usedDateFilter.toLocaleDateString('en-IN') : 'Date'}
+                                    </Text>
+                                </TouchableOpacity>
+
+                                {usedDateFilter && (
+                                    <TouchableOpacity onPress={() => setUsedDateFilter(null)}>
+                                        <Ionicons name="close-circle" size={18} color="#94A3B8" />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        </View>
+
+                        <Modal visible={showUsedSortMenu} transparent animationType="fade" onRequestClose={() => setShowUsedSortMenu(false)}>
+                            <TouchableOpacity style={dropdownStyles.fullScreenBackdrop} activeOpacity={1} onPress={() => setShowUsedSortMenu(false)}>
+                                {usedSortMenuAnchor && (
+                                    <View style={[dropdownStyles.floatingMenu, { top: usedSortMenuAnchor.y, left: usedSortMenuAnchor.x, width: usedSortMenuAnchor.width }]}>
+                                        {USED_SORT_OPTIONS.map(opt => (
+                                            <TouchableOpacity
+                                                key={opt.key}
+                                                style={dropdownStyles.menuItem}
+                                                onPress={() => { setUsedSortOrder(opt.key); setShowUsedSortMenu(false); }}
+                                            >
+                                                <Text style={[dropdownStyles.menuItemText, usedSortOrder === opt.key && dropdownStyles.menuItemTextActive]}>
+                                                    {opt.label}
+                                                </Text>
+                                                {usedSortOrder === opt.key && <Ionicons name="checkmark" size={16} color="#3A78B5" />}
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        </Modal>
+
+                        {showUsedDatePicker && (
+                            <DateTimePicker
+                                value={usedDateFilter || new Date()}
+                                mode="date"
+                                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                maximumDate={new Date()}
+                                onChange={(event, selectedDate) => {
+                                    setShowUsedDatePicker(Platform.OS === 'ios');
+                                    if (selectedDate) {
+                                        setUsedDateFilter(selectedDate);
+                                    }
+                                }}
+                            />
+                        )}
 
                         {/* ── Active Phase — merged into the same card, only when a mini-section is selected ── */}
                         {selectedMiniSection && (() => {
@@ -4993,6 +5280,43 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                 );
                             }
 
+                            // A–Z / Z–A sort shows a flat list (no date grouping); date-based
+                            // sort (oldest/newest) keeps the existing grouped-by-day view.
+                            if (usedSortOrder === 'name-asc' || usedSortOrder === 'name-desc') {
+                                const flatSorted = getUsedSortedByName();
+                                if (flatSorted.length === 0) {
+                                    return (
+                                        <View style={styles.noMaterialsContainer}>
+                                            <Ionicons name="cube-outline" size={64} color="#CBD5E1" />
+                                            <Text style={styles.noMaterialsTitle}>No Materials Found</Text>
+                                            <Text style={styles.noMaterialsDescription}>
+                                                {usedDateFilter
+                                                    ? `No materials used on ${usedDateFilter.toLocaleDateString('en-IN')}.`
+                                                    : 'No used materials found for this page.'}
+                                            </Text>
+                                        </View>
+                                    );
+                                }
+                                return flatSorted.map((material: any, index: number) => (
+                                    <MaterialCardEnhanced
+                                        key={`${material.name}-${material.unit}-${JSON.stringify(material.specs || {})}-${material.totalCost || 0}`}
+                                        material={material}
+                                        animation={cardAnimations[index] || new Animated.Value(1)}
+                                        activeTab={activeTab}
+                                        onAddUsage={handleAddUsage}
+                                        onTransferMaterial={handleTransferMaterial}
+                                        currentProjectId={projectId}
+                                        miniSections={miniSections}
+                                        showMiniSectionLabel={!selectedMiniSection}
+                                        userType={currentUserType}
+                                        onRefresh={() => reloadMaterials(1, true)}
+                                        canEdit={!user?.role && (material.totalUsed || 0) === 0}
+                                        lowStockThreshold={lowStockThreshold}
+                                        isIgnored={ignoredMaterials.includes(`${material.name}-${material.unit}-${buildSpecsKey(material.specs)}`)}
+                                    />
+                                ));
+                            }
+
                             // Group materials by date for display
                             const groupedByDate = getGroupedByDate();
                             if (!groupedByDate || groupedByDate.length === 0) {
@@ -5001,7 +5325,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                         <Ionicons name="cube-outline" size={64} color="#CBD5E1" />
                                         <Text style={styles.noMaterialsTitle}>No Materials Found</Text>
                                         <Text style={styles.noMaterialsDescription}>
-                                            No used materials found for this page.
+                                            {usedDateFilter
+                                                ? `No materials used on ${usedDateFilter.toLocaleDateString('en-IN')}.`
+                                                : 'No used materials found for this page.'}
                                         </Text>
                                     </View>
                                 );
@@ -5052,24 +5378,38 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         })()
                     ) : (materials?.available?.length || 0) > 0 ? (
                         // Available Materials tab - display API data directly
-                        getGroupedMaterialsWithCompleteData(materials?.available || [], false).map((material, index) => (
-                            <MaterialCardEnhanced
-                                key={`${material.name}-${material.unit}-${JSON.stringify(material.specs || {})}-${material.totalCost || 0}`}
-                                material={material}
-                                animation={cardAnimations[index] || new Animated.Value(1)}
-                                activeTab={activeTab}
-                                onAddUsage={handleAddUsage}
-                                onTransferMaterial={handleTransferMaterial}
-                                currentProjectId={projectId}
-                                miniSections={miniSections}
-                                showMiniSectionLabel={false}
-                                userType={currentUserType}
-                                onRefresh={() => reloadMaterials(1, true)}
-                                canEdit={!user?.role && (material.totalUsed || 0) === 0}
-                                lowStockThreshold={lowStockThreshold}
-                                isIgnored={ignoredMaterials.includes(`${material.name}-${material.unit}-${buildSpecsKey(material.specs)}`)}
-                            />
-                        ))
+                        (() => {
+                            const availableFiltered = getAvailableFilteredSorted();
+                            if (availableFiltered.length === 0) {
+                                return (
+                                    <View style={styles.noMaterialsContainer}>
+                                        <Ionicons name="filter-outline" size={64} color="#CBD5E1" />
+                                        <Text style={styles.noMaterialsTitle}>No Materials Match</Text>
+                                        <Text style={styles.noMaterialsDescription}>
+                                            No materials match the selected payment filter.
+                                        </Text>
+                                    </View>
+                                );
+                            }
+                            return availableFiltered.map((material, index) => (
+                                <MaterialCardEnhanced
+                                    key={`${material.name}-${material.unit}-${JSON.stringify(material.specs || {})}-${material.totalCost || 0}`}
+                                    material={material}
+                                    animation={cardAnimations[index] || new Animated.Value(1)}
+                                    activeTab={activeTab}
+                                    onAddUsage={handleAddUsage}
+                                    onTransferMaterial={handleTransferMaterial}
+                                    currentProjectId={projectId}
+                                    miniSections={miniSections}
+                                    showMiniSectionLabel={false}
+                                    userType={currentUserType}
+                                    onRefresh={() => reloadMaterials(1, true)}
+                                    canEdit={!user?.role && (material.totalUsed || 0) === 0}
+                                    lowStockThreshold={lowStockThreshold}
+                                    isIgnored={ignoredMaterials.includes(`${material.name}-${material.unit}-${buildSpecsKey(material.specs)}`)}
+                                />
+                            ));
+                        })()
                     ) : (
                         <View style={styles.noMaterialsContainer}>
                             {miniSections.length === 0 ? (
