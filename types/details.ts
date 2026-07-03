@@ -21,6 +21,8 @@ export interface Material {
   contractor_name?: string;
   paymentStatus?: 'full' | 'partial' | 'unpaid'; // Vendor payment state for this batch
   amountPaid?: number; // Amount already paid to the vendor for this batch
+  phaseId?: string; // Construction phase this usage was recorded against (used materials only)
+  phaseName?: string; // e.g. "Slab Work", "Column Work"
 }
 
 export interface MaterialEntry {

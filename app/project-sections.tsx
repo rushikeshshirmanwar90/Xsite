@@ -191,12 +191,7 @@ const SectionAccordionItem: React.FC<{
   isLoadingCompletion: boolean;
   options: SectionOption[];
   onToggle: () => void;
-  materialExpanded: boolean;
-  materialSubOptions: typeof MATERIAL_SUB_OPTIONS;
-  onMaterialSubOption: (key: string) => void;
-  reportExpanded: boolean;
-  onReportSubOption: (key: string) => void;
-}> = ({ section, index, isExpanded, isCompleted, isLoadingCompletion, options, onToggle, materialExpanded, materialSubOptions, onMaterialSubOption, reportExpanded, onReportSubOption }) => {
+}> = ({ section, index, isExpanded, isCompleted, isLoadingCompletion, options, onToggle }) => {
   const chevron  = useRef(new Animated.Value(isExpanded ? 1 : 0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -236,13 +231,6 @@ const SectionAccordionItem: React.FC<{
         activeOpacity={0.85}
         onPress={handlePress}
       >
-        {/* Index badge */}
-        <View style={[styles.indexBadge, { backgroundColor: statusBg }]}>
-          <Text style={[styles.indexBadgeText, { color: statusColor }]}>
-            {String(index + 1).padStart(2, '0')}
-          </Text>
-        </View>
-
         {/* Icon */}
         <View style={[styles.sectionIconWrap, { backgroundColor: statusBg }]}>
           {isLoadingCompletion ? (
@@ -284,54 +272,19 @@ const SectionAccordionItem: React.FC<{
           <View style={styles.optionsGrid}>
             {options.map((option) => {
               const cfg = OPTION_CONFIG[option.key] || { icon: 'ellipsis-horizontal', color: '#3A78B5', bg: '#EAF0FE', label: option.label };
-              const isMat    = option.key === 'material';
-              const isReport = option.key === 'report';
-              const subOpen  = (isMat && materialExpanded) || (isReport && reportExpanded);
-              const subItems = isMat ? materialSubOptions : isReport ? REPORT_SUB_OPTIONS : [];
-              const onSubPress = isMat ? onMaterialSubOption : onReportSubOption;
-
               return (
-                <View key={option.key}>
-                  <TouchableOpacity
-                    style={[styles.optionChip, subOpen && subDd.chipOpen]}
-                    activeOpacity={0.75}
-                    onPress={option.onPress}
-                  >
-                    <View style={[styles.optionChipIcon, { backgroundColor: cfg.bg }]}>
-                      <Ionicons name={cfg.icon as any} size={20} color={cfg.color} />
-                    </View>
-                    <Text style={styles.optionChipLabel}>{cfg.label}</Text>
-                    <Ionicons
-                      name={(isMat || isReport) ? (subOpen ? 'chevron-up' : 'chevron-down') : 'chevron-forward'}
-                      size={14}
-                      color={subOpen ? cfg.color : '#CBD5E1'}
-                    />
-                  </TouchableOpacity>
-
-                  {subOpen && subItems.length > 0 && (
-                    <View style={subDd.list}>
-                      {subItems.map((sub, i) => (
-                        <View key={sub.key}>
-                          {i > 0 && <View style={subDd.sep} />}
-                          <TouchableOpacity
-                            style={subDd.item}
-                            activeOpacity={0.75}
-                            onPress={() => onSubPress(sub.key)}
-                          >
-                            <View style={[subDd.icon, { backgroundColor: sub.bg }]}>
-                              <Ionicons name={sub.icon as any} size={16} color={sub.color} />
-                            </View>
-                            <View style={subDd.text}>
-                              <Text style={subDd.label}>{sub.label}</Text>
-                              <Text style={subDd.desc}>{sub.desc}</Text>
-                            </View>
-                            <Ionicons name="chevron-forward" size={13} color="#CBD5E1" />
-                          </TouchableOpacity>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                </View>
+                <TouchableOpacity
+                  key={option.key}
+                  style={styles.optionChip}
+                  activeOpacity={0.75}
+                  onPress={option.onPress}
+                >
+                  <View style={[styles.optionChipIcon, { backgroundColor: cfg.bg }]}>
+                    <Ionicons name={cfg.icon as any} size={20} color={cfg.color} />
+                  </View>
+                  <Text style={styles.optionChipLabel}>{cfg.label}</Text>
+                  <Ionicons name="chevron-forward" size={14} color="#CBD5E1" />
+                </TouchableOpacity>
               );
             })}
           </View>
@@ -358,8 +311,8 @@ const ProjectSections = () => {
   const [generatingStockReport, setGeneratingStockReport] = useState(false);
   const [expandedSectionId, setExpandedSectionId] = useState<string | null>(null);
   const [resolvedClientId, setResolvedClientId]   = useState<string>('');
-  const [expandedMaterialSectionId, setExpandedMaterialSectionId] = useState<string | null>(null);
-  const [expandedReportSectionId, setExpandedReportSectionId]     = useState<string | null>(null);
+  // Centered popup for Material / Cost Report sub-options
+  const [optionPopup, setOptionPopup] = useState<{ type: 'material' | 'report'; section: ProjectSection } | null>(null);
   const [contractorList, setContractorList]             = useState<any[]>([]);
   const [showContractorPicker, setShowContractorPicker] = useState(false);
   const [selectedForReport, setSelectedForReport]       = useState<Set<string>>(new Set());
@@ -472,7 +425,7 @@ const ProjectSections = () => {
   };
 
   const handleReportOption = async (key: string, section: ProjectSection) => {
-    setExpandedReportSectionId(null);
+    setOptionPopup(null);
 
     const opt = REPORT_SUB_OPTIONS.find(o => o.key === key);
     setReportGeneratingLabel(opt?.label ?? 'Report');
@@ -685,10 +638,10 @@ const ProjectSections = () => {
     }
   };
 
-  const getSectionOptions = (section: ProjectSection, sectionKey: string): SectionOption[] => {
+  const getSectionOptions = (section: ProjectSection): SectionOption[] => {
     const options: SectionOption[] = [];
     if (hasPermission('addMaterial') || hasPermission('addMaterialUsage'))
-      options.push({ key: 'material',      label: 'Material',    icon: 'cube-outline',          onPress: () => setExpandedMaterialSectionId(prev => prev === sectionKey ? null : sectionKey) });
+      options.push({ key: 'material',      label: 'Material',    icon: 'cube-outline',          onPress: () => setOptionPopup({ type: 'material', section }) });
     if (hasPermission('contractor'))
       options.push({ key: 'contractor',    label: 'Contractor',  icon: 'people-outline',        onPress: () => goToContractor(section) });
     if (hasPermission('addEquipmentCost'))
@@ -696,12 +649,12 @@ const ProjectSections = () => {
     if (hasPermission('addOtherCost'))
       options.push({ key: 'otherCost',     label: 'Other',       icon: 'cash-outline',          onPress: () => goToOtherCost() });
     if (hasPermission('generateReport'))
-      options.push({ key: 'report',        label: 'Cost Report', icon: 'bar-chart-outline',     onPress: () => setExpandedReportSectionId(prev => prev === sectionKey ? null : sectionKey) });
+      options.push({ key: 'report',        label: 'Cost Report', icon: 'bar-chart-outline',     onPress: () => setOptionPopup({ type: 'report', section }) });
     return options;
   };
 
   const handleMaterialSubOption = (key: string, section: ProjectSection) => {
-    setExpandedMaterialSectionId(null);
+    setOptionPopup(null);
     if (key === 'available') {
       goToMaterials(section, 'imported');
     } else if (key === 'used') {
@@ -970,7 +923,8 @@ const ProjectSections = () => {
         {sections && sections.length > 0 ? (
           sections.map((section, index) => {
             const sectionId  = section.sectionId || section._id;
-            const isCompleted = sectionCompletions[sectionId] || false;
+            const isCompleted = sectionCompleti
+            ons[sectionId] || false;
             const isLoadingCompletion = isLoadingSectionCompletions && !Object.prototype.hasOwnProperty.call(sectionCompletions, sectionId);
             const sectionKey = sectionId || String(index);
             const isExpanded = expandedSectionId === sectionKey;
@@ -982,13 +936,8 @@ const ProjectSections = () => {
                 isExpanded={isExpanded}
                 isCompleted={isCompleted}
                 isLoadingCompletion={isLoadingCompletion}
-                options={getSectionOptions(section, sectionKey)}
+                options={getSectionOptions(section)}
                 onToggle={() => toggleSection(sectionKey)}
-                materialExpanded={expandedMaterialSectionId === sectionKey}
-                materialSubOptions={getFilteredMaterialSubOptions()}
-                onMaterialSubOption={(key) => handleMaterialSubOption(key, section)}
-                reportExpanded={expandedReportSectionId === sectionKey}
-                onReportSubOption={(key) => handleReportOption(key, section)}
               />
             );
           })
@@ -1029,6 +978,67 @@ const ProjectSections = () => {
 
       {/* Animated report generation overlay */}
       <ReportGeneratingOverlay visible={reportGenerating} label={reportGeneratingLabel} />
+
+      {/* ── Centered popup: Material / Cost Report sub-options ───────────────── */}
+      <Modal
+        visible={optionPopup !== null}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setOptionPopup(null)}
+      >
+        <TouchableOpacity
+          style={popupStyles.backdrop}
+          activeOpacity={1}
+          onPress={() => setOptionPopup(null)}
+        >
+          <TouchableOpacity activeOpacity={1} style={popupStyles.card} onPress={() => {}}>
+            {optionPopup && (() => {
+              const isMat = optionPopup.type === 'material';
+              const cfg   = OPTION_CONFIG[isMat ? 'material' : 'report'];
+              const items = isMat ? getFilteredMaterialSubOptions() : REPORT_SUB_OPTIONS;
+              const onSelect = isMat
+                ? (key: string) => handleMaterialSubOption(key, optionPopup.section)
+                : (key: string) => handleReportOption(key, optionPopup.section);
+              return (
+                <>
+                  <View style={popupStyles.header}>
+                    <View style={[popupStyles.headerIcon, { backgroundColor: cfg.bg }]}>
+                      <Ionicons name={cfg.icon as any} size={20} color={cfg.color} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={popupStyles.title}>{cfg.label}</Text>
+                      <Text style={popupStyles.subtitle} numberOfLines={1}>{optionPopup.section.name}</Text>
+                    </View>
+                    <TouchableOpacity style={popupStyles.closeBtn} onPress={() => setOptionPopup(null)}>
+                      <Ionicons name="close" size={20} color="#64748B" />
+                    </TouchableOpacity>
+                  </View>
+
+                  {items.map((sub, i) => (
+                    <View key={sub.key}>
+                      {i > 0 && <View style={popupStyles.sep} />}
+                      <TouchableOpacity
+                        style={popupStyles.item}
+                        activeOpacity={0.75}
+                        onPress={() => onSelect(sub.key)}
+                      >
+                        <View style={[popupStyles.itemIcon, { backgroundColor: sub.bg }]}>
+                          <Ionicons name={sub.icon as any} size={18} color={sub.color} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={popupStyles.itemLabel}>{sub.label}</Text>
+                          <Text style={popupStyles.itemDesc}>{sub.desc}</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={15} color="#CBD5E1" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </>
+              );
+            })()}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Contractor Picker Modal — checkbox multi-select */}
       <Modal
@@ -1368,44 +1378,74 @@ const styles = StyleSheet.create({
 });
 
 // ─── Material sub-dropdown styles ─────────────────────────────────────────────
-const subDd = StyleSheet.create({
-  chipOpen: {
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    borderBottomWidth: 0,
+const popupStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(10,18,38,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 26,
   },
-  list: {
-    borderWidth: 1,
-    borderTopWidth: 0,
-    borderColor: '#EEF2F8',
-    borderBottomLeftRadius: 14,
-    borderBottomRightRadius: 14,
-    overflow: 'hidden',
-    marginBottom: 0,
+  card: {
+    alignSelf: 'stretch',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 12,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.18,
+    shadowRadius: 28,
+    elevation: 12,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    marginBottom: 4,
+  },
+  headerIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  title:    { fontSize: 16.5, fontWeight: '800', color: '#0F172A', letterSpacing: -0.2 },
+  subtitle: { fontSize: 12.5, color: '#64748B', marginTop: 1, fontWeight: '500' },
+  closeBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sep: {
     height: 1,
     backgroundColor: '#F1F5F9',
-    marginHorizontal: 14,
+    marginHorizontal: 4,
   },
   item: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    backgroundColor: '#FFFFFF',
+    paddingVertical: 14,
+    paddingHorizontal: 4,
   },
-  icon: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+  itemIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  text: { flex: 1 },
-  label: { fontSize: 13, fontWeight: '600', color: '#1E293B' },
-  desc: { fontSize: 11, color: '#94A3B8', marginTop: 1 },
+  itemLabel: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
+  itemDesc:  { fontSize: 11.5, color: '#94A3B8', marginTop: 1 },
 });
 
 export default ProjectSections;

@@ -4,7 +4,6 @@ import MaterialFormModal from '@/components/details/MaterialFormModel';
 import MaterialUsageForm from '@/components/details/MaterialUsageForm';
 import SectionManager from '@/components/details/SectionManager';
 import TabSelector from '@/components/details/TabSelector';
-import UsageFlagButton from '@/components/details/UsageFlagButton';
 import { predefinedSections } from '@/data/details';
 import { getSection } from '@/functions/details';
 import { getClientId } from '@/functions/clientId';
@@ -938,6 +937,10 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     // Keep undefined when never recorded, so the card shows no payment badge
                     paymentStatus: material.paymentStatus, // ✅ Vendor payment state (undefined if not recorded)
                     amountPaid: material.amountPaid !== undefined ? Number(material.amountPaid) : undefined,
+                    // Which construction phase this usage was recorded against (undefined for
+                    // usage recorded before phase-tagging existed, or if untaggable)
+                    phaseId: material.phaseId || undefined,
+                    phaseName: material.phaseName || undefined,
                     createdAt: material.createdAt,
                     addedAt: material.addedAt
                 };
@@ -3021,6 +3024,8 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     contractor_name: (material as any).contractor_name || undefined,
                     paymentStatus: (material as any).paymentStatus, // undefined if not recorded
                     amountPaid: (material as any).amountPaid,
+                    phaseId: (material as any).phaseId || undefined,
+                    phaseName: (material as any).phaseName || undefined,
                 });
 
                 // ✅ Accumulate vendor payment across this group's batches — but only for
@@ -3245,6 +3250,50 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
         const selectedSectionDoc = miniSections.find(s => s._id === miniSectionId);
         const resolvedSectionId = (selectedSectionDoc?.mainSectionDetails?.sectionId) || sectionId;
 
+        // Tag this usage with the mini-section's active construction phase (e.g. "Slab
+        // Work") so cards can later show what work the material was used for. Fetches the
+        // mini-section fresh (rather than trusting local `miniSections` state, which can be
+        // stale) so an explicit phase link is never missed, and coerces IDs to strings since
+        // one side comes from a Mongo ObjectId and the other from JSON. Uses the same
+        // idempotent "ensure" call as the Active Phase panel, so the tracker (and its phases)
+        // gets created on the fly if this mini-section has never been opened there. Still
+        // best-effort — if it fails for any reason, usage proceeds untagged.
+        let phaseId: string | undefined;
+        let phaseName: string | undefined;
+        try {
+            const [freshMiniSectionRes, trackerData] = await Promise.all([
+                apiClient.get('/api/mini-section', { params: { id: miniSectionId } }),
+                constructionTrackerService.ensureTracker(
+                    miniSectionId,
+                    projectId as string,
+                    projectName as string,
+                    sectionName
+                ),
+            ]);
+            const freshMiniSection = (freshMiniSectionRes.data as any)?.data?.[0];
+
+            if (trackerData?.phases?.length) {
+                const explicitPhaseId = freshMiniSection?.activePhaseId
+                    ? String(freshMiniSection.activePhaseId)
+                    : undefined;
+                let phase = explicitPhaseId
+                    ? trackerData.phases.find((p: any) => String(p._id) === explicitPhaseId)
+                    : null;
+                if (!phase) {
+                    const sectionLower = (freshMiniSection?.name || selectedSectionDoc?.name || (trackerData as any).sectionName || '').toLowerCase();
+                    phase = sectionLower.includes('foundation')
+                        ? (trackerData.phases.find((p: any) => p.name?.toLowerCase() === 'excavation') || trackerData.phases[0])
+                        : (trackerData.phases.find((p: any) => p.name?.toLowerCase().includes('column')) || trackerData.phases[0]);
+                }
+                if (phase) {
+                    phaseId = String((phase as any)._id);
+                    phaseName = phase.name;
+                }
+            }
+        } catch (trackerError) {
+            console.warn('⚠️ Could not resolve active phase for usage tagging:', trackerError);
+        }
+
         // Create the API payload
         const apiPayload = {
             projectId: projectId,
@@ -3252,7 +3301,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             miniSectionId: miniSectionId,
             materialUsages: materialUsages,
             clientId: clientId,
-            user: user
+            user: user,
+            phaseId,
+            phaseName,
         };
 
         // Validate parameters before making API call
@@ -4427,49 +4478,66 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 miniSectionCompletions={miniSectionCompletions}
             />
 
+            {!lockedTab && (
+                <TabSelector
+                    activeTab={activeTab}
+                    onSelectTab={setActiveTab}
+                />
+            )}
+
+            {/* Page heading row — fixed above the scroll area so it never scrolls
+                away; heading is plain text, Add Material / Add Usage is its own
+                themed button that swaps with the active tab. */}
+            <View style={pageBannerStyles.headingRow}>
+                <View style={{ flex: 1 }}>
+                    <Text style={pageBannerStyles.headingTitle}>
+                        {activeTab === 'used' ? 'Material Used' : 'Material Available'}
+                    </Text>
+                </View>
+
+                {activeTab === 'imported' ? (
+                    <TouchableOpacity
+                        style={pageBannerStyles.addMaterialBtn}
+                        activeOpacity={0.75}
+                        disabled={isAddingMaterial || sectionCompleted}
+                        onPress={() => {
+                            if (sectionCompleted) {
+                                toast.error('Cannot add materials to a completed section. Please reopen the section first.');
+                                return;
+                            }
+                            setShowMaterialForm(true);
+                        }}
+                    >
+                        {isAddingMaterial
+                            ? <Ionicons name="sync" size={16} color="#fff" />
+                            : <Ionicons name="add" size={17} color="#fff" />}
+                        <Text style={pageBannerStyles.addMaterialBtnText}>Add Material</Text>
+                    </TouchableOpacity>
+                ) : (
+                    <TouchableOpacity
+                        style={pageBannerStyles.addMaterialBtn}
+                        activeOpacity={0.75}
+                        disabled={sectionCompleted}
+                        onPress={() => {
+                            if (sectionCompleted) {
+                                toast.error('Cannot add material usage to a completed section. Please reopen the section first.');
+                                return;
+                            }
+                            setShowUsageForm(true);
+                        }}
+                    >
+                        <Ionicons name="add" size={17} color="#fff" />
+                        <Text style={pageBannerStyles.addMaterialBtnText}>Add Usage</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
+
             <ScrollView
                 ref={scrollViewRef}
                 style={styles.scrollContainer}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
             >
-
-                {!lockedTab && (
-                    <TabSelector
-                        activeTab={activeTab}
-                        onSelectTab={setActiveTab}
-                    />
-                )}
-
-                {/* Context banner — always adds material; only the title reflects the page */}
-                <TouchableOpacity
-                    style={pageBannerStyles.bannerAvailable}
-                    activeOpacity={0.75}
-                    disabled={isAddingMaterial || sectionCompleted}
-                    onPress={() => {
-                        if (sectionCompleted) {
-                            toast.error('Cannot add materials to a completed section. Please reopen the section first.');
-                            return;
-                        }
-                        setShowMaterialForm(true);
-                    }}
-                >
-                    <View style={[pageBannerStyles.iconWrap, { borderColor: '#E9D5FF' }]}>
-                        <Ionicons name="cube" size={24} color="#7C3AED" />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                        <Text style={[pageBannerStyles.bannerEyebrow, { color: '#7C3AED' }]}>Add Material</Text>
-                        <Text style={pageBannerStyles.bannerTitle}>
-                            {activeTab === 'used' ? 'Material Used' : 'Material Available'}
-                        </Text>
-                    </View>
-                    <View style={[pageBannerStyles.addBtn, { backgroundColor: '#7C3AED' }]}>
-                        {isAddingMaterial
-                            ? <Ionicons name="sync" size={18} color="#fff" />
-                            : <Ionicons name="add" size={20} color="#fff" />}
-                    </View>
-                </TouchableOpacity>
-
 
                 {/* Compact Filters - Only visible in "Used Materials" tab */}
                 {activeTab === 'used' && (
@@ -4841,24 +4909,22 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 )}
 
                 <View style={styles.materialsSection}>
-                    <View style={paginationStyles.headerContainer}>
-                        <Text style={styles.sectionTitle}>
+                    {(activeTab === 'used' && selectedMiniSection) || (!materials.loading && totalItems > 0) ? (
+                        <View style={paginationStyles.headerContainer}>
                             {activeTab === 'used' && selectedMiniSection && (
-                                <Text style={{ fontSize: 14, color: '#64748B', fontWeight: '400' }}>
-                                    {' '}(Filtered)
-                                </Text>
+                                <Text style={paginationStyles.filteredText}>(Filtered)</Text>
                             )}
-                        </Text>
 
-                        {/* Material count */}
-                        {!materials.loading && totalItems > 0 && (
-                            <View style={paginationStyles.infoContainer}>
-                                <Text style={paginationStyles.infoText}>
-                                    {totalItems} {activeTab === 'used' ? 'used materials' : 'available materials'}
-                                </Text>
-                            </View>
-                        )}
-                    </View>
+                            {/* Material count */}
+                            {!materials.loading && totalItems > 0 && (
+                                <View style={paginationStyles.infoContainer}>
+                                    <Text style={paginationStyles.infoText}>
+                                        {totalItems} {activeTab === 'used' ? 'used materials' : 'available materials'}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+                    ) : null}
                     {materials.loading ? (
                         <View style={styles.noMaterialsContainer}>
                             <Animated.View style={{
@@ -5108,23 +5174,6 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     </Animated.View>
                 </PanGestureHandler>
             )}
-
-            {/* Floating "Add Usage" flag — peeks from the right edge, expands briefly then
-                collapses to a small tab; tapping re-activates it and opens the usage form.
-                Anchored at a fixed distance from the bottom, sitting just above the low-stock
-                button (which lives ~100–150px from the bottom-right) so it never moves and
-                both stay visible and tappable. */}
-            <UsageFlagButton
-                disabled={sectionCompleted}
-                bottom={170}
-                onPress={() => {
-                    if (sectionCompleted) {
-                        toast.error('Cannot add material usage to a completed section. Please reopen the section first.');
-                        return;
-                    }
-                    setShowUsageForm(true);
-                }}
-            />
 
             {/* Custom Date Picker Modal */}
             <Modal
@@ -6623,13 +6672,18 @@ const sectionStyles = StyleSheet.create({
 
 const paginationStyles = StyleSheet.create({
     headerContainer: {
-        marginBottom: 16,
+        marginBottom: 10,
+    },
+    filteredText: {
+        fontSize: 14,
+        color: '#64748B',
+        fontWeight: '400',
+        paddingLeft: 4,
     },
     infoContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginTop: 8,
         paddingHorizontal: 4,
     },
     infoText: {
@@ -6810,68 +6864,39 @@ const confirmModalStyles = StyleSheet.create({
 });
 
 const pageBannerStyles = StyleSheet.create({
-    bannerAvailable: {
+    headingRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 14,
+        gap: 12,
         marginHorizontal: 16,
         marginTop: 14,
         marginBottom: 4,
-        backgroundColor: '#FAF5FF',
-        borderWidth: 1,
-        borderColor: '#E9D5FF',
-        borderRadius: 14,
-        paddingVertical: 14,
-        paddingHorizontal: 16,
     },
-    bannerUsed: {
+    headingTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: '#0F172A',
+        letterSpacing: -0.3,
+    },
+    addMaterialBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 14,
-        marginHorizontal: 16,
-        marginTop: 14,
-        marginBottom: 4,
-        backgroundColor: '#FFFBEB',
-        borderWidth: 1,
-        borderColor: '#FDE68A',
-        borderRadius: 14,
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-    },
-    iconWrap: {
-        width: 44,
-        height: 44,
-        borderRadius: 11,
-        backgroundColor: '#FFFFFF',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
+        gap: 6,
+        backgroundColor: '#3A78B5',
+        borderRadius: 12,
+        paddingVertical: 9,
+        paddingHorizontal: 14,
         flexShrink: 0,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.06,
-        shadowRadius: 3,
-        elevation: 2,
+        shadowColor: '#3A78B5',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+        elevation: 4,
     },
-    bannerEyebrow: {
-        fontSize: 11,
-        fontWeight: '600',
-        textTransform: 'uppercase',
-        letterSpacing: 0.8,
-        marginBottom: 2,
-    },
-    bannerTitle: {
-        fontSize: 15,
+    addMaterialBtnText: {
+        color: '#FFFFFF',
+        fontSize: 13,
         fontWeight: '700',
-        color: '#1E293B',
-    },
-    addBtn: {
-        width: 34,
-        height: 34,
-        borderRadius: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
     },
 });
 
