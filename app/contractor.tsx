@@ -23,6 +23,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import apiClient from '@/utils/axiosConfig';
 import { ContractorFormModal } from '@/components/details/ContractorFormModal';
 import ContractorReportGenerator from './components/contractor/ContractorReportGenerator';
+import Header from '@/components/details/Header';
 
 interface LaborEntry {
   _id: string;
@@ -688,25 +689,36 @@ export default function ContractorScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={24} color="#374151" />
-        </TouchableOpacity>
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle} numberOfLines={1}>Contractor Management</Text>
-          <Text style={styles.headerSubtitle} numberOfLines={1}>{projectName}</Text>
+      <Header
+        selectedSection={null}
+        onSectionSelect={() => { }}
+        totalCost={0}
+        formatPrice={(price: number) => `₹${price.toLocaleString('en-IN')}`}
+        getSectionName={() => sectionName || 'Unknown Section'}
+        projectName={projectName}
+        sectionName={sectionName}
+        projectId={projectId}
+        sectionId={sectionId}
+        onShowSectionPrompt={() => { }}
+        hideSection={true}
+        onReportPress={contractors.length > 0 ? () => setShowContractorPicker(true) : undefined}
+      />
+
+      {/* Page heading row — fixed above the list so it never scrolls away */}
+      <View style={pageBannerStyles.headingRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={pageBannerStyles.headingTitle}>Contractor Management</Text>
         </View>
         <TouchableOpacity
-          style={styles.reportHeaderButton}
-          onPress={() => setShowContractorPicker(true)}
-          activeOpacity={0.7}
-          disabled={contractors.length === 0}
+          style={pageBannerStyles.addBtn}
+          activeOpacity={0.75}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setShowAddModal(true);
+          }}
         >
-          <Ionicons name="document-text-outline" size={20} color={contractors.length === 0 ? '#94A3B8' : '#3A78B5'} />
+          <Ionicons name="add" size={17} color="#fff" />
+          <Text style={pageBannerStyles.addBtnText}>Add Contractor</Text>
         </TouchableOpacity>
       </View>
 
@@ -723,27 +735,6 @@ export default function ContractorScreen() {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           style={{ flex: 1 }}
-          ListHeaderComponent={
-            <TouchableOpacity
-              style={contractorBanner.banner}
-              activeOpacity={0.75}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setShowAddModal(true);
-              }}
-            >
-              <View style={contractorBanner.iconWrap}>
-                <Ionicons name="people" size={24} color="#3A78B5" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={contractorBanner.eyebrow}>Staff Contracts</Text>
-                <Text style={contractorBanner.title}>Contractor Management</Text>
-              </View>
-              <View style={contractorBanner.addBtn}>
-                <Ionicons name="add" size={20} color="#fff" />
-              </View>
-            </TouchableOpacity>
-          }
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <View style={styles.emptyIconContainer}>
@@ -1258,55 +1249,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderColor: '#E2E8F0',
-    elevation: 2,
-    shadowColor: '#000000',
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F1F5F9',
-    marginRight: 12,
-  },
-  headerTitleContainer: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1E293B',
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    color: '#64748B',
-    marginTop: 2,
-  },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  reportHeaderButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#EAF0FE',
-    marginLeft: 8,
   },
   loadingText: {
     marginTop: 12,
@@ -2819,57 +2765,38 @@ const pickerStyles = StyleSheet.create({
   },
 });
 
-const contractorBanner = StyleSheet.create({
-  banner: {
+const pageBannerStyles = StyleSheet.create({
+  headingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 12,
     marginHorizontal: 16,
     marginTop: 14,
-    marginBottom: 6,
-    backgroundColor: '#EAF0FE',
-    borderWidth: 1,
-    borderColor: '#C4D8FC',
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    marginBottom: 4,
   },
-  iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 11,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#C4D8FC',
-    flexShrink: 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  eyebrow: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#3A78B5',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 2,
-  },
-  title: {
-    fontSize: 15,
+  headingTitle: {
+    fontSize: 20,
     fontWeight: '700',
-    color: '#1E293B',
+    color: '#1F2937',
   },
   addBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: '#3A78B5',
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#3A78B5',
+    borderRadius: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
     flexShrink: 0,
+    shadowColor: '#3A78B5',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  addBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

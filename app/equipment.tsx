@@ -646,7 +646,7 @@ const EquipmentManagement = () => {
                 formatPrice={formatPrice}
                 getSectionName={getSectionName}
                 projectName={projectName}
-                sectionName={`${sectionName} - Equipment`}
+                sectionName={sectionName}
                 projectId={projectId}
                 sectionId={sectionId}
                 onShowSectionPrompt={() => { }}
@@ -663,6 +663,24 @@ const EquipmentManagement = () => {
                 sectionName={sectionName}
             />
 
+            {/* Page heading row — fixed above the scroll area so it never scrolls away */}
+            <View style={pageBannerStyles.headingRow}>
+                <View style={{ flex: 1 }}>
+                    <Text style={pageBannerStyles.headingTitle}>Equipment Cost</Text>
+                </View>
+                <TouchableOpacity
+                    style={pageBannerStyles.addBtn}
+                    activeOpacity={0.75}
+                    disabled={isAddingEquipment}
+                    onPress={() => setShowEquipmentForm(true)}
+                >
+                    {isAddingEquipment
+                        ? <Ionicons name="sync" size={16} color="#fff" />
+                        : <Ionicons name="add" size={17} color="#fff" />}
+                    <Text style={pageBannerStyles.addBtnText}>Add Equipment</Text>
+                </TouchableOpacity>
+            </View>
+
             <ScrollView
                 ref={scrollViewRef}
                 style={styles.scrollContainer}
@@ -677,27 +695,6 @@ const EquipmentManagement = () => {
                     />
                 }
             >
-                {/* Context banner */}
-                <TouchableOpacity
-                    style={bannerStyle.banner}
-                    activeOpacity={0.75}
-                    disabled={isAddingEquipment}
-                    onPress={() => setShowEquipmentForm(true)}
-                >
-                    <View style={bannerStyle.iconWrap}>
-                        <Ionicons name="hardware-chip" size={24} color="#2563EB" />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                        <Text style={bannerStyle.eyebrow}>Machinery & Tools</Text>
-                        <Text style={bannerStyle.title}>Equipment Cost</Text>
-                    </View>
-                    <View style={bannerStyle.addBtn}>
-                        {isAddingEquipment
-                            ? <Ionicons name="sync" size={18} color="#fff" />
-                            : <Ionicons name="add" size={20} color="#fff" />}
-                    </View>
-                </TouchableOpacity>
-
                 {/* Equipment Entries Display */}
                 {loading ? (
                     <View style={styles.noMaterialsContainer}>
@@ -1172,53 +1169,38 @@ const loadingStyles = StyleSheet.create({
     },
 });
 
-const bannerStyle = StyleSheet.create({
-    banner: {
+const pageBannerStyles = StyleSheet.create({
+    headingRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 14,
+        gap: 12,
         marginHorizontal: 16,
         marginTop: 14,
-        marginBottom: 6,
-        backgroundColor: '#EAF0FE',
-        borderWidth: 1,
-        borderColor: '#C4D8FC',
-        borderRadius: 14,
-        paddingVertical: 14,
-        paddingHorizontal: 16,
+        marginBottom: 4,
     },
-    iconWrap: {
-        width: 44,
-        height: 44,
-        borderRadius: 11,
-        backgroundColor: '#FFFFFF',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: '#C4D8FC',
-        flexShrink: 0,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.06,
-        shadowRadius: 3,
-        elevation: 2,
+    headingTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#1F2937',
     },
-    eyebrow: {
-        fontSize: 11,
-        fontWeight: '600',
-        color: '#2563EB',
-        textTransform: 'uppercase',
-        letterSpacing: 0.8,
-        marginBottom: 2,
-    },
-    title: { fontSize: 15, fontWeight: '700', color: '#1E293B' },
     addBtn: {
-        width: 34,
-        height: 34,
-        borderRadius: 10,
-        backgroundColor: '#2563EB',
+        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
+        gap: 6,
+        backgroundColor: '#3A78B5',
+        borderRadius: 12,
+        paddingVertical: 9,
+        paddingHorizontal: 14,
         flexShrink: 0,
+        shadowColor: '#3A78B5',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+        elevation: 4,
+    },
+    addBtnText: {
+        color: '#FFFFFF',
+        fontSize: 13,
+        fontWeight: '700',
     },
 });

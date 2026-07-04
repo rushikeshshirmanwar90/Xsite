@@ -234,6 +234,24 @@ const OtherCostPage = () => {
         onSubmit={handleAddOtherCosts}
       />
 
+      {/* Page heading row — fixed above the scroll area so it never scrolls away */}
+      <View style={pageBannerStyles.headingRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={pageBannerStyles.headingTitle}>Other Costs</Text>
+        </View>
+        <TouchableOpacity
+          style={pageBannerStyles.addBtn}
+          activeOpacity={0.75}
+          disabled={isSubmitting}
+          onPress={() => setShowForm(true)}
+        >
+          {isSubmitting
+            ? <Ionicons name="sync" size={16} color="#fff" />
+            : <Ionicons name="add" size={17} color="#fff" />}
+          <Text style={pageBannerStyles.addBtnText}>Add Cost</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Entries */}
       <ScrollView
         ref={scrollViewRef}
@@ -241,27 +259,6 @@ const OtherCostPage = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Context banner */}
-        <TouchableOpacity
-          style={bannerStyle.banner}
-          activeOpacity={0.75}
-          disabled={isSubmitting}
-          onPress={() => setShowForm(true)}
-        >
-          <View style={bannerStyle.iconWrap}>
-            <Ionicons name="receipt" size={24} color="#E11D48" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={bannerStyle.eyebrow}>Extra Expenses</Text>
-            <Text style={bannerStyle.title}>Other Costs</Text>
-          </View>
-          <View style={bannerStyle.addBtn}>
-            {isSubmitting
-              ? <Ionicons name="sync" size={18} color="#fff" />
-              : <Ionicons name="add" size={20} color="#fff" />}
-          </View>
-        </TouchableOpacity>
-
         {loading ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="sync" size={48} color="#E11D48" />
@@ -447,53 +444,38 @@ const styles = StyleSheet.create({
   },
 });
 
-const bannerStyle = StyleSheet.create({
-  banner: {
+const pageBannerStyles = StyleSheet.create({
+  headingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 12,
     marginHorizontal: 16,
     marginTop: 14,
-    marginBottom: 6,
-    backgroundColor: '#FFF1F2',
-    borderWidth: 1,
-    borderColor: '#FECDD3',
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    marginBottom: 4,
   },
-  iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 11,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#FECDD3',
-    flexShrink: 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 2,
+  headingTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
   },
-  eyebrow: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#E11D48',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 2,
-  },
-  title: { fontSize: 15, fontWeight: '700', color: '#1E293B' },
   addBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: '#E11D48',
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#3A78B5',
+    borderRadius: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
     flexShrink: 0,
+    shadowColor: '#3A78B5',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  addBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

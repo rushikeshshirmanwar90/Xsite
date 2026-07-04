@@ -7214,9 +7214,8 @@ const pageBannerStyles = StyleSheet.create({
     },
     headingTitle: {
         fontSize: 20,
-        fontWeight: '800',
-        color: '#0F172A',
-        letterSpacing: -0.3,
+        fontWeight: '700',
+        color: '#1F2937',
     },
     addMaterialBtn: {
         flexDirection: 'row',

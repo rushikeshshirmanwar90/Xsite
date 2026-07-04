@@ -424,6 +424,10 @@ const ProjectSections = () => {
     router.push({ pathname: '../other-cost', params: { projectId: id as string, projectName: name as string } });
   };
 
+  const goToCostSummary = () => {
+    router.push({ pathname: '../cost-summary', params: { projectId: id as string, projectName: name as string } });
+  };
+
   const handleReportOption = async (key: string, section: ProjectSection) => {
     setOptionPopup(null);
 
@@ -552,17 +556,6 @@ const ProjectSections = () => {
     try { return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }); } catch { return d; }
   };
 
-  const laborRowsHTML = (entries: any[]) => {
-    if (!entries.length) return '';
-    const byDate: Record<string, any[]> = {};
-    entries.forEach(e => { const k = new Date(e.addedAt).toDateString(); (byDate[k] = byDate[k] || []).push(e); });
-    return Object.entries(byDate).sort(([a],[b])=>new Date(a).getTime()-new Date(b).getTime()).map(([date,rows])=>{
-      const dayTotal = rows.reduce((s,r)=>s+r.totalCost,0);
-      return `<tr style="background:#1e293b;"><td colspan="4" style="padding:10px;color:white;font-weight:600;font-size:13px;">📅 ${fmtDateRpt(date)} — Total: ${fmtCurrency(dayTotal)}</td></tr>`
-        +rows.map(r=>`<tr style="background:#f8fafc;"><td style="padding:8px;border:1px solid #e2e8f0;font-size:12px;">${r.type}</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:center;font-size:12px;">${r.count}</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:right;font-size:12px;">${fmtCurrency(r.perLaborCost)}</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:right;font-weight:600;font-size:12px;">${fmtCurrency(r.totalCost)}</td></tr>`).join('');
-    }).join('');
-  };
-
   const paymentRowsHTML = (payments: any[]) => {
     if (!payments?.length) return '';
     const byDate: Record<string, any[]> = {};
@@ -574,34 +567,28 @@ const ProjectSections = () => {
     }).join('');
   };
 
-  const buildReportHTML = (selected: any[], laborMap: Record<string, any[]>) => {
+  const buildReportHTML = (selected: any[]) => {
     const now = new Date().toLocaleDateString('en-IN', { weekday:'long', day:'2-digit', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' } as any);
-    const totalBudget = selected.reduce((s,c)=>s+(c.totalAmount||0),0);
+    const totalAmount = selected.reduce((s,c)=>s+(c.totalAmount||0),0);
     const totalPaid   = selected.reduce((s,c)=>s+(c.totalPaid||0),0);
-    const totalWork   = selected.reduce((s,c)=>s+(c.usedAmount||0),0);
-    const css = `body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:20px;background:#fff;color:#1e293b;line-height:1.4;}table{width:100%;border-collapse:collapse;margin-bottom:16px;background:white;box-shadow:0 1px 3px rgba(0,0,0,0.1);}th{background:#374151;color:white;padding:10px 12px;text-align:left;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;}td{padding:10px;border:1px solid #e2e8f0;font-size:13px;}.no-data{text-align:center;padding:30px;color:#64748b;font-style:italic;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:16px;}.section-title{font-size:15px;font-weight:700;color:#1e293b;margin:20px 0 10px 0;padding:10px 14px;background:#f1f5f9;border-left:4px solid #3A78B5;border-radius:4px;}.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}.summary-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center;}.summary-card h3{margin:0 0 6px 0;font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;}.summary-card p{margin:0;font-size:16px;font-weight:700;color:#1e293b;}.footer{margin-top:40px;padding:16px;background:#f8fafc;border-radius:8px;text-align:center;font-size:12px;color:#64748b;}`;
+    const css = `body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:20px;background:#fff;color:#1e293b;line-height:1.4;}table{width:100%;border-collapse:collapse;margin-bottom:16px;background:white;box-shadow:0 1px 3px rgba(0,0,0,0.1);}th{background:#374151;color:white;padding:10px 12px;text-align:left;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;}td{padding:10px;border:1px solid #e2e8f0;font-size:13px;}.no-data{text-align:center;padding:30px;color:#64748b;font-style:italic;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:16px;}.section-title{font-size:15px;font-weight:700;color:#1e293b;margin:20px 0 10px 0;padding:10px 14px;background:#f1f5f9;border-left:4px solid #3A78B5;border-radius:4px;}.summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px;}.summary-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center;}.summary-card h3{margin:0 0 6px 0;font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;}.summary-card p{margin:0;font-size:16px;font-weight:700;color:#1e293b;}.footer{margin-top:40px;padding:16px;background:#f8fafc;border-radius:8px;text-align:center;font-size:12px;color:#64748b;}`;
     const sections = selected.map(c=>{
       const staffName = getContractorDisplayName(c);
       const contractName = c.contractType || 'Contract';
-      const entries = laborMap[c._id] || [];
-      const outstanding = Math.max(0,(c.usedAmount||0)-(c.totalPaid||0));
-      const statusStyle = c.status==='completed'?'background:#dcfce7;color:#166534;':'background:#fef3c7;color:#92400e;';
       return `<div style="margin-bottom:36px;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
         <div style="background:#3A78B5;padding:16px 20px;color:white;">
           <div style="font-size:18px;font-weight:700;">${contractName}</div>
-          <div style="font-size:12px;opacity:0.85;margin-top:3px;">${staffName} &nbsp;•&nbsp; <span style="display:inline-block;${statusStyle}padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;text-transform:uppercase;">${c.status||'active'}</span></div>
+          <div style="font-size:13px;opacity:0.85;margin-top:3px;">${staffName}</div>
         </div>
         <div style="padding:16px 20px;">
-          <div class="summary-grid"><div class="summary-card"><h3>Budget</h3><p>${fmtCurrency(c.totalAmount||0)}</p></div><div class="summary-card"><h3>Work Done</h3><p>${fmtCurrency(c.usedAmount||0)}</p></div><div class="summary-card"><h3>Paid</h3><p style="color:#059669;">${fmtCurrency(c.totalPaid||0)}</p></div><div class="summary-card"><h3>Outstanding</h3><p style="color:${outstanding>0?'#dc2626':'#059669'};">${fmtCurrency(outstanding)}</p></div></div>
-          <div class="section-title">Work Logs (Day-wise)</div>
-          ${entries.length?`<table><thead><tr><th>Worker Type</th><th style="text-align:center;">Count</th><th style="text-align:right;">Rate</th><th style="text-align:right;">Total</th></tr></thead><tbody>${laborRowsHTML(entries)}</tbody></table>`:'<div class="no-data">No work logs recorded.</div>'}
-          <div class="section-title">Payment History</div>
-          ${(c.payments||[]).length?`<table><thead><tr><th>Type</th><th>Notes</th><th style="text-align:right;">Amount</th></tr></thead><tbody>${paymentRowsHTML(c.payments)}</tbody></table>`:'<div class="no-data">No payments recorded.</div>'}
+          <div class="summary-grid"><div class="summary-card"><h3>Total Amount</h3><p>${fmtCurrency(c.totalAmount||0)}</p></div><div class="summary-card"><h3>Paid Amount</h3><p style="color:#059669;">${fmtCurrency(c.totalPaid||0)}</p></div></div>
+          <div class="section-title">Transaction Details</div>
+          ${(c.payments||[]).length?`<table><thead><tr><th>Type</th><th>Notes</th><th style="text-align:right;">Amount</th></tr></thead><tbody>${paymentRowsHTML(c.payments)}</tbody></table>`:'<div class="no-data">No transactions recorded.</div>'}
         </div></div>`;
     }).join('');
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Contractor Report</title><style>${css}.main-header{text-align:center;margin-bottom:24px;padding:20px;background:#3A78B5;color:white;border-radius:12px;}.main-header h1{margin:0 0 6px 0;font-size:24px;font-weight:700;}.main-header p{margin:3px 0;font-size:13px;opacity:0.9;}</style></head><body>
       <div class="main-header"><h1>Contractor Report</h1><p><strong>${name as string}</strong></p><p>${selected.length} Contractor${selected.length!==1?'s':''} selected</p><p>Generated: ${now}</p></div>
-      ${selected.length>1?`<div style="margin-bottom:24px;"><h2 style="font-size:16px;font-weight:700;margin-bottom:12px;">Project Summary</h2><div class="summary-grid"><div class="summary-card"><h3>Total Budget</h3><p>${fmtCurrency(totalBudget)}</p></div><div class="summary-card"><h3>Work Done</h3><p>${fmtCurrency(totalWork)}</p></div><div class="summary-card"><h3>Total Paid</h3><p style="color:#059669;">${fmtCurrency(totalPaid)}</p></div><div class="summary-card"><h3>Contractors</h3><p>${selected.length}</p></div></div></div>`:''}
+      ${selected.length>1?`<div style="margin-bottom:24px;"><h2 style="font-size:16px;font-weight:700;margin-bottom:12px;">Project Summary</h2><div class="summary-grid"><div class="summary-card"><h3>Total Amount</h3><p>${fmtCurrency(totalAmount)}</p></div><div class="summary-card"><h3>Paid Amount</h3><p style="color:#059669;">${fmtCurrency(totalPaid)}</p></div></div></div>`:''}
       ${sections}
       <div class="footer"><p><strong>Construction Management System</strong></p><p>Generated: ${new Date().toISOString()}</p></div>
     </body></html>`;
@@ -613,16 +600,7 @@ const ProjectSections = () => {
     setShowContractorPicker(false);
     setIsGeneratingReport(true);
     try {
-      const laborMap: Record<string, any[]> = {};
-      await Promise.allSettled(selected.map(async (c: any) => {
-        const staffId = c.staffId?._id || c.staffId;
-        try {
-          const res = await apiClient.get('/api/labor', { params: { projectId: id as string, addedBy: staffId } });
-          const r = res.data as any;
-          laborMap[c._id] = r.success && r.data ? r.data.laborEntries || [] : [];
-        } catch { laborMap[c._id] = []; }
-      }));
-      const html = buildReportHTML(selected, laborMap);
+      const html = buildReportHTML(selected);
       const { uri } = await Print.printToFileAsync({ html, base64: false });
       const isAvailable = await Sharing.isAvailableAsync();
       if (isAvailable) {
@@ -873,11 +851,9 @@ const ProjectSections = () => {
               <Text style={styles.headerSubtitle}>Project Sections</Text>
             </View>
 
-            {/* Stock report */}
-            <TouchableOpacity onPress={handleGenerateStockReport} style={styles.reportBtn} disabled={generatingStockReport} activeOpacity={0.8}>
-              {generatingStockReport
-                ? <ActivityIndicator size="small" color="#3A78B5" />
-                : <Ionicons name="stats-chart" size={20} color="#3A78B5" />}
+            {/* Add section */}
+            <TouchableOpacity onPress={() => setShowAddModal(true)} style={styles.reportBtn} activeOpacity={0.8}>
+              <Ionicons name="add" size={22} color="#3A78B5" />
             </TouchableOpacity>
           </View>
 
@@ -959,7 +935,21 @@ const ProjectSections = () => {
           </View>
         )}
 
-
+        {/* Cost Summary entry — full project cost overview */}
+        {(userIsAdmin || hasPermission('generateReport')) && (
+          <TouchableOpacity style={summaryBtnStyles.card} activeOpacity={0.8} onPress={goToCostSummary}>
+            <View style={summaryBtnStyles.iconWrap}>
+              <Ionicons name="pie-chart" size={22} color="#3A78B5" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={summaryBtnStyles.title}>Cost Summary</Text>
+              <Text style={summaryBtnStyles.desc}>Materials, contractors, equipment & other costs</Text>
+            </View>
+            <View style={summaryBtnStyles.chevronCircle}>
+              <Ionicons name="chevron-forward" size={16} color="#3A78B5" />
+            </View>
+          </TouchableOpacity>
+        )}
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -1445,6 +1435,53 @@ const popupStyles = StyleSheet.create({
   },
   itemLabel: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
   itemDesc:  { fontSize: 11.5, color: '#94A3B8', marginTop: 1 },
+});
+
+// ─── Cost Summary entry card styles ───────────────────────────────────────────
+const summaryBtnStyles = StyleSheet.create({
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  iconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#EAF0FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  desc: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  chevronCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    backgroundColor: '#EAF0FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });
 
 export default ProjectSections;
