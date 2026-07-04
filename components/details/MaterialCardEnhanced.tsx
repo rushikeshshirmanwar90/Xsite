@@ -36,6 +36,7 @@ interface GroupedMaterial {
     amountPaid?: number; // Total paid to the vendor across all batches
     paymentTotalCost?: number; // Total purchase cost across all batches
     amountRemaining?: number; // Outstanding amount still owed
+    usageLocations?: { miniSectionId: string; qty: number }[]; // Where this material was used, project-wide
 }
 
 interface MiniSection {
@@ -746,17 +747,24 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
             ? vendorNames[0]
             : `${vendorNames.length} vendors`;
 
-    // Which mini-section (e.g. "Foundation", "First Slab") this used material went to —
-    // the physical location, not the construction work-phase. Batches with no
-    // mini-section recorded are simply omitted rather than lumped into a fake bucket.
-    const sectionTotals: Record<string, number> = {};
-    (material.variants || []).forEach(v => {
-        if (v.miniSectionId) {
-            const sectionName = getMiniSectionName(v.miniSectionId);
-            sectionTotals[sectionName] = (sectionTotals[sectionName] || 0) + (Number(v.quantity) || 0);
-        }
-    });
-    const usedForList = Object.entries(sectionTotals).map(([phaseName, qty]) => ({ phaseName, qty }));
+    // Which mini-section (e.g. "Foundation", "First Slab") this material went to —
+    // the physical location, not the construction work-phase. Prefer the project-wide
+    // usageLocations (works on both tabs, since the available tab's variants are
+    // purchase batches and never carry a miniSectionId); fall back to deriving it from
+    // variants for older data shapes. Batches with no mini-section recorded are simply
+    // omitted rather than lumped into a fake bucket.
+    const usedForList = material.usageLocations && material.usageLocations.length > 0
+        ? material.usageLocations.map(loc => ({ phaseName: getMiniSectionName(loc.miniSectionId), qty: loc.qty }))
+        : (() => {
+            const sectionTotals: Record<string, number> = {};
+            (material.variants || []).forEach(v => {
+                if (v.miniSectionId) {
+                    const sectionName = getMiniSectionName(v.miniSectionId);
+                    sectionTotals[sectionName] = (sectionTotals[sectionName] || 0) + (Number(v.quantity) || 0);
+                }
+            });
+            return Object.entries(sectionTotals).map(([phaseName, qty]) => ({ phaseName, qty }));
+        })();
 
     // Which vendor(s) this available material was purchased from (e.g. "ABC Traders: 40 bags").
     const vendorTotals: Record<string, number> = {};
@@ -1045,10 +1053,11 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 </View>
                             )}
 
-                            {/* Used At — where (which construction phase) this material was used.
-                                Always shown on the used tab; falls back to a note when older
-                                usage records predate phase-tagging. */}
-                            {activeTab === 'used' && (
+                            {/* Used At — where (which mini-section) this material was used.
+                                Always shown on the used tab; also shown on the available tab
+                                when some of this material has already been used, so a partially
+                                consumed batch shows where its used portion went. */}
+                            {(activeTab === 'used' || (activeTab === 'imported' && (material.totalUsed || 0) > 0)) && (
                                 <View style={detailStyles.usedForSection}>
                                     <Text style={detailStyles.usedForTitle}>Used At</Text>
                                     {usedForList.length > 0 ? (

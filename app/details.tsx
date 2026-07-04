@@ -3226,6 +3226,19 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     }
                     group.amountRemaining = Math.max(0, costTotal - paidTotal);
                 }
+
+                // ✅ Where this material was used (by mini-section), sourced from the
+                // project-wide used-materials list rather than group.variants — on the
+                // available/imported tab, variants are purchase batches and never carry
+                // a miniSectionId, so usage location is only recorded on materials.used.
+                const usageTotals: Record<string, number> = {};
+                (materials.used || []).forEach((m: any) => {
+                    const mKey = `${m.name}-${m.unit}-${buildSpecsKey(m.specs)}`;
+                    if (mKey === key && m.miniSectionId) {
+                        usageTotals[m.miniSectionId] = (usageTotals[m.miniSectionId] || 0) + (Number(m.quantity) || 0);
+                    }
+                });
+                group.usageLocations = Object.entries(usageTotals).map(([miniSectionId, qty]) => ({ miniSectionId, qty }));
             });
 
             const result = Object.values(grouped);

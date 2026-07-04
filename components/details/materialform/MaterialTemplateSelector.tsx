@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextStyle, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { MATERIAL_TEMPLATES } from './constants';
 import { sharedStyles } from './styles';
@@ -12,35 +12,61 @@ const MaterialTemplateSelector: React.FC<MaterialTemplateSelectorProps> = ({
   selectedTemplateKey,
   onSelectTemplate,
 }) => {
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  const selectedName = selectedTemplateKey ? MATERIAL_TEMPLATES[selectedTemplateKey]?.name : null;
+
+  const handleSelect = (key: string) => {
+    onSelectTemplate(key);
+    setShowDropdown(false);
+  };
+
   return (
     <View style={styles.templateSection}>
       <Text style={sharedStyles.sectionLabel}>Quick Select Material Type</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.templateContainer}
+
+      <TouchableOpacity
+        style={sharedStyles.selectInput}
+        onPress={() => setShowDropdown((prev) => !prev)}
+        activeOpacity={0.8}
       >
-        {Object.entries(MATERIAL_TEMPLATES).map(([key, template]) => (
-          <TouchableOpacity
-            key={key}
-            style={[
-              styles.templateButton,
-              selectedTemplateKey === key && styles.templateButtonActive,
-            ]}
-            onPress={() => onSelectTemplate(key)}
-            activeOpacity={0.8}
+        <Text style={[sharedStyles.selectInputText, !selectedName && sharedStyles.placeholderText]}>
+          {selectedName || 'Select Material Type'}
+        </Text>
+        <Text style={sharedStyles.dropdownIcon}>{showDropdown ? '▲' : '▼'}</Text>
+      </TouchableOpacity>
+
+      {showDropdown && (
+        <View style={sharedStyles.dropdown}>
+          <ScrollView
+            style={styles.dropdownScrollView}
+            nestedScrollEnabled={true}
+            showsVerticalScrollIndicator={true}
+            keyboardShouldPersistTaps="handled"
           >
-            <Text
-              style={[
-                styles.templateButtonText,
-                selectedTemplateKey === key && styles.templateButtonTextActive,
-              ]}
-            >
-              {template.name}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+            {Object.entries(MATERIAL_TEMPLATES).map(([key, template]) => (
+              <TouchableOpacity
+                key={key}
+                style={[
+                  sharedStyles.dropdownItem,
+                  selectedTemplateKey === key && styles.dropdownItemActive,
+                ]}
+                onPress={() => handleSelect(key)}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    sharedStyles.dropdownItemText,
+                    selectedTemplateKey === key && styles.dropdownItemTextActive,
+                  ]}
+                >
+                  {template.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
     </View>
   );
 };
@@ -53,32 +79,15 @@ const styles = StyleSheet.create<Styles>({
   templateSection: {
     marginBottom: 24,
   },
-  templateContainer: {
-    flexDirection: 'row' as const,
-    paddingVertical: 8,
+  dropdownScrollView: {
+    maxHeight: 200,
   },
-  templateButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginRight: 12,
-    minWidth: 100,
-    alignItems: 'center' as const,
+  dropdownItemActive: {
+    backgroundColor: '#EAF0FE',
   },
-  templateButtonActive: {
-    backgroundColor: '#3A78B5',
-    borderColor: '#3A78B5',
-  },
-  templateButtonText: {
-    fontSize: 14,
-    fontWeight: '600' as const,
+  dropdownItemTextActive: {
     color: '#3A78B5',
-  },
-  templateButtonTextActive: {
-    color: '#fff',
+    fontWeight: '600' as const,
   },
 });
 

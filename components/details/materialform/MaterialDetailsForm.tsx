@@ -221,10 +221,10 @@ const MaterialDetailsForm: React.FC<MaterialDetailsFormProps> = ({
       </View>
 
       <View style={sharedStyles.formGroup}>
-        <Text style={sharedStyles.label}>Contractor Name (Optional)</Text>
+        <Text style={sharedStyles.label}>Purchased From (Optional)</Text>
         <TextInput
           style={sharedStyles.input}
-          placeholder="Enter contractor/vendor name"
+          placeholder="Enter where material was purchased from"
           value={formData.contractor_name || ''}
           onChangeText={(value) => {
             onInputChange('contractor_name', value);
@@ -266,7 +266,7 @@ const MaterialDetailsForm: React.FC<MaterialDetailsFormProps> = ({
         )}
 
         <Text style={{ fontSize: 12, color: '#64748B', marginTop: 4, fontStyle: 'italic' }}>
-          💡 Track which contractor supplied this material
+          💡 Track where this material was purchased from
         </Text>
       </View>
     </View>
