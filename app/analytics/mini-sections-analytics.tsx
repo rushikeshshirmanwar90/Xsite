@@ -1,4 +1,5 @@
 // Level 3: Mini-Sections Analytics
+import AnalyticsDashboardSkeleton from '@/components/common/AnalyticsDashboardSkeleton';
 import PieChart, { PieChartColors20 } from '@/components/PieChart';
 import PieChartLegend, { LegendItem } from '@/components/PieChartLegend';
 import { getSection } from '@/functions/details';
@@ -1072,10 +1073,7 @@ const MiniSectionsAnalytics: React.FC = () => {
         )}
 
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#3A78B5" />
-            <Text style={styles.loadingText}>Loading mini-section expenses...</Text>
-          </View>
+          <AnalyticsDashboardSkeleton />
         ) : (miniSections.length === 0 && equipmentExpenses.length === 0 && buildingLaborExpenses.length === 0 && otherCostExpenses.length === 0) || totalExpense === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="grid-outline" size={64} color="#CBD5E1" />

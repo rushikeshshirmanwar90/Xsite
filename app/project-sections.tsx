@@ -850,11 +850,6 @@ const ProjectSections = () => {
               <Text style={styles.headerProjectName} numberOfLines={1}>{name}</Text>
               <Text style={styles.headerSubtitle}>Project Sections</Text>
             </View>
-
-            {/* Add section */}
-            <TouchableOpacity onPress={() => setShowAddModal(true)} style={styles.reportBtn} activeOpacity={0.8}>
-              <Ionicons name="add" size={22} color="#3A78B5" />
-            </TouchableOpacity>
           </View>
 
           {/* Progress Bar */}

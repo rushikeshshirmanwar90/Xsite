@@ -1,4 +1,5 @@
 // Level 2: Project Sections Analytics
+import AnalyticsDashboardSkeleton from '@/components/common/AnalyticsDashboardSkeleton';
 import PieChart, { PieChartColors20 } from '@/components/PieChart';
 import PieChartLegend, { LegendItem } from '@/components/PieChartLegend';
 import { formatCurrency } from '@/utils/analytics';
@@ -498,10 +499,7 @@ const ProjectSectionsAnalytics: React.FC = () => {
         </View>
 
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#3A78B5" />
-            <Text style={styles.loadingText}>Loading section data...</Text>
-          </View>
+          <AnalyticsDashboardSkeleton />
         ) : sections.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="layers-outline" size={64} color="#CBD5E1" />

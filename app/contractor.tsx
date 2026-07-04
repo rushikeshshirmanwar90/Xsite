@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { ContractorListSkeleton } from '@/components/ContractorCardSkeleton';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -724,9 +725,8 @@ export default function ContractorScreen() {
 
       {/* Main List */}
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#3A78B5" />
-          <Text style={styles.loadingText}>Loading contractors...</Text>
+        <View style={styles.listContent}>
+          <ContractorListSkeleton count={4} />
         </View>
       ) : (
         <FlatList

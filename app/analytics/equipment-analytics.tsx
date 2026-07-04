@@ -1,4 +1,5 @@
 // Equipment Cost Analytics Page
+import AnalyticsDashboardSkeleton from '@/components/common/AnalyticsDashboardSkeleton';
 import PieChart, { PieChartColors20 } from '@/components/PieChart';
 import PieChartLegend, { LegendItem } from '@/components/PieChartLegend';
 import { formatCurrency } from '@/utils/analytics';
@@ -223,10 +224,7 @@ const EquipmentAnalytics: React.FC = () => {
         </View>
 
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#F59E0B" />
-            <Text style={styles.loadingText}>Loading equipment details...</Text>
-          </View>
+          <AnalyticsDashboardSkeleton />
         ) : equipmentDetails.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="construct-outline" size={64} color="#CBD5E1" />

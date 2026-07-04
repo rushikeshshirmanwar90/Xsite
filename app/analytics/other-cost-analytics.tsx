@@ -1,4 +1,5 @@
 // Other Cost Analytics Page
+import AnalyticsDashboardSkeleton from '@/components/common/AnalyticsDashboardSkeleton';
 import PieChart, { PieChartColors20 } from '@/components/PieChart';
 import PieChartLegend, { LegendItem } from '@/components/PieChartLegend';
 import { formatCurrency } from '@/utils/analytics';
@@ -120,10 +121,7 @@ const OtherCostAnalytics: React.FC = () => {
         </View>
 
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#3A78B5" />
-            <Text style={styles.loadingText}>Loading other cost details...</Text>
-          </View>
+          <AnalyticsDashboardSkeleton />
         ) : details.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="receipt-outline" size={64} color="#CBD5E1" />

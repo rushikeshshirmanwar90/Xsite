@@ -1,3 +1,4 @@
+import { IconRowCardListSkeleton } from '@/components/common/IconRowCardSkeleton';
 import Header from '@/components/details/Header';
 import OtherCostCard from '@/components/details/OtherCostCard';
 import OtherCostFormModal from '@/components/details/OtherCostFormModal';
@@ -260,9 +261,8 @@ const OtherCostPage = () => {
         contentContainerStyle={styles.scrollContent}
       >
         {loading ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="sync" size={48} color="#E11D48" />
-            <Text style={styles.emptyTitle}>Loading...</Text>
+          <View style={{ paddingHorizontal: 4, paddingTop: 8 }}>
+            <IconRowCardListSkeleton count={4} />
           </View>
         ) : grouped.length > 0 ? (
           grouped.map((group, groupIdx) => (

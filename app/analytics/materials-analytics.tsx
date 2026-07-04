@@ -1,4 +1,5 @@
 // Level 4: Materials List for Mini-Section
+import { IconRowCardListSkeleton } from '@/components/common/IconRowCardSkeleton';
 import PieChart, { PieChartColors20 } from '@/components/PieChart';
 import PieChartLegend, { LegendItem } from '@/components/PieChartLegend';
 import { getClientId } from '@/functions/clientId';
@@ -404,9 +405,8 @@ const MaterialsAnalytics: React.FC = () => {
         )}
 
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#3A78B5" />
-            <Text style={styles.loadingText}>Loading materials and labor...</Text>
+          <View style={{ paddingHorizontal: 20, paddingTop: 8 }}>
+            <IconRowCardListSkeleton count={4} />
           </View>
         ) : materials.length === 0 && labors.length === 0 ? (
           <View style={styles.emptyContainer}>

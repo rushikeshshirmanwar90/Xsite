@@ -1,3 +1,4 @@
+import { ChartCardSkeleton } from '@/components/common/AnalyticsDashboardSkeleton';
 import PieChart, { PieChartColors20 } from '@/components/PieChart';
 import PieChartLegend, { LegendItem } from '@/components/PieChartLegend';
 import { getClientId } from '@/functions/clientId';
@@ -994,19 +995,8 @@ const AnalyticsDashboard: React.FC = () => {
 
         {/* Content Display */}
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <Animated.View style={{
-              transform: [{
-                rotate: fadeAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ['0deg', '360deg'],
-                })
-              }]
-            }}>
-              <Ionicons name="sync" size={48} color="#3A78B5" />
-            </Animated.View>
-            <Text style={styles.loadingText}>Loading data...</Text>
-            <Text style={[styles.loadingText, { fontSize: 12, marginTop: 4 }]}>Please wait...</Text>
+          <View style={{ paddingTop: 8 }}>
+            <ChartCardSkeleton />
           </View>
         ) : error ? (
           <View style={styles.errorContainer}>

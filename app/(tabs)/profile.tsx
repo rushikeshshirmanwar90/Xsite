@@ -1,4 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
+import { InlineSkeleton } from '@/components/common/InlineSkeleton';
 import { getClientId } from '@/functions/clientId';
 import { getProjectData } from '@/functions/project';
 import { useUser, isStaff } from '@/hooks/useUser';
@@ -830,9 +831,11 @@ const CompanyProfile: React.FC = () => {
                                 <View style={styles.statIconContainer}>
                                     <Ionicons name="folder-open" size={24} color="#3A78B5" />
                                 </View>
-                                <Text style={styles.statValue}>
-                                    {loading ? '...' : stats.totalProjects}
-                                </Text>
+                                {loading ? (
+                                    <InlineSkeleton width={40} height={22} />
+                                ) : (
+                                    <Text style={styles.statValue}>{stats.totalProjects}</Text>
+                                )}
                                 <Text style={styles.statLabel}>Total Projects</Text>
                             </View>
                         )}
@@ -850,9 +853,11 @@ const CompanyProfile: React.FC = () => {
                                 <View style={styles.statIconContainer}>
                                     <Ionicons name="cash" size={24} color="#EF4444" />
                                 </View>
-                                <Text style={styles.statValue}>
-                                    {loading ? '...' : formatCurrency(stats.totalSpent)}
-                                </Text>
+                                {loading ? (
+                                    <InlineSkeleton width={70} height={22} />
+                                ) : (
+                                    <Text style={styles.statValue}>{formatCurrency(stats.totalSpent)}</Text>
+                                )}
                                 <Text style={styles.statLabel}>Total Spent</Text>
                                 <View style={styles.cardClickIndicator}>
                                     <Ionicons name="chevron-forward" size={16} color="#EF4444" />
@@ -870,12 +875,11 @@ const CompanyProfile: React.FC = () => {
                         <View style={[styles.infoCard, styles.licenseCard]}>
                             {loadingClient ? (
                                 <View style={styles.infoRow}>
-                                    <View style={styles.infoIconContainer}>
-                                        <Ionicons name="hourglass-outline" size={20} color="#64748B" />
-                                    </View>
+                                    <InlineSkeleton width={40} height={40} radius={10} />
                                     <View style={styles.infoContent}>
-                                        <Text style={styles.infoLabel}>Loading</Text>
-                                        <Text style={styles.infoValue}>Checking license status...</Text>
+                                        <InlineSkeleton width={80} height={11} />
+                                        <View style={{ height: 6 }} />
+                                        <InlineSkeleton width={140} height={14} />
                                     </View>
                                 </View>
                             ) : (
@@ -1348,9 +1352,11 @@ const CompanyProfile: React.FC = () => {
                             </View>
                             <View style={styles.infoContent}>
                                 <Text style={styles.infoLabel}>Email</Text>
-                                <Text style={styles.infoValue}>
-                                    {loading ? 'Loading...' : (userData.email || 'Not provided')}
-                                </Text>
+                                {loading ? (
+                                    <InlineSkeleton width={160} height={15} />
+                                ) : (
+                                    <Text style={styles.infoValue}>{userData.email || 'Not provided'}</Text>
+                                )}
                             </View>
                         </View>
 

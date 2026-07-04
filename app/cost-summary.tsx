@@ -1,4 +1,5 @@
 import ContractorReportGenerator from '@/app/components/contractor/ContractorReportGenerator';
+import CostSummarySkeleton from '@/components/CostSummarySkeleton';
 import { getClientId } from '@/functions/clientId';
 import apiClient from '@/utils/axiosConfig';
 import { PDFReportGenerator } from '@/utils/pdfReportGenerator';
@@ -393,9 +394,8 @@ const CostSummary = () => {
       </View>
 
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={THEME_COLOR} />
-          <Text style={styles.loadingText}>Calculating project costs...</Text>
+        <View style={styles.scrollContent}>
+          <CostSummarySkeleton />
         </View>
       ) : (
         <ScrollView

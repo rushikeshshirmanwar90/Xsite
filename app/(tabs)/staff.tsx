@@ -1,7 +1,7 @@
-import Loading from '@/components/Loading';
 import AddStaffModalWithVerification from '@/components/staff/AddStaffModalWithVerification';
 import StaffHeader from '@/components/staff/StaffHeader';
 import StaffCard from '@/components/staff/StaffCard';
+import { StaffListSkeleton } from '@/components/staff/StaffCardSkeleton';
 import StaffEmptyState from '@/components/staff/StaffEmptyState';
 import AdminCard from '@/components/staff/AdminCard';
 import StaffQRScannerModal from '@/components/staff/StaffQRScannerModal';
@@ -917,7 +917,9 @@ const StaffManagement: React.FC = () => {
             />
 
             {loading ? (
-                <Loading />
+                <View style={{ paddingHorizontal: 20, paddingTop: 8 }}>
+                    <StaffListSkeleton count={6} />
+                </View>
             ) : (
                 <FlatList
                     data={listData}

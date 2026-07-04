@@ -1,3 +1,4 @@
+import { ActivityListSkeleton } from '@/components/notification/ActivityCardSkeleton';
 import { getClientId } from '@/functions/clientId';
 import { domain } from '@/lib/domain';
 import { Ionicons } from '@expo/vector-icons';
@@ -2156,26 +2157,9 @@ const NotificationPage: React.FC = () => {
                 }
             >
                 {loading ? (
-                    <>
-                        {console.log('🔄 Rendering: LOADING STATE')}
-                        <View style={styles.loadingContainer}>
-                            <View style={styles.loadingHeader}>
-                                <ActivityIndicator size="large" color="#3A78B5" />
-                                <Text style={styles.loadingText}>Loading activities...</Text>
-                            </View>
-                            {/* Loading Skeleton */}
-                            {[1, 2, 3].map((item) => (
-                                <View key={item} style={styles.skeletonCard}>
-                                    <View style={styles.skeletonIcon} />
-                                    <View style={styles.skeletonContent}>
-                                        <View style={styles.skeletonLine} />
-                                        <View style={styles.skeletonLineSmall} />
-                                        <View style={styles.skeletonLineTiny} />
-                                    </View>
-                                </View>
-                            ))}
-                        </View>
-                    </>
+                    <View style={styles.loadingContainer}>
+                        <ActivityListSkeleton count={4} />
+                    </View>
                 ) : error ? (
                     <>
                         {console.log('❌ Rendering: ERROR STATE -', error)}

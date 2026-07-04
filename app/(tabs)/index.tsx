@@ -1,4 +1,5 @@
 import ProjectCard from '@/components/ProjectCard';
+import { ProjectListSkeleton } from '@/components/ProjectCardSkeleton';
 import FloatingStatsButton from '@/components/FloatingStatsButton';
 import { getClientId } from '@/functions/clientId';
 import { getProjectData } from '@/functions/project';
@@ -789,12 +790,8 @@ const Index: React.FC = () => {
                 }
             >
                 {loading ? (
-                    <View style={styles.centerContainer}>
-                        <View style={homeStyles.stateIconBadge}>
-                            <Ionicons name="sync" size={40} color="#3A78B5" />
-                        </View>
-                        <Text style={styles.loadingText}>Loading projects...</Text>
-                        <Text style={[styles.loadingText, { fontSize: 12, marginTop: 4, color: '#94A3B8' }]}>Please wait...</Text>
+                    <View style={{ marginBottom: 24 }}>
+                        <ProjectListSkeleton count={3} />
                     </View>
                 ) : error ? (
                     <View style={styles.centerContainer}>

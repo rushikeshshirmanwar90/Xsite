@@ -1,3 +1,4 @@
+import { TimelineActivityListSkeleton } from '@/components/TimelineActivitySkeleton';
 import { getClientId } from '@/functions/clientId';
 import { domain } from '@/lib/domain';
 import { Ionicons } from '@expo/vector-icons';
@@ -5,7 +6,6 @@ import apiClient from '@/utils/axiosConfig';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
     RefreshControl,
     ScrollView,
     StatusBar,
@@ -298,10 +298,7 @@ const MyActivitiesScreen: React.FC = () => {
                 }
             >
                 {loading ? (
-                    <View style={styles.centerContainer}>
-                        <ActivityIndicator size="large" color="#3A78B5" />
-                        <Text style={styles.loadingText}>Loading your activities...</Text>
-                    </View>
+                    <TimelineActivityListSkeleton count={5} />
                 ) : error ? (
                     <View style={styles.centerContainer}>
                         <Ionicons name="alert-circle" size={48} color="#EF4444" />

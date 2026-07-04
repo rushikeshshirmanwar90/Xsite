@@ -1,5 +1,6 @@
 import Header from '@/components/details/Header';
 import MaterialCardEnhanced from '@/components/details/MaterialCardEnhanced';
+import { MaterialListSkeleton } from '@/components/details/MaterialCardSkeleton';
 import MaterialFormModal from '@/components/details/MaterialFormModel';
 import MaterialUsageForm from '@/components/details/MaterialUsageForm';
 import SectionManager from '@/components/details/SectionManager';
@@ -5226,22 +5227,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         </View>
                     ) : null}
                     {materials.loading ? (
-                        <View style={styles.noMaterialsContainer}>
-                            <Animated.View style={{
-                                transform: [{
-                                    rotate: cardAnimations[0]?.interpolate({
-                                        inputRange: [0, 1],
-                                        outputRange: ['0deg', '360deg'],
-                                    }) || '0deg'
-                                }]
-                            }}>
-                                <Ionicons name="sync" size={48} color="#3A78B5" />
-                            </Animated.View>
-                            <Text style={styles.noMaterialsTitle}>Loading Materials...</Text>
-                            <Text style={styles.noMaterialsDescription}>
-                                Please wait while we fetch your data...
-                            </Text>
-                        </View>
+                        <MaterialListSkeleton count={4} />
                     ) : activeTab === 'used' ? (
                         // Used Materials tab - display API data directly
                         (() => {

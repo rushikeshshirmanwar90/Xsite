@@ -1,4 +1,5 @@
 import AddProjectModal from '@/components/AddProjectModel';
+import { ManageSitesListSkeleton } from '@/components/ManageSitesRowSkeleton';
 import { getClientId } from '@/functions/clientId';
 import { isAdmin, useUser } from '@/hooks/useUser';
 import { useSimpleNotifications } from '@/hooks/useSimpleNotifications';
@@ -1149,13 +1150,7 @@ const ProjectScreen: React.FC = () => {
                 }
             >
                 {loading ? (
-                    <View style={styles.centered}>
-                        <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                            <Ionicons name="sync" size={48} color="#3A78B5" />
-                        </View>
-                        <Text style={styles.loadingText}>Loading projects...</Text>
-                        <Text style={[styles.loadingText, { fontSize: 12, marginTop: 4, color: '#94A3B8' }]}>Please wait...</Text>
-                    </View>
+                    <ManageSitesListSkeleton count={5} />
                 ) : projects.length === 0 ? (
                     <View style={styles.centered}>
                         <Ionicons name="folder-open-outline" size={64} color="#CBD5E1" />

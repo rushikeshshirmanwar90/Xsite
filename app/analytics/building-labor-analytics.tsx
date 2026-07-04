@@ -1,4 +1,5 @@
 // Building-Level Labor Analytics Page
+import AnalyticsDashboardSkeleton from '@/components/common/AnalyticsDashboardSkeleton';
 import PieChart, { PieChartColors20 } from '@/components/PieChart';
 import PieChartLegend, { LegendItem } from '@/components/PieChartLegend';
 import { formatCurrency } from '@/utils/analytics';
@@ -178,10 +179,7 @@ const BuildingLaborAnalytics: React.FC = () => {
         </View>
 
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#10B981" />
-            <Text style={styles.loadingText}>Loading labor details...</Text>
-          </View>
+          <AnalyticsDashboardSkeleton />
         ) : laborDetails.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="people-outline" size={64} color="#CBD5E1" />

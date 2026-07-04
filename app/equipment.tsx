@@ -1,5 +1,6 @@
+import { EquipmentListSkeleton } from '@/components/EquipmentCardSkeleton';
 import React, { useEffect, useState, useRef } from 'react';
-import { 
+import {
     View, 
     Text, 
     ScrollView, 
@@ -697,22 +698,7 @@ const EquipmentManagement = () => {
             >
                 {/* Equipment Entries Display */}
                 {loading ? (
-                    <View style={styles.noMaterialsContainer}>
-                        <Animated.View style={{
-                            transform: [{
-                                rotate: cardAnimations[0]?.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: ['0deg', '360deg'],
-                                }) || '0deg'
-                            }]
-                        }}>
-                            <Ionicons name="sync" size={48} color="#F59E0B" />
-                        </Animated.View>
-                        <Text style={styles.noMaterialsTitle}>Loading Equipment...</Text>
-                        <Text style={styles.noMaterialsDescription}>
-                            Please wait while we fetch your data...
-                        </Text>
-                    </View>
+                    <EquipmentListSkeleton count={4} />
                 ) : equipment.length > 0 ? (
                     // Display equipment entries grouped by date
                     (() => {
