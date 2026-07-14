@@ -81,8 +81,10 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   const [purposeMessage, setPurposeMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAddForm, setShowAddForm] = useState(true);
-  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('unpaid');
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus | undefined>(undefined);
   const [amountPaid, setAmountPaid] = useState('');
+  // ISO date string (YYYY-MM-DD) from the billing date modal; '' = not entered
+  const [billingDate, setBillingDate] = useState('');
   
   // Loading animation states
   const [isAddingMaterials, setIsAddingMaterials] = useState(false);
@@ -541,8 +543,10 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
         perUnitCost: material.perUnitCost || 0,
         mergeIfExists: true,
         contractor_name: material.contractor_name || '',
+        // No payment recorded → leave both fields undefined so the card shows no tag
         paymentStatus,
-        amountPaid: matAmountPaid,
+        amountPaid: paymentStatus !== undefined ? matAmountPaid : undefined,
+        billingDate: billingDate || undefined,
       };
     });
 
@@ -716,8 +720,9 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       setPurposeMessage('');
       purposeMessageRef.current = '';
       setShowAddForm(true);
-      setPaymentStatus('unpaid');
+      setPaymentStatus(undefined);
       setAmountPaid('');
+      setBillingDate('');
       resetForm();
       setCurrentStep(0);
       slideAnim.setValue(0);
@@ -749,8 +754,9 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               setPurposeMessage('');
               purposeMessageRef.current = '';
               setShowAddForm(true);
-              setPaymentStatus('unpaid');
+              setPaymentStatus(undefined);
               setAmountPaid('');
+              setBillingDate('');
               resetForm();
               setCurrentStep(0);
               slideAnim.setValue(0);
@@ -772,8 +778,9 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       setPurposeMessage('');
       purposeMessageRef.current = '';
       setShowAddForm(true);
-      setPaymentStatus('unpaid');
+      setPaymentStatus(undefined);
       setAmountPaid('');
+      setBillingDate('');
       resetForm();
       setCurrentStep(0);
       slideAnim.setValue(0);
@@ -899,9 +906,11 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               <PaymentStep
                 paymentStatus={paymentStatus}
                 amountPaid={amountPaid}
+                billingDate={billingDate}
                 totalCost={addedMaterials.reduce((sum, m) => sum + m.perUnitCost * m.quantity, 0)}
                 onPaymentStatusChange={setPaymentStatus}
                 onAmountPaidChange={setAmountPaid}
+                onBillingDateChange={setBillingDate}
                 onBack={handlePreviousStep}
                 onClose={handleClose}
               />

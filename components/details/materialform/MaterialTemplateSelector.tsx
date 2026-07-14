@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import React from 'react';
 import { ScrollView, StyleSheet, Text, TextStyle, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { MATERIAL_TEMPLATES } from './constants';
 import { sharedStyles } from './styles';
@@ -12,61 +13,37 @@ const MaterialTemplateSelector: React.FC<MaterialTemplateSelectorProps> = ({
   selectedTemplateKey,
   onSelectTemplate,
 }) => {
-  const [showDropdown, setShowDropdown] = useState(false);
-
-  const selectedName = selectedTemplateKey ? MATERIAL_TEMPLATES[selectedTemplateKey]?.name : null;
-
-  const handleSelect = (key: string) => {
-    onSelectTemplate(key);
-    setShowDropdown(false);
-  };
-
   return (
     <View style={styles.templateSection}>
-      <Text style={sharedStyles.sectionLabel}>Quick Select Material Type</Text>
+      <Text style={sharedStyles.sectionLabel}>Quick Select the Material</Text>
 
-      <TouchableOpacity
-        style={sharedStyles.selectInput}
-        onPress={() => setShowDropdown((prev) => !prev)}
-        activeOpacity={0.8}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={true}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.chipsRow}
       >
-        <Text style={[sharedStyles.selectInputText, !selectedName && sharedStyles.placeholderText]}>
-          {selectedName || 'Select Material Type'}
-        </Text>
-        <Text style={sharedStyles.dropdownIcon}>{showDropdown ? '▲' : '▼'}</Text>
-      </TouchableOpacity>
-
-      {showDropdown && (
-        <View style={sharedStyles.dropdown}>
-          <ScrollView
-            style={styles.dropdownScrollView}
-            nestedScrollEnabled={true}
-            showsVerticalScrollIndicator={true}
-            keyboardShouldPersistTaps="handled"
-          >
-            {Object.entries(MATERIAL_TEMPLATES).map(([key, template]) => (
-              <TouchableOpacity
-                key={key}
-                style={[
-                  sharedStyles.dropdownItem,
-                  selectedTemplateKey === key && styles.dropdownItemActive,
-                ]}
-                onPress={() => handleSelect(key)}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={[
-                    sharedStyles.dropdownItemText,
-                    selectedTemplateKey === key && styles.dropdownItemTextActive,
-                  ]}
-                >
-                  {template.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
+        {Object.entries(MATERIAL_TEMPLATES).map(([key, template]) => {
+          const selected = selectedTemplateKey === key;
+          return (
+            <TouchableOpacity
+              key={key}
+              style={[styles.chip, selected && styles.chipActive]}
+              onPress={() => onSelectTemplate(key)}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={template.icon as React.ComponentProps<typeof Ionicons>['name']}
+                size={16}
+                color={selected ? '#fff' : '#3A78B5'}
+              />
+              <Text style={[styles.chipText, selected && styles.chipTextActive]}>
+                {template.name}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 };
@@ -79,15 +56,34 @@ const styles = StyleSheet.create<Styles>({
   templateSection: {
     marginBottom: 24,
   },
-  dropdownScrollView: {
-    maxHeight: 200,
+  chipsRow: {
+    flexDirection: 'row' as const,
+    gap: 8,
+    paddingVertical: 4,
+    paddingBottom: 10,
   },
-  dropdownItemActive: {
-    backgroundColor: '#EAF0FE',
+  chip: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
   },
-  dropdownItemTextActive: {
-    color: '#3A78B5',
+  chipActive: {
+    backgroundColor: '#3A78B5',
+    borderColor: '#3A78B5',
+  },
+  chipText: {
+    fontSize: 13,
     fontWeight: '600' as const,
+    color: '#374151',
+  },
+  chipTextActive: {
+    color: '#fff',
   },
 });
 

@@ -41,3 +41,7 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Firebase service account key (secret - already uploaded to EAS)
+xsite-7be93-firebase-adminsdk-fbsvc-*.json
+*-firebase-adminsdk-*.json

@@ -12,27 +12,32 @@ import Svg, {
     Text as SvgText
 } from 'react-native-svg';
 
+// Vivid categorical palette. `primary` is the slice fill (also used by legends),
+// `secondary` is a darker shade of the same hue for the slice gradients.
+// Hue order is fixed and colorblind-checked pairwise — don't reorder or insert;
+// append only. Every primary keeps >= 3:1 contrast on white so the bold white
+// value labels stay readable.
 export const PieChartColors20 = [
-    { primary: '#E2E8F0', secondary: '#3498DB' }, // blue
-    { primary: '#E2E8F0', secondary: '#E74C3C' }, // red
-    { primary: '#F59E0B', secondary: '#F1C40F' }, // yellow
-    { primary: '#58D68D', secondary: '#28B463' }, // green
-    { primary: '#AF7AC5', secondary: '#8E44AD' }, // purple
-    { primary: '#48C9B0', secondary: '#16A085' }, // teal
-    { primary: '#F5B041', secondary: '#DC7633' }, // orange
-    { primary: '#AAB7B8', secondary: '#566573' }, // gray
-    { primary: '#F1948A', secondary: '#C0392B' }, // pink-red
-    { primary: '#BB8FCE', secondary: '#6C3483' }, // lavender
-    { primary: '#73C6B6', secondary: '#117864' }, // aqua
-    { primary: '#F7DC6F', secondary: '#B7950B' }, // gold
-    { primary: '#85929E', secondary: '#34495E' }, // blue-gray
-    { primary: '#E59866', secondary: '#CA6F1E' }, // brown-orange
-    { primary: '#D7BDE2', secondary: '#512E5F' }, // light purple
-    { primary: '#A3E4D7', secondary: '#148F77' }, // light teal
-    { primary: '#FAD7A0', secondary: '#B9770E' }, // light gold
-    { primary: '#F9E79F', secondary: '#7D6608' }, // pale yellow
-    { primary: '#D5F5E3', secondary: '#196F3D' }, // mint
-    { primary: '#FDEBD0', secondary: '#7E5109' }, // cream
+    { primary: '#3B82F6', secondary: '#1D4ED8' }, // blue
+    { primary: '#EA580C', secondary: '#9A3412' }, // orange
+    { primary: '#059669', secondary: '#065F46' }, // emerald
+    { primary: '#EF4444', secondary: '#B91C1C' }, // red
+    { primary: '#8B5CF6', secondary: '#6D28D9' }, // violet
+    { primary: '#0D9488', secondary: '#115E59' }, // teal
+    { primary: '#D97706', secondary: '#92400E' }, // amber
+    { primary: '#EC4899', secondary: '#BE185D' }, // pink
+    { primary: '#65A30D', secondary: '#3F6212' }, // lime
+    { primary: '#6366F1', secondary: '#4338CA' }, // indigo
+    { primary: '#0891B2', secondary: '#155E75' }, // cyan
+    { primary: '#C2410C', secondary: '#7C2D12' }, // burnt orange
+    { primary: '#C026D3', secondary: '#86198F' }, // fuchsia
+    { primary: '#15803D', secondary: '#14532D' }, // green
+    { primary: '#E11D48', secondary: '#9F1239' }, // rose
+    { primary: '#4F46E5', secondary: '#3730A3' }, // deep indigo
+    { primary: '#A16207', secondary: '#713F12' }, // gold
+    { primary: '#0369A1', secondary: '#0C4A6E' }, // sky
+    { primary: '#9333EA', secondary: '#6B21A8' }, // purple
+    { primary: '#B91C1C', secondary: '#7F1D1D' }, // dark red
 ];
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);

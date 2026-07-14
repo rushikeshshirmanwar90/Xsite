@@ -6,7 +6,7 @@ export const MATERIAL_TEMPLATES: Record<string, MaterialTemplate> = {
   cement: {
     name: 'Cement',
     unit: 'bags',
-    icon: 'business',
+    icon: 'file-tray-stacked',
     specFields: ['brand', 'grade', 'weight']
   },
 
@@ -38,7 +38,7 @@ export const MATERIAL_TEMPLATES: Record<string, MaterialTemplate> = {
   aggregate: {
     name: 'Aggregate (Stone)',
     unit: 'cubic feet',
-    icon: 'diamond',
+    icon: 'prism',
     specFields: ['size', 'type']
   },
 

@@ -42,7 +42,10 @@ export class SimpleNotificationService {
   // ✅ ENHANCED: Configuration options
   private config = {
     enableBackendNotifications: true, // Set to false to disable backend calls entirely
-    enableLocalFallback: true,
+    // ⚠️ Local fallback only notifies the SENDER's own device, so it makes failed
+    // remote sends look like successes while other admins receive nothing.
+    // Keep disabled; enable temporarily only when debugging local notifications.
+    enableLocalFallback: false,
     networkCheckTimeout: 3000,
     apiTimeout: 10000,
   };
@@ -331,7 +334,9 @@ export class SimpleNotificationService {
       console.log('📤 Starting notification send process...');
       console.log('📤 Activity data:', activityData);
 
-      // 1. Check if we have a valid token
+      // 1. Try to refresh our own token, but never block the send on it —
+      // recipients are notified via THEIR tokens through the backend, so the
+      // sender's device not having a token must not prevent the remote send.
       if (!this.currentToken) {
         console.log('⚠️ No push token available, attempting to get one...');
         const token = await this.getPushToken();
@@ -339,14 +344,7 @@ export class SimpleNotificationService {
           this.currentToken = token;
           console.log('✅ Got new push token');
         } else {
-          console.error('❌ Failed to get push token');
-          // Fallback to local notification
-          await this.scheduleLocalNotification(
-            this.getNotificationTitle(activityData.activityType, activityData.staffName),
-            activityData.details,
-            { projectId: activityData.projectId, route: 'notifications' }
-          );
-          return true; // Return true since we sent local notification
+          console.warn('⚠️ Could not get own push token — continuing with backend send anyway');
         }
       }
 
@@ -384,7 +382,16 @@ export class SimpleNotificationService {
         // Continue with empty recipients array - backend will handle fallback
       }
 
-      // 5. Filter out performer (self-notification prevention)
+      // 5. Only admins of this client receive activity notifications.
+      // (The backend re-resolves admins from the DB anyway; this keeps the
+      // payload honest and the logs accurate.)
+      const beforeAdminFilter = recipients.length;
+      recipients = recipients.filter((r: any) => r.userType === 'admin');
+      if (beforeAdminFilter !== recipients.length) {
+        console.log(`🔒 Filtered out ${beforeAdminFilter - recipients.length} non-admin recipients`);
+      }
+
+      // Filter out performer (self-notification prevention)
       const performerId = activityData.performerId || activityData.staffId;
       if (performerId && recipients.length > 0) {
         const originalCount = recipients.length;
@@ -533,40 +540,41 @@ export class SimpleNotificationService {
         });
       }
       
-      // 9. Enhanced fallback: Always send local notification on error
-      try {
-        console.log('🔄 Sending local notification fallback...');
-        
-        const fallbackTitle = this.getNotificationTitle(activityData.activityType, activityData.staffName);
-        const fallbackMessage = activityData.details;
-        
-        await this.scheduleLocalNotification(
-          fallbackTitle,
-          fallbackMessage,
-          {
-            projectId: activityData.projectId,
-            activityType: activityData.activityType,
-            route: 'notifications',
-            screen: 'notifications',
-            source: 'local_fallback',
-            originalError: errorCategory
-          }
-        );
-        
-        console.log('✅ Local notification sent successfully as fallback');
-        return true; // Return true since we sent local notification
-        
-      } catch (localError: any) {
-        console.error('❌ Even local notification failed:', localError);
-        
-        // ✅ ENHANCED: Show user-friendly error only for critical failures
-        if (shouldShowUserError) {
-          // Could show a toast or alert here if needed
-          console.error('💥 Critical notification failure - user should be informed');
+      // 9. Local fallback is disabled by default: it only fires on the sender's
+      // own device, which hides real delivery failures. When disabled, report
+      // the failure honestly so it shows up during testing.
+      if (this.config.enableLocalFallback) {
+        try {
+          console.log('🔄 Sending local notification fallback (debug mode)...');
+
+          const fallbackTitle = this.getNotificationTitle(activityData.activityType, activityData.staffName);
+          const fallbackMessage = activityData.details;
+
+          await this.scheduleLocalNotification(
+            fallbackTitle,
+            fallbackMessage,
+            {
+              projectId: activityData.projectId,
+              activityType: activityData.activityType,
+              route: 'notifications',
+              screen: 'notifications',
+              source: 'local_fallback',
+              originalError: errorCategory
+            }
+          );
+
+          console.log('⚠️ Local fallback notification shown on sender device — remote send still FAILED');
+        } catch (localError: any) {
+          console.error('❌ Even local notification failed:', localError);
         }
-        
-        return false;
       }
+
+      if (shouldShowUserError) {
+        // Could show a toast or alert here if needed
+        console.error('💥 Critical notification failure - user should be informed');
+      }
+
+      return false;
     }
   }
 

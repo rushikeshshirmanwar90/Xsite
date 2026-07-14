@@ -270,7 +270,7 @@ const OtherCostPage = () => {
               {/* Date header */}
               <View style={styles.dateHeader}>
                 <View style={styles.dateHeaderLeft}>
-                  <Ionicons name="receipt-outline" size={14} color="#E11D48" />
+                  <Ionicons name="receipt-outline" size={14} color="#3A78B5" />
                   <Text style={styles.dateHeaderCount}>
                     {group.entries.length} {group.entries.length === 1 ? 'Entry' : 'Entries'}
                   </Text>
@@ -301,7 +301,7 @@ const OtherCostPage = () => {
           ))
         ) : (
           <View style={styles.emptyContainer}>
-            <Ionicons name="receipt-outline" size={64} color="#FECDD3" />
+            <Ionicons name="receipt-outline" size={64} color="#CBD5E1" />
             <Text style={styles.emptyTitle}>No Other Costs Yet</Text>
             <Text style={styles.emptyDesc}>
               Tap the + button to record transportation, utilities, safety, or any miscellaneous
@@ -321,7 +321,7 @@ const OtherCostPage = () => {
                 marginBottom: 14,
               }}
             >
-              <Ionicons name="receipt" size={44} color="#E11D48" />
+              <Ionicons name="receipt" size={44} color="#3A78B5" />
             </Animated.View>
             <Text style={styles.loadingTitle}>Adding Costs...</Text>
           </View>

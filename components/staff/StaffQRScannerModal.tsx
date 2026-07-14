@@ -113,33 +113,9 @@ const StaffQRScannerModal: React.FC<StaffQRScannerModalProps> = ({
   const handlePickImage = async () => {
     try {
       console.log('📱 Starting image picker...');
-      
-      // Request media library permissions
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permission Required',
-          'Please grant media library permission to upload QR code images.',
-          [
-            {
-              text: 'Cancel',
-              style: 'cancel',
-            },
-            {
-              text: 'Open Settings',
-              onPress: () => {
-                // On some platforms, you might want to open app settings
-                Alert.alert('Info', 'Please enable photo library access in your device settings.');
-              },
-            },
-          ]
-        );
-        return;
-      }
 
-      console.log('✅ Media library permission granted');
-
+      // The system Photo Picker (Android 11+ / iOS PHPicker) needs no
+      // media permissions — the OS grants access to only the picked image.
       // Launch image picker with optimized settings
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],

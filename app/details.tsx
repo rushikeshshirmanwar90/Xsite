@@ -768,6 +768,10 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     const getUserData = async () => {
         try {
             const userDetailsString = await AsyncStorage.getItem("user");
+            // userType also lives in its own key (set at login) — used as a
+            // fallback so admin actions are correctly excluded from their own
+            // push notifications even if the stored user object lacks it.
+            const storedUserType = await AsyncStorage.getItem("userType");
             if (userDetailsString) {
                 const userData = safeJsonParse(userDetailsString, {}) as any;
 
@@ -788,7 +792,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 return {
                     userId: userData._id || userData.id || userData.clientId || 'unknown',
                     fullName: fullName,
-                    userType: userData.userType || 'staff', // Include userType, default to 'staff'
+                    userType: userData.userType || storedUserType || 'staff', // Include userType, default to 'staff'
                 };
             }
         } catch (error) {
@@ -3105,10 +3109,12 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         miniSectionId: material.miniSectionId,
                         contractor_name: (material as any).contractor_name || undefined, // ✅ vendor pre-fill
                         // ✅ Payment aggregation across all batches (variants) in this group.
-                        // Batches with no recorded payment default to "unpaid" (0 paid) rather
-                        // than being excluded from the total, so every card shows a status.
+                        // Only batches that actually recorded a payment status/amount count
+                        // as "payment data" — groups where nothing was ever recorded keep
+                        // paymentStatus undefined so the card shows no payment tag.
                         amountPaid: 0,
                         paymentTotalCost: 0,
+                        hasPaymentRecord: false,
                     };
                 } else {
                     // ✅ CRITICAL FIX: Update to most recent date when grouping
@@ -3143,6 +3149,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 // Batches with no recorded amountPaid contribute 0, so they read as unpaid.
                 grouped[key].amountPaid += Number((material as any).amountPaid) || 0;
                 grouped[key].paymentTotalCost += Number(material.totalCost) || 0;
+                if ((material as any).paymentStatus !== undefined || (material as any).amountPaid !== undefined) {
+                    grouped[key].hasPaymentRecord = true;
+                }
 
                 // Debug logging for grouping
                 if (__DEV__) {
@@ -3214,8 +3223,8 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
                 // ✅ Derive the group's overall vendor payment status from the aggregated
                 // amountPaid vs the batches' total purchase cost. Materials with no payment
-                // ever recorded default to "unpaid" with the full cost shown as due.
-                {
+                // ever recorded stay undefined so the card renders no payment tag.
+                if (group.hasPaymentRecord) {
                     const paidTotal = Number(group.amountPaid) || 0;
                     const costTotal = Number(group.paymentTotalCost) || 0;
                     if (costTotal > 0 && paidTotal >= costTotal - 0.01) {
@@ -3226,6 +3235,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         group.paymentStatus = 'unpaid';
                     }
                     group.amountRemaining = Math.max(0, costTotal - paidTotal);
+                } else {
+                    group.paymentStatus = undefined;
+                    group.amountRemaining = 0;
                 }
 
                 // ✅ Where this material was used (by mini-section), sourced from the
@@ -4210,12 +4222,13 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     };
 
     // Material Available — sort by name and/or filter down to a single vendor
-    // payment status. A material with no recorded payment reads as "unpaid".
+    // payment status. Materials with no recorded payment have no status and only
+    // appear under "all".
     const getAvailableFilteredSorted = () => {
         let list = getGroupedMaterialsWithCompleteData(materials?.available || [], false);
 
         if (availablePaymentFilter !== 'all') {
-            list = list.filter((m: any) => (m.paymentStatus || 'unpaid') === availablePaymentFilter);
+            list = list.filter((m: any) => m.paymentStatus === availablePaymentFilter);
         }
 
         if (availableSortOrder === 'name-asc') {
@@ -4361,9 +4374,14 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             perUnitCost: material.perUnitCost, // ✅ FIXED: Use perUnitCost instead of cost
             mergeIfExists: material.mergeIfExists !== undefined ? material.mergeIfExists : true,
             contractor_name: material.contractor_name || '', // ✅ NEW: Include contractor_name
-            // ✅ NEW: Carry payment status/amount from the PaymentStep through to the API
-            paymentStatus: material.paymentStatus || 'unpaid',
-            amountPaid: Number(material.amountPaid) || 0,
+            // ✅ Carry payment status/amount from the PaymentStep through to the API.
+            // Stays undefined when no payment was recorded so the card shows no tag.
+            paymentStatus: material.paymentStatus || undefined,
+            amountPaid: material.amountPaid !== undefined && material.amountPaid !== null && material.amountPaid !== ''
+                ? Number(material.amountPaid) || 0
+                : undefined,
+            // Vendor bill date from the payment step (ISO YYYY-MM-DD); optional
+            billingDate: material.billingDate || undefined,
         }));
 
 

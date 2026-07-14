@@ -833,19 +833,21 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
 
                         {/* Compact stat list */}
                         <View style={styles.statsListSection}>
-                            <View style={styles.statsListRow}>
+                            <View style={styles.statsListColumn}>
                                 <Text style={styles.statsListLabel}>Total Purchase</Text>
                                 <Text style={styles.statsListValue}>
                                     {material.totalImported || material.totalQuantity || 0} {material.unit}
                                 </Text>
                             </View>
-                            <View style={styles.statsListRow}>
+                            <View style={styles.statsListDivider} />
+                            <View style={styles.statsListColumn}>
                                 <Text style={styles.statsListLabel}>Total Used</Text>
                                 <Text style={styles.statsListValue}>
                                     {material.totalUsed !== undefined && material.totalUsed !== null ? material.totalUsed : 0} {material.unit}
                                 </Text>
                             </View>
-                            <View style={styles.statsListRow}>
+                            <View style={styles.statsListDivider} />
+                            <View style={styles.statsListColumn}>
                                 <Text style={styles.statsListLabel}>Remaining Material</Text>
                                 <View style={styles.statValueWithIcon}>
                                     {isLowStock && (
@@ -2054,25 +2056,34 @@ const styles = StyleSheet.create({
     statsListSection: {
         backgroundColor: '#F9FAFB',
         borderRadius: 10,
-        paddingVertical: 8,
-        paddingHorizontal: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 8,
         marginBottom: 10,
-        gap: 6,
-    },
-    statsListRow: {
         flexDirection: 'row',
+        alignItems: 'stretch',
+    },
+    statsListColumn: {
+        flex: 1,
         alignItems: 'center',
         justifyContent: 'space-between',
+        paddingHorizontal: 4,
+    },
+    statsListDivider: {
+        width: 1,
+        backgroundColor: '#E5E7EB',
     },
     statsListLabel: {
-        fontSize: 12.5,
+        fontSize: 11,
         color: '#6B7280',
         fontWeight: '500',
+        textAlign: 'center',
+        marginBottom: 4,
     },
     statsListValue: {
         fontSize: 13.5,
         fontWeight: '700',
         color: '#1F2937',
+        textAlign: 'center',
     },
     costSection: {
         backgroundColor: '#F8FAFC',

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "725484354423",
+    "project_id": "xsite-7be93",
+    "storage_bucket": "xsite-7be93.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:725484354423:android:5492d12e72f6b93119bf72",
+        "android_client_info": {
+          "package_name": "com.codewithrushi.xsite"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBk1nBvho1q-3kDFaCrVzJLQTdMcheibuc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

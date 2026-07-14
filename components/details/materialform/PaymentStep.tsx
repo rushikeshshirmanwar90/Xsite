@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -8,18 +8,29 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import BillingDateModal from './BillingDateModal';
 
 export type PaymentStatus = 'full' | 'partial' | 'unpaid';
 
 interface PaymentStepProps {
-  paymentStatus: PaymentStatus;
+  // undefined = no payment recorded; no option pre-selected
+  paymentStatus: PaymentStatus | undefined;
   amountPaid: string;
+  // ISO date string (YYYY-MM-DD) or '' when no billing date entered
+  billingDate: string;
   totalCost: number;
   onPaymentStatusChange: (status: PaymentStatus) => void;
   onAmountPaidChange: (amount: string) => void;
+  onBillingDateChange: (isoDate: string) => void;
   onBack: () => void;
   onClose: (skip?: boolean) => void;
 }
+
+// "2026-07-06" → "06/07/2026" for display
+const formatBillingDate = (iso: string) => {
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+};
 
 const PAYMENT_OPTIONS: {
   key: PaymentStatus;
@@ -58,14 +69,17 @@ const PAYMENT_OPTIONS: {
 const PaymentStep: React.FC<PaymentStepProps> = ({
   paymentStatus,
   amountPaid,
+  billingDate,
   totalCost,
   onPaymentStatusChange,
   onAmountPaidChange,
+  onBillingDateChange,
   onBack,
   onClose,
 }) => {
   const paidNum = parseFloat(amountPaid) || 0;
   const overLimit = paymentStatus === 'partial' && paidNum > totalCost;
+  const [showDateModal, setShowDateModal] = useState(false);
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
@@ -176,7 +190,43 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
             )}
           </View>
         )}
+
+        {/* Billing date — optional, entered via custom modal */}
+        <View style={styles.billingCard}>
+          <View style={styles.billingHeader}>
+            <Text style={styles.billingLabel}>Billing Date</Text>
+            <Text style={styles.billingOptional}>Optional</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.billingRow}
+            onPress={() => setShowDateModal(true)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.billingIcon}>
+              <Ionicons name="calendar-outline" size={18} color="#3A78B5" />
+            </View>
+            <Text
+              style={[
+                styles.billingValue,
+                !billingDate && styles.billingPlaceholder,
+              ]}
+            >
+              {billingDate
+                ? formatBillingDate(billingDate)
+                : 'Enter the vendor bill date'}
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+          </TouchableOpacity>
+        </View>
       </ScrollView>
+
+      <BillingDateModal
+        visible={showDateModal}
+        value={billingDate}
+        onConfirm={onBillingDateChange}
+        onClear={() => onBillingDateChange('')}
+        onClose={() => setShowDateModal(false)}
+      />
     </View>
   );
 };
@@ -204,6 +254,9 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
     gap: 16,
+    // Room for the floating "Submit Materials" bar so the last card
+    // (billing date) can scroll fully into view above it.
+    paddingBottom: 140,
   },
   subtitle: {
     fontSize: 14,
@@ -317,6 +370,59 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#10B981',
     fontWeight: '500',
+  },
+  billingCard: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 10,
+  },
+  billingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  billingLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  billingOptional: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  billingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 10,
+  },
+  billingIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: '#EFF6FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  billingValue: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  billingPlaceholder: {
+    color: '#94A3B8',
+    fontWeight: '400',
   },
 });
 

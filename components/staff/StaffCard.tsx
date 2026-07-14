@@ -24,7 +24,13 @@ const StaffCard: React.FC<StaffCardProps & { isExpanded?: boolean }> = ({ staff,
             activeOpacity={0.75}
         >
             {/* Left accent */}
-            <View style={[styles.accent, { backgroundColor: roleStyle.color }]} />
+            <View
+                style={[
+                    styles.accent,
+                    { backgroundColor: roleStyle.color },
+                    isExpanded && styles.accentExpanded,
+                ]}
+            />
 
             {/* Avatar */}
             <View style={[styles.avatar, { backgroundColor: roleStyle.bg }]}>
@@ -88,7 +94,10 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
         borderRadius: 16,
         marginBottom: 10,
-        overflow: 'hidden',
+        // No overflow:'hidden' here — combined with elevation it triggers a
+        // Fabric/Android bug where the card's children render blank (white)
+        // when elevation/borderRadius change on expand/collapse. The accent
+        // stripe rounds its own corners instead.
         shadowColor: '#1E293B',
         shadowOffset: { width: 0, height: 3 },
         shadowOpacity: 0.06,
@@ -107,6 +116,12 @@ const styles = StyleSheet.create({
     accent: {
         width: 4,
         alignSelf: 'stretch',
+        borderTopLeftRadius: 16,
+        borderBottomLeftRadius: 16,
+    },
+    accentExpanded: {
+        // Card bottom corners are square while the dropdown is open
+        borderBottomLeftRadius: 0,
     },
     avatar: {
         width: 46,

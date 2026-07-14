@@ -326,17 +326,6 @@ const ProjectSections = () => {
   const staffPermissions: string[] = isStaff(user) ? ((user as StaffUser).permissions || []) : [];
   const hasPermission = (permission: string) => userIsAdmin || staffPermissions.includes(permission);
 
-  // FAB pulse
-  const fabPulse = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(fabPulse, { toValue: 1.08, duration: 900, useNativeDriver: true }),
-        Animated.timing(fabPulse, { toValue: 1, duration: 900, useNativeDriver: true }),
-      ])
-    ).start();
-  }, []);
-
   useEffect(() => {
     (async () => {
       try { setResolvedClientId((await getClientId()) || ''); } catch { setResolvedClientId(''); }
@@ -850,6 +839,11 @@ const ProjectSections = () => {
               <Text style={styles.headerProjectName} numberOfLines={1}>{name}</Text>
               <Text style={styles.headerSubtitle}>Project Sections</Text>
             </View>
+
+            {/* Add Section */}
+            <TouchableOpacity onPress={() => setShowAddModal(true)} style={styles.headerAddBtn} activeOpacity={0.85}>
+              <Ionicons name="add" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
           </View>
 
           {/* Progress Bar */}
@@ -930,8 +924,12 @@ const ProjectSections = () => {
           </View>
         )}
 
-        {/* Cost Summary entry — full project cost overview */}
-        {(userIsAdmin || hasPermission('generateReport')) && (
+        <View style={{ height: 100 }} />
+      </ScrollView>
+
+      {/* ── Cost Summary — pinned at the bottom of the screen ─────────────────── */}
+      {(userIsAdmin || hasPermission('generateReport')) && (
+        <SafeAreaView edges={['bottom']} style={summaryBtnStyles.bottomBar}>
           <TouchableOpacity style={summaryBtnStyles.card} activeOpacity={0.8} onPress={goToCostSummary}>
             <View style={summaryBtnStyles.iconWrap}>
               <Ionicons name="pie-chart" size={22} color="#3A78B5" />
@@ -944,20 +942,7 @@ const ProjectSections = () => {
               <Ionicons name="chevron-forward" size={16} color="#3A78B5" />
             </View>
           </TouchableOpacity>
-        )}
-
-        <View style={{ height: 100 }} />
-      </ScrollView>
-
-      {/* ── FAB ──────────────────────────────────────────────────────────────── */}
-      {sections.length > 0 && (
-        <Animated.View style={[styles.fab, { transform: [{ scale: fabPulse }] }]}>
-          <TouchableOpacity onPress={() => setShowAddModal(true)} activeOpacity={0.85} style={styles.fabInner}>
-            <View style={styles.fabSolid}>
-              <Ionicons name="add" size={28} color="#FFFFFF" />
-            </View>
-          </TouchableOpacity>
-        </Animated.View>
+        </SafeAreaView>
       )}
 
       {/* Animated report generation overlay */}
@@ -1209,6 +1194,7 @@ const styles = StyleSheet.create({
   headerInner:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8, gap: 12 },
   backBtn:            { width: 40, height: 40, borderRadius: 13, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' },
   headerCenter:       { flex: 1 },
+  headerAddBtn:       { width: 40, height: 40, borderRadius: 13, backgroundColor: '#3A78B5', justifyContent: 'center', alignItems: 'center' },
   headerProjectName:  { fontSize: 18, fontWeight: '800', color: '#0F172A', letterSpacing: -0.3 },
   headerSubtitle:     { fontSize: 12.5, color: '#64748B', marginTop: 2, fontWeight: '500' },
   reportBtn:          { width: 40, height: 40, borderRadius: 13, backgroundColor: '#EAF0FE', borderWidth: 1, borderColor: '#E0E7FF', justifyContent: 'center', alignItems: 'center' },
@@ -1304,9 +1290,6 @@ const styles = StyleSheet.create({
   completionBtnTextDone:  { color: '#16A34A' },
 
   // FAB
-  fab:      { position: 'absolute', bottom: 32, right: 24 },
-  fabInner: { borderRadius: 20, overflow: 'hidden', shadowColor: '#3A78B5', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 10 },
-  fabSolid: { width: 60, height: 60, borderRadius: 20, justifyContent: 'center', alignItems: 'center', backgroundColor: '#3A78B5' },
 
   // Modal
   modalOverlay:   { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'flex-end' },
@@ -1434,6 +1417,17 @@ const popupStyles = StyleSheet.create({
 
 // ─── Cost Summary entry card styles ───────────────────────────────────────────
 const summaryBtnStyles = StyleSheet.create({
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    backgroundColor: '#F8FAFC',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1442,7 +1436,7 @@ const summaryBtnStyles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: 14,
     paddingHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#E0E7FF',
     shadowColor: '#1E293B',

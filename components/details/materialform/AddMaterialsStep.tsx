@@ -72,7 +72,7 @@ const AddMaterialsStep: React.FC<AddMaterialsStepProps> = ({
     >
       <View style={sharedStyles.formHeader}>
         <Text style={sharedStyles.formTitle}>
-          {editingMaterialIndex !== null ? 'Edit Material Entry' : 'Add Material Entries'}
+          {editingMaterialIndex !== null ? 'Edit Material Entry' : 'Add Purchase Material'}
         </Text>
         <TouchableOpacity onPress={onClose} activeOpacity={0.7}>
           <Text style={sharedStyles.closeButton}>✕</Text>
