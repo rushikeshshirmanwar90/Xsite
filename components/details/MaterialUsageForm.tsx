@@ -332,7 +332,7 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
         console.log('  - currentSelectedMaterials keys:', Object.keys(currentSelectedMaterials));
         
         if (!currentSelectedMiniSectionId) {
-            alert('Please select a mini-section');
+            alert('Please select a slab');
             return;
         }
 
@@ -905,8 +905,8 @@ const MaterialUsageForm: React.FC<MaterialUsageFormProps> = ({
                                             <Ionicons name="alert-circle" size={20} color="#F59E0B" />
                                             <Text style={styles.helperText}>
                                                 {miniSections.length === 0 
-                                                    ? 'No mini-sections available. Please create one first.'
-                                                    : 'All mini-sections are completed. No materials can be added to completed sections.'
+                                                    ? 'No slabs available. Please create one first.'
+                                                    : 'All slabs are completed. No materials can be added to completed slabs.'
                                                 }
                                             </Text>
                                         </View>

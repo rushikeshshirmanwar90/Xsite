@@ -25,6 +25,9 @@ export interface LaborEntry {
   count: number;
   perLaborCost: number;
   description?: string;
+  skillLevel?: 'skilled' | 'unskilled' | 'na';
+  miniSectionId?: string;
+  miniSectionName?: string;
 }
 
 export interface LaborCategory {

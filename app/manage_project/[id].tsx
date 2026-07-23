@@ -363,6 +363,34 @@ const ManageProject = () => {
         );
     };
 
+    // A section may come back from the server as "row house" (normalized) or be
+    // created locally as "rowhouse" — treat both as a row house container.
+    const isRowHouse = (type?: string) => {
+        const t = (type || '').toLowerCase();
+        return t === 'rowhouse' || t === 'row house' || t === 'row-house';
+    };
+
+    // Open a row house → drill into its buildings list (reuses project-sections
+    // in row-house mode, where each building holds its own activities).
+    const openRowHouse = (section: ProjectSection) => {
+        const rowHouseId = section.sectionId || section._id;
+        const projectId = Array.isArray(id) ? id[0] : id;
+        if (!rowHouseId) {
+            toast.error('Row house ID is missing.');
+            return;
+        }
+        router.push({
+            pathname: '/project-sections',
+            params: {
+                id: projectId as string,
+                name: name as string,
+                rowHouseId,
+                rowHouseName: section.name,
+                sectionData: JSON.stringify([]),
+            },
+        });
+    };
+
     // Handle section details - Open details modal
     const handleSectionDetails = async (section: ProjectSection) => {
         console.log('🔍 DEBUG: Opening section details');
@@ -1041,18 +1069,57 @@ const ManageProject = () => {
                 }
 
             } else if (type === "rowhouse") {
+                const buildingCount = Math.max(1, totalHouses || 1);
+
+                // 1) Create the row house container section
                 const rowhousePayload = {
                     ...payload,
-                    totalHouses: totalHouses
+                    totalHouse: buildingCount,
                 };
-
                 res = await apiClient.post(`/api/rowHouse`, rowhousePayload);
                 console.log('Rowhouse API response:', res.data);
 
-                if (res && res.status === 200) {
-                    toast.dismiss(loadingToast);
-                    toast.success('Row house added successfully!');
+                // Extract the new row house id (route returns { newData })
+                const rhData: any = res?.data as any;
+                const rowHouseId =
+                    rhData?.newData?._id || rhData?.data?._id || rhData?._id;
+
+                // 2) Create Building 1…N nested inside the row house
+                if (rowHouseId) {
+                    try {
+                        const { getClientId } = await import('@/functions/clientId');
+                        const clientId = await getClientId();
+                        const buildings = Array.from({ length: buildingCount }, (_, i) => ({
+                            name: `Building ${i + 1}`,
+                        }));
+                        await apiClient.post(`/api/building`, {
+                            projectId: id,
+                            rowHouseId,
+                            clientId,
+                            buildings,
+                        });
+                    } catch (buildingErr) {
+                        console.error('⚠️ Failed to create row house buildings:', buildingErr);
+                    }
                 }
+
+                toast.dismiss(loadingToast);
+                toast.success('Row house added successfully!');
+                setShowAddModal(false);
+
+                if (rowHouseId) {
+                    await logSectionCreated(id as string, name as string, rowHouseId, title);
+                    setSections(prev => [
+                        ...prev,
+                        { _id: rowHouseId, sectionId: rowHouseId, name: title, type: 'rowhouse' } as ProjectSection,
+                    ]);
+                } else {
+                    // Fallback: refresh from server if id wasn't returned
+                    isLoadingRef.current = false;
+                    lastLoadTimeRef.current = 0;
+                    await fetchSections(true);
+                }
+                return;
             } else {
                 res = await apiClient.post(`/api/otherSection`, payload);
                 console.log('Other section API response:', res.data);
@@ -1454,7 +1521,7 @@ const ManageProject = () => {
                                     {section.type === "Buildings" && (
                                         <Ionicons name="business-outline" size={28} color="#3A78B5" />
                                     )}
-                                    {section.type === 'rowhouse' && (
+                                    {isRowHouse(section.type) && (
                                         <Ionicons name="home-outline" size={28} color="#10B981" />
                                     )}
                                     {section.type === 'other' && (
@@ -1475,6 +1542,17 @@ const ManageProject = () => {
                                                 {section.type === 'Buildings' ? 'Building Details' : 'Add Details'}
                                             </Text>
                                         </TouchableOpacity>
+
+                                        {isRowHouse(section.type) && (
+                                            <TouchableOpacity
+                                                style={styles.openRowHouseButton}
+                                                onPress={() => openRowHouse(section)}
+                                                activeOpacity={0.8}
+                                            >
+                                                <Ionicons name="business-outline" size={18} color="#10B981" />
+                                                <Text style={styles.openRowHouseText}>Open Buildings</Text>
+                                            </TouchableOpacity>
+                                        )}
 
                                         <View style={styles.actionButtons}>
                                             <TouchableOpacity
@@ -2055,6 +2133,24 @@ const styles = StyleSheet.create({
     },
     addDetailsText: {
         color: '#3A78B5',
+        fontWeight: '600',
+        fontSize: 14,
+    },
+    openRowHouseButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F0FDF4',
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 10,
+        gap: 6,
+        flex: 1,
+        borderWidth: 1,
+        borderColor: '#BBF7D0',
+    },
+    openRowHouseText: {
+        color: '#10B981',
         fontWeight: '600',
         fontSize: 14,
     },

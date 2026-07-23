@@ -118,7 +118,7 @@ const SwipeableMiniSection = ({
                                 fontSize: 14,
                                 color: '#6B7280',
                             }}>
-                                Mini-section
+                                Slab
                             </Text>
                         </View>
                         
@@ -580,6 +580,7 @@ const LaborPage = () => {
                 laborEntries: laborEntries.map(entry => ({
                     type: entry.type,
                     category: entry.category,
+                    skillLevel: entry.skillLevel || 'na',
                     count: entry.count,
                     perLaborCost: entry.perLaborCost,
                     totalCost: entry.count * entry.perLaborCost,
@@ -1356,10 +1357,10 @@ const LaborPage = () => {
                         <View style={modalStyles.modalHeader}>
                             <View style={{ flex: 1 }}>
                                 <Text style={modalStyles.modalTitle}>
-                                    Select Mini-Section
+                                    Select Slab
                                 </Text>
                                 <Text style={modalStyles.modalSubtitle}>
-                                    Filter labor entries by mini-section
+                                    Filter labor entries by slab
                                 </Text>
                             </View>
                             <TouchableOpacity
@@ -1406,7 +1407,7 @@ const LaborPage = () => {
                                         All Sections
                                     </Text>
                                     <Text style={modalStyles.allSectionsDescription}>
-                                        Show labor entries from all mini-sections
+                                        Show labor entries from all slabs
                                     </Text>
                                 </View>
                                 {!selectedMiniSection && (
@@ -1441,10 +1442,10 @@ const LaborPage = () => {
                                         <Ionicons name="folder-outline" size={32} color="#9CA3AF" />
                                     </View>
                                     <Text style={modalStyles.emptyStateTitle}>
-                                        No Mini-Sections Found
+                                        No Slabs Found
                                     </Text>
                                     <Text style={modalStyles.emptyStateDescription}>
-                                        No mini-sections available for this section.
+                                        No slabs available for this section.
                                     </Text>
                                 </View>
                             )}

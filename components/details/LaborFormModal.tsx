@@ -294,9 +294,11 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
   const isStaffLogin = !!user?.role;
 
   const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [selectedType, setSelectedType] = useState<string>('');
-  const [count, setCount] = useState<string>('');
-  const [perLaborCost, setPerLaborCost] = useState<string>('');
+  // Labor is entered as two tiers per work area: skilled (main worker) + unskilled (helper).
+  const [skilledCount, setSkilledCount] = useState<string>('');
+  const [skilledCost, setSkilledCost] = useState<string>('');
+  const [unskilledCount, setUnskilledCount] = useState<string>('');
+  const [unskilledCost, setUnskilledCost] = useState<string>('');
   const [description, setDescription] = useState<string>('');
   const [selectedMiniSection, setSelectedMiniSection] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -501,9 +503,10 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
 
   const resetForm = () => {
     setSelectedCategory('');
-    setSelectedType('');
-    setCount('');
-    setPerLaborCost('');
+    setSkilledCount('');
+    setSkilledCost('');
+    setUnskilledCount('');
+    setUnskilledCost('');
     setDescription('');
     setSelectedMiniSection('');
     setSearchQuery('');
@@ -548,20 +551,6 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
     });
   };
 
-  const handleTypeSelect = (type: string) => {
-    setSelectedType(type);
-
-    // If category is not set (quick selection), set it to 'civil' for Mistri and Labor
-    if (!selectedCategory && (type === 'Mason (Raj Mistri)' || type === 'Helper / Unskilled Labour')) {
-      setSelectedCategory('civil');
-    }
-
-    // Auto scroll to mini-section selection
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
-  };
-
   const handleMiniSectionSelect = (sectionId: string) => {
     setSelectedMiniSection(sectionId);
     // Auto scroll to labor details form
@@ -572,9 +561,10 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
 
   const resetCurrentEntry = () => {
     setSelectedCategory('');
-    setSelectedType('');
-    setCount('');
-    setPerLaborCost('');
+    setSkilledCount('');
+    setSkilledCost('');
+    setUnskilledCount('');
+    setUnskilledCost('');
     setDescription('');
     setSelectedMiniSection('');
     setSearchQuery('');
@@ -589,69 +579,95 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
     scrollViewRef.current?.scrollTo({ y: 0, animated: true });
   };
 
+  // Resolve the skilled (main worker) + unskilled (helper) type names for a category.
+  const getSkillTypes = (categoryId: string) => {
+    const catData = laborCategories.find(cat => cat.id === categoryId);
+    const basics = getBasicTypesForCategory(categoryId, catData?.types || []);
+    return {
+      catData,
+      skilledType: basics[0] || 'Multitask Labor',
+      unskilledType: basics[1] || basics[0] || 'Helper / Unskilled Labour',
+    };
+  };
+
   const handleAddLabor = () => {
-    if (!selectedCategory || !selectedType || !count || !perLaborCost || !description.trim()) {
-      Alert.alert('Error', 'Please fill all required fields');
+    if (!selectedCategory) {
+      Alert.alert('Error', 'Please select a category');
       return;
     }
-
     if (!selectedMiniSection) {
       Alert.alert('Error', 'Please select a work area');
       return;
     }
 
-    const countNum = parseInt(count);
-    const costNum = parseFloat(perLaborCost);
+    const num = (v: string) => (v.trim() === '' ? NaN : Number(v));
+    const sc = num(skilledCount);
+    const scost = num(skilledCost);
+    const uc = num(unskilledCount);
+    const ucost = num(unskilledCost);
 
-    if (isNaN(countNum) || countNum <= 0) {
-      Alert.alert('Error', 'Please enter a valid number of laborers');
+    const hasSkilled = skilledCount.trim() !== '' || skilledCost.trim() !== '';
+    const hasUnskilled = unskilledCount.trim() !== '' || unskilledCost.trim() !== '';
+
+    if (!hasSkilled && !hasUnskilled) {
+      Alert.alert('Error', 'Enter skilled and/or unskilled labor details');
+      return;
+    }
+    if (hasSkilled && (isNaN(sc) || sc <= 0 || isNaN(scost) || scost <= 0)) {
+      Alert.alert('Error', 'Enter a valid number and cost for skilled labor (main worker)');
+      return;
+    }
+    if (hasUnskilled && (isNaN(uc) || uc <= 0 || isNaN(ucost) || ucost <= 0)) {
+      Alert.alert('Error', 'Enter a valid number and cost for unskilled labor (helper)');
       return;
     }
 
-    if (isNaN(costNum) || costNum <= 0) {
-      Alert.alert('Error', 'Please enter a valid cost per laborer');
-      return;
+    const { catData, skilledType, unskilledType } = getSkillTypes(selectedCategory);
+    const miniSectionName =
+      selectedMiniSection === 'no-mini-section'
+        ? 'General Building Labor'
+        : (miniSections.find(s => s._id === selectedMiniSection)?.name || '');
+
+    const newEntries: any[] = [];
+    if (hasSkilled) {
+      newEntries.push({
+        type: skilledType,
+        category: catData?.name || '',
+        skillLevel: 'skilled',
+        count: sc,
+        perLaborCost: scost,
+        totalCost: sc * scost,
+        miniSectionId: selectedMiniSection,
+        miniSectionName,
+        icon: catData?.icon || 'people',
+        color: '#10B981',
+        description: description || '',
+      });
+    }
+    if (hasUnskilled) {
+      newEntries.push({
+        type: unskilledType,
+        category: catData?.name || '',
+        skillLevel: 'unskilled',
+        count: uc,
+        perLaborCost: ucost,
+        totalCost: uc * ucost,
+        miniSectionId: selectedMiniSection,
+        miniSectionName,
+        icon: catData?.icon || 'people',
+        color: '#6B7280',
+        description: description || '',
+      });
     }
 
-    const selectedCategoryData = laborCategories.find(cat => cat.id === selectedCategory);
-    let selectedMiniSectionData;
-    let miniSectionName;
-
-    if (selectedMiniSection === 'no-mini-section') {
-      miniSectionName = 'General Building Labor';
-    } else {
-      selectedMiniSectionData = miniSections.find(s => s._id === selectedMiniSection);
-      miniSectionName = selectedMiniSectionData?.name || '';
-    }
-
-    // Create LaborEntry format
-    const laborEntry: any = {
-      type: selectedType.trim(),
-      category: selectedCategoryData?.name || '',
-      count: countNum,
-      perLaborCost: costNum,
-      totalCost: countNum * costNum,
-      miniSectionId: selectedMiniSection,
-      miniSectionName: miniSectionName,
-      icon: selectedCategoryData?.icon || 'people',
-      color: selectedCategoryData?.color || '#3A78B5',
-      description: description || '',
-    };
-
-    // Add to entries list
     setLaborEntries(prev => {
-      const newEntries = [...prev, laborEntry];
-      laborEntriesRef.current = newEntries; // Keep ref in sync
-      console.log('Adding labor entry, new total:', newEntries.length);
-      console.log('New entry:', laborEntry);
-      return newEntries;
+      const updated = [...prev, ...newEntries];
+      laborEntriesRef.current = updated; // Keep ref in sync
+      return updated;
     });
 
-    // Reset current entry form and hide form
     resetCurrentEntry();
     setShowAddForm(false);
-
-    // Scroll to top to show the summary
     scrollViewRef.current?.scrollTo({ y: 0, animated: true });
   };
 
@@ -670,7 +686,10 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
     }
     if (isStaffLogin && (!activeContracts || activeContracts.length <= 1)) return; // Prevent clearing for regular staff unless they have multiple active contracts
     setSelectedCategory('');
-    setSelectedType('');
+    setSkilledCount('');
+    setSkilledCost('');
+    setUnskilledCount('');
+    setUnskilledCost('');
     setSelectedMiniSection('');
     setSearchQuery('');
 
@@ -690,16 +709,6 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
 
     // Scroll back to top
     scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-  };
-
-  const goBackToTypes = () => {
-    setSelectedType('');
-    setSelectedMiniSection('');
-    setShowAdvancedOptions(false);
-    // Scroll to types section
-    setTimeout(() => {
-      scrollViewRef.current?.scrollTo({ y: 200, animated: true });
-    }, 100);
   };
 
   const goBackToMiniSections = () => {
@@ -766,11 +775,20 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
     if (categoryData) {
       setSelectedCategory(categoryData.id);
     }
-    setSelectedType(entry.type);
-    setCount(entry.count.toString());
-    setPerLaborCost(entry.perLaborCost.toString());
     setSelectedMiniSection(entry.miniSectionId);
     setDescription(entry.description || '');
+    // Load the entry into its matching tier (skilled/unskilled)
+    if (entry.skillLevel === 'unskilled') {
+      setUnskilledCount(entry.count.toString());
+      setUnskilledCost(entry.perLaborCost.toString());
+      setSkilledCount('');
+      setSkilledCost('');
+    } else {
+      setSkilledCount(entry.count.toString());
+      setSkilledCost(entry.perLaborCost.toString());
+      setUnskilledCount('');
+      setUnskilledCost('');
+    }
 
     // Remove the entry being edited
     removeLaborEntry(index);
@@ -1055,155 +1073,8 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                   </View>
                 </View>
 
-                {/* Step 2: Type Selection */}
+                {/* Step 2: Mini-Section (Work Area) Selection */}
                 {selectedCategory && (
-                  <Animated.View
-                    style={[
-                      styles.sectionContainer,
-                      {
-                        opacity: typesSectionOpacity,
-                        transform: [{
-                          scaleY: typesSectionHeight
-                        }]
-                      }
-                    ]}
-                  >
-                    <View style={styles.sectionHeader}>
-                      <Text style={styles.sectionTitle}>
-                        {selectedType ? 'Selected Labor Type' : 'Select Labor Type'}
-                      </Text>
-                      {selectedType && (
-                        <TouchableOpacity
-                          style={styles.undoButton}
-                          onPress={goBackToTypes}
-                          activeOpacity={0.7}
-                        >
-                          <Ionicons name="arrow-undo-outline" size={16} color="#EA580C" />
-                          <Text style={styles.undoButtonText}>Clear</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-
-                    {!selectedType ? (
-                      <>
-                        {/* Basic Types — Labor & Mistri equivalent for this category */}
-                        <View style={styles.basicTypesGroup}>
-                          {getBasicTypesForCategory(selectedCategory, selectedCategoryData?.types || []).map((type, index) => (
-                            <TouchableOpacity
-                              key={index}
-                              style={[styles.typeCard, styles.basicTypeCard]}
-                              onPress={() => handleTypeSelect(type)}
-                              activeOpacity={0.7}
-                            >
-                              <View style={styles.typeCardLeft}>
-                                <View style={[styles.typeIconBadge, styles.basicTypeIconBadge]}>
-                                  <Ionicons
-                                    name={selectedCategoryData?.icon || 'person-outline'}
-                                    size={18}
-                                    color={selectedCategoryData?.color || '#3A78B5'}
-                                  />
-                                </View>
-                                <View style={styles.basicTypeInfo}>
-                                  <Text style={styles.typeCardName}>{type}</Text>
-                                  <Text style={styles.basicTypeSubtext}>Tap to select</Text>
-                                </View>
-                              </View>
-                              <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-
-                        {/* Advance Options Button */}
-                        {!showAdvancedOptions && (
-                          <TouchableOpacity
-                            style={styles.showAdvancedButton}
-                            onPress={() => {
-                              setShowAdvancedOptions(true);
-                              setTimeout(() => {
-                                scrollViewRef.current?.scrollToEnd({ animated: true });
-                              }, 100);
-                            }}
-                            activeOpacity={0.7}
-                          >
-                            <View style={styles.showAdvancedButtonContent}>
-                              <Ionicons name="options-outline" size={20} color="#7C3AED" />
-                              <Text style={styles.showAdvancedButtonText}>Advance Options</Text>
-                              <Ionicons name="chevron-down" size={18} color="#7C3AED" />
-                            </View>
-                          </TouchableOpacity>
-                        )}
-
-                        {/* Advanced Options — all types for this category */}
-                        {showAdvancedOptions && (
-                          <View style={styles.specificTypesGroup}>
-                            <View style={styles.specificTypesHeader}>
-                              <View style={styles.specificTypesHeaderLine} />
-                              <Text style={styles.specificTypesHeaderText}>All Labor Types</Text>
-                              <View style={styles.specificTypesHeaderLine} />
-                            </View>
-                            <View style={styles.typesList}>
-                              {(selectedCategoryData?.types || []).map((type, index) => (
-                                <TouchableOpacity
-                                  key={index}
-                                  style={[
-                                    styles.typeCard,
-                                    index === (selectedCategoryData!.types.length - 1) && styles.typeCardLast
-                                  ]}
-                                  onPress={() => handleTypeSelect(type)}
-                                  activeOpacity={0.7}
-                                >
-                                  <View style={styles.typeCardLeft}>
-                                    <View style={styles.typeIconBadge}>
-                                      <Ionicons
-                                        name={selectedCategoryData!.icon}
-                                        size={18}
-                                        color={selectedCategoryData!.color}
-                                      />
-                                    </View>
-                                    <Text style={styles.typeCardName}>{type}</Text>
-                                  </View>
-                                  <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-                                </TouchableOpacity>
-                              ))}
-                            </View>
-                            <TouchableOpacity
-                              style={styles.hideAdvancedButton}
-                              onPress={() => setShowAdvancedOptions(false)}
-                              activeOpacity={0.7}
-                            >
-                              <View style={styles.hideAdvancedButtonContent}>
-                                <Ionicons name="chevron-up" size={16} color="#64748B" />
-                                <Text style={styles.hideAdvancedButtonText}>Hide Advanced Options</Text>
-                              </View>
-                            </TouchableOpacity>
-                          </View>
-                        )}
-                      </>
-                    ) : (
-                      /* Selected type — collapsed display card */
-                      <View style={styles.selectedTypeWrapper}>
-                        <View style={styles.selectedTypeContainer}>
-                          <View style={[styles.typeCard, styles.typeCardSelected]}>
-                            <View style={styles.typeCardLeft}>
-                              <View style={[styles.typeIconBadge, { backgroundColor: (selectedCategoryData?.color || '#3A78B5') + '20' }]}>
-                                <Ionicons
-                                  name={selectedCategoryData?.icon || 'person-outline'}
-                                  size={18}
-                                  color={selectedCategoryData?.color || '#3A78B5'}
-                                />
-                              </View>
-                              <Text style={[styles.typeCardName, styles.typeCardNameSelected]}>{selectedType}</Text>
-                            </View>
-                            <Ionicons name="checkmark-circle" size={22} color="#3A78B5" />
-                          </View>
-                        </View>
-                      </View>
-                    )}
-                  </Animated.View>
-                )}
-
-                {/* Step 3: Mini-Section Selection */}
-                {selectedType && (
                   <View style={styles.sectionContainer}>
                     <View style={styles.sectionHeader}>
                       <Text style={styles.sectionTitle}>Select Work Area</Text>
@@ -1365,8 +1236,10 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                   </View>
                 )}
 
-                {/* Step 4: Labor Details */}
-                {selectedType && selectedMiniSection && (
+                {/* Step 3: Skilled + Unskilled Labor Details */}
+                {selectedCategory && selectedMiniSection && (() => {
+                  const { skilledType, unskilledType } = getSkillTypes(selectedCategory);
+                  return (
                   <View style={styles.sectionContainer}>
                     <Text style={styles.sectionTitle}>Enter Labor Details</Text>
 
@@ -1375,98 +1248,118 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                       <View style={styles.laborDetailsHeader}>
                         <Text style={styles.laborDetailsTitle}>Labor Information</Text>
                         <Text style={styles.laborDetailsSubtitle}>
-                          Specify the number of laborers and cost details
+                          Enter skilled (main worker) and unskilled (helper) counts & cost
                         </Text>
                       </View>
 
                       <View style={styles.laborDetailsSection}>
                         <View style={styles.laborDetailsInputCard}>
+                          {/* Category context */}
                           <View style={styles.laborDetailsCardHeader}>
                             <View style={styles.laborSummaryContainer}>
                               <View style={styles.laborSummaryHeader}>
-                                <View style={[styles.laborDetailsIconBadge, { backgroundColor: selectedCategoryData?.color + '20' }]}>
+                                <View style={[styles.laborDetailsIconBadge, { backgroundColor: (selectedCategoryData?.color || '#3A78B5') + '20' }]}>
                                   <Ionicons name={selectedCategoryData?.icon || 'person-outline'} size={24} color={selectedCategoryData?.color || '#6B7280'} />
                                 </View>
                                 <View style={styles.laborDetailsCardInfo}>
                                   <Text style={styles.laborDetailsCardName}>
-                                    {selectedType}
+                                    {selectedCategoryData?.name}
                                   </Text>
                                   <Text style={styles.laborDetailsCardCategory}>
-                                    {selectedCategoryData?.name}
+                                    Skilled + Unskilled workers
                                   </Text>
                                 </View>
                               </View>
                             </View>
                           </View>
 
+                          {/* Skilled — Main Worker */}
+                          <View style={styles.skillTierHeader}>
+                            <View style={[styles.skillTierBadge, { backgroundColor: '#F0FDF4' }]}>
+                              <Ionicons name="construct" size={18} color="#10B981" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.skillTierTitle}>Skilled Labor · Main Worker</Text>
+                              <Text style={styles.skillTierSub}>{skilledType}</Text>
+                            </View>
+                          </View>
+
                           <View style={styles.laborInputSection}>
-                            <Text style={styles.laborInputLabel}>Number of laborers:</Text>
+                            <Text style={styles.laborInputLabel}>Number of skilled laborers:</Text>
                             <View style={styles.laborInputWrapper}>
                               <TextInput
                                 style={styles.laborInputLarge}
-                                value={count}
-                                onChangeText={setCount}
-                                placeholder="Enter number of laborers"
+                                value={skilledCount}
+                                onChangeText={setSkilledCount}
+                                placeholder="e.g. 2"
                                 keyboardType="numeric"
                                 returnKeyType="next"
                                 placeholderTextColor="#94A3B8"
                               />
-                              <Text style={styles.laborUnitLarge}>laborers</Text>
+                              <Text style={styles.laborUnitLarge}>workers</Text>
                             </View>
-
-                            {count && parseInt(count) <= 0 && (
-                              <View style={styles.laborError}>
-                                <Ionicons name="warning" size={16} color="#EF4444" />
-                                <Text style={styles.laborErrorText}>
-                                  Please enter a valid number of laborers
-                                </Text>
-                              </View>
-                            )}
-
-                            {!count && (
-                              <View style={styles.laborHint}>
-                                <Ionicons name="information-circle-outline" size={16} color="#3A78B5" />
-                                <Text style={styles.laborHintText}>
-                                  Enter the number of laborers needed
-                                </Text>
-                              </View>
-                            )}
                           </View>
 
                           <View style={styles.laborInputSection}>
-                            <Text style={styles.laborInputLabel}>Cost per laborer:</Text>
+                            <Text style={styles.laborInputLabel}>Cost per skilled laborer:</Text>
                             <View style={styles.laborInputWrapper}>
                               <Text style={styles.laborCurrencySymbol}>₹</Text>
                               <TextInput
                                 style={styles.laborInputLarge}
-                                value={perLaborCost}
-                                onChangeText={setPerLaborCost}
-                                placeholder="Enter cost per laborer"
+                                value={skilledCost}
+                                onChangeText={setSkilledCost}
+                                placeholder="Enter cost per worker"
                                 keyboardType="numeric"
                                 returnKeyType="next"
                                 placeholderTextColor="#94A3B8"
                               />
                             </View>
-
-                            {perLaborCost && parseFloat(perLaborCost) <= 0 && (
-                              <View style={styles.laborError}>
-                                <Ionicons name="warning" size={16} color="#EF4444" />
-                                <Text style={styles.laborErrorText}>
-                                  Please enter a valid cost per laborer
-                                </Text>
-                              </View>
-                            )}
-
-                            {!perLaborCost && (
-                              <View style={styles.laborHint}>
-                                <Ionicons name="information-circle-outline" size={16} color="#3A78B5" />
-                                <Text style={styles.laborHintText}>
-                                  Enter the cost for each laborer
-                                </Text>
-                              </View>
-                            )}
                           </View>
 
+                          {/* Unskilled — Helper */}
+                          <View style={[styles.skillTierHeader, { marginTop: 6 }]}>
+                            <View style={[styles.skillTierBadge, { backgroundColor: '#F1F5F9' }]}>
+                              <Ionicons name="people" size={18} color="#6B7280" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.skillTierTitle}>Unskilled Labor · Helper</Text>
+                              <Text style={styles.skillTierSub}>{unskilledType}</Text>
+                            </View>
+                          </View>
+
+                          <View style={styles.laborInputSection}>
+                            <Text style={styles.laborInputLabel}>Number of unskilled laborers:</Text>
+                            <View style={styles.laborInputWrapper}>
+                              <TextInput
+                                style={styles.laborInputLarge}
+                                value={unskilledCount}
+                                onChangeText={setUnskilledCount}
+                                placeholder="e.g. 3"
+                                keyboardType="numeric"
+                                returnKeyType="next"
+                                placeholderTextColor="#94A3B8"
+                              />
+                              <Text style={styles.laborUnitLarge}>helpers</Text>
+                            </View>
+                          </View>
+
+                          <View style={styles.laborInputSection}>
+                            <Text style={styles.laborInputLabel}>Cost per unskilled laborer:</Text>
+                            <View style={styles.laborInputWrapper}>
+                              <Text style={styles.laborCurrencySymbol}>₹</Text>
+                              <TextInput
+                                style={styles.laborInputLarge}
+                                value={unskilledCost}
+                                onChangeText={setUnskilledCost}
+                                placeholder="Enter cost per helper"
+                                keyboardType="numeric"
+                                returnKeyType="next"
+                                placeholderTextColor="#94A3B8"
+                              />
+                            </View>
+                          </View>
+
+                          {/* Description */}
                           <View style={styles.laborInputSection}>
                             <Text style={styles.laborInputLabel}>Description of work done:</Text>
                             <View style={[styles.laborInputWrapper, { minHeight: 80, alignItems: 'flex-start', paddingTop: 6 }]}>
@@ -1485,7 +1378,8 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                       </View>
                     </View>
                   </View>
-                )}
+                  );
+                })()}
               </>
             )}
 
@@ -1518,7 +1412,7 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
           </ScrollView>
 
           {/* Footer Actions - Show when form is visible and fields are filled */}
-          {(laborEntries.length === 0 || showAddForm) && selectedType && selectedMiniSection && (
+          {(laborEntries.length === 0 || showAddForm) && selectedCategory && selectedMiniSection && (
             <View style={[styles.modalActions, { paddingBottom: safeBottomPadding + 8 }]}>
               <TouchableOpacity style={styles.submitButton} onPress={handleAddLabor}>
                 <View style={styles.submitButtonContainer}>
@@ -1544,139 +1438,19 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
             </View>
           )}
 
-          {/* Swipe to Submit - Show when there are entries and form is not shown */}
+          {/* Submit - Show when there are entries and form is not shown */}
           {laborEntries.length > 0 && !showAddForm && (
             <View style={[styles.swipeFooter, { paddingBottom: safeBottomPadding + 8 }]}>
-              <View style={styles.swipeToSubmitContainer}>
-                <View style={styles.swipeTrack} {...panResponder.panHandlers}>
-                  {/* Animated fill behind the button */}
-                  <Animated.View
-                    style={[
-                      styles.swipeFill,
-                      {
-                        width: swipeAnimation.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: ['0%', '100%'],
-                          extrapolate: 'clamp',
-                        }),
-                        backgroundColor: swipeAnimation.interpolate({
-                          inputRange: [0, 0.5, 0.7, 1],
-                          outputRange: ['rgba(59, 130, 246, 0.15)', 'rgba(59, 130, 246, 0.25)', 'rgba(16, 185, 129, 0.3)', 'rgba(16, 185, 129, 0.4)'],
-                          extrapolate: 'clamp',
-                        }),
-                      }
-                    ]}
-                  />
-
-                  {/* Shimmer arrow hints */}
-                  <Animated.View
-                    style={[
-                      styles.shimmerContainer,
-                      {
-                        opacity: swipeAnimation.interpolate({
-                          inputRange: [0, 0.15],
-                          outputRange: [1, 0],
-                          extrapolate: 'clamp',
-                        }),
-                      }
-                    ]}
-                  >
-                    {[0, 1, 2].map((i) => (
-                      <Animated.View
-                        key={i}
-                        style={{
-                          opacity: shimmerAnim.interpolate({
-                            inputRange: [0, 0.33 * i, 0.33 * i + 0.15, 0.33 * i + 0.33, 1],
-                            outputRange: [0.15, 0.15, 0.5, 0.15, 0.15],
-                            extrapolate: 'clamp',
-                          }),
-                        }}
-                      >
-                        <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.5)" />
-                      </Animated.View>
-                    ))}
-                  </Animated.View>
-
-                  {/* Swipe button with pulsing chevrons */}
-                  <Animated.View
-                    style={[
-                      styles.swipeButton,
-                      {
-                        transform: [{
-                          translateX: swipeAnimation.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [0, maxSwipeDistance],
-                            extrapolate: 'clamp',
-                          })
-                        }],
-                        backgroundColor: swipeAnimation.interpolate({
-                          inputRange: [0, 0.65, 0.7, 1],
-                          outputRange: ['#3A78B5', '#3A78B5', '#10B981', '#10B981'],
-                          extrapolate: 'clamp',
-                        }),
-                      }
-                    ]}
-                  >
-                    <Animated.View
-                      style={{
-                        transform: [{
-                          translateX: pulseAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [-2, 4],
-                          }),
-                        }],
-                      }}
-                    >
-                      <Animated.View
-                        style={{
-                          opacity: swipeAnimation.interpolate({
-                            inputRange: [0, 0.7, 1],
-                            outputRange: [1, 1, 0],
-                            extrapolate: 'clamp',
-                          }),
-                        }}
-                      >
-                        <View style={styles.doubleChevron}>
-                          <Ionicons name="chevron-forward" size={22} color="#FFFFFF" style={styles.chevronFirst} />
-                          <Ionicons name="chevron-forward" size={22} color="rgba(255,255,255,0.6)" style={styles.chevronSecond} />
-                        </View>
-                      </Animated.View>
-                      <Animated.View
-                        style={[
-                          styles.checkmarkOverlay,
-                          {
-                            opacity: swipeAnimation.interpolate({
-                              inputRange: [0, 0.65, 0.7, 1],
-                              outputRange: [0, 0, 1, 1],
-                              extrapolate: 'clamp',
-                            }),
-                          }
-                        ]}
-                      >
-                        <Ionicons name="checkmark" size={28} color="#FFFFFF" />
-                      </Animated.View>
-                    </Animated.View>
-                  </Animated.View>
-
-                  {/* Text */}
-                  <View style={styles.swipeTextContainer}>
-                    <Animated.Text
-                      style={[
-                        styles.swipeText,
-                        {
-                          opacity: swipeAnimation.interpolate({
-                            inputRange: [0, 0.3],
-                            outputRange: [1, 0],
-                            extrapolate: 'clamp',
-                          }),
-                        }
-                      ]}
-                    >
-                      Swipe to Submit All ({laborEntries.length})
-                    </Animated.Text>
-                  </View>
-                </View>
-              </View>
+              <TouchableOpacity
+                style={styles.submitAllButton}
+                onPress={handleFinalSubmit}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="checkmark-circle" size={22} color="#FFFFFF" />
+                <Text style={styles.submitAllText}>
+                  Submit All ({laborEntries.length})
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -2428,6 +2202,33 @@ const styles = StyleSheet.create({
     color: '#1E40AF',
   },
   // Selected Type Wrapper Styles
+  skillTierHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 4,
+    marginBottom: 8,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  skillTierBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  skillTierTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  skillTierSub: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
   selectedTypeWrapper: {
     backgroundColor: '#FFF7ED',
     borderRadius: 16,
@@ -2495,9 +2296,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#111827',
     flex: 1,
-  },
-  inputContainer: {
-    marginBottom: 16,
   },
   label: {
     fontSize: 14,
@@ -3417,6 +3215,25 @@ const styles = StyleSheet.create({
   swipeFooter: {
     paddingHorizontal: 20,
     paddingTop: 12,
+  },
+  submitAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#3A78B5',
+    paddingVertical: 16,
+    borderRadius: 16,
+    shadowColor: '#3A78B5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  submitAllText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   swipeToSubmitContainer: {
     width: '100%',

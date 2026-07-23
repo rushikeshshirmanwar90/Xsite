@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -98,6 +99,10 @@ const PieChartLegend: React.FC<PieChartLegendProps> = ({
                             </View>
                         )}
                     </View>
+                    {/* Drill-down affordance — only shown when the row is tappable */}
+                    {onItemClick && (
+                        <Ionicons name="chevron-forward" size={16} color="#B0BEC5" style={styles.chevron} />
+                    )}
                 </TouchableOpacity>
             ))}
             {maxItems && items.length > maxItems && (
@@ -121,9 +126,12 @@ const styles = StyleSheet.create({
     },
     item: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
+        alignItems: 'center',
         paddingVertical: 4,
         gap: 12,
+    },
+    chevron: {
+        marginLeft: 2,
     },
     horizontalItem: {
         flexDirection: 'row',

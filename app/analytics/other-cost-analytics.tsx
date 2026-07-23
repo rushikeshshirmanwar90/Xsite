@@ -97,7 +97,7 @@ const OtherCostAnalytics: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} stickyHeaderIndices={[0]}>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>

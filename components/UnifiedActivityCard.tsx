@@ -184,7 +184,7 @@ const UnifiedActivityCard: React.FC<UnifiedActivityCardProps> = ({
           {activity.type === 'completion' && (
             <View style={styles.additionalInfo}>
               <Text style={styles.additionalInfoText}>
-                {activity.category === 'section' ? 'Section' : 'Mini-Section'}
+                {activity.category === 'section' ? 'Section' : 'Slab'}
               </Text>
             </View>
           )}

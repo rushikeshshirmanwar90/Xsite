@@ -47,7 +47,7 @@ const onboardingData: OnboardingSlide[] = [
         id: 2,
         title: "Smart Project Tracking",
         subtitle: "Stay on Top of Every Detail",
-        description: "Organize projects into sections and mini-sections. Track materials from import to usage with comprehensive analytics.",
+        description: "Organize projects into sections and slabs. Track materials from import to usage with comprehensive analytics.",
         icon: "analytics-outline",
         backgroundColor: '#FDF2F8',
         iconColor: '#EC4899',

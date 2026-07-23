@@ -993,7 +993,7 @@ const MiniSectionsAnalytics: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} stickyHeaderIndices={[0]}>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
@@ -1002,7 +1002,7 @@ const MiniSectionsAnalytics: React.FC = () => {
             </TouchableOpacity>
             <View style={styles.projectInfo}>
               <Text style={styles.projectName}>{sectionName}</Text>
-              <Text style={styles.projectSubtitle}>Mini-Section Expenses</Text>
+              <Text style={styles.projectSubtitle}>Slab Expenses</Text>
             </View>
           </View>
         </View>
@@ -1018,7 +1018,7 @@ const MiniSectionsAnalytics: React.FC = () => {
         <View style={styles.statsSection}>
           <View style={[styles.statBox, styles.statBoxPrimary]}>
             <Text style={styles.statValue}>{miniSections.length}</Text>
-            <Text style={styles.statLabel}>Active Mini-Sections</Text>
+            <Text style={styles.statLabel}>Active Slabs</Text>
           </View>
           <View style={[styles.statBox, styles.statBoxSecondary]}>
             <Text style={styles.statValue}>{formatCurrency(totalExpense)}</Text>
@@ -1102,8 +1102,13 @@ const MiniSectionsAnalytics: React.FC = () => {
         ) : (
           <Animated.View style={[styles.card, { opacity: fadeAnim }]}>
             <View style={styles.heading}>
-              <Text style={styles.title}>Mini-Section Actual Expenses</Text>
+              <Text style={styles.title}>Slab Expenses</Text>
               <Text style={styles.subtitle}>Used Materials + Labor Costs</Text>
+            </View>
+
+            <View style={styles.tapHint}>
+              <Ionicons name="finger-print-outline" size={15} color="#3A78B5" />
+              <Text style={styles.tapHintText}>Tap a slab to view its material & labor details</Text>
             </View>
 
             <View style={styles.chartContainer}>
@@ -1118,7 +1123,7 @@ const MiniSectionsAnalytics: React.FC = () => {
                 centerContent={{
                   label: '',
                   value: formatCurrency(totalExpense),
-                  subtitle: `${miniSections.length} Mini-Section${miniSections.length > 1 ? 's' : ''}`,
+                  subtitle: `${miniSections.length} Slab${miniSections.length > 1 ? 's' : ''}`,
                 }}
               />
             </View>
@@ -1128,7 +1133,7 @@ const MiniSectionsAnalytics: React.FC = () => {
               {/* Mini-Sections Legend */}
               {miniSectionLegendData.length > 0 && (
                 <View style={styles.legendSection}>
-                  <Text style={styles.legendSectionTitle}>Mini-Sections</Text>
+                  <Text style={styles.legendSectionTitle}>Slabs</Text>
                   {miniSectionLegendData.map((item) => (
                     <TouchableOpacity
                       key={item.key}
@@ -1158,6 +1163,7 @@ const MiniSectionsAnalytics: React.FC = () => {
                           </View>
                         )}
                       </View>
+                      <Ionicons name="chevron-forward" size={16} color="#B0BEC5" style={{ alignSelf: 'center', marginLeft: 2 }} />
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -1204,6 +1210,7 @@ const MiniSectionsAnalytics: React.FC = () => {
                           </View>
                         )}
                       </View>
+                      <Ionicons name="chevron-forward" size={16} color="#B0BEC5" style={{ alignSelf: 'center', marginLeft: 2 }} />
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -1241,6 +1248,7 @@ const MiniSectionsAnalytics: React.FC = () => {
                           </View>
                         )}
                       </View>
+                      <Ionicons name="chevron-forward" size={16} color="#B0BEC5" style={{ alignSelf: 'center', marginLeft: 2 }} />
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -1480,6 +1488,25 @@ const styles = StyleSheet.create({
   chartContainer: {
     alignItems: 'center',
     marginVertical: 8,
+  },
+  tapHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    alignSelf: 'center',
+    backgroundColor: '#EAF0FE',
+    borderWidth: 1,
+    borderColor: '#C4D8FC',
+    borderRadius: 99,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    marginTop: 12,
+  },
+  tapHintText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#3A78B5',
   },
   loadingContainer: {
     flex: 1,

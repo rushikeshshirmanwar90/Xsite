@@ -304,19 +304,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       console.log('🚪 Starting enhanced logout process...');
       
-      // PRODUCTION FIX: Clear notification data first
+      // PRODUCTION FIX: Deactivate the device's push token on the backend FIRST.
+      // This must run before storage is cleared, because it needs the userId to
+      // tell the server to stop delivering notifications to this device. Without
+      // it the token stays active in the DB and the user keeps getting pushes
+      // after logging out.
       try {
-        console.log('🔔 Clearing notification data...');
+        console.log('🔔 Unregistering push token from backend...');
         const { default: SimpleNotificationService } = await import('@/services/SimpleNotificationService');
         const simpleNotificationService = SimpleNotificationService.getInstance();
-        
+
+        // Pass the current userId while it's still in memory/storage.
+        const currentUserId = user?._id?.toString();
+        await simpleNotificationService.unregisterToken(currentUserId);
+
         // Clear any stored notification data
         await AsyncStorage.removeItem('pushTokenRegistered');
         await AsyncStorage.removeItem('registeredClientId');
-        
-        console.log('✅ Simple notification data cleared successfully');
+
+        console.log('✅ Push token unregistered and notification data cleared');
       } catch (notificationError) {
-        console.error('⚠️ Error clearing simple notification data:', notificationError);
+        console.error('⚠️ Error unregistering push token:', notificationError);
         // Continue with logout even if notification cleanup fails
       }
       

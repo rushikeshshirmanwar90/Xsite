@@ -33,6 +33,21 @@ const slabSortOrder = (name: string): number => {
 const sortMiniSections = <T extends { name?: string }>(sections: T[]): T[] =>
   [...sections].sort((a, b) => slabSortOrder(a.name || '') - slabSortOrder(b.name || ''));
 
+// A row house holds no phases of its own — its work lives on nested buildings,
+// which are shown to users as "House N".
+const isRowHouseType = (type?: string) => {
+  const t = (type || '').toLowerCase();
+  return t === 'rowhouse' || t === 'row house' || t === 'row-house';
+};
+const toHouseLabel = (name?: string) =>
+  (name || '').replace(/buildings?/i, 'House').trim() || (name || '');
+const houseNumber = (name?: string) => {
+  const m = (name || '').match(/(\d+)/);
+  return m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER;
+};
+const sortHousesAsc = <T extends { name?: string }>(list: T[]): T[] =>
+  [...list].sort((a, b) => houseNumber(a.name) - houseNumber(b.name));
+
 const AnalyticsDashboard: React.FC = () => {
   const router = useRouter();
   const { user } = useUser(); // Add user context for staff filtering
@@ -46,12 +61,21 @@ const AnalyticsDashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showCompletedProjects, setShowCompletedProjects] = useState(false); // Toggle between ongoing and completed
 
-  // Segmented Tab and 3-page phases flow states
+  // Segmented Tab and phases flow states.
+  // Flow: projects → sections → phases. Row houses insert a "houses" level in
+  // between (projects → sections → houses → phases) since their phases live on
+  // the nested buildings, not on the row house section itself.
   const [activeTab, setActiveTab] = useState<'cost' | 'phases'>('cost');
-  const [phasesSubPage, setPhasesSubPage] = useState<'projects' | 'sections' | 'phases'>('projects');
+  const [phasesSubPage, setPhasesSubPage] = useState<'projects' | 'sections' | 'houses' | 'phases'>('projects');
   const [phasesProjectId, setPhasesProjectId] = useState<string | null>(null);
   const [phasesSectionId, setPhasesSectionId] = useState<string | null>(null);
   const [phasesSectionName, setPhasesSectionName] = useState<string | null>(null);
+
+  // Row house drill-down: the selected row house and its buildings ("houses").
+  const [phasesRowHouseId, setPhasesRowHouseId] = useState<string | null>(null);
+  const [phasesRowHouseName, setPhasesRowHouseName] = useState<string | null>(null);
+  const [phasesBuildings, setPhasesBuildings] = useState<any[]>([]);
+  const [loadingBuildings, setLoadingBuildings] = useState(false);
   
   const [miniSections, setMiniSections] = useState<any[]>([]);
   const [trackers, setTrackers] = useState<any[]>([]);
@@ -349,44 +373,112 @@ const AnalyticsDashboard: React.FC = () => {
     return FLOOR_PHASES;
   };
 
+  // Enter a row house: load its buildings ("houses") and show the houses list.
+  const enterRowHouse = async (rowHouseId: string, rowHouseName: string) => {
+    setPhasesRowHouseId(rowHouseId);
+    setPhasesRowHouseName(rowHouseName);
+    // Clear any previously selected building so phases don't load prematurely.
+    setPhasesSectionId(null);
+    setPhasesSectionName(null);
+    setPhasesBuildings([]);
+    setPhasesSubPage('houses');
+
+    setLoadingBuildings(true);
+    try {
+      const res = await apiClient.get(`/api/building?rowHouseId=${rowHouseId}`);
+      const list = (res.data as any)?.data || [];
+      const houses = sortHousesAsc(list).map((b: any) => ({
+        _id: b._id,
+        sectionId: b._id,
+        name: toHouseLabel(b.name),
+        type: 'Buildings',
+      }));
+      setPhasesBuildings(houses);
+    } catch (err) {
+      console.error('❌ Failed to load row house buildings:', err);
+      setPhasesBuildings([]);
+    } finally {
+      setLoadingBuildings(false);
+    }
+  };
+
   const handleProjectSelect = (project: Project) => {
     if (!project._id) return;
-    
+
     setPhasesProjectId(project._id);
+    // Reset any lingering row house context from a previous project.
+    setPhasesRowHouseId(null);
+    setPhasesRowHouseName(null);
     const sections = project.section || [];
-    
+
     if (sections.length === 1) {
-      // Direct redirection to the 3rd page if only 1 section exists
       const singleSection = sections[0];
-      setPhasesSectionId(singleSection.sectionId || singleSection._id);
-      setPhasesSectionName(singleSection.name);
-      setPhasesSubPage('phases');
+      const sectionId = singleSection.sectionId || singleSection._id || '';
+      if (isRowHouseType(singleSection.type)) {
+        // Single row house section → drill into its houses first.
+        enterRowHouse(sectionId, singleSection.name);
+      } else {
+        // Direct redirection to the phases page if only 1 (non-row-house) section.
+        setPhasesSectionId(sectionId);
+        setPhasesSectionName(singleSection.name);
+        setPhasesSubPage('phases');
+      }
     } else {
       setPhasesSubPage('sections');
     }
   };
 
-  const handleSectionSelect = (sectionId: string, sectionName: string) => {
+  const handleSectionSelect = (sectionId: string, sectionName: string, sectionType?: string) => {
+    if (isRowHouseType(sectionType)) {
+      // Row house → show its houses instead of (non-existent) phases.
+      enterRowHouse(sectionId, sectionName);
+      return;
+    }
     setPhasesSectionId(sectionId);
     setPhasesSectionName(sectionName);
     setPhasesSubPage('phases');
   };
 
+  // Select a building ("house") inside a row house → load that building's phases.
+  const handleBuildingSelect = (buildingId: string, buildingName: string) => {
+    setPhasesSectionId(buildingId);
+    setPhasesSectionName(buildingName);
+    setPhasesSubPage('phases');
+  };
+
   const handlePhasesBackPress = () => {
+    const project = projects.find(p => p._id === phasesProjectId);
+    const sections = project?.section || [];
+    const isSingleSectionProject = sections.length === 1;
+
     if (phasesSubPage === 'phases') {
-      // Find the selected project to check section count
-      const project = projects.find(p => p._id === phasesProjectId);
-      const sections = project?.section || [];
-      if (sections.length === 1) {
-        // Go back directly to projects list if it has only 1 section
+      if (phasesRowHouseId) {
+        // Inside a row house → go back to its houses list.
+        setPhasesSectionId(null);
+        setPhasesSectionName(null);
+        setPhasesSubPage('houses');
+      } else if (isSingleSectionProject) {
+        // Single-section project → back to projects list.
         setPhasesProjectId(null);
         setPhasesSectionId(null);
         setPhasesSectionName(null);
         setPhasesSubPage('projects');
       } else {
-        // Go back to sections list
+        // Back to sections list.
         setPhasesSectionId(null);
         setPhasesSectionName(null);
+        setPhasesSubPage('sections');
+      }
+    } else if (phasesSubPage === 'houses') {
+      // Leaving the houses list: clear row house context.
+      setPhasesRowHouseId(null);
+      setPhasesRowHouseName(null);
+      setPhasesBuildings([]);
+      if (isSingleSectionProject) {
+        // The row house was the project's only section → back to projects.
+        setPhasesProjectId(null);
+        setPhasesSubPage('projects');
+      } else {
         setPhasesSubPage('sections');
       }
     } else if (phasesSubPage === 'sections') {
@@ -515,7 +607,12 @@ const AnalyticsDashboard: React.FC = () => {
         console.log('   - Section names:', sections.map(s => s.name));
       }
       
-      if (sections.length === 1) {
+      // A row house has no mini-sections of its own (its work lives on nested
+      // buildings), so it must always go through the sections analytics level.
+      const singleSectionType = (sections[0]?.type || '').toLowerCase();
+      const singleIsRowHouse = singleSectionType === 'rowhouse' || singleSectionType === 'row house' || singleSectionType === 'row-house';
+
+      if (sections.length === 1 && !singleIsRowHouse) {
         // Navigate directly to mini-sections (Level 3) if only one section
         const singleSection = sections[0];
         console.log('🔍 Dashboard - Single section detected, navigating to mini-sections');
@@ -583,6 +680,11 @@ const AnalyticsDashboard: React.FC = () => {
           <Text style={styles.subtitle}>
             {showCompletedProjects ? 'Completed Project Costs' : 'Active Project Costs'}
           </Text>
+        </View>
+
+        <View style={styles.tapHint}>
+          <Ionicons name="finger-print-outline" size={15} color="#3A78B5" />
+          <Text style={styles.tapHintText}>Tap a project to explore its section breakdown</Text>
         </View>
 
         <View style={styles.chartContainer}>
@@ -664,18 +766,74 @@ const AnalyticsDashboard: React.FC = () => {
           <TouchableOpacity
             key={section._id || section.sectionId}
             activeOpacity={0.7}
-            onPress={() => handleSectionSelect(section.sectionId || section._id, section.name)}
+            onPress={() => handleSectionSelect(section.sectionId || section._id, section.name, section.type)}
             style={styles.projectListCard}
           >
             <View style={{ flex: 1 }}>
               <Text style={styles.projectListName}>{section.name}</Text>
               <Text style={styles.projectListSubText}>
-                Type: {section.type || 'Standard'}
+                {isRowHouseType(section.type)
+                  ? 'Row House · tap to view houses'
+                  : `Type: ${section.type || 'Standard'}`}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
           </TouchableOpacity>
         ))}
+      </View>
+    );
+  };
+
+  const renderPhasesHousesList = () => {
+    const project = projects.find(p => p._id === phasesProjectId);
+    const sections = project?.section || [];
+    const isSingleSectionProject = sections.length === 1;
+
+    return (
+      <View style={styles.phaseTrackerContainer}>
+        {/* Back Button */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={handlePhasesBackPress}
+          style={styles.backButton}
+        >
+          <Ionicons name="arrow-back" size={18} color="#3A78B5" />
+          <Text style={styles.backButtonText}>
+            {isSingleSectionProject ? 'Back to Projects' : 'Back to Sections'}
+          </Text>
+        </TouchableOpacity>
+
+        <Text style={styles.sectionSubtitleHeader}>Select a House ({phasesRowHouseName})</Text>
+
+        {loadingBuildings ? (
+          <View style={styles.loadingContainer}>
+            <Ionicons name="sync" size={36} color="#3A78B5" />
+            <Text style={styles.loadingText}>Loading houses...</Text>
+          </View>
+        ) : phasesBuildings.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="home-outline" size={64} color="#CBD5E1" />
+            <Text style={styles.emptyTitle}>No Houses Found</Text>
+            <Text style={styles.emptySubtitle}>
+              Go to the project details page to add houses to this row house.
+            </Text>
+          </View>
+        ) : (
+          phasesBuildings.map((house) => (
+            <TouchableOpacity
+              key={house._id || house.sectionId}
+              activeOpacity={0.7}
+              onPress={() => handleBuildingSelect(house.sectionId || house._id, house.name)}
+              style={styles.projectListCard}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.projectListName}>{house.name}</Text>
+                <Text style={styles.projectListSubText}>Tap to view phases</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+            </TouchableOpacity>
+          ))
+        )}
       </View>
     );
   };
@@ -686,6 +844,10 @@ const AnalyticsDashboard: React.FC = () => {
     const section = sections.find(s => s._id === phasesSectionId || s.sectionId === phasesSectionId);
     const sectionName = section?.name || phasesSectionName || 'Section';
     const isSingleSectionProject = sections.length === 1;
+    // When drilled into a row house, the back target is the houses list.
+    const backLabel = phasesRowHouseId
+      ? 'Back to Houses'
+      : (isSingleSectionProject ? 'Back to Projects' : 'Back to Sections');
 
     if (loadingPhases) {
       return (
@@ -698,7 +860,7 @@ const AnalyticsDashboard: React.FC = () => {
           >
             <Ionicons name="arrow-back" size={18} color="#3A78B5" />
             <Text style={styles.backButtonText}>
-              {isSingleSectionProject ? "Back to Projects" : "Back to Sections"}
+              {backLabel}
             </Text>
           </TouchableOpacity>
           <View style={styles.loadingContainer}>
@@ -720,14 +882,14 @@ const AnalyticsDashboard: React.FC = () => {
           >
             <Ionicons name="arrow-back" size={18} color="#3A78B5" />
             <Text style={styles.backButtonText}>
-              {isSingleSectionProject ? "Back to Projects" : "Back to Sections"}
+              {backLabel}
             </Text>
           </TouchableOpacity>
           <View style={styles.emptyContainer}>
             <Ionicons name="construct-outline" size={64} color="#CBD5E1" />
-            <Text style={styles.emptyTitle}>No Mini-sections Found</Text>
+            <Text style={styles.emptyTitle}>No Slabs Found</Text>
             <Text style={styles.emptySubtitle}>
-              Go to the project details page to create and configure mini-sections for this section.
+              Go to the project details page to create and configure slabs for this section.
             </Text>
           </View>
         </View>
@@ -772,7 +934,7 @@ const AnalyticsDashboard: React.FC = () => {
           </View>
           <View style={styles.sectionStatsRow}>
             <Text style={styles.sectionStatText}>
-              Total Mini-sections: <Text style={{ fontWeight: '700', color: '#1E293B' }}>{miniSections.length}</Text>
+              Total Slabs: <Text style={{ fontWeight: '700', color: '#1E293B' }}>{miniSections.length}</Text>
             </Text>
             <Text style={styles.sectionStatText}>
               Tracked: <Text style={{ fontWeight: '700', color: '#3A78B5' }}>{activeTrackers.length}</Text>
@@ -781,7 +943,7 @@ const AnalyticsDashboard: React.FC = () => {
         </View>
 
         {/* Mini-section accordion card list */}
-        <Text style={styles.sectionSubtitleHeader}>Mini-Sections & Phases</Text>
+        <Text style={styles.sectionSubtitleHeader}>Slabs & Phases</Text>
         {miniSections.map((miniSec) => {
           const tracker = trackers.find(t => t.miniSectionId === miniSec._id);
           const isExpanded = expandedMiniSectionId === miniSec._id;
@@ -938,20 +1100,8 @@ const AnalyticsDashboard: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={['#3A78B5']}
-            tintColor="#3A78B5"
-            title="Pull to refresh"
-            titleColor="#64748B"
-          />
-        }
-      >
+      {/* Sticky top: Main Header + Segmented Tab Selector (stay pinned across all views) */}
+      <View style={styles.stickyHeader}>
         {/* Main Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
@@ -992,7 +1142,22 @@ const AnalyticsDashboard: React.FC = () => {
             <Text style={[styles.tabText, activeTab === 'phases' && styles.activeTabText]}>Project Phases</Text>
           </TouchableOpacity>
         </View>
+      </View>
 
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#3A78B5']}
+            tintColor="#3A78B5"
+            title="Pull to refresh"
+            titleColor="#64748B"
+          />
+        }
+      >
         {/* Content Display */}
         {loading ? (
           <View style={{ paddingTop: 8 }}>
@@ -1018,6 +1183,8 @@ const AnalyticsDashboard: React.FC = () => {
             renderPhasesProjectsList()
           ) : phasesSubPage === 'sections' ? (
             renderPhasesSectionsList()
+          ) : phasesSubPage === 'houses' ? (
+            renderPhasesHousesList()
           ) : (
             renderBuildingPhasesTracker()
           )
@@ -1093,6 +1260,10 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  stickyHeader: {
+    backgroundColor: '#F8FAFC',
+    zIndex: 10,
   },
   card: {
     backgroundColor: '#FFFFFF',
@@ -1222,6 +1393,25 @@ const styles = StyleSheet.create({
   chartContainer: {
     alignItems: 'center',
     marginVertical: 20,
+  },
+  tapHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    alignSelf: 'center',
+    backgroundColor: '#EAF0FE',
+    borderWidth: 1,
+    borderColor: '#C4D8FC',
+    borderRadius: 99,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    marginTop: 12,
+  },
+  tapHintText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#3A78B5',
   },
   statsSection: {
     marginTop: 5,

@@ -33,6 +33,7 @@ const AddSectionModal = ({ visible, onClose, onAddSection, projectId, projectNam
     // Section types
     const sectionTypes: SectionType[] = [
         { id: 'building', label: 'Building' },
+        { id: 'rowhouse', label: 'Row House' },
         { id: 'other', label: 'Other' }
     ];
 
@@ -43,16 +44,19 @@ const AddSectionModal = ({ visible, onClose, onAddSection, projectId, projectNam
             return;
         }
 
-        if (selectedType === "rowhouse" && !totalHouses.trim()) {
-            Alert.alert('Error', 'Please enter the total number of houses');
-            return;
+        if (selectedType === "rowhouse") {
+            const count = parseInt(totalHouses.trim(), 10);
+            if (!totalHouses.trim() || isNaN(count) || count < 1) {
+                Alert.alert('Error', 'Please enter how many buildings this row house has (at least 1)');
+                return;
+            }
         }
 
         try {
             await onAddSection(
-                selectedType, 
-                sectionTitle.trim(), 
-                selectedType === 'rowhouse' ? parseInt(totalHouses.trim()) : undefined
+                selectedType,
+                sectionTitle.trim(),
+                selectedType === 'rowhouse' ? parseInt(totalHouses.trim(), 10) : undefined
             );
             
             // 🔔 Send section creation notification
@@ -66,7 +70,7 @@ const AddSectionModal = ({ visible, onClose, onAddSection, projectId, projectNam
                     staffName: user?.firstName || user?.name || 'User',
                     projectName: projectName || 'Project',
                     sectionName: sectionTitle.trim(),
-                    details: `Created ${selectedType} section "${sectionTitle.trim()}"${selectedType === 'rowhouse' ? ` with ${totalHouses} houses` : ''}`,
+                    details: `Created ${selectedType} section "${sectionTitle.trim()}"${selectedType === 'rowhouse' ? ` with ${totalHouses} buildings` : ''}`,
                     performerId: user?._id,
                     performerRole: user?.role,
                     recipientType: 'admins',
@@ -154,14 +158,17 @@ const AddSectionModal = ({ visible, onClose, onAddSection, projectId, projectNam
 
                         {selectedType === 'rowhouse' && (
                             <>
-                                <Text style={styles.label}>Total Houses *</Text>
+                                <Text style={styles.label}>Number of Buildings *</Text>
                                 <TextInput
                                     style={styles.input}
                                     value={totalHouses}
                                     onChangeText={setTotalHouses}
-                                    placeholder="Enter total number of houses"
+                                    placeholder="e.g. 4 — buildings inside this row house"
                                     keyboardType="numeric"
                                 />
+                                <Text style={styles.helperNote}>
+                                    Building 1…N will be created inside this row house. Each building tracks its own materials, contractors, equipment and costs.
+                                </Text>
                             </>
                         )}
 
@@ -222,6 +229,13 @@ const styles = StyleSheet.create({
         marginBottom: 16,
         borderWidth: 1,
         borderColor: '#E5E7EB',
+    },
+    helperNote: {
+        fontSize: 12.5,
+        color: '#64748B',
+        lineHeight: 18,
+        marginTop: -8,
+        marginBottom: 16,
     },
     typeContainer: {
         marginBottom: 16,

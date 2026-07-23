@@ -170,10 +170,25 @@ const getSectionIcon = (type: string, isCompleted: boolean = false) => {
   switch (type?.toLowerCase()) {
     case 'building':
     case 'buildings': return 'business';
-    case 'rowhouse':  return 'home';
+    case 'rowhouse':
+    case 'row house':
+    case 'row-house': return 'home';
     default:          return 'grid';
   }
 };
+
+// Buildings inside a row house are stored as "Building N" but shown to users as
+// "House N". These helpers convert the label and sort the list ascending by number.
+const toHouseLabel = (name?: string) =>
+  (name || '').replace(/buildings?/i, 'House').trim() || (name || '');
+
+const houseNumber = (name?: string) => {
+  const m = (name || '').match(/(\d+)/);
+  return m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER;
+};
+
+const sortHousesAsc = <T extends { name?: string }>(list: T[]): T[] =>
+  [...list].sort((a, b) => houseNumber(a.name) - houseNumber(b.name));
 
 type SectionOption = {
   key: string;
@@ -191,7 +206,8 @@ const SectionAccordionItem: React.FC<{
   isLoadingCompletion: boolean;
   options: SectionOption[];
   onToggle: () => void;
-}> = ({ section, index, isExpanded, isCompleted, isLoadingCompletion, options, onToggle }) => {
+  onViewBuildings?: () => void;
+}> = ({ section, index, isExpanded, isCompleted, isLoadingCompletion, options, onToggle, onViewBuildings }) => {
   const chevron  = useRef(new Animated.Value(isExpanded ? 1 : 0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -269,6 +285,22 @@ const SectionAccordionItem: React.FC<{
       {isExpanded && (
         <View style={styles.optionsContainer}>
           <View style={styles.optionsDivider} />
+
+          {/* View all houses — row houses only, shown under the status badge when expanded */}
+          {onViewBuildings && (
+            <TouchableOpacity
+              style={[styles.optionChip, { marginBottom: 8 }]}
+              activeOpacity={0.75}
+              onPress={onViewBuildings}
+            >
+              <View style={[styles.optionChipIcon, { backgroundColor: '#F0FDF4' }]}>
+                <Ionicons name="business" size={20} color="#10B981" />
+              </View>
+              <Text style={styles.optionChipLabel}>View all houses</Text>
+              <Ionicons name="chevron-forward" size={14} color="#CBD5E1" />
+            </TouchableOpacity>
+          )}
+
           <View style={styles.optionsGrid}>
             {options.map((option) => {
               const cfg = OPTION_CONFIG[option.key] || { icon: 'ellipsis-horizontal', color: '#3A78B5', bg: '#EAF0FE', label: option.label };
@@ -282,7 +314,7 @@ const SectionAccordionItem: React.FC<{
                   <View style={[styles.optionChipIcon, { backgroundColor: cfg.bg }]}>
                     <Ionicons name={cfg.icon as any} size={20} color={cfg.color} />
                   </View>
-                  <Text style={styles.optionChipLabel}>{cfg.label}</Text>
+                  <Text style={styles.optionChipLabel}>{option.label || cfg.label}</Text>
                   <Ionicons name="chevron-forward" size={14} color="#CBD5E1" />
                 </TouchableOpacity>
               );
@@ -299,11 +331,22 @@ const ProjectSections = () => {
   const params = useLocalSearchParams();
   const { id, name, sectionData, materialAvailable, materialUsed, contractorId, contractorType, userId } = params;
 
+  // Row house mode — when a rowHouseId is passed, this screen lists the buildings
+  // that live inside that row house instead of the project's top-level sections.
+  const rowHouseId  = Array.isArray(params.rowHouseId)  ? params.rowHouseId[0]  : params.rowHouseId;
+  const rowHouseName = Array.isArray(params.rowHouseName) ? params.rowHouseName[0] : params.rowHouseName;
+  const isRowHouseMode = !!rowHouseId;
+
   const [sections, setSections]       = useState<ProjectSection[]>([]);
   const [showAddModal, setShowAddModal]   = useState(false);
   const [newSectionName, setNewSectionName] = useState('');
   const [newSectionType, setNewSectionType] = useState('building');
+  const [newBuildingCount, setNewBuildingCount] = useState('4');
   const [isAdding, setIsAdding]           = useState(false);
+  // Row house building picker (choose which building an activity applies to)
+  const [rhPicker, setRhPicker] = useState<{ rowHouse: ProjectSection; optionKey: string; materialKey?: string } | null>(null);
+  const [rhBuildings, setRhBuildings] = useState<ProjectSection[]>([]);
+  const [rhBuildingsLoading, setRhBuildingsLoading] = useState(false);
   const [projectCompleted, setProjectCompleted]   = useState(false);
   const [isUpdatingProjectCompletion, setIsUpdatingProjectCompletion] = useState(false);
   const [sectionCompletions, setSectionCompletions] = useState<{ [key: string]: boolean }>({});
@@ -326,6 +369,9 @@ const ProjectSections = () => {
   const staffPermissions: string[] = isStaff(user) ? ((user as StaffUser).permissions || []) : [];
   const hasPermission = (permission: string) => userIsAdmin || staffPermissions.includes(permission);
 
+  // Staff see the contractor option labelled "Labors"; admins keep "Contractor".
+  const contractorLabel = userIsAdmin ? 'Contractor' : 'Labors';
+
   useEffect(() => {
     (async () => {
       try { setResolvedClientId((await getClientId()) || ''); } catch { setResolvedClientId(''); }
@@ -341,11 +387,37 @@ const ProjectSections = () => {
   }, [sectionCompletions, sections]);
 
   useEffect(() => {
+    if (isRowHouseMode) return; // buildings are loaded separately below
     if (sectionData) {
       const parsedData = JSON.parse(Array.isArray(sectionData) ? sectionData[0] : sectionData);
       setSections(parsedData);
     }
-  }, [sectionData]);
+  }, [sectionData, isRowHouseMode]);
+
+  // ── Row house mode: load the buildings nested inside this row house ──────────
+  const fetchRowHouseBuildings = async () => {
+    if (!rowHouseId) return;
+    try {
+      const res = await apiClient.get(`/api/building?rowHouseId=${rowHouseId}`);
+      const list = (res.data as any)?.data || [];
+      const mapped: ProjectSection[] = sortHousesAsc(list).map((b: any) => ({
+        _id: b._id,
+        sectionId: b._id,
+        name: toHouseLabel(b.name),
+        type: 'Buildings',
+      }));
+      setSections(mapped);
+    } catch (error) {
+      console.error('❌ Failed to load row house buildings:', error);
+      toast.error('Failed to load buildings for this row house');
+      setSections([]);
+    }
+  };
+
+  useEffect(() => {
+    if (isRowHouseMode) fetchRowHouseBuildings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowHouseId]);
 
   useEffect(() => {
     if (sections && sections.length > 0 && id) fetchSectionCompletionStatus();
@@ -610,7 +682,7 @@ const ProjectSections = () => {
     if (hasPermission('addMaterial') || hasPermission('addMaterialUsage'))
       options.push({ key: 'material',      label: 'Material',    icon: 'cube-outline',          onPress: () => setOptionPopup({ type: 'material', section }) });
     if (hasPermission('contractor'))
-      options.push({ key: 'contractor',    label: 'Contractor',  icon: 'people-outline',        onPress: () => goToContractor(section) });
+      options.push({ key: 'contractor',    label: contractorLabel, icon: 'people-outline',      onPress: () => goToContractor(section) });
     if (hasPermission('addEquipmentCost'))
       options.push({ key: 'equipmentCost', label: 'Equipment',   icon: 'hardware-chip-outline', onPress: () => goToEquipment(section) });
     if (hasPermission('addOtherCost'))
@@ -622,6 +694,12 @@ const ProjectSections = () => {
 
   const handleMaterialSubOption = (key: string, section: ProjectSection) => {
     setOptionPopup(null);
+    // For a row house, the sub-option is chosen first — now ask which building
+    // it applies to, then re-run this handler with that building.
+    if (isRowHouseSection(section.type)) {
+      openBuildingPicker(section, 'material', key);
+      return;
+    }
     if (key === 'available') {
       goToMaterials(section, 'imported');
     } else if (key === 'used') {
@@ -653,16 +731,168 @@ const ProjectSections = () => {
     setExpandedSectionId(prev => (prev === sectionKey ? null : sectionKey));
   };
 
+  const isRowHouseSection = (type: string) => {
+    const t = (type || '').toLowerCase();
+    return t === 'rowhouse' || t === 'row house' || t === 'row-house';
+  };
+
+  // Drill into a row house → list its buildings (each holds its own activities).
+  const openRowHouse = (section: ProjectSection) => {
+    const rhId = section.sectionId || section._id;
+    if (!rhId) { toast.error('Row house ID is missing.'); return; }
+    router.push({
+      pathname: '/project-sections',
+      params: {
+        id: id as string,
+        name: name as string,
+        rowHouseId: rhId,
+        rowHouseName: section.name,
+        sectionData: JSON.stringify([]),
+        ...(materialAvailable ? { materialAvailable: materialAvailable as string } : {}),
+        ...(materialUsed ? { materialUsed: materialUsed as string } : {}),
+        ...(contractorId ? { contractorId: contractorId as string } : {}),
+        ...(contractorType ? { contractorType: contractorType as string } : {}),
+        ...(userId ? { userId: userId as string } : {}),
+      },
+    });
+  };
+
+  // ── Row house → building picker ──────────────────────────────────────────────
+  // A row house shows the same options as a building, but each activity first
+  // asks which building inside the row house it applies to.
+  const ROW_HOUSE_OPTION_LABEL: Record<string, string> = {
+    material:      'Material',
+    contractor:    contractorLabel,
+    equipmentCost: 'Equipment',
+    otherCost:     'Other Cost',
+    report:        'Cost Report',
+  };
+
+  const getRowHouseOptions = (section: ProjectSection): SectionOption[] => {
+    const options: SectionOption[] = [];
+    if (hasPermission('addMaterial') || hasPermission('addMaterialUsage'))
+      options.push({ key: 'material',      label: 'Material',    icon: 'cube-outline',          onPress: () => setOptionPopup({ type: 'material', section }) });
+    if (hasPermission('contractor'))
+      options.push({ key: 'contractor',    label: contractorLabel, icon: 'people-outline',      onPress: () => openBuildingPicker(section, 'contractor') });
+    if (hasPermission('addEquipmentCost'))
+      options.push({ key: 'equipmentCost', label: 'Equipment',   icon: 'hardware-chip-outline', onPress: () => openBuildingPicker(section, 'equipmentCost') });
+    if (hasPermission('addOtherCost'))
+      options.push({ key: 'otherCost',     label: 'Other',       icon: 'cash-outline',          onPress: () => goToOtherCost() });
+    if (hasPermission('generateReport'))
+      options.push({ key: 'report',        label: 'Cost Report', icon: 'bar-chart-outline',     onPress: () => openBuildingPicker(section, 'report') });
+    return options;
+  };
+
+  const openBuildingPicker = async (rowHouse: ProjectSection, optionKey: string, materialKey?: string) => {
+    setRhPicker({ rowHouse, optionKey, materialKey });
+    setRhBuildings([]);
+    setRhBuildingsLoading(true);
+    try {
+      const rhId = rowHouse.sectionId || rowHouse._id;
+      const res = await apiClient.get(`/api/building?rowHouseId=${rhId}`);
+      const list = (res.data as any)?.data || [];
+      setRhBuildings(sortHousesAsc(list).map((b: any) => ({ _id: b._id, sectionId: b._id, name: toHouseLabel(b.name), type: 'Buildings' })));
+    } catch {
+      setRhBuildings([]);
+      toast.error('Failed to load buildings for this row house');
+    } finally {
+      setRhBuildingsLoading(false);
+    }
+  };
+
+  const handlePickBuilding = (building: ProjectSection) => {
+    const optionKey = rhPicker?.optionKey;
+    const materialKey = rhPicker?.materialKey;
+    setRhPicker(null);
+    if (!optionKey) return;
+    switch (optionKey) {
+      case 'material':      handleMaterialSubOption(materialKey || 'used', building); break;
+      case 'contractor':    goToContractor(building); break;
+      case 'equipmentCost': goToEquipment(building); break;
+      case 'report':        setOptionPopup({ type: 'report', section: building }); break;
+    }
+  };
+
   // ── Add section ─────────────────────────────────────────────────────────────
+  const closeAddModal = () => {
+    setShowAddModal(false);
+    setNewSectionName('');
+    setNewSectionType('building');
+    setNewBuildingCount('4');
+  };
+
   const handleAddSection = async () => {
-    if (!newSectionName.trim()) { toast.error('Please enter a section name'); return; }
+    if (!newSectionName.trim()) {
+      toast.error(isRowHouseMode ? 'Please enter a building name' : 'Please enter a section name');
+      return;
+    }
+
+    // Row house mode: everything added here is a building nested in the row house.
+    if (isRowHouseMode) {
+      setIsAdding(true);
+      try {
+        const clientId = await getClientId();
+        const res = await apiClient.post(`/api/building`, {
+          projectId: id,
+          rowHouseId,
+          clientId,
+          name: newSectionName.trim(),
+        });
+        const rd = res.data as any;
+        const created = rd?.data || rd;
+        const bId = created?._id || `temp-${Date.now()}`;
+        setSections(prev => [
+          ...prev,
+          { _id: bId, sectionId: bId, name: created?.name || newSectionName.trim(), type: 'Buildings' },
+        ]);
+        closeAddModal();
+        toast.success('Building added successfully');
+      } catch (error: any) {
+        toast.error(error?.response?.data?.message || 'Failed to add building');
+      } finally {
+        setIsAdding(false);
+      }
+      return;
+    }
+
     setIsAdding(true);
     try {
       const payload = { projectId: id, name: newSectionName.trim() };
       let res;
-      if      (newSectionType === 'building')  res = await apiClient.post(`/api/building`, payload);
-      else if (newSectionType === 'rowhouse')  res = await apiClient.post(`/api/rowHouse`, payload);
-      else                                     res = await apiClient.post(`/api/otherSection`, payload);
+
+      if (newSectionType === 'rowhouse') {
+        // 1) create the row house container, 2) create Building 1…N inside it
+        const count = Math.max(1, parseInt(newBuildingCount, 10) || 1);
+        res = await apiClient.post(`/api/rowHouse`, { ...payload, totalHouse: count });
+        const rhData = res.data as any;
+        const newRowHouseId = rhData?.newData?._id || rhData?.data?._id || rhData?._id;
+
+        if (newRowHouseId) {
+          try {
+            const clientId = await getClientId();
+            const buildings = Array.from({ length: count }, (_, i) => ({ name: `Building ${i + 1}` }));
+            await apiClient.post(`/api/building`, { projectId: id, rowHouseId: newRowHouseId, clientId, buildings });
+          } catch (bErr) {
+            console.error('⚠️ Failed to create row house buildings:', bErr);
+          }
+        }
+
+        setSections(prev => [
+          ...prev,
+          {
+            _id: newRowHouseId || `temp-${Date.now()}`,
+            sectionId: newRowHouseId || `temp-${Date.now()}`,
+            name: newSectionName.trim(),
+            type: 'rowhouse',
+          },
+        ]);
+        closeAddModal();
+        toast.success('Row house added successfully');
+        return;
+      }
+
+      if (newSectionType === 'building') res = await apiClient.post(`/api/building`, payload);
+      else                              res = await apiClient.post(`/api/otherSection`, payload);
 
       if (res && (res.status === 200 || res.status === 201)) {
         let newSectionData: any = null;
@@ -671,20 +901,17 @@ const ProjectSections = () => {
         else if (rd.section)          newSectionData = rd.section;
         else if (rd.data)             newSectionData = rd.data;
         else if (rd.building)         newSectionData = rd.building;
-        else if (rd.rowHouse)         newSectionData = rd.rowHouse;
         else if (rd.otherSection)     newSectionData = rd.otherSection;
 
         const formattedSection: ProjectSection = {
           _id: newSectionData?._id || `temp-${Date.now()}`,
           sectionId: newSectionData?.sectionId || newSectionData?._id || `temp-${Date.now()}`,
           name: newSectionData?.name || newSectionName.trim(),
-          type: newSectionType === 'building' ? 'Buildings' : (newSectionType === 'rowhouse' ? 'rowhouse' : 'other'),
+          type: newSectionType === 'building' ? 'Buildings' : 'other',
           ...(newSectionData || {}),
         };
         setSections([...sections, formattedSection]);
-        setShowAddModal(false);
-        setNewSectionName('');
-        setNewSectionType('building');
+        closeAddModal();
         toast.success('Section added successfully');
       } else {
         toast.error('Failed to add section');
@@ -836,8 +1063,12 @@ const ProjectSections = () => {
 
             {/* Title block */}
             <View style={styles.headerCenter}>
-              <Text style={styles.headerProjectName} numberOfLines={1}>{name}</Text>
-              <Text style={styles.headerSubtitle}>Project Sections</Text>
+              <Text style={styles.headerProjectName} numberOfLines={1}>
+                {isRowHouseMode ? rowHouseName : name}
+              </Text>
+              <Text style={styles.headerSubtitle}>
+                {isRowHouseMode ? `Row House · Buildings` : 'Project Sections'}
+              </Text>
             </View>
 
             {/* Add Section */}
@@ -892,6 +1123,11 @@ const ProjectSections = () => {
             const isLoadingCompletion = isLoadingSectionCompletions && !Object.prototype.hasOwnProperty.call(sectionCompletions, sectionId);
             const sectionKey = sectionId || String(index);
             const isExpanded = expandedSectionId === sectionKey;
+
+            // Row houses use the SAME accordion structure as buildings, but their
+            // activity options ask which building to apply to, plus a "Buildings" button.
+            const rowHouse = isRowHouseSection(section.type);
+
             return (
               <SectionAccordionItem
                 key={section._id || index}
@@ -900,8 +1136,9 @@ const ProjectSections = () => {
                 isExpanded={isExpanded}
                 isCompleted={isCompleted}
                 isLoadingCompletion={isLoadingCompletion}
-                options={getSectionOptions(section)}
+                options={rowHouse ? getRowHouseOptions(section) : getSectionOptions(section)}
                 onToggle={() => toggleSection(sectionKey)}
+                onViewBuildings={rowHouse ? () => openRowHouse(section) : undefined}
               />
             );
           })
@@ -911,14 +1148,16 @@ const ProjectSections = () => {
             <View style={styles.emptyIconWrap}>
               <Ionicons name="folder-open" size={48} color="#3A78B5" />
             </View>
-            <Text style={styles.emptyTitle}>No Sections Yet</Text>
+            <Text style={styles.emptyTitle}>{isRowHouseMode ? 'No Buildings Yet' : 'No Sections Yet'}</Text>
             <Text style={styles.emptySubtitle}>
-              Add your first section to start organizing this project's materials and work areas.
+              {isRowHouseMode
+                ? 'Add a building to start tracking materials, contractors, equipment and costs inside this row house.'
+                : "Add your first section to start organizing this project's materials and work areas."}
             </Text>
             <TouchableOpacity style={styles.emptyAddBtn} onPress={() => setShowAddModal(true)} activeOpacity={0.85}>
               <View style={styles.emptyAddBtnInner}>
                 <Ionicons name="add-circle" size={20} color="#FFFFFF" />
-                <Text style={styles.emptyAddBtnText}>Add First Section</Text>
+                <Text style={styles.emptyAddBtnText}>{isRowHouseMode ? 'Add First Building' : 'Add First Section'}</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -928,7 +1167,7 @@ const ProjectSections = () => {
       </ScrollView>
 
       {/* ── Cost Summary — pinned at the bottom of the screen — admins only ───── */}
-      {userIsAdmin && (
+      {userIsAdmin && !isRowHouseMode && (
         <SafeAreaView edges={['bottom']} style={summaryBtnStyles.bottomBar}>
           <TouchableOpacity style={summaryBtnStyles.card} activeOpacity={0.8} onPress={goToCostSummary}>
             <View style={summaryBtnStyles.iconWrap}>
@@ -1118,22 +1357,26 @@ const ProjectSections = () => {
             {/* Modal header */}
             <View style={styles.modalHeader}>
               <View>
-                <Text style={styles.modalTitle}>Add New Section</Text>
-                <Text style={styles.modalSubtitle}>Organize your project into sections</Text>
+                <Text style={styles.modalTitle}>{isRowHouseMode ? 'Add Building' : 'Add New Section'}</Text>
+                <Text style={styles.modalSubtitle}>
+                  {isRowHouseMode ? `Add a building to ${rowHouseName}` : 'Organize your project into sections'}
+                </Text>
               </View>
-              <TouchableOpacity onPress={() => setShowAddModal(false)} style={styles.modalCloseBtn}>
+              <TouchableOpacity onPress={closeAddModal} style={styles.modalCloseBtn}>
                 <Ionicons name="close" size={22} color="#64748B" />
               </TouchableOpacity>
             </View>
 
             {/* Name input */}
             <View style={styles.modalInputGroup}>
-              <Text style={styles.modalInputLabel}>Section Name <Text style={{ color: '#EF4444' }}>*</Text></Text>
+              <Text style={styles.modalInputLabel}>
+                {isRowHouseMode ? 'Building Name' : 'Section Name'} <Text style={{ color: '#EF4444' }}>*</Text>
+              </Text>
               <View style={styles.modalInputWrap}>
                 <Ionicons name="bookmark-outline" size={18} color="#3A78B5" style={{ marginRight: 10 }} />
                 <TextInput
                   style={styles.modalInput}
-                  placeholder="e.g., Tower A, Building 1, Wing B"
+                  placeholder={isRowHouseMode ? 'e.g., Building 5, Block C' : 'e.g., Tower A, Building 1, Wing B'}
                   placeholderTextColor="#94A3B8"
                   value={newSectionName}
                   onChangeText={setNewSectionName}
@@ -1142,48 +1385,154 @@ const ProjectSections = () => {
               </View>
             </View>
 
-            {/* Type selector */}
-            <View style={styles.modalInputGroup}>
-              <Text style={styles.modalInputLabel}>Section Type</Text>
-              <View style={styles.typeRow}>
-                {[
-                  { key: 'building',  label: 'Building',  icon: 'business'  },
-                  { key: 'other',     label: 'Other',     icon: 'grid'      },
-                ].map(t => (
-                  <TouchableOpacity
-                    key={t.key}
-                    style={[styles.typeChip, newSectionType === t.key && styles.typeChipActive]}
-                    onPress={() => setNewSectionType(t.key)}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name={t.icon as any} size={18} color={newSectionType === t.key ? '#3A78B5' : '#64748B'} />
-                    <Text style={[styles.typeChipText, newSectionType === t.key && styles.typeChipTextActive]}>
-                      {t.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+            {/* Type selector — hidden in row house mode (always adds a building) */}
+            {!isRowHouseMode && (
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.modalInputLabel}>Section Type</Text>
+                <View style={styles.typeRow}>
+                  {[
+                    { key: 'building',  label: 'Building',   icon: 'business' },
+                    { key: 'rowhouse',  label: 'Row House',  icon: 'home'     },
+                    { key: 'other',     label: 'Other',      icon: 'grid'     },
+                  ].map(t => (
+                    <TouchableOpacity
+                      key={t.key}
+                      style={[styles.typeChip, newSectionType === t.key && styles.typeChipActive]}
+                      onPress={() => setNewSectionType(t.key)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name={t.icon as any} size={18} color={newSectionType === t.key ? '#3A78B5' : '#64748B'} />
+                      <Text style={[styles.typeChipText, newSectionType === t.key && styles.typeChipTextActive]}>
+                        {t.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
-            </View>
+            )}
+
+            {/* Building count — only when creating a Row House */}
+            {!isRowHouseMode && newSectionType === 'rowhouse' && (
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.modalInputLabel}>Number of Buildings <Text style={{ color: '#EF4444' }}>*</Text></Text>
+                <View style={styles.modalInputWrap}>
+                  <Ionicons name="business-outline" size={18} color="#10B981" style={{ marginRight: 10 }} />
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="e.g., 4"
+                    placeholderTextColor="#94A3B8"
+                    value={newBuildingCount}
+                    onChangeText={setNewBuildingCount}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <Text style={styles.rowHouseHint}>
+                  Building 1…N are created inside this row house. Each tracks its own materials, contractors, equipment & costs.
+                </Text>
+              </View>
+            )}
 
             {/* Actions */}
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowAddModal(false)} disabled={isAdding}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={closeAddModal} disabled={isAdding}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalAddBtn, isAdding && { opacity: 0.6 }]} onPress={handleAddSection} disabled={isAdding}>
                 <View style={styles.modalAddBtnInner}>
                   {isAdding
                     ? <ActivityIndicator size="small" color="#FFFFFF" />
-                    : <><Ionicons name="add-circle" size={18} color="#FFFFFF" /><Text style={styles.modalAddText}>Add Section</Text></>}
+                    : <><Ionicons name="add-circle" size={18} color="#FFFFFF" /><Text style={styles.modalAddText}>{isRowHouseMode ? 'Add Building' : 'Add Section'}</Text></>}
                 </View>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
+
+      {/* ── Row house building picker ─────────────────────────────────────────── */}
+      <Modal
+        visible={rhPicker !== null}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setRhPicker(null)}
+      >
+        <TouchableOpacity style={popupStyles.backdrop} activeOpacity={1} onPress={() => setRhPicker(null)}>
+          <TouchableOpacity activeOpacity={1} style={popupStyles.card} onPress={() => {}}>
+            <View style={popupStyles.header}>
+              <View style={[popupStyles.headerIcon, { backgroundColor: '#F0FDF4' }]}>
+                <Ionicons name="home" size={20} color="#10B981" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={popupStyles.title}>Select a Building</Text>
+                <Text style={popupStyles.subtitle} numberOfLines={1}>
+                  {rhPicker ? `${ROW_HOUSE_OPTION_LABEL[rhPicker.optionKey] || 'Activity'} · ${rhPicker.rowHouse.name}` : ''}
+                </Text>
+              </View>
+              <TouchableOpacity style={popupStyles.closeBtn} onPress={() => setRhPicker(null)}>
+                <Ionicons name="close" size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {rhBuildingsLoading ? (
+              <View style={{ paddingVertical: 28, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color="#10B981" />
+                <Text style={{ marginTop: 10, fontSize: 13, color: '#64748B' }}>Loading buildings…</Text>
+              </View>
+            ) : rhBuildings.length === 0 ? (
+              <View style={{ paddingVertical: 24, alignItems: 'center', paddingHorizontal: 12 }}>
+                <Ionicons name="business-outline" size={30} color="#CBD5E1" />
+                <Text style={{ marginTop: 10, fontSize: 14, fontWeight: '700', color: '#334155' }}>No buildings yet</Text>
+                <Text style={{ marginTop: 4, fontSize: 12.5, color: '#94A3B8', textAlign: 'center' }}>
+                  Add buildings to this row house first.
+                </Text>
+                <TouchableOpacity
+                  style={rhPickerStyles.addBtn}
+                  activeOpacity={0.85}
+                  onPress={() => { const rh = rhPicker?.rowHouse; setRhPicker(null); if (rh) openRowHouse(rh); }}
+                >
+                  <Ionicons name="add" size={16} color="#FFFFFF" />
+                  <Text style={rhPickerStyles.addBtnText}>View Buildings</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
+                {rhBuildings.map((b, i) => (
+                  <View key={b._id || i}>
+                    {i > 0 && <View style={popupStyles.sep} />}
+                    <TouchableOpacity style={popupStyles.item} activeOpacity={0.75} onPress={() => handlePickBuilding(b)}>
+                      <View style={[popupStyles.itemIcon, { backgroundColor: '#EAF0FE' }]}>
+                        <Ionicons name="business" size={18} color="#3A78B5" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={popupStyles.itemLabel}>{b.name}</Text>
+                        <Text style={popupStyles.itemDesc}>Tap to continue</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={15} color="#CBD5E1" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
+
+const rhPickerStyles = StyleSheet.create({
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#10B981',
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  addBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+});
 
 // ─── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
@@ -1232,6 +1581,29 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
   },
   sectionAccentStrip: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4 },
+
+  // Row house container card (navigates into its buildings)
+  rowHouseCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    marginBottom: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    elevation: 3,
+  },
+  rowHouseIconWrap: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#F0FDF4', justifyContent: 'center', alignItems: 'center' },
+  rowHousePill: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
+  rowHousePillText: { fontSize: 11.5, fontWeight: '600', color: '#10B981' },
+  rowHouseChevron: { width: 32, height: 32, borderRadius: 11, backgroundColor: '#F0FDF4', justifyContent: 'center', alignItems: 'center' },
+  rowHouseHint: { fontSize: 12, color: '#64748B', lineHeight: 17, marginTop: 8 },
   sectionHeaderRow:   { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingLeft: 20, paddingRight: 16, gap: 12 },
   indexBadge:         { width: 30, height: 30, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   indexBadgeText:     { fontSize: 12, fontWeight: '800' },
@@ -1244,6 +1616,8 @@ const styles = StyleSheet.create({
   statusPillText:     { fontSize: 11, fontWeight: '700' },
   chevronWrap:        { width: 32, height: 32 },
   chevronCircle:      { width: 32, height: 32, borderRadius: 11, backgroundColor: '#EAF0FE', justifyContent: 'center', alignItems: 'center' },
+  viewBuildingsBtn:   { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#BBF7D0', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, marginRight: 8 },
+  viewBuildingsBtnText: { fontSize: 12, fontWeight: '700', color: '#10B981' },
 
   // Options
   optionsContainer:   { paddingHorizontal: 16, paddingBottom: 14 },

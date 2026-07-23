@@ -3,8 +3,29 @@ import AnalyticsDashboardSkeleton from '@/components/common/AnalyticsDashboardSk
 import PieChart, { PieChartColors20 } from '@/components/PieChart';
 import PieChartLegend, { LegendItem } from '@/components/PieChartLegend';
 import { formatCurrency } from '@/utils/analytics';
+import apiClient from '@/utils/axiosConfig';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
+// A section may be a row house container. Its materials/labor/equipment live on
+// its nested buildings, so its expense must be aggregated from those buildings.
+const isRowHouseType = (type?: string) => {
+  const t = (type || '').toLowerCase();
+  return t === 'rowhouse' || t === 'row house' || t === 'row-house';
+};
+
+// Buildings inside a row house are stored as "Building N" but shown as "House N",
+// sorted ascending by number.
+const toHouseLabel = (name?: string) =>
+  (name || '').replace(/buildings?/i, 'House').trim() || (name || '');
+
+const houseNumber = (name?: string) => {
+  const m = (name || '').match(/(\d+)/);
+  return m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER;
+};
+
+const sortHousesAsc = <T extends { name?: string }>(list: T[]): T[] =>
+  [...list].sort((a, b) => houseNumber(a.name) - houseNumber(b.name));
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -46,6 +67,8 @@ const ProjectSectionsAnalytics: React.FC = () => {
   const [totalEquipment, setTotalEquipment] = useState(0); // Add total equipment state
   const [totalImported, setTotalImported] = useState(0); // Add total imported materials state
   const [parsedEquipments, setParsedEquipments] = useState<any[]>([]); // Add state for equipment data
+  // rowHouseId → its building sections (used to aggregate + drill into a row house)
+  const [rowHouseBuildings, setRowHouseBuildings] = useState<Record<string, any[]>>({});
 
   useEffect(() => {
     loadSectionExpenses();
@@ -214,12 +237,61 @@ const ProjectSectionsAnalytics: React.FC = () => {
         }
       }
 
+      // Row houses hold their activities on nested buildings, not on the row house
+      // section itself. Fetch each row house's buildings so their expenses can be
+      // aggregated up to the row house (and drilled into on tap).
+      const rowHouseSections = parsedSections.filter((s: any) => isRowHouseType(s.type));
+      const rhBuildingsMap: Record<string, any[]> = {};
+      await Promise.all(
+        rowHouseSections.map(async (rh: any) => {
+          const rhId = rh.sectionId || rh._id;
+          try {
+            const res = await apiClient.get(`/api/building?rowHouseId=${rhId}`);
+            const list = (res.data as any)?.data || [];
+            rhBuildingsMap[rhId] = sortHousesAsc(list).map((b: any) => ({
+              _id: b._id,
+              sectionId: b._id,
+              name: toHouseLabel(b.name),
+              type: 'Buildings',
+            }));
+          } catch (err) {
+            console.warn(`⚠️ Failed to load buildings for row house ${rhId}`, err);
+            rhBuildingsMap[rhId] = [];
+          }
+        })
+      );
+      setRowHouseBuildings(rhBuildingsMap);
+
       // Calculate expenses per section from MaterialUsed + Labor + Equipment
       const sectionExpenses: SectionExpense[] = parsedSections.map((section: any) => {
         console.log(`\n🔍 Processing section: ${section.name}`);
         console.log(`   - section._id: ${section._id}`);
         console.log(`   - section.sectionId: ${section.sectionId}`);
-        
+
+        // Row house → aggregate the expenses of all buildings inside it.
+        if (isRowHouseType(section.type)) {
+          const rhId = section.sectionId || section._id;
+          const buildingIds = new Set((rhBuildingsMap[rhId] || []).map((b: any) => String(b.sectionId)));
+          const inRowHouse = (sid: any) => buildingIds.has(String(sid));
+
+          const rhMaterial = parsedMaterialUsed
+            .filter((m: any) => inRowHouse(m.sectionId))
+            .reduce((sum: number, m: any) => sum + (m.totalCost || m.cost || 0), 0);
+          const rhLabor = parsedLabors
+            .filter((l: any) => inRowHouse(l.sectionId))
+            .reduce((sum: number, l: any) => sum + (l.totalCost || 0), 0);
+          const rhEquipment = parsedEquipments
+            .filter((e: any) => {
+              const isActive = e.status === 'active' || !e.status;
+              return isActive && (inRowHouse(e.sectionId) || inRowHouse(e.projectSectionId));
+            })
+            .reduce((sum: number, e: any) => sum + (e.totalCost || e.cost || e.amount || e.price || 0), 0);
+
+          const rhTotal = rhMaterial + rhLabor + rhEquipment;
+          console.log(`   - 🏘️ Row house "${section.name}" aggregated ${buildingIds.size} buildings → ₹${rhTotal}`);
+          return { _id: rhId, name: section.name, type: section.type, totalExpense: rhTotal };
+        }
+
         const sectionMaterials = parsedMaterialUsed.filter(
           (material: any) =>
             material.sectionId === section.sectionId || material.sectionId === section._id
@@ -397,10 +469,29 @@ const ProjectSectionsAnalytics: React.FC = () => {
     
     const section = sections.find((s) => s._id === sectionId);
     if (section) {
-      // CRITICAL: section._id already contains the correct sectionId 
+      // Row house → drill into its buildings (this same screen, buildings as sections).
+      if (isRowHouseType(section.type)) {
+        const buildings = rowHouseBuildings[section._id] || [];
+        console.log(`🏘️ Row house tapped → drilling into ${buildings.length} buildings`);
+        router.push({
+          pathname: '/analytics/project-sections-analytics',
+          params: {
+            projectId,
+            projectName: `${projectName} · ${section.name}`,
+            sections: JSON.stringify(buildings),
+            materialAvailable,
+            materialUsed,
+            labors: laborsData,
+            equipments: JSON.stringify(parsedEquipments),
+          },
+        });
+        return;
+      }
+
+      // CRITICAL: section._id already contains the correct sectionId
       // (set in line 265: _id: section.sectionId || section._id)
       // So we just use section._id directly, no need to extract again
-      
+
       console.log('🔍 Project Sections - Navigating to mini-sections with data:', {
         sectionId: section._id,
         sectionName: section.name,
@@ -433,7 +524,7 @@ const ProjectSectionsAnalytics: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} stickyHeaderIndices={[0]}>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
@@ -535,6 +626,11 @@ const ProjectSectionsAnalytics: React.FC = () => {
             <View style={styles.heading}>
               <Text style={styles.title}>Section Expenses</Text>
               <Text style={styles.subtitle}>Materials + Labor + Equipment by Section</Text>
+            </View>
+
+            <View style={styles.tapHint}>
+              <Ionicons name="finger-print-outline" size={15} color="#3A78B5" />
+              <Text style={styles.tapHintText}>Tap a section to view its slab expenses</Text>
             </View>
 
             <View style={styles.chartContainer}>
@@ -688,6 +784,25 @@ const styles = StyleSheet.create({
   chartContainer: {
     alignItems: 'center',
     marginVertical: 20,
+  },
+  tapHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    alignSelf: 'center',
+    backgroundColor: '#EAF0FE',
+    borderWidth: 1,
+    borderColor: '#C4D8FC',
+    borderRadius: 99,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    marginTop: 12,
+  },
+  tapHintText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#3A78B5',
   },
   loadingContainer: {
     flex: 1,

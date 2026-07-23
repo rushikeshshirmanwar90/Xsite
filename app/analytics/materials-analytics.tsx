@@ -335,7 +335,7 @@ const MaterialsAnalytics: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} stickyHeaderIndices={[0]}>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
@@ -413,7 +413,7 @@ const MaterialsAnalytics: React.FC = () => {
             <Ionicons name="cube-outline" size={64} color="#CBD5E1" />
             <Text style={styles.emptyTitle}>No Data Available</Text>
             <Text style={styles.emptySubtitle}>
-              No materials or labor have been used in this mini-section yet
+              No materials or labor have been used in this slab yet
             </Text>
           </View>
         ) : (
@@ -548,7 +548,7 @@ const MaterialsAnalytics: React.FC = () => {
                   No {activeTab === 'materials' ? 'Materials' : 'Labor'} Data
                 </Text>
                 <Text style={styles.emptySubtitle}>
-                  No {activeTab === 'materials' ? 'materials have been used' : 'labor has been assigned'} in this mini-section yet
+                  No {activeTab === 'materials' ? 'materials have been used' : 'labor has been assigned'} in this slab yet
                 </Text>
               </View>
             )}

@@ -295,6 +295,77 @@ export class SimpleNotificationService {
   }
 
   /**
+   * Unregister token with backend — call on logout.
+   *
+   * Removes this user's push token from the backend so the server stops
+   * delivering notifications to the device once the user is logged out.
+   * Must be called BEFORE auth data is cleared from storage, since it needs
+   * the userId. Pass the userId explicitly when the caller still has it in
+   * memory; otherwise it falls back to the stored `user` record.
+   */
+  async unregisterToken(userId?: string): Promise<boolean> {
+    try {
+      let resolvedUserId = userId;
+
+      if (!resolvedUserId) {
+        const userDetailsString = await AsyncStorage.getItem('user');
+        if (userDetailsString) {
+          try {
+            resolvedUserId = JSON.parse(userDetailsString)?._id?.toString();
+          } catch {
+            // ignore parse errors — handled by the missing-id guard below
+          }
+        }
+      }
+
+      if (!resolvedUserId) {
+        console.log('⚠️ No userId available to unregister push token');
+        return false;
+      }
+
+      console.log('🗑️ Unregistering push token for userId:', resolvedUserId);
+
+      const response = await apiClient.delete(
+        `/api/notifications/register-token?userId=${encodeURIComponent(resolvedUserId)}`,
+        { timeout: 10000 }
+      );
+
+      // Treat both a successful delete and a "no token found" (404) as success —
+      // either way the device is no longer registered on the backend.
+      if ((response.data as any)?.success) {
+        console.log('✅ Push token unregistered from backend');
+      } else {
+        console.log('⚠️ Unregister response was not successful:', response.data);
+      }
+
+      this.currentToken = null;
+      await AsyncStorage.multiRemove([
+        'pushTokenRegistered',
+        'registeredClientId',
+        'pushToken',
+        'pushTokenRegistrationTime',
+      ]);
+
+      return true;
+    } catch (error: any) {
+      // A 404 means there was no token to remove — that's still the desired end state.
+      if (error?.response?.status === 404) {
+        console.log('ℹ️ No push token found on backend to unregister (already gone)');
+        this.currentToken = null;
+        await AsyncStorage.multiRemove([
+          'pushTokenRegistered',
+          'registeredClientId',
+          'pushToken',
+          'pushTokenRegistrationTime',
+        ]);
+        return true;
+      }
+      console.error('❌ Error unregistering push token:', error?.message || error);
+      return false;
+    }
+  }
+
+  /**
    * Send notification for project activity
    */
   async sendProjectNotification(activityData: {

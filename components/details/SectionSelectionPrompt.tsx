@@ -73,7 +73,7 @@ const SectionSelectionPrompt: React.FC<SectionSelectionPromptProps> = ({
                     <View style={styles.header}>
                         <View style={styles.headerContent}>
                             <Ionicons name="layers-outline" size={24} color="#3A78B5" />
-                            <Text style={styles.title}>Select a Mini-Section</Text>
+                            <Text style={styles.title}>Select a Slab</Text>
                         </View>
                         <TouchableOpacity onPress={onClose} style={styles.closeButton}>
                             <Ionicons name="close" size={24} color="#64748B" />
@@ -83,7 +83,7 @@ const SectionSelectionPrompt: React.FC<SectionSelectionPromptProps> = ({
                     {/* Subtitle */}
                     <View style={styles.subtitleContainer}>
                         <Text style={styles.subtitle}>
-                            Choose a mini-section from <Text style={styles.projectName}>{projectName}</Text>
+                            Choose a slab from <Text style={styles.projectName}>{projectName}</Text>
                             {sectionName && (
                                 <>
                                     <Text style={styles.separator}> › </Text>
@@ -92,7 +92,7 @@ const SectionSelectionPrompt: React.FC<SectionSelectionPromptProps> = ({
                             )}
                         </Text>
                         <Text style={styles.description}>
-                            Select a mini-section (like Foundation, First Slab, etc.) to view and manage materials
+                            Select a slab (like Foundation, First Slab, etc.) to view and manage materials
                         </Text>
                     </View>
 
@@ -120,7 +120,7 @@ const SectionSelectionPrompt: React.FC<SectionSelectionPromptProps> = ({
                                     <View style={styles.sectionInfo}>
                                         <Text style={styles.sectionName}>{section.name}</Text>
                                         <Text style={styles.sectionDescription}>
-                                            Tap to view materials for this mini-section
+                                            Tap to view materials for this slab
                                         </Text>
                                     </View>
                                     <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
@@ -131,7 +131,7 @@ const SectionSelectionPrompt: React.FC<SectionSelectionPromptProps> = ({
                                 <Ionicons name="cube-outline" size={48} color="#9CA3AF" />
                                 <Text style={styles.emptyTitle}>No Sections Found</Text>
                                 <Text style={styles.emptyDescription}>
-                                    No mini-sections are available for this section yet.
+                                    No slabs are available for this section yet.
                                 </Text>
                             </View>
                         )}

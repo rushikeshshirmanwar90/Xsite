@@ -3,7 +3,7 @@
     "name": "Xsite",
     "slug": "site_Ex",
     "owner": "codewithrushi",
-    "version": "1.3.5",
+    "version": "1.4.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "xsite",
@@ -21,7 +21,7 @@
     "android": {
       "package": "com.codewithrushi.xsite",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 35,
+      "versionCode": 36,
       "adaptiveIcon": {
         "backgroundColor": "#ffffff",
         "foregroundImage": "./assets/images/icon.png",

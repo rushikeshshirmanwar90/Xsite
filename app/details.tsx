@@ -1225,7 +1225,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     const handleLinkPhase = async (phaseId: string, options?: { force?: boolean }) => {
         const miniSec = getActiveMiniSection();
         if (!miniSec) {
-            toast.error('Please select a mini-section first');
+            toast.error('Please select a slab first');
             return;
         }
 
@@ -1644,14 +1644,22 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
         const projectWideTotalImported = projectWideAvailable + projectWideUsed;
 
-        // Section-specific used calculation (when mini-section is selected)
-        let sectionSpecificUsed = projectWideUsed;
+        // Section-specific used calculation. Usage is owned by a single building /
+        // section, so the "used" figure is scoped to this section (and further to a
+        // mini-section when one is selected). Available/imported stay project-wide.
+        const inSection = (m: any) => !sectionId || String(m.sectionId || '') === String(sectionId);
+
+        let sectionSpecificUsed = usedMaterials
+            .filter(m => m.name === materialName && m.unit === materialUnit && matchesSpecs(m) && inSection(m))
+            .reduce((sum, m) => sum + m.quantity, 0);
+
         if (selectedMiniSection && isValidMongoId(selectedMiniSection)) {
             sectionSpecificUsed = usedMaterials
                 .filter(m =>
                     m.name === materialName &&
                     m.unit === materialUnit &&
                     matchesSpecs(m) &&
+                    inSection(m) &&
                     m.miniSectionId === selectedMiniSection
                 )
                 .reduce((sum, m) => sum + m.quantity, 0);
@@ -1841,7 +1849,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     // selected mini-section only (via the new miniSectionId filter on the report API).
     const handleGenerateReport = async () => {
         if (!selectedMiniSection) {
-            toast.error('Please select a mini-section first');
+            toast.error('Please select a slab first');
             return;
         }
         const miniSec = getActiveMiniSection();
@@ -1870,12 +1878,12 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             const activities = responseData.data?.activities || [];
 
             if (activities.length === 0) {
-                toast.error(`No material usage recorded yet for "${miniSec?.name || 'this mini-section'}"`);
+                toast.error(`No material usage recorded yet for "${miniSec?.name || 'this slab'}"`);
                 return;
             }
 
             const currentUser = await getUserData();
-            const reportTitle = `${projectName}${sectionName ? ` - ${sectionName}` : ''} - ${miniSec?.name || 'Mini-Section'}`;
+            const reportTitle = `${projectName}${sectionName ? ` - ${sectionName}` : ''} - ${miniSec?.name || 'Slab'}`;
 
             const pdfGenerator = new PDFReportGenerator({}, { name: currentUser.fullName });
             await pdfGenerator.generatePDF(activities, reportTitle);
@@ -2036,7 +2044,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     // currently selected mini-section's used materials.
     const handleMaterialAnalysisPress = () => {
         if (!selectedMiniSection) {
-            toast.error('Please select a mini-section first');
+            toast.error('Please select a slab first');
             return;
         }
         const miniSec = getActiveMiniSection();
@@ -2251,7 +2259,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
                     errorMessage = 'Request timed out. Please check your connection and try again.';
                 } else if (error.response?.status === 404) {
-                    errorMessage = 'Mini-section not found. Please refresh the page.';
+                    errorMessage = 'Slab not found. Please refresh the page.';
                 } else if (error.response?.status >= 500) {
                     errorMessage = 'Server error. Please try again later.';
                 } else if (error.response?.data?.message) {
@@ -3932,7 +3940,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
         try {
             // Show confirmation alert
             Alert.alert(
-                'Delete Mini-Section',
+                'Delete Slab',
                 `Are you sure you want to delete "${miniSectionName}"? This action cannot be undone.`,
                 [
                     {
@@ -4054,8 +4062,8 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
                 // Show warning alert for mini-sections with used materials
                 Alert.alert(
-                    'Cannot Delete Mini-Section',
-                    `Cannot delete "${miniSectionName}" because it contains ${usedMaterialsInfo.count} used material${usedMaterialsInfo.count > 1 ? 's' : ''} worth ₹${usedMaterialsInfo.totalValue.toLocaleString()}.\n\nDeleting this mini-section would disturb the project calculations and material tracking.\n\nTo delete this mini-section, please first remove or transfer all used materials from it.`,
+                    'Cannot Delete Slab',
+                    `Cannot delete "${miniSectionName}" because it contains ${usedMaterialsInfo.count} used material${usedMaterialsInfo.count > 1 ? 's' : ''} worth ₹${usedMaterialsInfo.totalValue.toLocaleString()}.\n\nDeleting this slab would disturb the project calculations and material tracking.\n\nTo delete this slab, please first remove or transfer all used materials from it.`,
                     [
                         {
                             text: 'OK',
@@ -4068,7 +4076,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
             // Show confirmation alert for mini-sections without used materials
             Alert.alert(
-                'Delete Mini-Section',
+                'Delete Slab',
                 `Are you sure you want to delete "${miniSectionName}"? This action cannot be undone.`,
                 [
                     {
@@ -4172,11 +4180,22 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
         // The API already handles pagination and filtering, so we don't need to filter again
         const rawMaterials: Material[] = activeTab === 'imported' ? (materials?.available || []) : (materials?.used || []);
 
-        // ✅ MINI-SECTION FILTER: When a specific mini-section is selected on the "used" tab,
-        // filter the displayed materials to only show those belonging to that mini-section.
-        // This ensures the UI list matches exactly what the report will generate.
-        if (activeTab === 'used' && selectedMiniSection && isValidMongoId(selectedMiniSection)) {
-            return rawMaterials.filter(m => m.miniSectionId === selectedMiniSection);
+        // Material AVAILABLE is shared project-wide, but material USAGE is
+        // section-specific: a building only shows the material it actually used.
+        if (activeTab === 'used') {
+            let list = rawMaterials;
+
+            // Restrict to this section/building's own usage.
+            if (sectionId) {
+                list = list.filter(m => String(m.sectionId || '') === String(sectionId));
+            }
+
+            // Optional further narrowing to a selected mini-section (sub-phase).
+            if (selectedMiniSection && isValidMongoId(selectedMiniSection)) {
+                list = list.filter(m => m.miniSectionId === selectedMiniSection);
+            }
+
+            return list;
         }
 
         return rawMaterials;
@@ -4196,7 +4215,8 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
     const totalItems = activeTab === 'imported'
         ? (materials?.pagination?.available?.totalItems || 0)
-        : (materials?.pagination?.used?.totalItems || 0);
+        // Used is section-scoped client-side, so count the filtered entries actually shown.
+        : getCurrentData().length;
 
     useEffect(() => {
         fetchMaterials(1, MATERIALS_FETCH_LIMIT, true);
@@ -4693,7 +4713,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         {isAddingMaterial
                             ? <Ionicons name="sync" size={16} color="#fff" />
                             : <Ionicons name="add" size={17} color="#fff" />}
-                        <Text style={pageBannerStyles.addMaterialBtnText}>Add Material</Text>
+                        <Text style={pageBannerStyles.addMaterialBtnText}>Add Purchase Material</Text>
                     </TouchableOpacity>
                 ) : (
                     <TouchableOpacity
@@ -4912,7 +4932,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                 <View style={sectionStyles.noSectionsWrapper}>
                                     <View style={sectionStyles.noSectionsCompact}>
                                         <Ionicons name="alert-circle-outline" size={16} color="#D97706" />
-                                        <Text style={sectionStyles.noSectionsTextCompact}>No mini-sections</Text>
+                                        <Text style={sectionStyles.noSectionsTextCompact}>No slabs</Text>
                                     </View>
                                     <SectionManager
                                         onSectionSelect={(sectionId) => {
@@ -5264,9 +5284,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                         {miniSections.length === 0 ? (
                                             <>
                                                 <Ionicons name="layers-outline" size={64} color="#CBD5E1" />
-                                                <Text style={styles.noMaterialsTitle}>No Mini-Sections Found</Text>
+                                                <Text style={styles.noMaterialsTitle}>No Slabs Found</Text>
                                                 <Text style={[styles.noMaterialsDescription, { marginBottom: 20 }]}>
-                                                    Create mini-sections to organize and track material usage in different areas of your project.
+                                                    Create slabs to organize and track material usage in different areas of your project.
                                                 </Text>
                                                 <TouchableOpacity
                                                     style={{
@@ -5441,9 +5461,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                             {miniSections.length === 0 ? (
                                 <>
                                     <Ionicons name="layers-outline" size={64} color="#CBD5E1" />
-                                    <Text style={styles.noMaterialsTitle}>No Mini-Sections Found</Text>
+                                    <Text style={styles.noMaterialsTitle}>No Slabs Found</Text>
                                     <Text style={[styles.noMaterialsDescription, { marginBottom: 20 }]}>
-                                        Create mini-sections to organize and track material usage in different areas of your project.
+                                        Create slabs to organize and track material usage in different areas of your project.
                                     </Text>
                                     <TouchableOpacity
                                         style={{
@@ -6203,7 +6223,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                     fontWeight: '600',
                                     color: '#1F2937',
                                 }}>
-                                    Select Mini-Section
+                                    Select Slab
                                 </Text>
                                 <Text style={{
                                     fontSize: 14,
@@ -6286,7 +6306,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                         fontSize: 10,
                                         color: '#6B7280',
                                     }}>
-                                        Show materials from all mini-sections
+                                        Show materials from all slabs
                                     </Text>
                                 </View>
                                 {!selectedMiniSection && (
@@ -6358,7 +6378,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                         color: '#374151',
                                         marginBottom: 8,
                                     }}>
-                                        No Mini-Sections
+                                        No Slabs
                                     </Text>
                                     <Text style={{
                                         fontSize: 14,
@@ -6366,7 +6386,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                         textAlign: 'center',
                                         lineHeight: 20,
                                     }}>
-                                        Create mini-sections to organize{'\n'}your materials better
+                                        Create slabs to organize{'\n'}your materials better
                                     </Text>
                                 </View>
                             )}
@@ -6409,7 +6429,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                             <Ionicons name="construct-outline" size={40} color="#CBD5E1" />
                                             <Text style={{ fontSize: 14, color: '#94A3B8', marginTop: 12, fontWeight: '500' }}>No phases found</Text>
                                             <Text style={{ fontSize: 12, color: '#CBD5E1', marginTop: 4, textAlign: 'center' }}>
-                                                Initialize the construction tracker for this mini-section first.
+                                                Initialize the construction tracker for this slab first.
                                             </Text>
                                         </View>
                                     );
