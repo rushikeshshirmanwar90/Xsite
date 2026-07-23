@@ -26,6 +26,8 @@ import {
 import { staffStorage } from '@/utils/staffStorage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+const fmtINR = (v: number) => `₹${Number(v).toLocaleString('en-IN')}`;
+
 const ProjectScreen: React.FC = () => {
     const [addingProject, setAddingProject] = useState(false);
     const [clientId, setClientId] = useState('');
@@ -1091,10 +1093,13 @@ const ProjectScreen: React.FC = () => {
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
                 <View style={styles.titleSection}>
-                    <Text style={styles.headerTitle}>Manage All sites Projects</Text>
-                    <Text style={styles.headerSubtitle}>
-                        {projects.length} project{projects.length !== 1 ? 's' : ''}
-                    </Text>
+                    <View style={styles.titleRow}>
+                        <Text style={styles.headerTitle}>Projects</Text>
+                        <View style={styles.countBadge}>
+                            <Text style={styles.countBadgeText}>{projects.length}</Text>
+                        </View>
+                    </View>
+                    <Text style={styles.headerSubtitle}>Manage all your construction sites</Text>
                 </View>
 
                 {userIsAdmin && (
@@ -1153,41 +1158,68 @@ const ProjectScreen: React.FC = () => {
                     <ManageSitesListSkeleton count={5} />
                 ) : projects.length === 0 ? (
                     <View style={styles.centered}>
-                        <Ionicons name="folder-open-outline" size={64} color="#CBD5E1" />
-                        <Text style={styles.emptyTitle}>No projects found</Text>
+                        <View style={styles.emptyIconWrap}>
+                            <Ionicons name="folder-open-outline" size={34} color="#94A3B8" />
+                        </View>
+                        <Text style={styles.emptyTitle}>No projects yet</Text>
                         <Text style={styles.emptySubtitle}>
                             {userIsAdmin
-                                ? 'Tap "Add New Project" to get started'
+                                ? 'Create your first project to start tracking sites, materials and costs.'
                                 : 'No projects available. Contact your admin to add projects.'}
                         </Text>
+                        {userIsAdmin && (
+                            <TouchableOpacity
+                                style={styles.emptyCtaBtn}
+                                onPress={() => setShowAddModal(true)}
+                                activeOpacity={0.85}
+                            >
+                                <Ionicons name="add" size={18} color="#FFFFFF" />
+                                <Text style={styles.emptyCtaText}>Add New Project</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 ) : (
                     projects.map((project) => (
-                        <View key={project._id} style={styles.projectCard}>
-                            <View style={styles.projectInfo}>
-                                <Text style={styles.projectName}>{project.name}</Text>
-                                <Text style={styles.projectAddress} numberOfLines={1}>
-                                    {project.address}
-                                </Text>
-                            </View>
-                            
-                            <View style={styles.projectActions}>
-                                {/* Admin Controls */}
+                        <TouchableOpacity
+                            key={project._id}
+                            style={styles.projectCard}
+                            activeOpacity={0.85}
+                            onPress={() => project._id && handleAddDetails(project._id, project.name, project.section)}
+                        >
+                            {/* Top row — icon, name/address, admin actions */}
+                            <View style={styles.cardTop}>
+                                <View style={styles.projectIconWrap}>
+                                    <Ionicons name="business" size={20} color="#3A78B5" />
+                                </View>
+
+                                <View style={styles.projectInfo}>
+                                    <Text style={styles.projectName} numberOfLines={1}>{project.name}</Text>
+                                    <View style={styles.addressRow}>
+                                        <Ionicons name="location-outline" size={13} color="#94A3B8" />
+                                        <Text style={styles.projectAddress} numberOfLines={1}>
+                                            {project.address}
+                                        </Text>
+                                    </View>
+                                </View>
+
                                 {userIsAdmin && (
                                     <View style={styles.adminActions}>
                                         <TouchableOpacity
-                                            style={styles.editButton}
+                                            style={styles.iconActionBtn}
                                             onPress={() => handleEditProject(project)}
+                                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                                         >
-                                            <Ionicons name="create-outline" size={18} color="#059669" />
+                                            <Ionicons name="create-outline" size={17} color="#3A78B5" />
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             style={[
-                                                styles.deleteButton,
-                                                deletingProjectId === project._id && styles.deleteButtonDisabled
+                                                styles.iconActionBtn,
+                                                styles.iconActionBtnDanger,
+                                                deletingProjectId === project._id && styles.iconActionBtnDisabled
                                             ]}
                                             onPress={() => handleDeleteProject(project)}
                                             disabled={deletingProjectId === project._id}
+                                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                                         >
                                             {deletingProjectId === project._id ? (
                                                 <Animated.View
@@ -1200,23 +1232,41 @@ const ProjectScreen: React.FC = () => {
                                                         }]
                                                     }}
                                                 >
-                                                    <Ionicons name="sync" size={18} color="#9CA3AF" />
+                                                    <Ionicons name="sync" size={17} color="#9CA3AF" />
                                                 </Animated.View>
                                             ) : (
-                                                <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                                                <Ionicons name="trash-outline" size={17} color="#EF4444" />
                                             )}
                                         </TouchableOpacity>
                                     </View>
                                 )}
-                                
-                                <TouchableOpacity
-                                    style={styles.detailsButton}
-                                    onPress={() => project._id && handleAddDetails(project._id, project.name, project.section)}
-                                >
-                                    <Text style={styles.detailsButtonText}>Add Details</Text>
-                                </TouchableOpacity>
                             </View>
-                        </View>
+
+                            <View style={styles.cardDivider} />
+
+                            {/* Footer row — budget / staff chips + open affordance */}
+                            <View style={styles.cardFooter}>
+                                <View style={styles.metaChips}>
+                                    {!!project.budget && (
+                                        <View style={styles.metaChip}>
+                                            <Ionicons name="wallet-outline" size={12} color="#64748B" />
+                                            <Text style={styles.metaChipText}>{fmtINR(project.budget)}</Text>
+                                        </View>
+                                    )}
+                                    <View style={styles.metaChip}>
+                                        <Ionicons name="people-outline" size={12} color="#64748B" />
+                                        <Text style={styles.metaChipText}>
+                                            {(project.assignedStaff?.length || 0)} staff
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                <View style={styles.openLink}>
+                                    <Text style={styles.openLinkText}>View Details</Text>
+                                    <Ionicons name="chevron-forward" size={14} color="#3A78B5" />
+                                </View>
+                            </View>
+                        </TouchableOpacity>
                     ))
                 )}
             </ScrollView>
@@ -1237,11 +1287,20 @@ const ProjectScreen: React.FC = () => {
             >
                 <View style={styles.modalContainer}>
                     <View style={styles.modalHeader}>
-                        <TouchableOpacity onPress={() => setShowEditModal(false)}>
-                            <Ionicons name="close" size={24} color="#374151" />
+                        <TouchableOpacity
+                            style={styles.modalCloseBtn}
+                            onPress={() => setShowEditModal(false)}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="close" size={20} color="#475569" />
                         </TouchableOpacity>
-                        <Text style={styles.modalTitle}>Edit Project</Text>
-                        <View style={{ width: 24 }} />
+                        <View style={{ flex: 1, alignItems: 'center' }}>
+                            <Text style={styles.modalTitle}>Edit Project</Text>
+                            {!!editingProject && (
+                                <Text style={styles.modalSubtitle} numberOfLines={1}>{editingProject.name}</Text>
+                            )}
+                        </View>
+                        <View style={{ width: 36 }} />
                     </View>
 
                     <ScrollView style={styles.modalContent}>
@@ -1419,14 +1478,32 @@ const styles = StyleSheet.create({
         marginBottom: 16,
         gap: 4,
     },
+    titleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
     headerTitle: {
-        fontSize: 20,
+        fontSize: 22,
         fontWeight: '700',
         color: '#1E293B',
         letterSpacing: -0.5,
     },
+    countBadge: {
+        backgroundColor: '#EAF0FE',
+        borderRadius: 12,
+        paddingHorizontal: 10,
+        paddingVertical: 3,
+        minWidth: 28,
+        alignItems: 'center',
+    },
+    countBadgeText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#3A78B5',
+    },
     headerSubtitle: {
-        fontSize: 14,
+        fontSize: 13.5,
         color: '#64748B',
         fontWeight: '500',
     },
@@ -1490,6 +1567,15 @@ const styles = StyleSheet.create({
         color: '#64748b',
         fontWeight: '500',
     },
+    emptyIconWrap: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: '#F1F5F9',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 4,
+    },
     emptyTitle: {
         marginTop: 16,
         fontSize: 18,
@@ -1501,78 +1587,130 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#64748b',
         textAlign: 'center',
+        lineHeight: 20,
+        paddingHorizontal: 24,
     },
-    projectCard: {
-        backgroundColor: 'white',
-        borderRadius: 8,
-        padding: 16,
-        marginBottom: 12,
+    emptyCtaBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        gap: 6,
+        backgroundColor: '#3A78B5',
+        paddingVertical: 12,
+        paddingHorizontal: 22,
+        borderRadius: 12,
+        marginTop: 20,
+    },
+    emptyCtaText: {
+        color: '#FFFFFF',
+        fontSize: 14.5,
+        fontWeight: '600',
+    },
+    projectCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 14,
+        padding: 14,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
         elevation: 1,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
+    },
+    cardTop: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    projectIconWrap: {
+        width: 42,
+        height: 42,
+        borderRadius: 12,
+        backgroundColor: '#EAF0FE',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     projectInfo: {
         flex: 1,
-        marginRight: 12,
+        gap: 3,
     },
     projectName: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#1e293b',
-        marginBottom: 4,
+        fontSize: 15.5,
+        fontWeight: '700',
+        color: '#1E293B',
+        letterSpacing: -0.2,
     },
-    projectAddress: {
-        fontSize: 14,
-        color: '#64748b',
-    },
-    projectActions: {
+    addressRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 4,
+    },
+    projectAddress: {
+        flex: 1,
+        fontSize: 13,
+        color: '#64748B',
     },
     adminActions: {
         flexDirection: 'row',
-        gap: 6,
+        gap: 8,
     },
-    editButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: '#F0FDF4',
+    iconActionBtn: {
+        width: 34,
+        height: 34,
+        borderRadius: 10,
+        backgroundColor: '#EAF0FE',
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#BBF7D0',
     },
-    deleteButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+    iconActionBtnDanger: {
         backgroundColor: '#FEF2F2',
-        justifyContent: 'center',
+    },
+    iconActionBtnDisabled: {
+        backgroundColor: '#F1F5F9',
+    },
+    cardDivider: {
+        height: 1,
+        backgroundColor: '#F1F5F9',
+        marginVertical: 12,
+    },
+    cardFooter: {
+        flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 8,
+    },
+    metaChips: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        flexShrink: 1,
+    },
+    metaChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: '#F8FAFC',
         borderWidth: 1,
-        borderColor: '#FECACA',
+        borderColor: '#E2E8F0',
+        borderRadius: 8,
+        paddingHorizontal: 9,
+        paddingVertical: 5,
     },
-    deleteButtonDisabled: {
-        backgroundColor: '#F3F4F6',
-        borderColor: '#E5E7EB',
+    metaChipText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#475569',
     },
-    detailsButton: {
-        backgroundColor: '#e0f2fe',
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        borderRadius: 6,
+    openLink: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
     },
-    detailsButtonText: {
-        color: '#0369a1',
-        fontWeight: '500',
-        fontSize: 14,
+    openLinkText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#3A78B5',
     },
     // Modal Styles
     modalContainer: {
@@ -1584,14 +1722,31 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingVertical: 16,
+        paddingVertical: 14,
         borderBottomWidth: 1,
-        borderBottomColor: '#E5E7EB',
+        borderBottomColor: '#E2E8F0',
+        backgroundColor: '#FFFFFF',
+    },
+    modalCloseBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#F1F5F9',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     modalTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#1F2937',
+        fontSize: 17,
+        fontWeight: '700',
+        color: '#1E293B',
+        letterSpacing: -0.3,
+    },
+    modalSubtitle: {
+        fontSize: 12.5,
+        color: '#64748B',
+        fontWeight: '500',
+        marginTop: 1,
+        maxWidth: 220,
     },
     modalContent: {
         flex: 1,
@@ -1613,20 +1768,20 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     inputLabel: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: '#374151',
+        fontSize: 13.5,
+        fontWeight: '600',
+        color: '#334155',
         marginBottom: 8,
     },
     textInput: {
         borderWidth: 1,
-        borderColor: '#D1D5DB',
-        borderRadius: 8,
-        paddingHorizontal: 12,
+        borderColor: '#E2E8F0',
+        borderRadius: 10,
+        paddingHorizontal: 14,
         paddingVertical: 12,
-        fontSize: 16,
-        color: '#1F2937',
-        backgroundColor: '#FFFFFF',
+        fontSize: 15.5,
+        color: '#1E293B',
+        backgroundColor: '#F8FAFC',
     },
     textArea: {
         minHeight: 100,
@@ -1642,30 +1797,30 @@ const styles = StyleSheet.create({
     },
     cancelButton: {
         flex: 1,
-        paddingVertical: 12,
-        borderRadius: 8,
-        backgroundColor: '#F3F4F6',
+        paddingVertical: 13,
+        borderRadius: 12,
+        backgroundColor: '#F1F5F9',
         alignItems: 'center',
         justifyContent: 'center',
     },
     cancelButtonText: {
-        fontSize: 16,
+        fontSize: 15.5,
         fontWeight: '600',
-        color: '#6B7280',
+        color: '#475569',
     },
     saveButton: {
         flex: 1,
-        paddingVertical: 12,
-        borderRadius: 8,
+        paddingVertical: 13,
+        borderRadius: 12,
         backgroundColor: '#3A78B5',
         alignItems: 'center',
         justifyContent: 'center',
     },
     saveButtonDisabled: {
-        backgroundColor: '#9CA3AF',
+        backgroundColor: '#94A3B8',
     },
     saveButtonText: {
-        fontSize: 16,
+        fontSize: 15.5,
         fontWeight: '600',
         color: '#FFFFFF',
     },

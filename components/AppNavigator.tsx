@@ -35,7 +35,25 @@ const AppNavigator: React.FC = () => {
   const router = useRouter();
   const segments = useSegments();
 
-  // ✅ Handle notification tap - Navigate to notification page (skip in Expo Go)
+  // Notification responses already navigated for — prevents the cold-start check
+  // and the live tap listener from handling the same tap twice.
+  const handledNotificationIds = React.useRef<Set<string>>(new Set());
+  // Set when the app was launched (cold start) by a notification tap; navigation
+  // is deferred until auth has finished loading so the login/tabs redirect
+  // doesn't immediately override it.
+  const [pendingNotificationNav, setPendingNotificationNav] = React.useState(false);
+
+  const navigateToNotifications = React.useCallback(() => {
+    try {
+      router.push('/notification');
+    } catch (error) {
+      console.error('❌ Navigation error from notification:', error);
+      // Fallback navigation
+      router.replace('/(tabs)');
+    }
+  }, [router]);
+
+  // ✅ Handle notification tap while the app is running (skip in Expo Go)
   useEffect(() => {
     if (isExpoGo) {
       console.log('⚠️ Push notifications not available in Expo Go - use development build for full functionality');
@@ -45,22 +63,70 @@ const AppNavigator: React.FC = () => {
     try {
       const subscription = Notifications.addNotificationResponseReceivedListener(response => {
         console.log('🔔 Notification tapped:', response);
-        
-        // Navigate to notification page when user taps notification
-        try {
-          router.push('/notification');
-        } catch (error) {
-          console.error('❌ Navigation error from notification:', error);
-          // Fallback navigation
-          router.replace('/(tabs)');
+
+        const id = response?.notification?.request?.identifier;
+        if (id) {
+          if (handledNotificationIds.current.has(id)) return;
+          handledNotificationIds.current.add(id);
         }
+
+        navigateToNotifications();
       });
 
       return () => subscription.remove();
     } catch (error) {
       console.log('⚠️ Notification listener setup skipped');
     }
-  }, [router]);
+  }, [navigateToNotifications]);
+
+  // ✅ Handle cold start: app was killed and opened BY tapping a notification.
+  // The live listener above doesn't reliably fire in that case, so check the
+  // last notification response once on mount.
+  useEffect(() => {
+    if (isExpoGo) return;
+
+    try {
+      Notifications.getLastNotificationResponseAsync()
+        .then((response: Notifications.NotificationResponse | null) => {
+          if (!response) return;
+
+          const id = response.notification?.request?.identifier;
+          if (id) {
+            if (handledNotificationIds.current.has(id)) return;
+            handledNotificationIds.current.add(id);
+          }
+
+          console.log('🔔 App opened from notification (cold start)');
+          setPendingNotificationNav(true);
+        })
+        .catch((error: unknown) => {
+          console.log('⚠️ Could not read last notification response:', error);
+        });
+    } catch (error) {
+      console.log('⚠️ Cold start notification check skipped');
+    }
+  }, []);
+
+  // Complete the cold-start navigation once auth state is known. Waits out the
+  // auth redirect below (which uses a 100ms timeout) so /notification wins.
+  useEffect(() => {
+    if (!pendingNotificationNav || isLoading) return;
+
+    setPendingNotificationNav(false);
+
+    if (!isAuthenticated) {
+      // Not logged in — let the normal login flow take over.
+      console.log('🔔 Skipping notification navigation - user not authenticated');
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      console.log('🔔 Navigating to /notification from cold start tap');
+      navigateToNotifications();
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [pendingNotificationNav, isLoading, isAuthenticated, navigateToNotifications]);
 
   // ✅ Handle notification received while app is in foreground (skip in Expo Go)
   useEffect(() => {

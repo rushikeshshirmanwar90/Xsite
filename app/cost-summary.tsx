@@ -1,5 +1,6 @@
 import ContractorReportGenerator from '@/app/components/contractor/ContractorReportGenerator';
 import CostSummarySkeleton from '@/components/CostSummarySkeleton';
+import { isAdmin, useUser } from '@/hooks/useUser';
 import { getClientId } from '@/functions/clientId';
 import apiClient from '@/utils/axiosConfig';
 import { PDFReportGenerator } from '@/utils/pdfReportGenerator';
@@ -141,6 +142,19 @@ const CostSummary = () => {
   const params = useLocalSearchParams();
   const projectId = params.projectId as string;
   const projectName = (params.projectName as string) || 'Project';
+
+  // Cost figures are admin-only. The entry button on project-sections is already
+  // hidden for staff — this guard also bounces anyone reaching the screen directly.
+  const { user, loading: userLoading } = useUser();
+  const userIsAdmin = isAdmin(user);
+
+  useEffect(() => {
+    if (userLoading) return;
+    if (!userIsAdmin) {
+      toast.error('Cost Summary is available to admins only.');
+      router.back();
+    }
+  }, [userLoading, userIsAdmin]);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -393,7 +407,7 @@ const CostSummary = () => {
         </View>
       </View>
 
-      {loading ? (
+      {loading || userLoading || !userIsAdmin ? (
         <View style={styles.scrollContent}>
           <CostSummarySkeleton />
         </View>

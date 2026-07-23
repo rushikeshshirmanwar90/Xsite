@@ -218,6 +218,8 @@ const formatDate = (date: Date | null) => {
     return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
+const fmtINR = (v: number) => `₹${Number(v).toLocaleString('en-IN')}`;
+
 const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onAdd, staffMembers }) => {
     // Wizard state
     const [currentStep, setCurrentStep] = useState(1);
@@ -457,7 +459,9 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                         <View style={styles.header}>
                             <View style={styles.headerTextBlock}>
                                 <Text style={styles.headerTitle}>Add New Project</Text>
-                                <Text style={styles.headerSubtitle}>Create a new project</Text>
+                                <Text style={styles.headerSubtitle}>
+                                    Step {currentStep} of {STEPS.length} — {STEPS[currentStep - 1].label}
+                                </Text>
                             </View>
                             <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.7}>
                                 <Ionicons name="close" size={20} color="#374151" />
@@ -583,7 +587,11 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                                                 onBlur={() => setFocusedField(null)}
                                             />
                                         </View>
-                                        <Text style={styles.helperText}>Enter total estimated budget</Text>
+                                        {!isNaN(parseFloat(estimatedBudget)) && parseFloat(estimatedBudget) > 0 ? (
+                                            <Text style={styles.helperTextValue}>≈ {fmtINR(parseFloat(estimatedBudget))}</Text>
+                                        ) : (
+                                            <Text style={styles.helperText}>Enter total estimated budget</Text>
+                                        )}
                                     </View>
                                 )}
 
@@ -756,6 +764,28 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
 
                                 {currentStep === 3 && (
                                     <View>
+                                        {/* Review summary — what will be created */}
+                                        <View style={styles.summaryCard}>
+                                            <View style={styles.summaryIconWrap}>
+                                                <Ionicons name="business" size={18} color="#3A78B5" />
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.summaryName} numberOfLines={1}>
+                                                    {projectName.trim() || 'Untitled Project'}
+                                                </Text>
+                                                <Text style={styles.summaryMeta} numberOfLines={1}>
+                                                    {fmtINR(parseFloat(estimatedBudget) || 0)}
+                                                    {'  ·  '}
+                                                    {buildingType === 'single'
+                                                        ? `1 building · ${slabsCount} slab${slabsCount > 1 ? 's' : ''}${hasTerrace ? ' + terrace' : ''}`
+                                                        : `${buildings.length} buildings`}
+                                                </Text>
+                                            </View>
+                                            <TouchableOpacity onPress={() => jumpToStep(1)} hitSlop={8}>
+                                                <Text style={styles.summaryEditLink}>Edit</Text>
+                                            </TouchableOpacity>
+                                        </View>
+
                                         <View style={styles.sectionLabelRow}>
                                             <Text style={styles.sectionLabel}>ASSIGN TEAM MEMBERS</Text>
                                             <Text style={styles.sectionLabelCount}>{assignedTo.length} selected</Text>
@@ -805,7 +835,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
 
                                                     {selected && (
                                                         <View style={styles.paymentRow}>
-                                                            <Ionicons name="cash-outline" size={15} color="#059669" />
+                                                            <Ionicons name="wallet-outline" size={15} color="#3A78B5" />
                                                             <Text style={styles.paymentLabel}>Monthly Payment (₹)</Text>
                                                             <TextInput
                                                                 style={styles.paymentInput}
@@ -823,7 +853,9 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
 
                                         {filteredStaff.length === 0 && (
                                             <View style={styles.emptyStaffContainer}>
-                                                <Ionicons name="people-outline" size={30} color="#9CA3AF" />
+                                                <View style={styles.emptyStaffIconWrap}>
+                                                    <Ionicons name="people-outline" size={26} color="#94A3B8" />
+                                                </View>
                                                 <Text style={styles.emptyStaffText}>
                                                     {staffMembers.length === 0 ? 'No staff members available' : 'No matches found'}
                                                 </Text>
@@ -844,7 +876,11 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                                     <TouchableOpacity style={styles.secondaryButton} onPress={onClose} activeOpacity={0.7}>
                                         <Text style={styles.secondaryButtonText}>Cancel</Text>
                                     </TouchableOpacity>
-                                    <TouchableOpacity style={[styles.primaryButtonWrap, styles.primaryButtonSolid]} onPress={goNext} activeOpacity={0.85}>
+                                    <TouchableOpacity
+                                        style={[styles.primaryButtonWrap, styles.primaryButtonSolid, !isStep1Valid && styles.primaryButtonDimmed]}
+                                        onPress={goNext}
+                                        activeOpacity={0.85}
+                                    >
                                         <Text style={styles.primaryButtonText}>Next</Text>
                                         <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />
                                     </TouchableOpacity>
@@ -887,8 +923,8 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ visible, onClose, onA
                                             </Animated.View>
                                         ) : (
                                             <>
+                                                <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
                                                 <Text style={styles.primaryButtonText}>Create Project</Text>
-                                                <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />
                                             </>
                                         )}
                                     </TouchableOpacity>
@@ -1130,6 +1166,13 @@ const styles = StyleSheet.create({
         marginTop: -10,
         marginBottom: 4,
     },
+    helperTextValue: {
+        fontSize: 12.5,
+        color: '#3A78B5',
+        fontWeight: '700',
+        marginTop: -10,
+        marginBottom: 4,
+    },
     placeholderText: {
         color: '#9CA3AF',
     },
@@ -1205,7 +1248,7 @@ const styles = StyleSheet.create({
         width: 36,
         height: 36,
         borderRadius: 12,
-        backgroundColor: 'rgba(59,130,246,0.10)',
+        backgroundColor: '#EAF0FE',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -1244,7 +1287,7 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 14,
-        backgroundColor: 'rgba(59,130,246,0.10)',
+        backgroundColor: '#EAF0FE',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -1301,7 +1344,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        backgroundColor: '#ECFDF5',
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
         borderRadius: 12,
         paddingHorizontal: 14,
         paddingVertical: 10,
@@ -1311,25 +1356,33 @@ const styles = StyleSheet.create({
     paymentLabel: {
         flex: 1,
         fontSize: 12.5,
-        color: '#065F46',
-        fontWeight: '500',
+        color: '#475569',
+        fontWeight: '600',
     },
     paymentInput: {
         minWidth: 80,
         textAlign: 'right',
         fontSize: 14,
-        fontWeight: '600',
-        color: '#065F46',
+        fontWeight: '700',
+        color: '#1E293B',
         backgroundColor: '#FFFFFF',
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#A7F3D0',
+        borderColor: '#C4D8FC',
         paddingHorizontal: 10,
         paddingVertical: 6,
     },
     emptyStaffContainer: {
         alignItems: 'center',
         paddingVertical: 32,
+    },
+    emptyStaffIconWrap: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: '#F1F5F9',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     emptyStaffText: {
         fontSize: 14,
@@ -1399,6 +1452,48 @@ const styles = StyleSheet.create({
         fontSize: 14.5,
         fontWeight: '700',
         color: '#FFFFFF',
+    },
+    primaryButtonDimmed: {
+        opacity: 0.5,
+        shadowOpacity: 0,
+        elevation: 0,
+    },
+
+    // Step-3 review summary card
+    summaryCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        backgroundColor: '#EAF0FE',
+        borderWidth: 1,
+        borderColor: '#C4D8FC',
+        borderRadius: 16,
+        padding: 14,
+        marginBottom: 18,
+    },
+    summaryIconWrap: {
+        width: 38,
+        height: 38,
+        borderRadius: 12,
+        backgroundColor: '#FFFFFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    summaryName: {
+        fontSize: 14.5,
+        fontWeight: '700',
+        color: '#0F172A',
+        marginBottom: 2,
+    },
+    summaryMeta: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#3A78B5',
+    },
+    summaryEditLink: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#3A78B5',
     },
     buildingConfigCard: {
         backgroundColor: '#F8FAFC',

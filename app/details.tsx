@@ -123,13 +123,22 @@ const remainingPhases = (sectionName: string, existingPhases: { name: string }[]
     return phaseTemplateForSection(sectionName).filter(p => !added.has(p.toLowerCase()));
 };
 
+// Order: Foundation first, then Slab 1..n ascending, Terrace always last.
+// Unrecognized names land between the slabs and Terrace, keeping their original order.
 const slabSortOrder = (name: string): number => {
-    const lower = (name || '').toLowerCase();
-    if (lower === 'foundation') return 0;
-    if (lower === 'terrace') return 9999;
-    const slabIdx = SLAB_ORDINALS.findIndex(o => lower === `${o.toLowerCase()} slab`);
+    const lower = (name || '').toLowerCase().trim();
+    if (lower.includes('foundation')) return 0;
+    if (lower.includes('terrace')) return Number.MAX_SAFE_INTEGER;
+
+    // Numeric forms: "Slab 1", "slab-2", "slab3", "Slab No. 4", "1st Slab", "2 slab"
+    const numMatch = lower.match(/slab\s*(?:no\.?\s*)?[-#]?\s*(\d+)|(\d+)\s*(?:st|nd|rd|th)?\s*slab/);
+    if (numMatch) return parseInt(numMatch[1] || numMatch[2], 10);
+
+    // Ordinal-word forms: "First Slab" … "Tenth Slab"
+    const slabIdx = SLAB_ORDINALS.findIndex(o => lower.includes(`${o.toLowerCase()} slab`));
     if (slabIdx !== -1) return slabIdx + 1;
-    return 1000;
+
+    return 1_000_000;
 };
 
 const sortMiniSections = <T extends { name?: string }>(sections: T[]): T[] =>

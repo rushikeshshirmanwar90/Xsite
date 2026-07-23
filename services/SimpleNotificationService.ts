@@ -405,12 +405,15 @@ export class SimpleNotificationService {
       console.log(`📤 Sending notification to ${recipients.length} recipients`);
 
       // 6. Prepare notification payload with recipients array
+      // Build the styled title/body (matches the in-app notification card design)
+      const styled = this.buildNotificationContent(activityData, cleanProjectName);
+
       const notificationPayload = {
         projectId: activityData.projectId,
         clientId: targetClientId,
         type: activityData.activityType,
-        title: activityData.title || this.getNotificationTitle(activityData.activityType, activityData.staffName),
-        message: cleanProjectName ? `${cleanProjectName}: ${activityData.details}` : activityData.details,
+        title: activityData.title || styled.title,
+        message: styled.body,
         recipients: recipients, // ✅ Send recipients array instead of recipientType
         category: activityData.category,
         action: activityData.activityType,
@@ -547,8 +550,12 @@ export class SimpleNotificationService {
         try {
           console.log('🔄 Sending local notification fallback (debug mode)...');
 
-          const fallbackTitle = this.getNotificationTitle(activityData.activityType, activityData.staffName);
-          const fallbackMessage = activityData.details;
+          const fallbackStyled = this.buildNotificationContent(
+            activityData,
+            this.cleanProjectName(activityData.projectName)
+          );
+          const fallbackTitle = activityData.title || fallbackStyled.title;
+          const fallbackMessage = fallbackStyled.body;
 
           await this.scheduleLocalNotification(
             fallbackTitle,
@@ -603,6 +610,137 @@ export class SimpleNotificationService {
   }
 
   /**
+   * Visual identity per activity type — mirrors the category icons/colors used by
+   * the in-app notification page (app/notification.tsx getActivityIcon), so the
+   * system push and the in-app card feel like the same design.
+   */
+  private getActivityEmoji(activityType: string): string {
+    if (activityType === 'material_imported' || activityType === 'material_added') return '📥';
+    if (activityType === 'material_used' || activityType === 'usage_added') return '📤';
+    if (activityType === 'material_transferred') return '🔁';
+    if (activityType === 'labor_added') return '👷';
+    if (activityType.startsWith('equipment_')) return '🏗️';
+    if (activityType.startsWith('project_')) return '📁';
+    if (activityType.startsWith('mini_section_')) return '🧩';
+    if (activityType.startsWith('section_')) return '🗂️';
+    if (activityType.startsWith('staff_')) return '👥';
+    return 'ℹ️';
+  }
+
+  /**
+   * Short badge-style headline per activity type — same wording as the badges on
+   * the notification page cards ("MATERIALS IMPORTED", "LABOR ADDED", …).
+   */
+  private getActivityHeadline(activityType: string): string {
+    switch (activityType) {
+      case 'material_added':
+      case 'material_imported': return 'Materials Imported';
+      case 'usage_added':
+      case 'material_used': return 'Materials Used';
+      case 'material_transferred': return 'Materials Transferred';
+      case 'labor_added': return 'Labor Added';
+      case 'equipment_added': return 'Equipment Added';
+      case 'equipment_updated': return 'Equipment Updated';
+      case 'equipment_removed': return 'Equipment Removed';
+      case 'project_created': return 'New Project Created';
+      case 'project_updated': return 'Project Updated';
+      case 'project_deleted': return 'Project Deleted';
+      case 'section_created': return 'New Section Created';
+      case 'section_updated': return 'Section Updated';
+      case 'section_deleted': return 'Section Deleted';
+      case 'mini_section_created': return 'New Mini-Section Created';
+      case 'mini_section_updated': return 'Mini-Section Updated';
+      case 'mini_section_deleted': return 'Mini-Section Deleted';
+      case 'staff_added': return 'New Staff Added';
+      case 'staff_updated': return 'Staff Updated';
+      case 'staff_removed': return 'Staff Removed';
+      case 'admin_update': return 'Admin Update';
+      default: return 'Activity Update';
+    }
+  }
+
+  /**
+   * Builds the push notification title + body styled like the in-app activity
+   * cards on the notification page:
+   *
+   *   📥 Materials Imported · Sunrise Towers
+   *   📍 Sunrise Towers › Building A › Slab 2
+   *   • Cement — 50 bag · ₹25,000
+   *   • Steel — 2 ton · ₹1,20,000
+   *   💰 Total: ₹1,45,000
+   *   👤 By Rushikesh
+   *
+   * Android expands the multi-line body via BigText; iOS shows it on long-press.
+   */
+  private buildNotificationContent(activityData: {
+    activityType: string;
+    staffName: string;
+    projectName?: string;
+    sectionName?: string;
+    miniSectionName?: string;
+    details: string;
+    materials?: Array<{ name: string; unit: string; qnt: number; cost: number }>;
+    transferDetails?: {
+      fromProject: { id: string; name: string };
+      toProject: { id: string; name: string };
+    };
+  }, cleanProjectName: string): { title: string; body: string } {
+    const emoji = this.getActivityEmoji(activityData.activityType);
+    const headline = this.getActivityHeadline(activityData.activityType);
+    const rupees = (n: number) => `₹${Number(n).toLocaleString('en-IN')}`;
+
+    const title = cleanProjectName
+      ? `${emoji} ${headline} · ${cleanProjectName}`
+      : `${emoji} ${headline}`;
+
+    const lines: string[] = [];
+
+    // Location breadcrumb — same info as the project/section rows on the card
+    const locationParts = [
+      cleanProjectName,
+      activityData.sectionName,
+      activityData.miniSectionName,
+    ].filter(Boolean);
+    if (locationParts.length > 1) {
+      lines.push(`📍 ${locationParts.join(' › ')}`);
+    }
+
+    // Materials list — mirrors the card's materials list (max 3, then "+n more")
+    const materials = activityData.materials || [];
+    if (materials.length > 0) {
+      const MAX_SHOWN = 3;
+      materials.slice(0, MAX_SHOWN).forEach((m) => {
+        const costPart = m.cost > 0 ? ` · ${rupees(m.cost)}` : '';
+        lines.push(`• ${m.name} — ${m.qnt} ${m.unit}${costPart}`);
+      });
+      if (materials.length > MAX_SHOWN) {
+        lines.push(`  +${materials.length - MAX_SHOWN} more item${materials.length - MAX_SHOWN > 1 ? 's' : ''}`);
+      }
+      const totalCost = materials.reduce((sum, m) => sum + (m.cost || 0), 0);
+      if (totalCost > 0) {
+        lines.push(`💰 Total: ${rupees(totalCost)}`);
+      }
+    } else if (activityData.details) {
+      // No structured materials — fall back to the caller's details text
+      lines.push(activityData.details);
+    }
+
+    // Transfer route — mirrors the card's from → to section
+    if (activityData.transferDetails) {
+      lines.push(
+        `🔁 ${activityData.transferDetails.fromProject.name} → ${activityData.transferDetails.toProject.name}`
+      );
+    }
+
+    // Footer — matches the card's user attribution footer
+    if (activityData.staffName) {
+      lines.push(`👤 By ${activityData.staffName}`);
+    }
+
+    return { title, body: lines.join('\n') };
+  }
+
+  /**
    * Clean project name for display in notifications
    */
   private cleanProjectName(projectName?: string): string {
@@ -625,74 +763,6 @@ export class SimpleNotificationService {
     cleaned = cleaned.replace(/\b\w/g, l => l.toUpperCase());
     
     return cleaned;
-  }
-
-  /**
-   * Get notification title based on activity type
-   */
-  private getNotificationTitle(activityType: string, staffName: string): string {
-    switch (activityType) {
-      // Material Activities
-      case 'material_added':
-      case 'material_imported':
-        return `Materials Imported by ${staffName}`;
-      case 'usage_added':
-      case 'material_used':
-        return `Materials Used by ${staffName}`;
-      case 'material_transferred':
-        return `Materials Transferred by ${staffName}`;
-        
-      // Labor Activities
-      case 'labor_added':
-        return `Labor Added by ${staffName}`;
-        
-      // Equipment Activities
-      case 'equipment_added':
-        return `Equipment Added by ${staffName}`;
-      case 'equipment_updated':
-        return `Equipment Updated by ${staffName}`;
-      case 'equipment_removed':
-        return `Equipment Removed by ${staffName}`;
-        
-      // Project Activities
-      case 'project_created':
-        return `New Project Created by ${staffName}`;
-      case 'project_updated':
-        return `Project Updated by ${staffName}`;
-      case 'project_deleted':
-        return `Project Deleted by ${staffName}`;
-        
-      // Section Activities
-      case 'section_created':
-        return `New Section Created by ${staffName}`;
-      case 'section_updated':
-        return `Section Updated by ${staffName}`;
-      case 'section_deleted':
-        return `Section Deleted by ${staffName}`;
-        
-      // Mini-Section Activities
-      case 'mini_section_created':
-        return `New Mini-Section Created by ${staffName}`;
-      case 'mini_section_updated':
-        return `Mini-Section Updated by ${staffName}`;
-      case 'mini_section_deleted':
-        return `Mini-Section Deleted by ${staffName}`;
-        
-      // Staff Activities
-      case 'staff_added':
-        return `New Staff Added by ${staffName}`;
-      case 'staff_updated':
-        return `Staff Updated by ${staffName}`;
-      case 'staff_removed':
-        return `Staff Removed by ${staffName}`;
-        
-      // Admin Activities
-      case 'admin_update':
-        return `Admin Update by ${staffName}`;
-        
-      default:
-        return `Activity Update by ${staffName}`;
-    }
   }
 
   /**

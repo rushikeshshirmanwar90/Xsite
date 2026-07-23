@@ -927,8 +927,8 @@ const ProjectSections = () => {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* ── Cost Summary — pinned at the bottom of the screen ─────────────────── */}
-      {(userIsAdmin || hasPermission('generateReport')) && (
+      {/* ── Cost Summary — pinned at the bottom of the screen — admins only ───── */}
+      {userIsAdmin && (
         <SafeAreaView edges={['bottom']} style={summaryBtnStyles.bottomBar}>
           <TouchableOpacity style={summaryBtnStyles.card} activeOpacity={0.8} onPress={goToCostSummary}>
             <View style={summaryBtnStyles.iconWrap}>

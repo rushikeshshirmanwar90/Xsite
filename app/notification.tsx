@@ -295,6 +295,26 @@ const NotificationPage: React.FC = () => {
 
             console.log('✅ Client ID is valid, proceeding with API calls...');
 
+            // ✅ FIX: Fetch all available contractors BEFORE the empty-day early return,
+            // so the vendor filter list is populated even on dates with no activities.
+            apiClient.get(`/api/materialActivity/contractors?clientId=${clientId}`)
+                .then(res => {
+                    console.log('📋 Fetched all unique contractors:', res.data);
+                    if (res.data && res.data.success !== false) {
+                        const contractors = res.data.data || [];
+                        setAvailableVendors(contractors);
+                    }
+                })
+                .catch(err => {
+                    // Handle 404 gracefully - it just means no contractors exist for this client yet
+                    if (err.response?.status === 404) {
+                        console.log('📝 No contractors found for this client');
+                        setAvailableVendors([]);
+                    } else {
+                        console.error('⚠️ Failed to fetch unique contractors:', err);
+                    }
+                });
+
             // Date-based navigation - fetch activities for specific date
             const dateToFetch = targetDate || currentDate;
             // If contractor filter is active, do NOT filter by date on the backend so we fetch all materials!
@@ -595,25 +615,6 @@ const NotificationPage: React.FC = () => {
             setActivitiesRaw(filteredActivities);
             setMaterialActivities(filteredMaterials);
             setOtherCostActivities(filteredOtherCosts);
-
-            // ✅ NEW: Fetch all available contractors for this client asynchronously
-            apiClient.get(`/api/materialActivity/contractors?clientId=${clientId}`)
-                .then(res => {
-                    console.log('📋 Fetched all unique contractors:', res.data);
-                    if (res.data && res.data.success !== false) {
-                        const contractors = res.data.data || [];
-                        setAvailableVendors(contractors);
-                    }
-                })
-                .catch(err => {
-                    // Handle 404 gracefully - it just means no contractors exist for this client yet
-                    if (err.response?.status === 404) {
-                        console.log('📝 No contractors found for this client');
-                        setAvailableVendors([]);
-                    } else {
-                        console.error('⚠️ Failed to fetch unique contractors:', err);
-                    }
-                });
 
             console.log('✅ Date navigation state updated');
             console.log('   - Date Groups:', newDateGroups.length);
