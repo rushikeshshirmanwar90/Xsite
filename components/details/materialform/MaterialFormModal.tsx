@@ -21,6 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 import AddMaterialsStep from './AddMaterialsStep';
 import { MATERIAL_TEMPLATES } from './constants';
+import { clearMaterialDraft, loadMaterialDraft, MaterialDraft, saveMaterialDraft } from './draft';
 import CustomSpecModal from './CustomSpecModal';
 import PaymentStep, { PaymentStatus } from './PaymentStep';
 import ProgressIndicator from './ProgressIndicator';
@@ -28,6 +29,7 @@ import ReviewPurposeStep from './ReviewPurposeStep';
 import { CustomSpec, InternalMaterial, MaterialFormData } from './types';
 import { getClientId } from '@/functions/clientId';
 import apiClient from '@/utils/axiosConfig';
+import { BillImage, toBillPayload } from '@/utils/billUpload';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -85,7 +87,12 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   const [amountPaid, setAmountPaid] = useState('');
   // ISO date string (YYYY-MM-DD) from the billing date modal; '' = not entered
   const [billingDate, setBillingDate] = useState('');
-  
+  // Vendor bill photos uploaded on the payment step; [] = no bill attached
+  const [billImages, setBillImages] = useState<BillImage[]>([]);
+  // True while a bill photo is still uploading — submit is blocked so the
+  // material isn't saved without the bill the user is clearly waiting on.
+  const [isUploadingBill, setIsUploadingBill] = useState(false);
+
   // Loading animation states
   const [isAddingMaterials, setIsAddingMaterials] = useState(false);
   const loadingAnimation = useRef(new Animated.Value(0)).current;
@@ -135,6 +142,75 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       }
     })();
     return () => { cancelled = true; };
+  }, [visible]);
+
+  // ── Restart safety net ──────────────────────────────────────────────────────
+  // Opening the camera backgrounds Xsite, and Android may destroy the activity
+  // to free memory for the camera app. Everything typed into this form would be
+  // gone on the way back, so the form snapshots itself before the picker opens
+  // and offers the snapshot back the next time it is opened.
+
+  const saveDraft = async () => {
+    await saveMaterialDraft({
+      currentStep,
+      addedMaterials: addedMaterialsRef.current,
+      formData,
+      customSpecs,
+      selectedTemplateKey,
+      purposeMessage: purposeMessageRef.current,
+      paymentStatus,
+      amountPaid,
+      billingDate,
+      billImages,
+    });
+  };
+
+  const applyDraft = (draft: MaterialDraft) => {
+    // Materials first: an effect below bounces the form back to step 0 whenever
+    // a later step is showing with nothing added.
+    updateAddedMaterials(draft.addedMaterials || []);
+    setFormData(draft.formData);
+    setCustomSpecs(draft.customSpecs || []);
+    setSelectedTemplateKey(draft.selectedTemplateKey ?? null);
+    updatePurposeMessage(draft.purposeMessage || '');
+    setPaymentStatus(draft.paymentStatus);
+    setAmountPaid(draft.amountPaid || '');
+    setBillingDate(draft.billingDate || '');
+    // Drop localUri — the cached file may not have survived the restart, and the
+    // hosted URL renders the same thumbnail.
+    setBillImages((draft.billImages || []).map(({ localUri, ...bill }) => bill));
+    setShowAddForm((draft.addedMaterials || []).length === 0);
+    setCurrentStep(draft.currentStep || 0);
+    slideAnim.setValue(-SCREEN_WIDTH * (draft.currentStep || 0));
+    toast.success('Restored your unsaved materials');
+  };
+
+  useEffect(() => {
+    if (!visible) return;
+    let cancelled = false;
+
+    (async () => {
+      const draft = await loadMaterialDraft();
+      if (cancelled || !draft) return;
+      // Never overwrite work the user has already started in this session.
+      if (addedMaterialsRef.current.length > 0 || formData.name) return;
+
+      Alert.alert(
+        'Restore Unsaved Materials?',
+        'Xsite closed before your last material request was sent. Continue where you left off?',
+        [
+          {
+            text: 'Start Fresh',
+            style: 'destructive',
+            onPress: () => { clearMaterialDraft(); },
+          },
+          { text: 'Restore', onPress: () => applyDraft(draft) },
+        ]
+      );
+    })();
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   // Custom setter that updates both state and ref
@@ -518,6 +594,11 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       }
     }
 
+    if (isUploadingBill) {
+      Alert.alert('Upload In Progress', 'Please wait for the bill photo to finish uploading.');
+      return;
+    }
+
     if (isSubmitting) return;
 
     const totalBatchCost = currentAddedMaterials.reduce(
@@ -526,6 +607,10 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     const paidTotal = paymentStatus === 'full'
       ? totalBatchCost
       : (parseFloat(amountPaid) || 0);
+
+    // One vendor bill covers the whole batch, so every material in this submit
+    // carries the same bill references (the API de-dupes them per activity).
+    const billPayload = billImages.length > 0 ? toBillPayload(billImages) : undefined;
 
     const formattedMaterials = currentAddedMaterials.map((material) => {
       const matCost = material.perUnitCost * material.quantity;
@@ -547,6 +632,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
         paymentStatus,
         amountPaid: paymentStatus !== undefined ? matAmountPaid : undefined,
         billingDate: billingDate || undefined,
+        billImages: billPayload,
       };
     });
 
@@ -723,6 +809,10 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       setPaymentStatus(undefined);
       setAmountPaid('');
       setBillingDate('');
+      setBillImages([]);
+      setIsUploadingBill(false);
+      // The form is being emptied on purpose — no snapshot left to offer back.
+      clearMaterialDraft();
       resetForm();
       setCurrentStep(0);
       slideAnim.setValue(0);
@@ -757,6 +847,10 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               setPaymentStatus(undefined);
               setAmountPaid('');
               setBillingDate('');
+              setBillImages([]);
+              setIsUploadingBill(false);
+              // The form is being emptied on purpose — no snapshot left to offer back.
+              clearMaterialDraft();
               resetForm();
               setCurrentStep(0);
               slideAnim.setValue(0);
@@ -781,6 +875,10 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       setPaymentStatus(undefined);
       setAmountPaid('');
       setBillingDate('');
+      setBillImages([]);
+      setIsUploadingBill(false);
+      // The form is being emptied on purpose — no snapshot left to offer back.
+      clearMaterialDraft();
       resetForm();
       setCurrentStep(0);
       slideAnim.setValue(0);
@@ -908,9 +1006,13 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                 amountPaid={amountPaid}
                 billingDate={billingDate}
                 totalCost={addedMaterials.reduce((sum, m) => sum + m.perUnitCost * m.quantity, 0)}
+                billImages={billImages}
                 onPaymentStatusChange={setPaymentStatus}
                 onAmountPaidChange={setAmountPaid}
                 onBillingDateChange={setBillingDate}
+                onBillImagesChange={setBillImages}
+                onBillUploadingChange={setIsUploadingBill}
+                onBeforeBillCapture={saveDraft}
                 onBack={handlePreviousStep}
                 onClose={handleClose}
               />
@@ -950,13 +1052,20 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
           {currentStep === 2 && (
             <View style={styles.floatingButtonContainer}>
               <TouchableOpacity
-                style={[styles.floatingSendButton, isSubmitting && styles.floatingSendButtonDisabled]}
+                style={[
+                  styles.floatingSendButton,
+                  (isSubmitting || isUploadingBill) && styles.floatingSendButtonDisabled,
+                ]}
                 onPress={handleSendRequest}
                 activeOpacity={0.8}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isUploadingBill}
               >
                 <Text style={styles.floatingSendButtonText}>
-                  {isSubmitting ? 'Submitting...' : 'Submit Materials'}
+                  {isUploadingBill
+                    ? 'Uploading bill...'
+                    : isSubmitting
+                      ? 'Submitting...'
+                      : 'Submit Materials'}
                 </Text>
               </TouchableOpacity>
             </View>

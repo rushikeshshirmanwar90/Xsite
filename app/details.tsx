@@ -1012,6 +1012,12 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     // Keep undefined when never recorded, so the card shows no payment badge
                     paymentStatus: material.paymentStatus, // ✅ Vendor payment state (undefined if not recorded)
                     amountPaid: material.amountPaid !== undefined ? Number(material.amountPaid) : undefined,
+                    // Vendor bill from the Add Material payment step. Both stay undefined
+                    // for batches added without a bill, so the card shows no bill section.
+                    billingDate: material.billingDate || undefined,
+                    billImages: Array.isArray(material.billImages) && material.billImages.length > 0
+                        ? material.billImages
+                        : undefined,
                     createdAt: material.createdAt,
                     addedAt: material.addedAt
                 };
@@ -3132,6 +3138,10 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         amountPaid: 0,
                         paymentTotalCost: 0,
                         hasPaymentRecord: false,
+                        // Vendor bills from every batch in this group, collected below so
+                        // the detail popup can show them all in one place.
+                        billImages: [],
+                        billingDate: undefined,
                     };
                 } else {
                     // ✅ CRITICAL FIX: Update to most recent date when grouping
@@ -3157,7 +3167,30 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     amountPaid: (material as any).amountPaid,
                     phaseId: (material as any).phaseId || undefined,
                     phaseName: (material as any).phaseName || undefined,
+                    billingDate: (material as any).billingDate || undefined,
+                    billImages: (material as any).billImages || undefined,
                 });
+
+                // Collect this batch's bill photos on the group, de-duplicated by URL —
+                // merged batches can repeat a bill, and the same photo twice in the
+                // viewer would look like the user uploaded it twice.
+                const batchBills = (material as any).billImages;
+                if (Array.isArray(batchBills)) {
+                    batchBills.forEach((bill: any) => {
+                        if (bill?.url && !grouped[key].billImages.some((b: any) => b.url === bill.url)) {
+                            grouped[key].billImages.push(bill);
+                        }
+                    });
+                }
+
+                // Latest bill date across the group's batches
+                const batchBillingDate = (material as any).billingDate;
+                if (batchBillingDate) {
+                    const existing = grouped[key].billingDate;
+                    if (!existing || new Date(batchBillingDate) > new Date(existing)) {
+                        grouped[key].billingDate = batchBillingDate;
+                    }
+                }
 
                 // ✅ Accumulate vendor payment across this group's batches. Every batch's
                 // cost counts toward the total (denominator uses the batch's stored
@@ -4411,6 +4444,11 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 : undefined,
             // Vendor bill date from the payment step (ISO YYYY-MM-DD); optional
             billingDate: material.billingDate || undefined,
+            // Uploaded bill photos from the payment step ([{ url, publicId }]);
+            // stays undefined when no bill was attached
+            billImages: Array.isArray(material.billImages) && material.billImages.length > 0
+                ? material.billImages
+                : undefined,
         }));
 
 

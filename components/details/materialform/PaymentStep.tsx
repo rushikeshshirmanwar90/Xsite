@@ -8,7 +8,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { BillImage } from '@/utils/billUpload';
 import BillingDateModal from './BillingDateModal';
+import BillUploadCard from './BillUploadCard';
 
 export type PaymentStatus = 'full' | 'partial' | 'unpaid';
 
@@ -19,9 +21,15 @@ interface PaymentStepProps {
   // ISO date string (YYYY-MM-DD) or '' when no billing date entered
   billingDate: string;
   totalCost: number;
+  // Uploaded vendor bill photos for this batch
+  billImages: BillImage[];
   onPaymentStatusChange: (status: PaymentStatus) => void;
   onAmountPaidChange: (amount: string) => void;
   onBillingDateChange: (isoDate: string) => void;
+  onBillImagesChange: (bills: BillImage[]) => void;
+  onBillUploadingChange?: (uploading: boolean) => void;
+  /** Lets the form snapshot itself before the camera takes over the screen. */
+  onBeforeBillCapture?: () => void | Promise<void>;
   onBack: () => void;
   onClose: (skip?: boolean) => void;
 }
@@ -71,9 +79,13 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
   amountPaid,
   billingDate,
   totalCost,
+  billImages,
   onPaymentStatusChange,
   onAmountPaidChange,
   onBillingDateChange,
+  onBillImagesChange,
+  onBillUploadingChange,
+  onBeforeBillCapture,
   onBack,
   onClose,
 }) => {
@@ -218,6 +230,17 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
             <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
           </TouchableOpacity>
         </View>
+
+        {/* Bill photo — shown once a payment status (full / partial / unpaid) is
+            chosen, so the user can attach proof of the vendor bill for the admin. */}
+        {paymentStatus !== undefined && (
+          <BillUploadCard
+            bills={billImages}
+            onBillsChange={onBillImagesChange}
+            onUploadingChange={onBillUploadingChange}
+            onBeforeCapture={onBeforeBillCapture}
+          />
+        )}
       </ScrollView>
 
       <BillingDateModal

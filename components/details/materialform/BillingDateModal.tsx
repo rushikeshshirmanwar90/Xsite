@@ -1,10 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Modal,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -20,21 +19,37 @@ interface BillingDateModalProps {
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
-const toIso = (day: number, month: number, year: number) =>
+const toIso = (year: number, month: number, day: number) =>
   `${year}-${pad(month)}-${pad(day)}`;
 
-const isRealDate = (day: number, month: number, year: number) => {
-  if (year < 2000 || year > 2100) return false;
-  if (month < 1 || month > 12) return false;
-  if (day < 1 || day > 31) return false;
-  const d = new Date(year, month - 1, day);
-  return (
-    d.getFullYear() === year &&
-    d.getMonth() === month - 1 &&
-    d.getDate() === day
-  );
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+const daysInMonth = (year: number, month: number) =>
+  new Date(year, month, 0).getDate();
+
+// Weekday index (0 = Sunday) the 1st of the month falls on
+const firstWeekday = (year: number, month: number) =>
+  new Date(year, month - 1, 1).getDay();
+
+const isoToParts = (iso: string) => {
+  const [y, m, d] = iso.split('-').map((n) => parseInt(n, 10));
+  if (!y || !m || !d) return null;
+  return { year: y, month: m, day: d };
 };
 
+/**
+ * Billing date picker — a month calendar the user taps a day on. Uses a
+ * self-contained grid rather than the native DateTimePicker because this modal
+ * opens inside the full-screen Add Material modal, where the Android picker
+ * dialog is unreliable; the grid also renders identically on both platforms.
+ *
+ * Any date can be picked, past or future — a bill may carry a future due date.
+ */
 const BillingDateModal: React.FC<BillingDateModalProps> = ({
   visible,
   value,
@@ -42,65 +57,85 @@ const BillingDateModal: React.FC<BillingDateModalProps> = ({
   onClear,
   onClose,
 }) => {
-  const [day, setDay] = useState('');
-  const [month, setMonth] = useState('');
-  const [year, setYear] = useState('');
+  const today = new Date();
+  const todayIso = toIso(today.getFullYear(), today.getMonth() + 1, today.getDate());
 
-  const monthRef = useRef<TextInput>(null);
-  const yearRef = useRef<TextInput>(null);
+  const [selected, setSelected] = useState('');
+  // Month currently shown in the grid
+  const [viewYear, setViewYear] = useState(today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(today.getMonth() + 1);
 
-  // Pre-fill fields from the current value each time the modal opens
+  // Re-sync with the saved value each time the modal opens
   useEffect(() => {
     if (!visible) return;
-    if (value) {
-      const [y, m, d] = value.split('-');
-      setDay(d || '');
-      setMonth(m || '');
-      setYear(y || '');
+    const parts = value ? isoToParts(value) : null;
+    if (parts) {
+      setSelected(value);
+      setViewYear(parts.year);
+      setViewMonth(parts.month);
     } else {
-      setDay('');
-      setMonth('');
-      setYear('');
+      setSelected('');
+      setViewYear(today.getFullYear());
+      setViewMonth(today.getMonth() + 1);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, value]);
 
-  const dayNum = parseInt(day, 10);
-  const monthNum = parseInt(month, 10);
-  const yearNum = parseInt(year, 10);
-
-  const allFilled = day.length > 0 && month.length > 0 && year.length === 4;
-  const valid = allFilled && isRealDate(dayNum, monthNum, yearNum);
-  const showError = allFilled && !valid;
-
-  const handleDayChange = (text: string) => {
-    const clean = text.replace(/[^0-9]/g, '').slice(0, 2);
-    setDay(clean);
-    if (clean.length === 2) monthRef.current?.focus();
+  const goToPreviousMonth = () => {
+    if (viewMonth === 1) {
+      setViewYear(viewYear - 1);
+      setViewMonth(12);
+    } else {
+      setViewMonth(viewMonth - 1);
+    }
   };
 
-  const handleMonthChange = (text: string) => {
-    const clean = text.replace(/[^0-9]/g, '').slice(0, 2);
-    setMonth(clean);
-    if (clean.length === 2) yearRef.current?.focus();
+  const goToNextMonth = () => {
+    if (viewMonth === 12) {
+      setViewYear(viewYear + 1);
+      setViewMonth(1);
+    } else {
+      setViewMonth(viewMonth + 1);
+    }
   };
 
-  const handleYearChange = (text: string) => {
-    setYear(text.replace(/[^0-9]/g, '').slice(0, 4));
-  };
-
-  const setQuickDate = (daysAgo: number) => {
+  // ISO date `offset` days from today (negative = past, positive = future)
+  const isoFromToday = (offset: number) => {
     const d = new Date();
-    d.setDate(d.getDate() - daysAgo);
-    setDay(pad(d.getDate()));
-    setMonth(pad(d.getMonth() + 1));
-    setYear(String(d.getFullYear()));
+    d.setDate(d.getDate() + offset);
+    return toIso(d.getFullYear(), d.getMonth() + 1, d.getDate());
   };
+
+  // Jump the grid to a nearby date and select it in one tap
+  const setQuickDate = (offset: number) => {
+    const iso = isoFromToday(offset);
+    const parts = isoToParts(iso)!;
+    setViewYear(parts.year);
+    setViewMonth(parts.month);
+    setSelected(iso);
+  };
+
+  const QUICK_DATES: { label: string; offset: number }[] = [
+    { label: 'Yesterday', offset: -1 },
+    { label: 'Today', offset: 0 },
+    { label: 'Tomorrow', offset: 1 },
+  ];
 
   const handleConfirm = () => {
-    if (!valid) return;
-    onConfirm(toIso(dayNum, monthNum, yearNum));
+    if (!selected) return;
+    onConfirm(selected);
     onClose();
   };
+
+  // Leading blanks so the 1st lands under its weekday, then the month's days
+  const leadingBlanks = firstWeekday(viewYear, viewMonth);
+  const totalDays = daysInMonth(viewYear, viewMonth);
+  const cells: (number | null)[] = [
+    ...Array(leadingBlanks).fill(null),
+    ...Array.from({ length: totalDays }, (_, i) => i + 1),
+  ];
+  // Pad the final row so the grid keeps a stable width
+  while (cells.length % 7 !== 0) cells.push(null);
 
   return (
     <Modal
@@ -125,73 +160,109 @@ const BillingDateModal: React.FC<BillingDateModalProps> = ({
           </View>
 
           <Text style={styles.subtitle}>
-            Enter the date on the vendor&apos;s bill for this purchase.
+            Pick the date on the vendor&apos;s bill for this purchase. A future
+            date is fine if the bill is dated ahead.
           </Text>
 
           {/* Quick select chips */}
           <View style={styles.chipsRow}>
-            <TouchableOpacity style={styles.chip} onPress={() => setQuickDate(0)}>
-              <Text style={styles.chipText}>Today</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.chip} onPress={() => setQuickDate(1)}>
-              <Text style={styles.chipText}>Yesterday</Text>
-            </TouchableOpacity>
+            {QUICK_DATES.map(({ label, offset }) => {
+              const iso = isoFromToday(offset);
+              const isActive = selected === iso;
+              return (
+                <TouchableOpacity
+                  key={label}
+                  style={[styles.chip, isActive && styles.chipActive]}
+                  onPress={() => setQuickDate(offset)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
-          {/* DD / MM / YYYY inputs */}
-          <View style={styles.inputsRow}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Day</Text>
-              <TextInput
-                style={[styles.dateInput, showError && styles.dateInputError]}
-                value={day}
-                onChangeText={handleDayChange}
-                keyboardType="number-pad"
-                maxLength={2}
-                placeholder="DD"
-                placeholderTextColor="#94A3B8"
-              />
-            </View>
-            <Text style={styles.separator}>/</Text>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Month</Text>
-              <TextInput
-                ref={monthRef}
-                style={[styles.dateInput, showError && styles.dateInputError]}
-                value={month}
-                onChangeText={handleMonthChange}
-                keyboardType="number-pad"
-                maxLength={2}
-                placeholder="MM"
-                placeholderTextColor="#94A3B8"
-              />
-            </View>
-            <Text style={styles.separator}>/</Text>
-            <View style={[styles.inputGroup, { flex: 1.5 }]}>
-              <Text style={styles.inputLabel}>Year</Text>
-              <TextInput
-                ref={yearRef}
-                style={[styles.dateInput, showError && styles.dateInputError]}
-                value={year}
-                onChangeText={handleYearChange}
-                keyboardType="number-pad"
-                maxLength={4}
-                placeholder="YYYY"
-                placeholderTextColor="#94A3B8"
-              />
-            </View>
-          </View>
-
-          {showError && (
-            <Text style={styles.errorText}>
-              Please enter a valid date (e.g. 15/03/{new Date().getFullYear()}).
+          {/* Month navigation */}
+          <View style={styles.monthRow}>
+            <TouchableOpacity
+              style={styles.monthNavBtn}
+              onPress={goToPreviousMonth}
+              hitSlop={8}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="chevron-back" size={18} color="#3A78B5" />
+            </TouchableOpacity>
+            <Text style={styles.monthLabel}>
+              {MONTH_NAMES[viewMonth - 1]} {viewYear}
             </Text>
-          )}
+            <TouchableOpacity
+              style={styles.monthNavBtn}
+              onPress={goToNextMonth}
+              hitSlop={8}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="chevron-forward" size={18} color="#3A78B5" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Weekday header */}
+          <View style={styles.weekRow}>
+            {WEEKDAYS.map((day, index) => (
+              <View key={index} style={styles.weekCell}>
+                <Text style={styles.weekdayText}>{day}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Day grid */}
+          <View style={styles.grid}>
+            {cells.map((day, index) => {
+              if (day === null) {
+                return <View key={`blank-${index}`} style={styles.cell} />;
+              }
+
+              const iso = toIso(viewYear, viewMonth, day);
+              const isSelected = iso === selected;
+              const isToday = iso === todayIso;
+
+              return (
+                <TouchableOpacity
+                  key={iso}
+                  style={styles.cell}
+                  onPress={() => setSelected(iso)}
+                  activeOpacity={0.7}
+                >
+                  <View
+                    style={[
+                      styles.dayPill,
+                      isToday && !isSelected && styles.dayPillToday,
+                      isSelected && styles.dayPillSelected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.dayText,
+                        isToday && !isSelected && styles.dayTextToday,
+                        isSelected && styles.dayTextSelected,
+                      ]}
+                    >
+                      {day}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
 
           {/* Actions */}
           <View style={styles.actionsRow}>
             {value ? (
-              <TouchableOpacity style={styles.clearBtn} onPress={() => { onClear(); onClose(); }}>
+              <TouchableOpacity
+                style={styles.clearBtn}
+                onPress={() => { onClear(); onClose(); }}
+              >
                 <Ionicons name="trash-outline" size={16} color="#EF4444" />
                 <Text style={styles.clearBtnText}>Clear</Text>
               </TouchableOpacity>
@@ -199,9 +270,9 @@ const BillingDateModal: React.FC<BillingDateModalProps> = ({
               <View style={{ flex: 1 }} />
             )}
             <TouchableOpacity
-              style={[styles.confirmBtn, !valid && styles.confirmBtnDisabled]}
+              style={[styles.confirmBtn, !selected && styles.confirmBtnDisabled]}
               onPress={handleConfirm}
-              disabled={!valid}
+              disabled={!selected}
             >
               <Text style={styles.confirmBtnText}>Set Date</Text>
             </TouchableOpacity>
@@ -223,7 +294,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 18,
     padding: 20,
-    gap: 14,
+    gap: 12,
   },
   header: {
     flexDirection: 'row',
@@ -268,58 +339,96 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
+  chipActive: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#3A78B5',
+  },
   chipText: {
     fontSize: 13,
     fontWeight: '600',
     color: '#3A78B5',
   },
-  inputsRow: {
+  chipTextActive: {
+    color: '#1E40AF',
+  },
+  monthRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 2,
   },
-  inputGroup: {
-    flex: 1,
-    gap: 4,
-  },
-  inputLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748B',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  dateInput: {
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+  monthNavBtn: {
+    width: 34,
+    height: 34,
     borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 17,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  monthLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  weekRow: {
+    flexDirection: 'row',
+    marginBottom: 2,
+  },
+  weekCell: {
+    width: `${100 / 7}%`,
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  weekdayText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  cell: {
+    width: `${100 / 7}%`,
+    aspectRatio: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dayPill: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dayPillToday: {
+    borderWidth: 1.5,
+    borderColor: '#3A78B5',
+  },
+  dayPillSelected: {
+    backgroundColor: '#3A78B5',
+  },
+  dayText: {
+    fontSize: 14,
     fontWeight: '600',
     color: '#1E293B',
-    textAlign: 'center',
-    backgroundColor: '#F8FAFC',
   },
-  dateInputError: {
-    borderColor: '#EF4444',
+  dayTextToday: {
+    color: '#3A78B5',
+    fontWeight: '700',
   },
-  separator: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#94A3B8',
-    paddingBottom: 12,
-  },
-  errorText: {
-    fontSize: 12,
-    color: '#EF4444',
-    fontWeight: '500',
+  dayTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginTop: 2,
+    marginTop: 4,
   },
   clearBtn: {
     flex: 1,

@@ -29,7 +29,8 @@ export const MATERIAL_TEMPLATES: Record<string, MaterialTemplate> = {
   // 4. Sand - Essential for mortar and concrete
   sand: {
     name: 'Sand',
-    unit: 'cubic feet',
+    // Sand is bought by the brass (100 cubic feet) on Indian sites
+    unit: 'brass',
     icon: 'layers',
     specFields: ['type', 'grade']
   },
@@ -208,7 +209,8 @@ export const UNIT_OPTIONS = [
   'kg',           // Steel, cement (sometimes)
   'bags',         // Cement
   'pieces',       // Bricks, blocks
-  'cubic feet',   // Sand, aggregate, wood
+  'brass',        // Sand, aggregate (1 brass = 100 cubic feet)
+  'cubic feet',   // Aggregate, wood
   'cubic meter',  // Large volume materials
   'liters',       // Paint, chemicals
   'boxes',        // Tiles, fittings

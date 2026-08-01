@@ -1,7 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { Animated, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
+import { Animated, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
+import BillViewerModal from '@/components/common/BillViewerModal';
 import apiClient from '@/utils/axiosConfig';
+
+/** A vendor bill photo attached to a purchase batch (see utils/billUpload). */
+interface BillImageRef {
+    url: string;
+    publicId?: string;
+    uploadedAt?: string;
+}
 
 interface MaterialVariant {
     _id: string;
@@ -14,6 +22,8 @@ interface MaterialVariant {
     amountPaid?: number;
     phaseId?: string;
     phaseName?: string;
+    billingDate?: string;
+    billImages?: BillImageRef[];
 }
 
 interface GroupedMaterial {
@@ -37,6 +47,10 @@ interface GroupedMaterial {
     paymentTotalCost?: number; // Total purchase cost across all batches
     amountRemaining?: number; // Outstanding amount still owed
     usageLocations?: { miniSectionId: string; qty: number }[]; // Where this material was used, project-wide
+    // Vendor bill photos across this group's purchase batches, and the most recent
+    // bill date. Both undefined/empty when the material was added without a bill.
+    billImages?: BillImageRef[];
+    billingDate?: string;
 }
 
 interface MiniSection {
@@ -122,6 +136,8 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
         return section ? section.name : 'Unknown Section';
     };
     const [showDetailPopup, setShowDetailPopup] = useState(false);
+    // Index of the bill photo opened in the full-screen viewer; null = closed
+    const [billViewerIndex, setBillViewerIndex] = useState<number | null>(null);
     const [showUsageModal, setShowUsageModal] = useState(false);
     const [selectedVariant, setSelectedVariant] = useState<MaterialVariant | null>(null);
     const [usageQuantity, setUsageQuantity] = useState('');
@@ -775,6 +791,24 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
     });
     const purchasedFromList = Object.entries(vendorTotals).map(([vendorName, qty]) => ({ vendorName, qty }));
 
+    // Vendor bill photos for this material. Prefer the group-level list built during
+    // grouping; fall back to collecting them off the variants so materials fetched
+    // through an older code path still show their bills.
+    const billImages: BillImageRef[] = (() => {
+        if (material.billImages && material.billImages.length > 0) return material.billImages;
+        const collected: BillImageRef[] = [];
+        (material.variants || []).forEach(v => {
+            (v.billImages || []).forEach(bill => {
+                if (bill?.url && !collected.some(b => b.url === bill.url)) collected.push(bill);
+            });
+        });
+        return collected;
+    })();
+    const billingDate = material.billingDate
+        || (material.variants || []).map(v => v.billingDate).filter(Boolean).sort().pop();
+    // Bills belong to purchases, so they only make sense on the imported tab.
+    const showBills = activeTab === 'imported' && billImages.length > 0;
+
     return (
         <>
             <Animated.View
@@ -1105,6 +1139,39 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 </View>
                             )}
 
+                            {/* Bill / Receipt — vendor bill photos attached on the payment
+                                step of Add Material. Tap a thumbnail to open it full-screen. */}
+                            {showBills && (
+                                <View style={detailStyles.usedForSection}>
+                                    <View style={detailStyles.billHeaderRow}>
+                                        <Text style={detailStyles.usedForTitle}>Bill / Receipt</Text>
+                                        {!!billingDate && (
+                                            <Text style={detailStyles.billDate}>
+                                                {formatDate(billingDate)}
+                                            </Text>
+                                        )}
+                                    </View>
+                                    <View style={detailStyles.billThumbRow}>
+                                        {billImages.map((bill, index) => (
+                                            <TouchableOpacity
+                                                key={bill.url}
+                                                onPress={() => setBillViewerIndex(index)}
+                                                activeOpacity={0.8}
+                                            >
+                                                <Image
+                                                    source={{ uri: bill.url }}
+                                                    style={detailStyles.billThumb}
+                                                    resizeMode="cover"
+                                                />
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                    <Text style={detailStyles.billHint}>
+                                        Tap to view {billImages.length > 1 ? `all ${billImages.length} bills` : 'the bill'}
+                                    </Text>
+                                </View>
+                            )}
+
                             {/* Actions — imported tab only; used materials are consumption
                                 records with nothing to add/edit/transfer */}
                             {activeTab === 'imported' && (
@@ -1135,6 +1202,15 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                     </TouchableOpacity>
                 </TouchableOpacity>
             </Modal>
+
+            {/* Full-screen bill viewer — a sibling of the detail popup rather than a
+                child of it, so the two modals stack predictably on Android. */}
+            <BillViewerModal
+                visible={billViewerIndex !== null}
+                images={billImages.map(b => b.url)}
+                initialIndex={billViewerIndex ?? 0}
+                onClose={() => setBillViewerIndex(null)}
+            />
 
             {/* Variant Selector Modal */}
             <Modal
@@ -2782,6 +2858,34 @@ const detailStyles = StyleSheet.create({
         fontSize: 13,
         color: '#0F172A',
         fontWeight: '700',
+    },
+    billHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    billDate: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#64748B',
+        marginBottom: 2,
+    },
+    billThumbRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 10,
+    },
+    billThumb: {
+        width: 64,
+        height: 64,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        backgroundColor: '#F1F5F9',
+    },
+    billHint: {
+        fontSize: 11,
+        color: '#94A3B8',
     },
     actions: {
         gap: 10,

@@ -9,7 +9,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Animated,
+    Image,
     Modal,
+    Platform,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -20,6 +22,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { PDFReportGenerator } from '@/utils/pdfReportGenerator';
+import BillViewerModal from '@/components/common/BillViewerModal';
 
 interface Activity {
     _id: string;
@@ -46,6 +49,13 @@ interface Activity {
     };
 }
 
+// Vendor bill photo uploaded on the payment step of the Add Material form
+interface BillImageRef {
+    url: string;
+    publicId?: string;
+    uploadedAt?: string;
+}
+
 interface MaterialActivity {
     _id: string;
     user: {
@@ -63,6 +73,7 @@ interface MaterialActivity {
         qnt: number;
         cost: number;
         contractor_name?: string;
+        billImages?: BillImageRef[];
     }[];
     message?: string;
     activity: 'imported' | 'used' | 'transferred';
@@ -73,6 +84,8 @@ interface MaterialActivity {
         toProject: { id: string; name: string };
     };
     contractor_name?: string;
+    // Batch-level bills (mirrored from the materials by the API)
+    billImages?: BillImageRef[];
 }
 
 interface OtherCostActivity {
@@ -113,6 +126,10 @@ const NotificationPage: React.FC = () => {
         console.log('🎬 Initializing activities state to empty array');
         return [];
     });
+
+    // 🧾 Bill viewer — opened from a material activity card so the admin can
+    // inspect the vendor bill photo the site user uploaded on the payment step.
+    const [billViewer, setBillViewer] = useState<{ images: string[]; index: number } | null>(null);
 
     // ✅ NEW: Vendor filter state - Changed to array for multiple selection
     const [selectedVendors, setSelectedVendors] = useState<string[]>([]);
@@ -743,6 +760,28 @@ const NotificationPage: React.FC = () => {
         }
     };
 
+    // Today in the device's local timezone, in the same YYYY-MM-DD shape as currentDate
+    const todayIso = new Date().toLocaleDateString('en-CA');
+    const isViewingToday = currentDate === todayIso;
+
+    // The picker may reach today, or further out when activities already exist on a
+    // future date (a bill dated ahead, for instance) — otherwise those days would be
+    // visible to the next-day arrow but unreachable from the picker.
+    const latestAvailableDate = availableDates.length > 0
+        ? availableDates.reduce((latest, date) => (date > latest ? date : latest), todayIso)
+        : todayIso;
+    const pickerMaximumDate = new Date(latestAvailableDate + 'T00:00:00');
+
+    // Jump back to today from wherever the user has navigated to
+    const handleGoToToday = async () => {
+        if (loading || isViewingToday) return;
+        setLoading(true);
+        await fetchActivities(false, false, todayIso);
+        setTimeout(() => {
+            scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+        }, 100);
+    };
+
     // Handle date picker
     const handleDatePickerOpen = () => {
         // Set the picker to current viewing date
@@ -1325,6 +1364,19 @@ const NotificationPage: React.FC = () => {
             ? activity.user
             : currentUser || { userId: 'unknown', fullName: 'Unknown User' };
 
+        // 🧾 Vendor bill photos. Prefer the batch-level list the API mirrors up;
+        // fall back to the materials' own bills for activities written before that.
+        const billUrls = Array.from(
+            new Set(
+                (activity.billImages && activity.billImages.length > 0
+                    ? activity.billImages
+                    : activity.materials.flatMap((m) => m.billImages || [])
+                )
+                    .map((b) => b?.url)
+                    .filter((url): url is string => typeof url === 'string' && !!url)
+            )
+        );
+
         return (
             <View key={activity._id} style={styles.materialActivityCard}>
                 <View style={styles.materialActivityGradient}>
@@ -1458,6 +1510,41 @@ const NotificationPage: React.FC = () => {
                         <View style={styles.messageContainer}>
                             <Ionicons name="chatbox-outline" size={14} color="#64748B" />
                             <Text style={styles.messageText}>{activity.message}</Text>
+                        </View>
+                    )}
+
+                    {/* 🧾 Vendor bill — tap a thumbnail to open it full screen */}
+                    {billUrls.length > 0 && (
+                        <View style={styles.billContainer}>
+                            <View style={styles.billHeaderRow}>
+                                <Ionicons name="receipt-outline" size={14} color="#3A78B5" />
+                                <Text style={styles.billHeaderText}>
+                                    Bill{billUrls.length > 1 ? `s (${billUrls.length})` : ''}
+                                </Text>
+                                <TouchableOpacity
+                                    style={styles.billViewAllBtn}
+                                    onPress={() => setBillViewer({ images: billUrls, index: 0 })}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={styles.billViewAllText}>View Bill</Text>
+                                    <Ionicons name="chevron-forward" size={13} color="#3A78B5" />
+                                </TouchableOpacity>
+                            </View>
+                            <View style={styles.billThumbRow}>
+                                {billUrls.map((url, index) => (
+                                    <TouchableOpacity
+                                        key={url}
+                                        onPress={() => setBillViewer({ images: billUrls, index })}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Image
+                                            source={{ uri: url }}
+                                            style={styles.billThumb}
+                                            resizeMode="cover"
+                                        />
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
                         </View>
                     )}
 
@@ -2006,6 +2093,27 @@ const NotificationPage: React.FC = () => {
                         </TouchableOpacity>
                     )}
 
+                    {/* Select Date — jump straight to any day's activity instead of
+                        stepping through with the prev/next arrows. Hidden while a vendor
+                        filter is on, because that view intentionally ignores dates. */}
+                    {selectedVendors.length === 0 && (
+                        <TouchableOpacity
+                            onPress={handleDatePickerOpen}
+                            style={[
+                                styles.vendorFilterButton,
+                                { marginRight: 8 },
+                                !isViewingToday && styles.vendorFilterButtonActive,
+                            ]}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons
+                                name={isViewingToday ? 'calendar-outline' : 'calendar'}
+                                size={20}
+                                color={isViewingToday ? '#3A78B5' : '#FFFFFF'}
+                            />
+                        </TouchableOpacity>
+                    )}
+
                     {/* ✅ NEW: Vendor Filter Button (replaces refresh button) */}
                     <TouchableOpacity
                         onPress={() => setShowVendorModal(true)}
@@ -2253,6 +2361,7 @@ const NotificationPage: React.FC = () => {
                                             <Text style={styles.compactDateText}>
                                                 {formatDateHeader(currentDate)}
                                             </Text>
+                                            <Ionicons name="chevron-down" size={12} color="#10B981" />
                                         </View>
                                         <Text style={styles.compactActivityCount}>
                                             0 activities
@@ -2293,6 +2402,20 @@ const NotificationPage: React.FC = () => {
                                             {availableDates.length} dates with activities available
                                         </Text>
                                     </View>
+                                )}
+
+                                {/* One tap back to today — picking a far-off date otherwise
+                                    means stepping back through the arrows one day at a time */}
+                                {!isViewingToday && (
+                                    <TouchableOpacity
+                                        style={styles.todayButton}
+                                        onPress={handleGoToToday}
+                                        disabled={loading}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="today-outline" size={14} color="#3A78B5" />
+                                        <Text style={styles.todayButtonText}>Back to Today</Text>
+                                    </TouchableOpacity>
                                 )}
                             </View>
                         )}
@@ -2400,18 +2523,23 @@ const NotificationPage: React.FC = () => {
                                             />
                                         </TouchableOpacity>
 
-                                        {/* Current Date Display - Compact */}
-                                        <View style={styles.compactDateDisplay}>
+                                        {/* Current Date Display - Compact - Clickable */}
+                                        <TouchableOpacity
+                                            style={styles.compactDateDisplay}
+                                            onPress={handleDatePickerOpen}
+                                            activeOpacity={0.7}
+                                        >
                                             <View style={styles.compactDateBadge}>
                                                 <Ionicons name="calendar" size={14} color="#10B981" />
                                                 <Text style={styles.compactDateText}>
                                                     {formatDateHeader(currentDate)}
                                                 </Text>
+                                                <Ionicons name="chevron-down" size={12} color="#10B981" />
                                             </View>
                                             <Text style={styles.compactActivityCount}>
                                                 {groupedActivities.reduce((sum, group) => sum + group.activities.length, 0)} activities
                                             </Text>
-                                        </View>
+                                        </TouchableOpacity>
 
                                         {/* Next Day Button */}
                                         <TouchableOpacity
@@ -2448,6 +2576,20 @@ const NotificationPage: React.FC = () => {
                                             </Text>
                                         </View>
                                     )}
+
+                                    {/* One tap back to today — picking a far-off date otherwise
+                                        means stepping back through the arrows one day at a time */}
+                                    {!isViewingToday && (
+                                        <TouchableOpacity
+                                            style={styles.todayButton}
+                                            onPress={handleGoToToday}
+                                            disabled={loading}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Ionicons name="today-outline" size={14} color="#3A78B5" />
+                                            <Text style={styles.todayButtonText}>Back to Today</Text>
+                                        </TouchableOpacity>
+                                    )}
                                 </View>
                             )}
                         </Animated.View>
@@ -2455,15 +2597,55 @@ const NotificationPage: React.FC = () => {
                 )}
             </ScrollView>
 
-            {/* Date Picker Modal */}
-            {showDatePicker && (
+            {/* Date Picker — Android shows its own dialog, so the picker is rendered
+                bare. iOS renders the picker inline, so it gets a sheet of its own with
+                an explicit Done button (an inline picker at the end of the screen would
+                otherwise be all but unusable). */}
+            {showDatePicker && Platform.OS === 'android' && (
                 <DateTimePicker
                     value={selectedDate}
                     mode="date"
                     display="default"
                     onChange={handleDateChange}
-                    maximumDate={new Date()} // Can't select future dates
+                    // Today, or the newest date that already has activity (see above)
+                    maximumDate={pickerMaximumDate}
                 />
+            )}
+
+            {Platform.OS === 'ios' && (
+                <Modal
+                    visible={showDatePicker}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => setShowDatePicker(false)}
+                >
+                    <View style={styles.datePickerBackdrop}>
+                        <View style={styles.datePickerSheet}>
+                            <Text style={styles.datePickerTitle}>Select Date</Text>
+                            <DateTimePicker
+                                value={selectedDate}
+                                mode="date"
+                                display="spinner"
+                                onChange={(_event, date) => date && setSelectedDate(date)}
+                                maximumDate={pickerMaximumDate}
+                            />
+                            <View style={styles.datePickerActions}>
+                                <TouchableOpacity
+                                    style={styles.datePickerCancel}
+                                    onPress={() => setShowDatePicker(false)}
+                                >
+                                    <Text style={styles.datePickerCancelText}>Cancel</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.datePickerConfirm}
+                                    onPress={() => handleDateChange({ type: 'set' }, selectedDate)}
+                                >
+                                    <Text style={styles.datePickerConfirmText}>Show Activity</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
             )}
 
             {/* ✅ NEW: Vendor Filter Modal */}
@@ -2615,6 +2797,14 @@ const NotificationPage: React.FC = () => {
                     </View>
                 </View>
             </Modal>
+
+            {/* 🧾 Full-screen vendor bill viewer */}
+            <BillViewerModal
+                visible={billViewer !== null}
+                images={billViewer?.images || []}
+                initialIndex={billViewer?.index || 0}
+                onClose={() => setBillViewer(null)}
+            />
         </SafeAreaView>
     );
 };
@@ -3243,6 +3433,52 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: '#475569',
         lineHeight: 18,
+    },
+    // 🧾 Vendor bill block on material activity cards
+    billContainer: {
+        backgroundColor: '#F8FAFF',
+        borderRadius: 10,
+        padding: 10,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#DBEAFE',
+        gap: 10,
+    },
+    billHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    billHeaderText: {
+        flex: 1,
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#3A78B5',
+        textTransform: 'uppercase',
+        letterSpacing: 0.4,
+    },
+    billViewAllBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
+    },
+    billViewAllText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#3A78B5',
+    },
+    billThumbRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    billThumb: {
+        width: 56,
+        height: 56,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#DBEAFE',
+        backgroundColor: '#EFF6FF',
     },
     materialActivityFooter: {
         flexDirection: 'row',
@@ -3904,6 +4140,70 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: '#9CA3AF',
         fontWeight: '500',
+    },
+    todayButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingVertical: 9,
+        backgroundColor: '#EAF0FE',
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+    },
+    todayButtonText: {
+        fontSize: 12.5,
+        fontWeight: '700',
+        color: '#3A78B5',
+    },
+    // iOS date picker sheet (Android uses the OS dialog instead)
+    datePickerBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(15, 23, 42, 0.55)',
+        justifyContent: 'center',
+        paddingHorizontal: 24,
+    },
+    datePickerSheet: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 18,
+        padding: 16,
+    },
+    datePickerTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#1E293B',
+        textAlign: 'center',
+        marginBottom: 4,
+    },
+    datePickerActions: {
+        flexDirection: 'row',
+        gap: 10,
+        marginTop: 8,
+    },
+    datePickerCancel: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        alignItems: 'center',
+    },
+    datePickerCancelText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#64748B',
+    },
+    datePickerConfirm: {
+        flex: 1.4,
+        paddingVertical: 12,
+        borderRadius: 10,
+        backgroundColor: '#3A78B5',
+        alignItems: 'center',
+    },
+    datePickerConfirmText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#FFFFFF',
     },
     // Simple Empty State Styles (keeps all UI elements visible)
     simpleEmptyState: {
