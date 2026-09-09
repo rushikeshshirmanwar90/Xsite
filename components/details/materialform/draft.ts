@@ -33,6 +33,7 @@ export interface MaterialDraft {
   paymentStatus?: PaymentStatus;
   amountPaid: string;
   billingDate: string;
+  commitmentDate: string;
   billImages: BillImage[];
 }
 

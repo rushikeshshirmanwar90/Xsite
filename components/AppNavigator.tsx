@@ -40,8 +40,10 @@ const AppNavigator: React.FC = () => {
   const handledNotificationIds = React.useRef<Set<string>>(new Set());
   // Set when the app was launched (cold start) by a notification tap; navigation
   // is deferred until auth has finished loading so the login/tabs redirect
-  // doesn't immediately override it.
+  // doesn't immediately override it. Holds the tapped notification's data
+  // payload so the deferred navigation below can still route by category.
   const [pendingNotificationNav, setPendingNotificationNav] = React.useState(false);
+  const pendingNotificationDataRef = React.useRef<any>(null);
 
   const navigateToNotifications = React.useCallback(() => {
     try {
@@ -52,6 +54,35 @@ const AppNavigator: React.FC = () => {
       router.replace('/(tabs)');
     }
   }, [router]);
+
+  // Routes a tapped notification by its data payload. Payment-commitment
+  // notifications deep-link straight to the relevant screen instead of the
+  // generic notifications list — overdue ones go to the re-commit screen so
+  // the admin can set a new date in one tap; everything else falls through
+  // to the existing generic behavior.
+  const navigateForNotification = React.useCallback((data: any) => {
+    try {
+      if (data?.category === 'payment_commitment') {
+        if (data.action === 'overdue') {
+          router.push({ pathname: '/payment-commitment-recommit', params: data });
+          return;
+        }
+        router.push({
+          pathname: data.entityType === 'contractor' ? '/contractor' : '/details',
+          params: {
+            projectId: data.projectId,
+            clientId: data.clientId,
+            projectName: data.projectName,
+          },
+        });
+        return;
+      }
+      navigateToNotifications();
+    } catch (error) {
+      console.error('❌ Navigation error from notification:', error);
+      router.replace('/(tabs)');
+    }
+  }, [router, navigateToNotifications]);
 
   // ✅ Handle notification tap while the app is running (skip in Expo Go)
   useEffect(() => {
@@ -70,14 +101,14 @@ const AppNavigator: React.FC = () => {
           handledNotificationIds.current.add(id);
         }
 
-        navigateToNotifications();
+        navigateForNotification(response?.notification?.request?.content?.data);
       });
 
       return () => subscription.remove();
     } catch (error) {
       console.log('⚠️ Notification listener setup skipped');
     }
-  }, [navigateToNotifications]);
+  }, [navigateForNotification]);
 
   // ✅ Handle cold start: app was killed and opened BY tapping a notification.
   // The live listener above doesn't reliably fire in that case, so check the
@@ -97,6 +128,7 @@ const AppNavigator: React.FC = () => {
           }
 
           console.log('🔔 App opened from notification (cold start)');
+          pendingNotificationDataRef.current = response.notification?.request?.content?.data;
           setPendingNotificationNav(true);
         })
         .catch((error: unknown) => {
@@ -121,12 +153,12 @@ const AppNavigator: React.FC = () => {
     }
 
     const timeout = setTimeout(() => {
-      console.log('🔔 Navigating to /notification from cold start tap');
-      navigateToNotifications();
+      console.log('🔔 Navigating from cold start notification tap');
+      navigateForNotification(pendingNotificationDataRef.current);
     }, 300);
 
     return () => clearTimeout(timeout);
-  }, [pendingNotificationNav, isLoading, isAuthenticated, navigateToNotifications]);
+  }, [pendingNotificationNav, isLoading, isAuthenticated, navigateForNotification]);
 
   // ✅ Handle notification received while app is in foreground (skip in Expo Go)
   useEffect(() => {

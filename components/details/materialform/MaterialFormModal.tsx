@@ -87,6 +87,8 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   const [amountPaid, setAmountPaid] = useState('');
   // ISO date string (YYYY-MM-DD) from the billing date modal; '' = not entered
   const [billingDate, setBillingDate] = useState('');
+  // ISO date string (YYYY-MM-DD); required once paymentStatus is partial/unpaid
+  const [commitmentDate, setCommitmentDate] = useState('');
   // Vendor bill photos uploaded on the payment step; [] = no bill attached
   const [billImages, setBillImages] = useState<BillImage[]>([]);
   // True while a bill photo is still uploading — submit is blocked so the
@@ -161,6 +163,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       paymentStatus,
       amountPaid,
       billingDate,
+      commitmentDate,
       billImages,
     });
   };
@@ -176,6 +179,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     setPaymentStatus(draft.paymentStatus);
     setAmountPaid(draft.amountPaid || '');
     setBillingDate(draft.billingDate || '');
+    setCommitmentDate(draft.commitmentDate || '');
     // Drop localUri — the cached file may not have survived the restart, and the
     // hosted URL renders the same thumbnail.
     setBillImages((draft.billImages || []).map(({ localUri, ...bill }) => bill));
@@ -594,6 +598,16 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       }
     }
 
+    if (paymentStatus === 'partial' || paymentStatus === 'unpaid') {
+      if (!commitmentDate) {
+        Alert.alert(
+          'Commitment Date Required',
+          'Please set when this outstanding payment will be made.'
+        );
+        return;
+      }
+    }
+
     if (isUploadingBill) {
       Alert.alert('Upload In Progress', 'Please wait for the bill photo to finish uploading.');
       return;
@@ -632,6 +646,10 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
         paymentStatus,
         amountPaid: paymentStatus !== undefined ? matAmountPaid : undefined,
         billingDate: billingDate || undefined,
+        commitmentDate:
+          paymentStatus === 'partial' || paymentStatus === 'unpaid'
+            ? commitmentDate || undefined
+            : undefined,
         billImages: billPayload,
       };
     });
@@ -809,6 +827,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       setPaymentStatus(undefined);
       setAmountPaid('');
       setBillingDate('');
+      setCommitmentDate('');
       setBillImages([]);
       setIsUploadingBill(false);
       // The form is being emptied on purpose — no snapshot left to offer back.
@@ -847,6 +866,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               setPaymentStatus(undefined);
               setAmountPaid('');
               setBillingDate('');
+              setCommitmentDate('');
               setBillImages([]);
               setIsUploadingBill(false);
               // The form is being emptied on purpose — no snapshot left to offer back.
@@ -875,6 +895,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       setPaymentStatus(undefined);
       setAmountPaid('');
       setBillingDate('');
+      setCommitmentDate('');
       setBillImages([]);
       setIsUploadingBill(false);
       // The form is being emptied on purpose — no snapshot left to offer back.
@@ -1005,11 +1026,13 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                 paymentStatus={paymentStatus}
                 amountPaid={amountPaid}
                 billingDate={billingDate}
+                commitmentDate={commitmentDate}
                 totalCost={addedMaterials.reduce((sum, m) => sum + m.perUnitCost * m.quantity, 0)}
                 billImages={billImages}
                 onPaymentStatusChange={setPaymentStatus}
                 onAmountPaidChange={setAmountPaid}
                 onBillingDateChange={setBillingDate}
+                onCommitmentDateChange={setCommitmentDate}
                 onBillImagesChange={setBillImages}
                 onBillUploadingChange={setIsUploadingBill}
                 onBeforeBillCapture={saveDraft}

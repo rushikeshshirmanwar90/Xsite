@@ -23,6 +23,7 @@ import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import apiClient from '@/utils/axiosConfig';
 import { ContractorFormModal } from '@/components/details/ContractorFormModal';
+import CommitmentDateModal from '@/components/common/CommitmentDateModal';
 import ContractorReportGenerator from './components/contractor/ContractorReportGenerator';
 import Header from '@/components/details/Header';
 
@@ -57,6 +58,9 @@ export default function ContractorScreen() {
   // Tab & Payout specific states
   const [activeTab, setActiveTab] = useState<'payments' | 'logs'>('payments');
   const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
+  // Shown before a payment that would leave a balance still owed — a
+  // commitment date is required whenever the contractor stays partial/unpaid.
+  const [showCommitmentPrompt, setShowCommitmentPrompt] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentType, setPaymentType] = useState('weekly');
   const [paymentNotes, setPaymentNotes] = useState('');
@@ -385,6 +389,24 @@ export default function ContractorScreen() {
           </View>
         </View>
 
+        {/* Payment commitment — overdue is red; pending/reminded is a quieter amber note */}
+        {item.commitment?.status === 'overdue' && (
+          <View style={cStyles.commitmentOverdueRow}>
+            <Ionicons name="alert-circle" size={14} color="#EF4444" />
+            <Text style={cStyles.commitmentOverdueText} numberOfLines={1}>
+              Payment overdue since {formatDate(item.commitment.commitmentDate)}
+            </Text>
+          </View>
+        )}
+        {(item.commitment?.status === 'pending' || item.commitment?.status === 'reminded') && (
+          <View style={cStyles.commitmentPendingRow}>
+            <Ionicons name="alarm-outline" size={14} color="#F59E0B" />
+            <Text style={cStyles.commitmentPendingText} numberOfLines={1}>
+              Payment due {formatDate(item.commitment.commitmentDate)}
+            </Text>
+          </View>
+        )}
+
         {/* Action button */}
         <TouchableOpacity
           style={[cStyles.actionBtn, { backgroundColor: isActive ? '#3A78B5' : '#F1F5F9' }]}
@@ -462,7 +484,7 @@ export default function ContractorScreen() {
           {
             text: 'Proceed Anyway',
             style: 'destructive',
-            onPress: () => proceedWithPayment(),
+            onPress: () => maybePromptCommitmentThenPay(),
           },
         ]
       );
@@ -482,7 +504,7 @@ export default function ContractorScreen() {
           {
             text: 'Proceed Anyway',
             style: 'destructive',
-            onPress: () => proceedWithPayment(),
+            onPress: () => maybePromptCommitmentThenPay(),
           },
         ]
       );
@@ -490,26 +512,44 @@ export default function ContractorScreen() {
     }
 
     // If validations pass, proceed with payment
-    await proceedWithPayment();
+    maybePromptCommitmentThenPay();
+  };
+
+  // A balance will still be owed after this payment — require a commitment
+  // date before it's actually recorded. Otherwise there's nothing to ask, so
+  // record the payment immediately.
+  const maybePromptCommitmentThenPay = () => {
+    if (!currentContractorForPayment) return;
+    const totalBudget = currentContractorForPayment.totalAmount || 0;
+    const totalPaid = currentContractorForPayment.totalPaid || 0;
+    const entered = Number(paymentAmount) || 0;
+    const remainingAfterPayment = totalBudget - (totalPaid + entered);
+
+    if (remainingAfterPayment > 0) {
+      setShowCommitmentPrompt(true);
+    } else {
+      proceedWithPayment();
+    }
   };
 
   // ✅ NEW: Separate function to handle the actual payment processing
-  const proceedWithPayment = async () => {
+  const proceedWithPayment = async (commitmentDate?: string) => {
     if (!currentContractorForPayment) {
       Alert.alert('Error', 'Unable to identify contractor. Please try again.');
       return;
     }
-    
+
     try {
       setRecordingPayment(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      
+
       const res = await apiClient.patch('/api/contractor', {
         contractorId: currentContractorForPayment._id,
         action: 'add_payment',
         amount: Number(paymentAmount),
         paymentType: paymentType,
         notes: paymentNotes,
+        ...(commitmentDate ? { commitmentDate } : {}),
       });
       
       if ((res.data as any).success) {
@@ -1111,6 +1151,17 @@ export default function ContractorScreen() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+
+      {/* Commitment date — required whenever this payment leaves a balance owed */}
+      <CommitmentDateModal
+        visible={showCommitmentPrompt}
+        value=""
+        onConfirm={(isoDate) => {
+          setShowCommitmentPrompt(false);
+          proceedWithPayment(isoDate);
+        }}
+        onClose={() => setShowCommitmentPrompt(false)}
+      />
 
       {/* Contractor Picker Modal — checkbox multi-select */}
       <Modal
@@ -1855,6 +1906,42 @@ const cStyles = StyleSheet.create({
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
+  },
+  commitmentOverdueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    backgroundColor: '#FEF2F2',
+    marginTop: 10,
+  },
+  commitmentOverdueText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#EF4444',
+  },
+  commitmentPendingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    backgroundColor: '#FFFBEB',
+    marginTop: 10,
+  },
+  commitmentPendingText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#B45309',
   },
   outstandingLabel: {
     fontSize: 12,

@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { BillImage } from '@/utils/billUpload';
+import CommitmentDateModal from '@/components/common/CommitmentDateModal';
 import BillingDateModal from './BillingDateModal';
 import BillUploadCard from './BillUploadCard';
 
@@ -20,12 +21,16 @@ interface PaymentStepProps {
   amountPaid: string;
   // ISO date string (YYYY-MM-DD) or '' when no billing date entered
   billingDate: string;
+  // ISO date string (YYYY-MM-DD) or '' — required once paymentStatus is
+  // 'partial'/'unpaid'; when the outstanding balance will be paid.
+  commitmentDate: string;
   totalCost: number;
   // Uploaded vendor bill photos for this batch
   billImages: BillImage[];
   onPaymentStatusChange: (status: PaymentStatus) => void;
   onAmountPaidChange: (amount: string) => void;
   onBillingDateChange: (isoDate: string) => void;
+  onCommitmentDateChange: (isoDate: string) => void;
   onBillImagesChange: (bills: BillImage[]) => void;
   onBillUploadingChange?: (uploading: boolean) => void;
   /** Lets the form snapshot itself before the camera takes over the screen. */
@@ -78,11 +83,13 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
   paymentStatus,
   amountPaid,
   billingDate,
+  commitmentDate,
   totalCost,
   billImages,
   onPaymentStatusChange,
   onAmountPaidChange,
   onBillingDateChange,
+  onCommitmentDateChange,
   onBillImagesChange,
   onBillUploadingChange,
   onBeforeBillCapture,
@@ -92,6 +99,8 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
   const paidNum = parseFloat(amountPaid) || 0;
   const overLimit = paymentStatus === 'partial' && paidNum > totalCost;
   const [showDateModal, setShowDateModal] = useState(false);
+  const [showCommitmentModal, setShowCommitmentModal] = useState(false);
+  const commitmentRequired = paymentStatus === 'partial' || paymentStatus === 'unpaid';
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
@@ -203,6 +212,39 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
           </View>
         )}
 
+        {/* Commitment date — required whenever the vendor is left partial/unpaid */}
+        {commitmentRequired && (
+          <View style={[styles.billingCard, !commitmentDate && styles.commitmentCardRequired]}>
+            <View style={styles.billingHeader}>
+              <Text style={styles.billingLabel}>Commitment Date</Text>
+              <Text style={styles.commitmentRequiredTag}>Required</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.billingRow}
+              onPress={() => setShowCommitmentModal(true)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.billingIcon}>
+                <Ionicons name="alarm-outline" size={18} color="#3A78B5" />
+              </View>
+              <Text
+                style={[
+                  styles.billingValue,
+                  !commitmentDate && styles.billingPlaceholder,
+                ]}
+              >
+                {commitmentDate
+                  ? formatBillingDate(commitmentDate)
+                  : 'When will this be paid?'}
+              </Text>
+              <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+            </TouchableOpacity>
+            <Text style={styles.commitmentNote}>
+              We&apos;ll remind you 2 days before, and flag it if the date passes unpaid.
+            </Text>
+          </View>
+        )}
+
         {/* Billing date — optional, entered via custom modal */}
         <View style={styles.billingCard}>
           <View style={styles.billingHeader}>
@@ -249,6 +291,13 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
         onConfirm={onBillingDateChange}
         onClear={() => onBillingDateChange('')}
         onClose={() => setShowDateModal(false)}
+      />
+
+      <CommitmentDateModal
+        visible={showCommitmentModal}
+        value={commitmentDate}
+        onConfirm={onCommitmentDateChange}
+        onClose={() => setShowCommitmentModal(false)}
       />
     </View>
   );
@@ -418,6 +467,21 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     textTransform: 'uppercase',
     letterSpacing: 0.4,
+  },
+  commitmentCardRequired: {
+    borderColor: '#F59E0B',
+  },
+  commitmentRequiredTag: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#F59E0B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  commitmentNote: {
+    fontSize: 11,
+    color: '#94A3B8',
+    lineHeight: 15,
   },
   billingRow: {
     flexDirection: 'row',

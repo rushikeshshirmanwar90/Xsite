@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { Animated, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
 import BillViewerModal from '@/components/common/BillViewerModal';
 import apiClient from '@/utils/axiosConfig';
+import PaymentStep, { PaymentStatus } from '@/components/details/materialform/PaymentStep';
+import { BillImage, toBillPayload } from '@/utils/billUpload';
 
 /** A vendor bill photo attached to a purchase batch (see utils/billUpload). */
 interface BillImageRef {
@@ -24,6 +26,15 @@ interface MaterialVariant {
     phaseName?: string;
     billingDate?: string;
     billImages?: BillImageRef[];
+    commitment?: PaymentCommitmentRef | null;
+}
+
+/** Live payment-commitment status for a batch, attached by the material GET. */
+interface PaymentCommitmentRef {
+    _id: string;
+    status: 'pending' | 'reminded' | 'overdue' | 'resolved';
+    commitmentDate: string;
+    amountDue?: number;
 }
 
 interface GroupedMaterial {
@@ -51,6 +62,9 @@ interface GroupedMaterial {
     // bill date. Both undefined/empty when the material was added without a bill.
     billImages?: BillImageRef[];
     billingDate?: string;
+    // Worst open payment commitment across this group's batches (see
+    // MaterialVariant.commitment) — null/undefined when nothing is open.
+    commitment?: PaymentCommitmentRef | null;
 }
 
 interface MiniSection {
@@ -159,6 +173,15 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
     const [addStockQuantity, setAddStockQuantity] = useState('');
     const [addStockCost, setAddStockCost] = useState('');
     const [addStockVendor, setAddStockVendor] = useState('');
+    // Add Stock — payment step (bill photo + commitment date when partial/unpaid)
+    const [addStockStep, setAddStockStep] = useState<'details' | 'payment'>('details');
+    const [addStockPaymentStatus, setAddStockPaymentStatus] = useState<PaymentStatus | undefined>(undefined);
+    const [addStockAmountPaid, setAddStockAmountPaid] = useState('');
+    const [addStockBillingDate, setAddStockBillingDate] = useState('');
+    const [addStockCommitmentDate, setAddStockCommitmentDate] = useState('');
+    const [addStockBillImages, setAddStockBillImages] = useState<BillImage[]>([]);
+    const [addStockUploadingBill, setAddStockUploadingBill] = useState(false);
+    const [isAddingStock, setIsAddingStock] = useState(false);
 
     // Do Payment functionality states
     const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -384,6 +407,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
             setAddStockQuantity('');
             setAddStockCost('');
             setAddStockVendor(variant.contractor_name || '');
+            resetAddStockPaymentState();
             setShowVariantSelector(false);
             setShowAddStockModal(true);
         } else if (variantSelectionMode === 'edit') {
@@ -599,6 +623,32 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
     };
 
     // Add Stock functionality
+    const resetAddStockPaymentState = () => {
+        setAddStockStep('details');
+        setAddStockPaymentStatus(undefined);
+        setAddStockAmountPaid('');
+        setAddStockBillingDate('');
+        setAddStockCommitmentDate('');
+        setAddStockBillImages([]);
+        setAddStockUploadingBill(false);
+    };
+
+    const closeAddStockModal = () => {
+        setShowAddStockModal(false);
+        setSelectedStockVariant(null);
+        setAddStockQuantity('');
+        setAddStockCost('');
+        setAddStockVendor('');
+        resetAddStockPaymentState();
+    };
+
+    // Cost of just the batch being added right now (not the material's running total).
+    const addStockBatchCost = (() => {
+        const quantity = parseFloat(addStockQuantity) || 0;
+        const perUnitCost = addStockCost ? parseFloat(addStockCost) : (selectedStockVariant?.cost || 0);
+        return quantity * perUnitCost;
+    })();
+
     const handleOpenAddStockModal = () => {
         setShowDetailPopup(false);
 
@@ -607,12 +657,28 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
             setAddStockQuantity('');
             setAddStockCost('');
             setAddStockVendor(material.variants[0].contractor_name || '');
+            resetAddStockPaymentState();
             setShowAddStockModal(true);
         } else {
             // Multiple variants, show selector first
             setVariantSelectionMode('addStock');
             setShowVariantSelector(true);
         }
+    };
+
+    const handleGoToAddStockPayment = () => {
+        if (!selectedStockVariant || !addStockQuantity || parseFloat(addStockQuantity) <= 0) {
+            Alert.alert('Error', 'Please enter a valid quantity');
+            return;
+        }
+
+        const perUnitCost = addStockCost ? parseFloat(addStockCost) : 0;
+        if (perUnitCost < 0) {
+            Alert.alert('Error', 'Cost cannot be negative');
+            return;
+        }
+
+        setAddStockStep('payment');
     };
 
     const handleAddStock = async () => {
@@ -627,6 +693,30 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
 
         if (perUnitCost < 0) {
             Alert.alert('Error', 'Cost cannot be negative');
+            return;
+        }
+
+        if (addStockPaymentStatus === 'partial') {
+            const paid = parseFloat(addStockAmountPaid);
+            if (!addStockAmountPaid || isNaN(paid) || paid <= 0) {
+                Alert.alert('Amount Required', 'Please enter the amount paid.');
+                return;
+            }
+            if (paid > addStockBatchCost) {
+                Alert.alert('Invalid Amount', 'Amount paid cannot exceed the cost of this batch.');
+                return;
+            }
+        }
+
+        if (addStockPaymentStatus === 'partial' || addStockPaymentStatus === 'unpaid') {
+            if (!addStockCommitmentDate) {
+                Alert.alert('Commitment Date Required', 'Please set when this outstanding payment will be made.');
+                return;
+            }
+        }
+
+        if (addStockUploadingBill) {
+            Alert.alert('Upload In Progress', 'Please wait for the bill photo to finish uploading.');
             return;
         }
 
@@ -645,20 +735,29 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                     style: 'default',
                     onPress: async () => {
                         try {
+                            setIsAddingStock(true);
+
                             // Import required modules
                             const { getClientId } = await import('@/functions/clientId');
-                            
+
                             const clientId = await getClientId();
-                            
+
                             if (!clientId) {
                                 throw new Error('Client ID not found');
                             }
+
+                            const amountPaid = addStockPaymentStatus === 'full'
+                                ? addStockBatchCost
+                                : addStockPaymentStatus === 'partial'
+                                    ? parseFloat(addStockAmountPaid) || 0
+                                    : 0;
 
                             console.log('📤 Sending add stock request...');
                             console.log('Material ID:', selectedStockVariant._id);
                             console.log('Quantity:', quantity);
                             console.log('Per Unit Cost:', perUnitCost);
                             console.log('Vendor:', vendorName);
+                            console.log('Payment Status:', addStockPaymentStatus);
                             console.log('Client ID:', clientId);
 
                             // Call API to add stock
@@ -668,6 +767,16 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 perUnitCost: perUnitCost > 0 ? perUnitCost : undefined,
                                 contractor_name: vendorName || undefined,
                                 clientId: clientId,
+                                // Carry payment status/amount from the payment step through to the API.
+                                // Stays undefined when no payment was recorded so the card shows no tag.
+                                paymentStatus: addStockPaymentStatus,
+                                amountPaid: addStockPaymentStatus !== undefined ? amountPaid : undefined,
+                                billingDate: addStockBillingDate || undefined,
+                                commitmentDate:
+                                    addStockPaymentStatus === 'partial' || addStockPaymentStatus === 'unpaid'
+                                        ? addStockCommitmentDate || undefined
+                                        : undefined,
+                                billImages: addStockBillImages.length > 0 ? toBillPayload(addStockBillImages) : undefined,
                             });
 
                             console.log('📥 API Response:', response.data);
@@ -683,16 +792,12 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 const message = isNewEntry
                                     ? `New material entry created!\n\nAdded ${quantity} ${material.unit}${perUnitCost > 0 ? ` at ₹${perUnitCost}/${material.unit}` : ''}${vendorName ? `\nVendor: ${vendorName}` : ''}\n\nReason: ${reasons.join(' & ')} — tracked separately.`
                                     : `Successfully added ${quantity} ${material.unit} to stock`;
-                                
+
                                 Alert.alert('Success', message);
-                                
+
                                 // Reset states
-                                setShowAddStockModal(false);
-                                setSelectedStockVariant(null);
-                                setAddStockQuantity('');
-                                setAddStockCost('');
-                                setAddStockVendor('');
-                                
+                                closeAddStockModal();
+
                                 // Trigger refresh
                                 if (onRefresh) {
                                     onRefresh();
@@ -703,6 +808,8 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                         } catch (error: any) {
                             console.error('Error adding stock:', error);
                             Alert.alert('Error', error.message || 'Failed to add stock');
+                        } finally {
+                            setIsAddingStock(false);
                         }
                     }
                 }
@@ -938,6 +1045,25 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                             </View>
                         )}
 
+                        {/* Payment commitment — overdue is red and always shown; an
+                            upcoming/pending commitment is a quieter amber note. */}
+                        {material.commitment?.status === 'overdue' && (
+                            <View style={styles.commitmentOverdueRow}>
+                                <Ionicons name="alert-circle" size={14} color="#EF4444" />
+                                <Text style={styles.commitmentOverdueText} numberOfLines={1}>
+                                    Payment overdue since {formatDate(material.commitment.commitmentDate)}
+                                </Text>
+                            </View>
+                        )}
+                        {(material.commitment?.status === 'pending' || material.commitment?.status === 'reminded') && (
+                            <View style={styles.commitmentPendingRow}>
+                                <Ionicons name="alarm-outline" size={14} color="#F59E0B" />
+                                <Text style={styles.commitmentPendingText} numberOfLines={1}>
+                                    Payment due {formatDate(material.commitment.commitmentDate)}
+                                </Text>
+                            </View>
+                        )}
+
                         {/* Add Material */}
                         {activeTab === 'imported' && (
                             <TouchableOpacity
@@ -1086,6 +1212,23 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                             <Text style={[styles.doPaymentButtonText, { color: paymentCfg.color }]} numberOfLines={1}>Pay</Text>
                                         </TouchableOpacity>
                                     )}
+                                </View>
+                            )}
+
+                            {material.commitment?.status === 'overdue' && (
+                                <View style={[styles.commitmentOverdueRow, { marginBottom: 14 }]}>
+                                    <Ionicons name="alert-circle" size={14} color="#EF4444" />
+                                    <Text style={styles.commitmentOverdueText} numberOfLines={1}>
+                                        Payment overdue since {formatDate(material.commitment.commitmentDate)}
+                                    </Text>
+                                </View>
+                            )}
+                            {(material.commitment?.status === 'pending' || material.commitment?.status === 'reminded') && (
+                                <View style={[styles.commitmentPendingRow, { marginBottom: 14 }]}>
+                                    <Ionicons name="alarm-outline" size={14} color="#F59E0B" />
+                                    <Text style={styles.commitmentPendingText} numberOfLines={1}>
+                                        Payment due {formatDate(material.commitment.commitmentDate)}
+                                    </Text>
                                 </View>
                             )}
 
@@ -1646,6 +1789,54 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                 onRequestClose={() => setShowAddStockModal(false)}
             >
                 <View style={styles.modalContainer}>
+                    {addStockStep === 'payment' ? (
+                        <>
+                            <PaymentStep
+                                paymentStatus={addStockPaymentStatus}
+                                amountPaid={addStockAmountPaid}
+                                billingDate={addStockBillingDate}
+                                commitmentDate={addStockCommitmentDate}
+                                totalCost={addStockBatchCost}
+                                billImages={addStockBillImages}
+                                onPaymentStatusChange={setAddStockPaymentStatus}
+                                onAmountPaidChange={setAddStockAmountPaid}
+                                onBillingDateChange={setAddStockBillingDate}
+                                onCommitmentDateChange={setAddStockCommitmentDate}
+                                onBillImagesChange={setAddStockBillImages}
+                                onBillUploadingChange={setAddStockUploadingBill}
+                                onBack={() => setAddStockStep('details')}
+                                onClose={() => closeAddStockModal()}
+                            />
+                            <View style={styles.addStockFloatingBar}>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.confirmButton,
+                                        (isAddingStock || addStockUploadingBill) && styles.confirmButtonDisabled
+                                    ]}
+                                    onPress={handleAddStock}
+                                    activeOpacity={0.8}
+                                    disabled={isAddingStock || addStockUploadingBill}
+                                >
+                                    <Ionicons
+                                        name="add-circle"
+                                        size={20}
+                                        color={(isAddingStock || addStockUploadingBill) ? "#9CA3AF" : "#FFFFFF"}
+                                    />
+                                    <Text style={[
+                                        styles.confirmButtonText,
+                                        (isAddingStock || addStockUploadingBill) && styles.confirmButtonTextDisabled
+                                    ]}>
+                                        {addStockUploadingBill
+                                            ? 'Uploading bill…'
+                                            : isAddingStock
+                                                ? 'Adding…'
+                                                : 'Add to Stock'}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        </>
+                    ) : (
+                    <>
                     <View style={styles.modalHeader}>
                         <TouchableOpacity onPress={() => setShowAddStockModal(false)}>
                             <Ionicons name="close" size={24} color="#374151" />
@@ -1776,29 +1967,31 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                             </View>
                         )}
 
-                        {/* Add Stock Button */}
+                        {/* Next: Payment Button */}
                         <TouchableOpacity
                             style={[
                                 styles.confirmButton,
                                 (!addStockQuantity || parseFloat(addStockQuantity) <= 0) && styles.confirmButtonDisabled
                             ]}
-                            onPress={handleAddStock}
+                            onPress={handleGoToAddStockPayment}
                             activeOpacity={0.8}
                             disabled={!addStockQuantity || parseFloat(addStockQuantity) <= 0}
                         >
-                            <Ionicons
-                                name="add-circle"
-                                size={20}
-                                color={addStockQuantity && parseFloat(addStockQuantity) > 0 ? "#FFFFFF" : "#9CA3AF"}
-                            />
                             <Text style={[
                                 styles.confirmButtonText,
                                 (!addStockQuantity || parseFloat(addStockQuantity) <= 0) && styles.confirmButtonTextDisabled
                             ]}>
-                                Add to Stock
+                                Next: Payment
                             </Text>
+                            <Ionicons
+                                name="arrow-forward"
+                                size={20}
+                                color={addStockQuantity && parseFloat(addStockQuantity) > 0 ? "#FFFFFF" : "#9CA3AF"}
+                            />
                         </TouchableOpacity>
                     </ScrollView>
+                    </>
+                    )}
                 </View>
             </Modal>
 
@@ -2260,6 +2453,42 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '700',
     },
+    commitmentOverdueRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#FECACA',
+        backgroundColor: '#FEF2F2',
+        marginTop: 8,
+    },
+    commitmentOverdueText: {
+        flex: 1,
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#EF4444',
+    },
+    commitmentPendingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+        backgroundColor: '#FFFBEB',
+        marginTop: 8,
+    },
+    commitmentPendingText: {
+        flex: 1,
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#B45309',
+    },
     paymentSummaryCard: {
         backgroundColor: '#F8FAFC',
         borderRadius: 12,
@@ -2489,6 +2718,22 @@ const styles = StyleSheet.create({
     },
     confirmButtonTextDisabled: {
         color: '#9CA3AF',
+    },
+    addStockFloatingBar: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 16,
+        paddingVertical: 16,
+        borderTopWidth: 1,
+        borderTopColor: '#E5E7EB',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        elevation: 8,
     },
     // Options menu styles
     optionsOverlay: {

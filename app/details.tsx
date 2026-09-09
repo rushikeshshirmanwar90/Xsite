@@ -1018,6 +1018,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     billImages: Array.isArray(material.billImages) && material.billImages.length > 0
                         ? material.billImages
                         : undefined,
+                    // Live payment-commitment status/date for this batch, attached by the
+                    // GET /api/material response; null/undefined when none is open.
+                    commitment: material.commitment || undefined,
                     createdAt: material.createdAt,
                     addedAt: material.addedAt
                 };
@@ -3142,6 +3145,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                         // the detail popup can show them all in one place.
                         billImages: [],
                         billingDate: undefined,
+                        // Worst (overdue > pending/reminded) open payment commitment across
+                        // this group's batches, picked below as each variant is added.
+                        commitment: undefined,
                     };
                 } else {
                     // ✅ CRITICAL FIX: Update to most recent date when grouping
@@ -3169,7 +3175,23 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                     phaseName: (material as any).phaseName || undefined,
                     billingDate: (material as any).billingDate || undefined,
                     billImages: (material as any).billImages || undefined,
+                    commitment: (material as any).commitment || undefined,
                 });
+
+                // Surface the "worst" open commitment on the group — overdue beats
+                // pending/reminded, and among equal severity the soonest date wins.
+                const batchCommitment = (material as any).commitment;
+                if (batchCommitment && batchCommitment.status && batchCommitment.status !== 'resolved') {
+                    const existingCommitment = grouped[key].commitment;
+                    const severity = (c: any) => (c?.status === 'overdue' ? 2 : 1);
+                    const isMoreSevere = !existingCommitment
+                        || severity(batchCommitment) > severity(existingCommitment)
+                        || (severity(batchCommitment) === severity(existingCommitment)
+                            && new Date(batchCommitment.commitmentDate) < new Date(existingCommitment.commitmentDate));
+                    if (isMoreSevere) {
+                        grouped[key].commitment = batchCommitment;
+                    }
+                }
 
                 // Collect this batch's bill photos on the group, de-duplicated by URL —
                 // merged batches can repeat a bill, and the same photo twice in the
@@ -4444,6 +4466,10 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 : undefined,
             // Vendor bill date from the payment step (ISO YYYY-MM-DD); optional
             billingDate: material.billingDate || undefined,
+            // When the vendor will be paid — required by the API whenever
+            // paymentStatus is 'partial'/'unpaid' (PaymentStep enforces this
+            // before the form can even be submitted).
+            commitmentDate: material.commitmentDate || undefined,
             // Uploaded bill photos from the payment step ([{ url, publicId }]);
             // stays undefined when no bill was attached
             billImages: Array.isArray(material.billImages) && material.billImages.length > 0
