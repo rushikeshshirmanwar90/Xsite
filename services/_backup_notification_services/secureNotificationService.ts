@@ -1,8 +1,17 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
+
+const isExpoGo = Constants.appOwnership === 'expo' || Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+let Notifications: typeof import('expo-notifications') | null = null;
+if (!isExpoGo) {
+  try {
+    Notifications = require('expo-notifications');
+  } catch (e) {
+    console.log('⚠️ Could not load expo-notifications:', e);
+  }
+}
 import apiClient from '@/utils/axiosConfig';
 import { domain } from '@/lib/domain';
 
@@ -28,35 +37,40 @@ export class SecureNotificationService {
    * SECURITY FIX: Proper notification handler setup
    */
   private setupNotificationHandler() {
-    Notifications.setNotificationHandler({
-      handleNotification: async (notification) => {
-        // SECURITY: Validate notification content
-        const isValidNotification = this.validateNotificationContent(notification);
-        
-        if (!isValidNotification) {
-          console.warn('🚨 Invalid notification received, blocking display');
+    if (!Notifications) return;
+    try {
+      Notifications.setNotificationHandler({
+        handleNotification: async (notification: any) => {
+          // SECURITY: Validate notification content
+          const isValidNotification = this.validateNotificationContent(notification);
+          
+          if (!isValidNotification) {
+            console.warn('🚨 Invalid notification received, blocking display');
+            return {
+              shouldShowBanner: false,
+              shouldShowList: false,
+              shouldPlaySound: false,
+              shouldSetBadge: false,
+            };
+          }
+
           return {
-            shouldShowBanner: false,
-            shouldShowList: false,
+            shouldShowBanner: true,
+            shouldShowList: true,
             shouldPlaySound: false,
             shouldSetBadge: false,
           };
-        }
-
-        return {
-          shouldShowBanner: true,
-          shouldShowList: true,
-          shouldPlaySound: false,
-          shouldSetBadge: false,
-        };
-      },
-      handleSuccess: (notificationId) => {
-        console.log('✅ Notification handled successfully:', notificationId);
-      },
-      handleError: (notificationId, error) => {
-        console.error('❌ Notification handling error:', notificationId, error);
-      },
-    });
+        },
+        handleSuccess: (notificationId: any) => {
+          console.log('✅ Notification handled successfully:', notificationId);
+        },
+        handleError: (notificationId: any, error: any) => {
+          console.error('❌ Notification handling error:', notificationId, error);
+        },
+      });
+    } catch (error) {
+      console.log('⚠️ Notification handler setup skipped (Expo Go limitation)');
+    }
   }
 
   /**
@@ -83,7 +97,7 @@ export class SecureNotificationService {
   /**
    * SECURITY FIX: Validate notification content
    */
-  private validateNotificationContent(notification: Notifications.Notification): boolean {
+  private validateNotificationContent(notification: any): boolean {
     try {
       const content = notification.request.content;
       
@@ -185,6 +199,10 @@ export class SecureNotificationService {
    */
   async requestPermissions(): Promise<{ granted: boolean; status: string }> {
     try {
+      if (isExpoGo || !Notifications) {
+        console.warn('⚠️ Push notifications not supported in Expo Go');
+        return { granted: false, status: 'unsupported' };
+      }
       // Check device support first
       if (!Device.isDevice) {
         console.warn('⚠️ Push notifications require a physical device');
@@ -225,6 +243,10 @@ export class SecureNotificationService {
    */
   async getSecurePushToken(): Promise<string | null> {
     try {
+      if (isExpoGo || !Notifications) {
+        console.warn('⚠️ Push notifications not supported in Expo Go');
+        return null;
+      }
       // Validate environment
       if (!Device.isDevice) {
         console.warn('⚠️ Push tokens require a physical device');
@@ -517,32 +539,37 @@ export class SecureNotificationService {
    * SECURITY FIX: Secure notification listeners
    */
   private setupNotificationListeners() {
-    // Listen for incoming notifications
-    const notificationListener = Notifications.addNotificationReceivedListener(notification => {
-      console.log('📱 Notification received');
-      // SECURITY: Validate before processing
-      if (this.validateNotificationContent(notification)) {
-        this.handleSecureNotification(notification);
-      }
-    });
+    if (isExpoGo || !Notifications) return;
+    try {
+      // Listen for incoming notifications
+      const notificationListener = Notifications.addNotificationReceivedListener((notification: any) => {
+        console.log('📱 Notification received');
+        // SECURITY: Validate before processing
+        if (this.validateNotificationContent(notification)) {
+          this.handleSecureNotification(notification);
+        }
+      });
 
-    // Listen for notification responses
-    const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('👆 Notification response received');
-      // SECURITY: Validate before processing
-      if (this.validateNotificationContent(response.notification)) {
-        this.handleSecureNotificationResponse(response);
-      }
-    });
+      // Listen for notification responses
+      const responseListener = Notifications.addNotificationResponseReceivedListener((response: any) => {
+        console.log('👆 Notification response received');
+        // SECURITY: Validate before processing
+        if (this.validateNotificationContent(response.notification)) {
+          this.handleSecureNotificationResponse(response);
+        }
+      });
 
-    // Store listeners for cleanup
-    AsyncStorage.setItem('notification_listeners_active', 'true');
+      // Store listeners for cleanup
+      AsyncStorage.setItem('notification_listeners_active', 'true');
+    } catch (error) {
+      console.log('⚠️ Listener setup skipped (Expo Go limitation)');
+    }
   }
 
   /**
    * SECURITY FIX: Secure notification handling
    */
-  private handleSecureNotification(notification: Notifications.Notification) {
+  private handleSecureNotification(notification: any) {
     try {
       // Process notification securely
       const content = notification.request.content;
@@ -566,7 +593,7 @@ export class SecureNotificationService {
   /**
    * SECURITY FIX: Secure notification response handling
    */
-  private handleSecureNotificationResponse(response: Notifications.NotificationResponse) {
+  private handleSecureNotificationResponse(response: any) {
     try {
       const data = response.notification.request.content.data;
       const sanitizedData = this.sanitizeNotificationData(data);

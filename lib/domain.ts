@@ -8,7 +8,7 @@
 // export const domain = "http://10.225.204.56:8080";
 // export const domain = "http://10.130.142.174:8080";
 // export const domain = "http://10.188.124.56:8080";
-export const domain = " http://192.168.0.103:8080";
+export const domain = "http://10.185.182.56:8080";
 
 // PRODUCTION OPTIONS:
 // export const domain = "https://real-estate-optimize-apis.vercel.app/";

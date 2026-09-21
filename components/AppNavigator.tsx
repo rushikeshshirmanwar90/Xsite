@@ -4,14 +4,22 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Toaster } from "sonner-native";
-import * as Notifications from 'expo-notifications';
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 
 // ✅ Check if we're running in Expo Go (which doesn't support push notifications in SDK 53+)
-const isExpoGo = Constants.appOwnership === 'expo';
+const isExpoGo = Constants.appOwnership === 'expo' || Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+let Notifications: typeof import('expo-notifications') | null = null;
+if (!isExpoGo) {
+  try {
+    Notifications = require('expo-notifications');
+  } catch (error) {
+    console.log('⚠️ Could not load expo-notifications:', error);
+  }
+}
 
 // ✅ Configure notification behavior (only if not in Expo Go)
-if (!isExpoGo) {
+if (!isExpoGo && Notifications) {
   try {
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
@@ -86,7 +94,7 @@ const AppNavigator: React.FC = () => {
 
   // ✅ Handle notification tap while the app is running (skip in Expo Go)
   useEffect(() => {
-    if (isExpoGo) {
+    if (isExpoGo || !Notifications) {
       console.log('⚠️ Push notifications not available in Expo Go - use development build for full functionality');
       return;
     }
@@ -114,11 +122,11 @@ const AppNavigator: React.FC = () => {
   // The live listener above doesn't reliably fire in that case, so check the
   // last notification response once on mount.
   useEffect(() => {
-    if (isExpoGo) return;
+    if (isExpoGo || !Notifications) return;
 
     try {
       Notifications.getLastNotificationResponseAsync()
-        .then((response: Notifications.NotificationResponse | null) => {
+        .then((response: any) => {
           if (!response) return;
 
           const id = response.notification?.request?.identifier;
@@ -162,7 +170,7 @@ const AppNavigator: React.FC = () => {
 
   // ✅ Handle notification received while app is in foreground (skip in Expo Go)
   useEffect(() => {
-    if (isExpoGo) return;
+    if (isExpoGo || !Notifications) return;
 
     try {
       const subscription = Notifications.addNotificationReceivedListener(notification => {

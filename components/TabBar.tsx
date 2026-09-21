@@ -1,35 +1,46 @@
-import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
-import { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import TabBarButton from './TabBarButton';
 
+type BottomTabBarProps = {
+    state: any;
+    descriptors: any;
+    navigation: any;
+};
+
 const TabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => {
+    if (!state || !state.routes || state.routes.length === 0) return null;
 
     const [dimensions, setDimensions] = useState({
         width: 20,
         height: 100
-    })
+    });
 
-    const buttonWidth = dimensions.width / state.routes.length;
+    const buttonWidth = dimensions.width / (state.routes.length || 1);
 
     const onTabbarLayout = (e: LayoutChangeEvent) => {
         setDimensions({
             height: e.nativeEvent.layout.height,
             width: e.nativeEvent.layout.width
-        })
-    }
+        });
+    };
 
     const tabPositionX = useSharedValue(0);
+
+    useEffect(() => {
+        if (state.index !== undefined) {
+            tabPositionX.value = withSpring(buttonWidth * state.index, { duration: 100 });
+        }
+    }, [state.index, buttonWidth, tabPositionX]);
 
     const animatedStyle = useAnimatedStyle(() => {
         return {
             transform: [{
                 translateX: tabPositionX.value
             }]
-        }
-    })
-
+        };
+    });
 
     return (
         <View onLayout={onTabbarLayout} style={styles.tabBar}>
@@ -68,20 +79,21 @@ const TabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => {
 
             </Animated.View>
 
-            {state.routes.map((route, index) => {
-                const { options } = descriptors[route.key];
-                const label =
+            {state.routes.map((route: any, index: number) => {
+                const descriptor = descriptors?.[route.key];
+                const options = descriptor?.options || {};
+                const rawLabel =
                     options.tabBarLabel !== undefined
                         ? options.tabBarLabel
                         : options.title !== undefined
                             ? options.title
                             : route.name;
+                const label = typeof rawLabel === 'string' ? rawLabel : String(rawLabel || route.name);
 
                 const isFocused = state.index === index;
 
                 const onPress = () => {
-
-                    tabPositionX.value = withSpring(buttonWidth * index, { duration: 100 })
+                    tabPositionX.value = withSpring(buttonWidth * index, { duration: 100 });
 
                     const event = navigation.emit({
                         type: 'tabPress',
@@ -103,8 +115,8 @@ const TabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => {
 
                 return (
 
-                    // eslint-disable-next-line react/jsx-key
                     <TabBarButton
+                        key={route.key}
                         onPress={onPress}
                         onLongPress={onLongPress}
                         isFocused={isFocused}

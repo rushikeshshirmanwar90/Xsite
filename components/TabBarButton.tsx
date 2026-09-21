@@ -6,7 +6,7 @@ import Animated, {
     useSharedValue,
     withSpring
 } from 'react-native-reanimated';
-import { icons } from './constants/icons';
+import { icons } from '@/constants/icons';
 
 interface TabBarButtonProps {
     onPress: () => void;
@@ -52,10 +52,19 @@ const TabBarButton = ({
     });
 
     // Check if the icon exists for the current route
-    const IconComponent = icons[routeName];
+    const IconComponent = icons[routeName as keyof typeof icons];
     if (!IconComponent) {
-        console.warn(`No icon found for route: ${routeName}`);
-        return null;
+        return (
+            <Pressable
+                onPress={onPress}
+                onLongPress={onLongPress}
+                style={styles.tabBarItem}
+            >
+                <Animated.Text style={[{ color: color, fontSize: 12 }, animatedTextStyle]}>
+                    {label}
+                </Animated.Text>
+            </Pressable>
+        );
     }
 
     return (
