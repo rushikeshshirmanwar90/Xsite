@@ -24,7 +24,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import apiClient from '@/utils/axiosConfig';
 import { ContractorFormModal } from '@/components/details/ContractorFormModal';
 import CommitmentDateModal from '@/components/common/CommitmentDateModal';
-import ContractorReportGenerator from './components/contractor/ContractorReportGenerator';
+import ContractorReportGenerator from './_components/contractor/ContractorReportGenerator';
 import Header from '@/components/details/Header';
 
 interface LaborEntry {

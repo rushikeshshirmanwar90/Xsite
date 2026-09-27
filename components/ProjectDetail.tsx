@@ -1,10 +1,11 @@
+import React, { useState } from 'react';
 import AddProjectModal from '@/components/AddProjectModel';
 import ProjectCard from '@/components/ProjectCard';
 import styles from '@/style/project';
 import { Project } from '@/types/project';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
-import { SafeAreaView, ScrollView, StatusBar, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StatusBar, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface ProjectDetailsProps {
     project: Project;
@@ -26,7 +27,14 @@ const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack }) => {
                 <Text style={styles.projectAddress}>{project.address}</Text>
                 <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Assigned To:</Text>
-                    <Text style={styles.detailValue}>{project.assignedStaff}</Text>
+                    <Text style={styles.detailValue}>
+                        {Array.isArray(project.assignedStaff)
+                            ? project.assignedStaff
+                                .map((staff) => (typeof staff === 'string' ? staff : staff.fullName))
+                                .filter(Boolean)
+                                .join(', ')
+                            : (typeof project.assignedStaff === 'string' ? project.assignedStaff : 'Unassigned')}
+                    </Text>
                 </View>
                 <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Status:</Text>
@@ -87,82 +95,8 @@ const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack }) => {
     );
 };
 
-const dummyProjects: Project[] = [
-    {
-        id: 1,
-        name: "Manthan Tower A",
-        address: "Baner Road, Pune, Maharashtra 411045",
-        assignedStaff: "Rajesh Kumar",
-        status: "active",
-        startDate: "2024-10-01",
-        endDate: "2026-03-01",
-        progress: 45,
-        totalMaterials: 156,
-        materialsReceived: 124,
-        materialsIssued: 89,
-        recentActivities: [
-            { type: "received", material: "Modular Bricks", quantity: "10,000 pcs", date: "2024-09-10" },
-            { type: "issued", material: "Cement Bags", quantity: "150 bags", date: "2024-09-09" },
-            { type: "ordered", material: "Steel Bars", quantity: "5 tons", date: "2024-09-08" }
-        ]
-    },
-    {
-        id: 2,
-        name: "Skyline Apartments B",
-        address: "Hinjewadi Phase 2, Pune, Maharashtra 411057",
-        assignedStaff: "Priya Sharma",
-        status: "active",
-        startDate: "2024-08-15",
-        endDate: "2025-12-15",
-        progress: 65,
-        totalMaterials: 203,
-        materialsReceived: 189,
-        materialsIssued: 156,
-        recentActivities: [
-            { type: "received", material: "Ready Mix Concrete", quantity: "50 m³", date: "2024-09-12" },
-            { type: "issued", material: "Sand", quantity: "25 m³", date: "2024-09-11" },
-            { type: "ordered", material: "Tiles", quantity: "2,000 sq ft", date: "2024-09-10" }
-        ]
-    },
-    {
-        id: 3,
-        name: "Metro Plaza Complex",
-        address: "Wakad, Pune, Maharashtra 411057",
-        assignedStaff: "Amit Patel",
-        status: "planning",
-        startDate: "2024-11-01",
-        endDate: "2026-08-01",
-        progress: 15,
-        totalMaterials: 89,
-        materialsReceived: 12,
-        materialsIssued: 8,
-        recentActivities: [
-            { type: "ordered", material: "Foundation Steel", quantity: "15 tons", date: "2024-09-13" },
-            { type: "received", material: "Survey Equipment", quantity: "1 set", date: "2024-09-12" }
-        ]
-    },
-    {
-        id: 4,
-        name: "Green Valley Villas",
-        address: "Kothrud, Pune, Maharashtra 411038",
-        assignedStaff: "Sneha Reddy",
-        status: "active",
-        startDate: "2024-06-01",
-        endDate: "2025-10-01",
-        progress: 78,
-        totalMaterials: 178,
-        materialsReceived: 165,
-        materialsIssued: 142,
-        recentActivities: [
-            { type: "issued", material: "Paint", quantity: "200 liters", date: "2024-09-13" },
-            { type: "received", material: "Door Frames", quantity: "45 units", date: "2024-09-12" },
-            { type: "issued", material: "Electrical Wires", quantity: "500 meters", date: "2024-09-11" }
-        ]
-    }
-];
-
 const App: React.FC = () => {
-    const [projects, setProjects] = useState<Project[]>(dummyProjects);
+    const [projects, setProjects] = useState<Project[]>([]);
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const [showAddModal, setShowAddModal] = useState(false);
 

@@ -45,6 +45,56 @@ const Index: React.FC = () => {
     const [showCompletedProjects, setShowCompletedProjects] = useState(false); // Toggle for completed projects
     const [pinnedProjects, setPinnedProjects] = useState<Set<string>>(new Set()); // Track pinned projects
     const [featuredProjects, setFeaturedProjects] = useState<Set<string>>(new Set()); // Track featured projects
+    const [urgentPayments, setUrgentPayments] = useState<{ count: number; totalAmount: number }>({ count: 0, totalAmount: 0 });
+    const [scrollY, setScrollY] = useState(0);
+    const [bannerCollapsed, setBannerCollapsed] = useState(false); // Urgent banner collapsed state
+
+    const handleScroll = (event: any) => {
+        const y = event.nativeEvent.contentOffset.y;
+        setScrollY(y);
+    };
+
+    // Helper to fetch urgent pending payments (due within 3 days or overdue)
+    const fetchUrgentPayments = async () => {
+        try {
+            const clientId = await getClientId();
+            if (!clientId) return;
+            const res = await apiClient.get(`/api/payment-commitment?clientId=${clientId}`);
+            const responseData = res.data as any;
+            const commitments = Array.isArray(responseData)
+                ? responseData
+                : (responseData?.data && Array.isArray(responseData.data) ? responseData.data : []);
+
+            const now = new Date();
+            const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+            const urgent = commitments.filter((item: any) => {
+                if (item.status === 'resolved' || item.status === 'paid') return false;
+
+                const dateStr = item.commitmentDate || item.dueDate;
+                if (!dateStr) return true; // If no date specified, count as urgent pending
+
+                const dueTime = new Date(dateStr).getTime();
+                if (isNaN(dueTime)) return true;
+
+                // Calendar days remaining until due date
+                const diffMs = dueTime - startOfToday;
+                const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+                // Urgent if due within 3 days (diffDays <= 3) or overdue (diffDays < 0 or status === 'overdue')
+                return diffDays <= 3 || item.status === 'overdue';
+            });
+
+            const totalAmount = urgent.reduce((sum: number, item: any) => sum + (item.amountDue || 0), 0);
+
+            setUrgentPayments({
+                count: urgent.length,
+                totalAmount,
+            });
+        } catch (err) {
+            console.warn('Could not fetch urgent payments for home banner:', err);
+        }
+    };
 
     // Refs for capturing QR code views
     const embeddedQRRef = useRef<ViewShot | null>(null);
@@ -374,8 +424,9 @@ const Index: React.FC = () => {
                 }
             }
 
-            // Then fetch project data
+            // Then fetch project data & urgent payments
             fetchProjectData();
+            fetchUrgentPayments();
         };
 
         initializeData();
@@ -390,7 +441,10 @@ const Index: React.FC = () => {
         setRefreshing(true);
         try {
             isInitializedRef.current = false; // Reset initialization flag
-            await fetchProjectData(false); // Don't show loading state during refresh
+            await Promise.all([
+                fetchProjectData(false),
+                fetchUrgentPayments(),
+            ]);
         } finally {
             setRefreshing(false);
         }
@@ -670,11 +724,67 @@ const Index: React.FC = () => {
                     </View>
                 </View>
                 <TouchableOpacity style={homeStyles.heroNotifButton}
-                    onPress={() => router.push('/notification' as any)}
+                    onPress={() => router.push({ pathname: '/notification', params: { tab: 'warnings' } } as any)}
                 >
                     <Ionicons name="notifications-outline" size={20} color="#3A78B5" />
+                    {urgentPayments.count > 0 && (
+                        <View style={homeStyles.notifBadgeDot}>
+                            <Text style={homeStyles.notifBadgeDotText}>
+                                {urgentPayments.count > 99 ? '99+' : urgentPayments.count}
+                            </Text>
+                        </View>
+                    )}
                 </TouchableOpacity>
             </View>
+
+            {/* Urgent Payment Banner – collapsible, expanded by default */}
+            {urgentPayments.count > 0 && (
+                <View style={homeStyles.urgentAlertBanner}>
+                    {/* Banner header row – always visible */}
+                    <TouchableOpacity
+                        style={homeStyles.urgentBannerHeaderRow}
+                        onPress={() => setBannerCollapsed(prev => !prev)}
+                        activeOpacity={0.7}
+                    >
+                        <View style={homeStyles.urgentIconContainer}>
+                            <Ionicons name="card-outline" size={18} color="#D97706" />
+                        </View>
+                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={homeStyles.urgentAlertTitle}>
+                                Urgent Pending Payment{urgentPayments.count === 1 ? '' : 's'}
+                            </Text>
+                            <View style={homeStyles.urgentBadge}>
+                                <Text style={homeStyles.urgentBadgeText}>{urgentPayments.count}</Text>
+                            </View>
+                        </View>
+                        <Ionicons
+                            name={bannerCollapsed ? 'chevron-down' : 'chevron-up'}
+                            size={16}
+                            color="#B45309"
+                        />
+                    </TouchableOpacity>
+
+                    {/* Expanded content */}
+                    {!bannerCollapsed && (
+                        <>
+                            <View style={homeStyles.urgentBannerDivider} />
+                            <TouchableOpacity
+                                style={homeStyles.urgentBannerExpandedRow}
+                                onPress={() => router.push({ pathname: '/notification', params: { tab: 'warnings' } } as any)}
+                                activeOpacity={0.85}
+                            >
+                                <Text style={homeStyles.urgentAlertSubtitle} numberOfLines={1}>
+                                    ₹{urgentPayments.totalAmount.toLocaleString('en-IN')} due across {urgentPayments.count} commitment{urgentPayments.count === 1 ? '' : 's'}
+                                </Text>
+                                <View style={homeStyles.urgentAlertAction}>
+                                    <Text style={homeStyles.urgentAlertActionText}>Review</Text>
+                                    <Ionicons name="chevron-forward" size={14} color="#B45309" />
+                                </View>
+                            </TouchableOpacity>
+                        </>
+                    )}
+                </View>
+            )}
 
             {/* QR Code Section - Priority for unassigned staff */}
             {isStaff && user && !clientId && (
@@ -767,7 +877,7 @@ const Index: React.FC = () => {
                             color={showCompletedProjects ? "#295E94" : "#3A78B5"}
                         />
                         <Text
-                            style={[homeStyles.viewCompletedButtonText, showCompletedProjects && homeStyles.viewCompletedButtonTextActive]}
+                            style={[homeStyles.viewCompletedButtonText, showCompletedProjects && homeStyles.viewCompletedButtonActive]}
                             numberOfLines={1}
                         >
                             {showCompletedProjects ? 'View Ongoing' : 'View Completed'}
@@ -778,6 +888,8 @@ const Index: React.FC = () => {
 
             <ScrollView
                 style={styles.projectsList}
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
@@ -925,12 +1037,6 @@ const Index: React.FC = () => {
 };
 
 export default Index;
-
-// Local, UI-only styles for the redesigned brand header/greeting/section/state badges.
-// Kept local to this file so the shared `@/style/adminHome` stylesheet stays untouched.
-// Flat, white-base UI with light pastel accent patches per zone.
-// Header zone = light-blue tint, Projects toggle = blue (ongoing) / green (completed),
-// state badges = soft rounded-square pastel chips. No gradients, 1px hairline borders.
 const homeStyles = StyleSheet.create({
     brandHeader: {
         backgroundColor: '#FFFFFF',
@@ -1059,5 +1165,107 @@ const homeStyles = StyleSheet.create({
         alignSelf: 'center',
         borderWidth: 1,
         borderColor: '#B8D8F8',
+    },
+    notifBadgeDot: {
+        position: 'absolute',
+        top: -2,
+        right: -2,
+        backgroundColor: '#EF4444',
+        borderRadius: 9,
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        minWidth: 18,
+        height: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: '#FFFFFF',
+    },
+    notifBadgeDotText: {
+        color: '#FFFFFF',
+        fontSize: 9,
+        fontWeight: '800',
+    },
+    urgentAlertBanner: {
+        marginHorizontal: 20,
+        marginTop: 12,
+        marginBottom: 4,
+        borderRadius: 14,
+        backgroundColor: '#FFFBEB',
+        borderWidth: 1,
+        borderColor: '#FCD34D',
+        overflow: 'hidden',
+        shadowColor: '#D97706',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    urgentBannerHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+    },
+    urgentBannerDivider: {
+        height: 1,
+        backgroundColor: '#FDE68A',
+        marginHorizontal: 14,
+    },
+    urgentBannerExpandedRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+    },
+    urgentIconContainer: {
+        width: 38,
+        height: 38,
+        borderRadius: 12,
+        backgroundColor: '#FEF3C7',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    urgentAlertTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#92400E',
+    },
+    urgentBadge: {
+        backgroundColor: '#D97706',
+        borderRadius: 10,
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+    },
+    urgentBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: '800',
+    },
+    urgentAlertSubtitle: {
+        fontSize: 12,
+        color: '#B45309',
+        marginTop: 2,
+        fontWeight: '500',
+    },
+    urgentAlertAction: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#FEF3C7',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    urgentAlertActionText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#B45309',
     },
 });

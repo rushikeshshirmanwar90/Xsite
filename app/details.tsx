@@ -29,7 +29,7 @@ import { constructionTrackerService } from '@/services/constructionTrackerServic
 import type { ConstructionTracker, Phase, PhaseStatus, SubPhase, DailyUpdate } from '@/types/construction';
 import { PDFReportGenerator } from '@/utils/pdfReportGenerator';
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+if (Platform.OS === 'android' && !(global as any).nativeFabricUIManager && UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
@@ -5762,7 +5762,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
                             <TouchableOpacity
                                 style={sectionStyles.modalApplyButton}
-                                onPress={handleAddSection}
+                                onPress={() => handleAddSection()}
                                 disabled={!newSectionName.trim()}
                             >
                                 <Text style={sectionStyles.modalApplyText}>Add Section</Text>

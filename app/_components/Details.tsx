@@ -18,10 +18,10 @@ import SearchModal from './SearchModal';
 
 // Import types and data
 import { Material, Period, MaterialCharacteristics } from '@/types/materialTypes';
-import { importedMaterials, usedMaterials, periods } from '../data/materialData';
+import { importedMaterials, usedMaterials, periods } from '../_data/materialData';
 
 // Import styles
-import { detailsStyles as styles } from '../styles/detailsStyles';
+import { detailsStyles as styles } from '../_styles/detailsStyles';
 
 const Details = () => {
   // State variables

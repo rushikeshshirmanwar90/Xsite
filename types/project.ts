@@ -2,14 +2,21 @@ import { StaffMembers } from "./staff";
 
 // Types
 export interface Project {
-  _id?: string | string;
+  id?: number | string;
+  _id?: string;
   name: string;
   address: string;
-  description: string;
-  assignedStaff: StaffMembers[];
+  description?: string;
+  assignedStaff?: StaffMembers[] | string;
   budget?: number;
   spent?: number;
   progress?: number;
+  status?: string;
+  endDate?: string;
+  totalMaterials?: number;
+  materialsReceived?: number;
+  materialsIssued?: number;
+  recentActivities?: Activity[];
   section?: ProjectSection[];
   MaterialAvailable?: MaterialItem[];
   MaterialUsed?: MaterialItem[];

@@ -1,4 +1,4 @@
-import ContractorReportGenerator from '@/app/components/contractor/ContractorReportGenerator';
+import ContractorReportGenerator from '@/app/_components/contractor/ContractorReportGenerator';
 import CostSummarySkeleton from '@/components/CostSummarySkeleton';
 import { isAdmin, useUser } from '@/hooks/useUser';
 import { getClientId } from '@/functions/clientId';
@@ -23,7 +23,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+if (Platform.OS === 'android' && !(global as any).nativeFabricUIManager && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 

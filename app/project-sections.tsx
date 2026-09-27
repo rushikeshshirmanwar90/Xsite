@@ -34,7 +34,7 @@ import { toast } from 'sonner-native';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Enable LayoutAnimation on Android (no-op on the new architecture, harmless otherwise).
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+if (Platform.OS === 'android' && !(global as any).nativeFabricUIManager && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 

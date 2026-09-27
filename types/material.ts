@@ -1,4 +1,4 @@
-import { MaterialIconName } from '../app/components/types/common';
+import { MaterialIconName } from '../app/_components/types/common';
 
 export interface Material {
   id: number;

@@ -12,8 +12,19 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Dynamic import to avoid loading expo-notifications in Expo Go on Android SDK 53+
+let Notifications: typeof import('expo-notifications') | null = null;
+const isExpoGo = Constants.appOwnership === 'expo' || (Constants as any).executionEnvironment === 'storeClient';
+
+if (!isExpoGo) {
+  try {
+    Notifications = require('expo-notifications');
+  } catch (error) {
+    console.log('⚠️ Could not load expo-notifications:', error);
+  }
+}
 
 interface DiagnosticResult {
   step: string;
@@ -106,6 +117,12 @@ export class AndroidNotificationDiagnostics {
    * Check 4: Notification Permissions
    */
   private async checkPermissions(): Promise<void> {
+    if (!Notifications) {
+      this.addResult('Permission Check', 'warning', 'Skipped: expo-notifications not available in Expo Go (SDK 53+)', {
+        solution: 'Use a development build: eas build --profile development'
+      });
+      return;
+    }
     try {
       const { status } = await Notifications.getPermissionsAsync();
       
@@ -133,16 +150,23 @@ export class AndroidNotificationDiagnostics {
       return;
     }
 
+    if (!Notifications) {
+      this.addResult('Channel Check', 'warning', 'Skipped: expo-notifications not available in Expo Go (SDK 53+)', {
+        solution: 'Use a development build: eas build --profile development'
+      });
+      return;
+    }
+
     try {
       // Try to get existing channels
       const channels = await Notifications.getNotificationChannelsAsync();
       
-      const defaultChannel = channels.find(ch => ch.id === 'default');
-      const projectUpdatesChannel = channels.find(ch => ch.id === 'project-updates');
+      const defaultChannel = channels.find((ch: any) => ch.id === 'default');
+      const projectUpdatesChannel = channels.find((ch: any) => ch.id === 'project-updates');
       
       if (defaultChannel && projectUpdatesChannel) {
         this.addResult('Channel Check', 'pass', 'Both required channels exist', {
-          channels: channels.map(ch => ({ id: ch.id, name: ch.name })),
+          channels: channels.map((ch: any) => ({ id: ch.id, name: ch.name })),
         });
       } else {
         const missing = [];
@@ -150,7 +174,7 @@ export class AndroidNotificationDiagnostics {
         if (!projectUpdatesChannel) missing.push('project-updates');
         
         this.addResult('Channel Check', 'fail', `Missing channels: ${missing.join(', ')}`, {
-          existingChannels: channels.map(ch => ch.id),
+          existingChannels: channels.map((ch: any) => ch.id),
           missingChannels: missing,
           solution: 'Channels should be created during app initialization',
         });
@@ -166,6 +190,13 @@ export class AndroidNotificationDiagnostics {
    * Check 6: Push Token Generation
    */
   private async checkToken(): Promise<void> {
+    if (!Notifications) {
+      this.addResult('Token Check', 'warning', 'Skipped: expo-notifications remote push disabled in Expo Go on Android SDK 53+', {
+        solution: 'Use a development build: eas build --profile development'
+      });
+      return;
+    }
+
     try {
       const projectId = Constants.expoConfig?.extra?.eas?.projectId || 
                         '2fcc4ccc-b8b5-4ff4-ae3c-b195aa9eb32f';
@@ -296,11 +327,15 @@ export class AndroidNotificationDiagnostics {
    * Test sending a local notification
    */
   async testLocalNotification(): Promise<boolean> {
+    if (!Notifications) {
+      console.warn('⚠️ Notifications module not loaded (Expo Go / SDK 53+ limit)');
+      return false;
+    }
     try {
       console.log('🧪 Testing local notification...');
       
       const trigger: any = {
-        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        type: Notifications.SchedulableTriggerInputTypes?.TIME_INTERVAL || 'timeInterval',
         seconds: 2,
       };
 

@@ -16,7 +16,7 @@ import {
 import 'react-native'; // This imports the JSX namespace
 import { Ionicons } from '@expo/vector-icons';
 import { MaterialTemplate, MaterialFormData } from '@/types/material';
-import { SPEC_FIELD_CONFIG } from '../../constants/materials';
+import { SPEC_FIELD_CONFIG } from '../../_constants/materials';
 
 interface SpecFieldConfig {
   type: string;

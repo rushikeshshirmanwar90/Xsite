@@ -4,7 +4,7 @@ import { domain } from '@/lib/domain';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from '@/utils/axiosConfig';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -113,15 +113,55 @@ interface OtherCostActivity {
     date?: string;
 }
 
-type TabType = 'all' | 'project' | 'material' | 'labor' | 'other_cost';
+type TabType = 'all' | 'project' | 'material' | 'labor' | 'other_cost' | 'warnings';
 type MaterialSubTab = 'all' | 'imported' | 'used' | 'transferred';
+type WarningSubFilter = 'all' | 'contractor' | 'material_vendor' | 'labor' | 'equipment';
+
+interface WarningItem {
+    id: string;
+    title: string;
+    category: 'contractor' | 'material_vendor' | 'labor' | 'equipment' | 'other';
+    categoryLabel: string;
+    vendorName: string;
+    projectName: string;
+    sectionName?: string;
+    amount: number;
+    dueDate?: string;
+    createdAt?: string;
+    priority: 'high' | 'medium' | 'low';
+    status: 'pending' | 'overdue' | 'action_required' | 'paid';
+    description?: string;
+}
 
 const NotificationPage: React.FC = () => {
     console.log('🏗️ NotificationPage component rendering/re-rendering');
 
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState<TabType>('all');
+    const params = useLocalSearchParams<{ tab?: string }>();
+    const [activeTab, setActiveTab] = useState<TabType>(() => {
+        if (params?.tab && ['all', 'project', 'material', 'labor', 'other_cost', 'warnings'].includes(params.tab)) {
+            return params.tab as TabType;
+        }
+        return 'all';
+    });
+
+    useEffect(() => {
+        if (params?.tab && ['all', 'project', 'material', 'labor', 'other_cost', 'warnings'].includes(params.tab)) {
+            setActiveTab(params.tab as TabType);
+        }
+    }, [params?.tab]);
     const [materialSubTab, setMaterialSubTab] = useState<MaterialSubTab>('all');
+    const [warningSubFilter, setWarningSubFilter] = useState<WarningSubFilter>('all');
+    const [paidWarningIds, setPaidWarningIds] = useState<string[]>([]);
+    const [selectedWarningModal, setSelectedWarningModal] = useState<WarningItem | null>(null);
+    const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+
+    const toggleCategoryCollapse = (categoryKey: string) => {
+        setCollapsedCategories(prev => ({
+            ...prev,
+            [categoryKey]: !prev[categoryKey]
+        }));
+    };
     const [activitiesRaw, setActivitiesRaw] = useState<Activity[]>(() => {
         console.log('🎬 Initializing activities state to empty array');
         return [];
@@ -174,6 +214,8 @@ const NotificationPage: React.FC = () => {
     }, [activitiesRaw]);
     const [materialActivities, setMaterialActivities] = useState<MaterialActivity[]>([]);
     const [otherCostActivities, setOtherCostActivities] = useState<OtherCostActivity[]>([]);
+    const [paymentCommitments, setPaymentCommitments] = useState<any[]>([]);
+    const [contractorsList, setContractorsList] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -361,60 +403,31 @@ const NotificationPage: React.FC = () => {
             console.log('  - Other Cost Activity:', `${domain}/api/otherCostActivity?${otherCostParams.toString()}`);
 
             // Fetch all activities in parallel with enhanced error handling
-            const [activityRes, materialActivityRes, otherCostActivityRes] = await Promise.all([
+            const [activityRes, materialActivityRes, otherCostActivityRes, paymentCommitmentRes, contractorRes] = await Promise.all([
                 apiClient.get(`/api/activity?${activityParams.toString()}`)
                     .catch((err) => {
-                        console.error('❌ Activity API Error Details:');
-                        console.error('   - URL:', `${domain}/api/activity?${activityParams.toString()}`);
-                        console.error('   - Status:', err?.response?.status);
-                        console.error('   - Status Text:', err?.response?.statusText);
-                        console.error('   - Response Data:', err?.response?.data);
-                        console.error('   - Error Message:', err.message);
-                        console.error('   - Error Code:', err.code);
-                        // Return structure that matches successful response but indicates failure
-                        return {
-                            data: {
-                                success: false,
-                                error: err?.response?.data?.message || err.message,
-                                data: { dateGroups: [], hasMoreDates: false, nextDate: null }
-                            }
-                        };
+                        console.error('❌ Activity API Error Details:', err);
+                        return { data: { success: false, data: { dateGroups: [], hasMoreDates: false, nextDate: null } } };
                     }),
                 apiClient.get(`/api/materialActivity?${materialParams.toString()}`)
                     .catch((err) => {
-                        console.error('❌ Material Activity API Error Details:');
-                        console.error('   - URL:', `${domain}/api/materialActivity?${materialParams.toString()}`);
-                        console.error('   - Status:', err?.response?.status);
-                        console.error('   - Status Text:', err?.response?.statusText);
-                        console.error('   - Response Data:', err?.response?.data);
-                        console.error('   - Error Message:', err.message);
-                        console.error('   - Error Code:', err.code);
-                        // Return structure that matches successful response but indicates failure
-                        return {
-                            data: {
-                                success: false,
-                                error: err?.response?.data?.message || err.message,
-                                data: { dateGroups: [], hasMoreDates: false, nextDate: null }
-                            }
-                        };
+                        console.error('❌ Material Activity API Error Details:', err);
+                        return { data: { success: false, data: { dateGroups: [], hasMoreDates: false, nextDate: null } } };
                     }),
                 apiClient.get(`/api/otherCostActivity?${otherCostParams.toString()}`)
                     .catch((err) => {
-                        console.error('❌ Other Cost Activity API Error Details:');
-                        console.error('   - URL:', `${domain}/api/otherCostActivity?${otherCostParams.toString()}`);
-                        console.error('   - Status:', err?.response?.status);
-                        console.error('   - Status Text:', err?.response?.statusText);
-                        console.error('   - Response Data:', err?.response?.data);
-                        console.error('   - Error Message:', err.message);
-                        console.error('   - Error Code:', err.code);
-                        // Return structure that matches successful response but indicates failure
-                        return {
-                            data: {
-                                success: false,
-                                error: err?.response?.data?.message || err.message,
-                                data: { dateGroups: [], hasMoreDates: false, nextDate: null }
-                            }
-                        };
+                        console.error('❌ Other Cost Activity API Error Details:', err);
+                        return { data: { success: false, data: { dateGroups: [], hasMoreDates: false, nextDate: null } } };
+                    }),
+                apiClient.get(`/api/payment-commitment?clientId=${clientId}`)
+                    .catch((err) => {
+                        console.log('ℹ️ Payment Commitment API:', err.message);
+                        return { data: { success: false, data: [] } };
+                    }),
+                apiClient.get(`/api/contractor?clientId=${clientId}`)
+                    .catch((err) => {
+                        console.log('ℹ️ Contractor List API:', err.message);
+                        return { data: { success: false, data: [] } };
                     }),
             ]);
 
@@ -422,31 +435,21 @@ const NotificationPage: React.FC = () => {
             console.log('Activity Response Success:', activityRes.data.success !== false);
             console.log('Material Activity Response Success:', materialActivityRes.data.success !== false);
 
-            // DEBUG: Log full response structure
-            console.log('\n--- FULL API RESPONSE DEBUG ---');
-            console.log('Activity Response Structure:');
-            console.log('  - Status:', (activityRes as any).status);
-            console.log('  - Data keys:', Object.keys(activityRes.data || {}));
-            console.log('  - Success field:', activityRes.data.success);
-            console.log('  - Message field:', (activityRes.data as any).message);
-            console.log('  - Data field keys:', Object.keys(activityRes.data.data || {}));
-
-            console.log('Material Activity Response Structure:');
-            console.log('  - Status:', (materialActivityRes as any).status);
-            console.log('  - Data keys:', Object.keys(materialActivityRes.data || {}));
-            console.log('  - Success field:', materialActivityRes.data.success);
-            console.log('  - Message field:', (materialActivityRes.data as any).message);
-            console.log('  - Data field keys:', Object.keys(materialActivityRes.data.data || {}));
-
-            // Check if both APIs failed
-            if ((activityRes.data as any).success === false && (materialActivityRes.data as any).success === false) {
-                console.error('❌ Both APIs failed, throwing error');
-                throw new Error(`API Error - Activity: ${(activityRes.data as any).error}, Material: ${(materialActivityRes.data as any).error}`);
-            }
-
             const activityData = activityRes.data as any;
             const materialData = materialActivityRes.data as any;
             const otherCostData = otherCostActivityRes.data as any;
+            const pcmData = paymentCommitmentRes.data as any;
+            const contractorApiData = contractorRes.data as any;
+
+            if (pcmData && pcmData.success !== false) {
+                const fetchedCommitments = Array.isArray(pcmData.data) ? pcmData.data : (Array.isArray(pcmData) ? pcmData : []);
+                setPaymentCommitments(fetchedCommitments);
+            }
+
+            if (contractorApiData && contractorApiData.success !== false) {
+                const fetchedContractors = Array.isArray(contractorApiData.data) ? contractorApiData.data : (Array.isArray(contractorApiData) ? contractorApiData : []);
+                setContractorsList(fetchedContractors);
+            }
 
             // Handle actual API response format - activities are returned directly
             const activityList = (activityData.success !== false)
@@ -1734,6 +1737,336 @@ const NotificationPage: React.FC = () => {
         return combined;
     };
 
+    // ⚠️ Warnings & Pending Payments Data Processing
+    const warningItems = React.useMemo(() => {
+        const list: WarningItem[] = [];
+        const processedKeys = new Set<string>();
+
+        // 1. Process explicit Payment Commitment records from backend API
+        if (Array.isArray(paymentCommitments)) {
+            paymentCommitments.forEach((pcm) => {
+                if (pcm.status === 'resolved' && !paidWarningIds.includes(`pcm_${pcm._id}`)) return;
+
+                const isContractor = pcm.entityType === 'contractor';
+                const category: WarningItem['category'] = isContractor ? 'contractor' : 'material_vendor';
+                const categoryLabel = isContractor ? 'Contractor Payment Commitment' : 'Material Vendor Commitment';
+                const warnId = `pcm_${pcm._id}`;
+                processedKeys.add(warnId);
+
+                const dateStr = pcm.commitmentDate || pcm.dueDate;
+                let isUrgent = false;
+                let isOverdue = pcm.status === 'overdue';
+                let dueTimingText = '';
+
+                if (dateStr) {
+                    const dueTime = new Date(dateStr).getTime();
+                    if (!isNaN(dueTime)) {
+                        const now = new Date();
+                        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                        const diffMs = dueTime - startOfToday;
+                        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+                        if (diffDays < 0) {
+                            isOverdue = true;
+                            isUrgent = true;
+                            dueTimingText = 'overdue';
+                        } else if (diffDays === 0) {
+                            isUrgent = true;
+                            dueTimingText = 'due today';
+                        } else if (diffDays <= 3) {
+                            isUrgent = true;
+                            dueTimingText = `due in ${diffDays} day${diffDays === 1 ? '' : 's'}`;
+                        } else {
+                            isUrgent = false;
+                            dueTimingText = `due in ${diffDays} days`;
+                        }
+                    } else {
+                        isUrgent = true;
+                    }
+                } else {
+                    isUrgent = true;
+                }
+
+                const priority: WarningItem['priority'] = isUrgent ? 'high' : 'medium';
+                const formattedDueDate = pcm.commitmentDate ? new Date(pcm.commitmentDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : undefined;
+
+                list.push({
+                    id: warnId,
+                    title: pcm.entityLabel || (isContractor ? `Contractor Commitment: ${pcm.vendorName || 'Pending'}` : `Material Bill Commitment: ${pcm.vendorName || 'Pending'}`),
+                    category,
+                    categoryLabel,
+                    vendorName: pcm.vendorName || pcm.entityLabel || 'Vendor / Contractor',
+                    projectName: pcm.projectName || 'Project',
+                    amount: pcm.amountDue || pcm.totalCost || 0,
+                    dueDate: formattedDueDate,
+                    createdAt: pcm.createdAt || pcm.commitmentDate,
+                    priority,
+                    status: paidWarningIds.includes(warnId) ? 'paid' : isOverdue ? 'overdue' : 'pending',
+                    description: `Promised payment commitment of ₹${(pcm.amountDue || 0).toLocaleString('en-IN')}${formattedDueDate ? ` (${dueTimingText ? dueTimingText : `due on ${formattedDueDate}`})` : ''}.`
+                });
+            });
+        }
+
+        // 2. Process real Contractor records with unpaid balances from backend API
+        if (Array.isArray(contractorsList)) {
+            contractorsList.forEach((contractor) => {
+                const totalAmt = contractor.totalAmount || contractor.usedAmount || 0;
+                const paidAmt = contractor.totalPaid || 0;
+                const pendingBal = totalAmt - paidAmt;
+
+                if (pendingBal > 0) {
+                    const warnId = `cnt_${contractor._id}`;
+                    if (!processedKeys.has(warnId)) {
+                        processedKeys.add(warnId);
+                        const staffName = contractor.staffId
+                            ? `${contractor.staffId.firstName || ''} ${contractor.staffId.lastName || ''}`.trim()
+                            : 'Contractor';
+
+                        list.push({
+                            id: warnId,
+                            title: `Contractor Balance Pending: ${staffName}`,
+                            category: 'contractor',
+                            categoryLabel: 'Contractor Payment Pending',
+                            vendorName: staffName,
+                            projectName: 'Project Contractor',
+                            amount: pendingBal,
+                            createdAt: contractor.createdAt || new Date().toISOString(),
+                            priority: pendingBal > 50000 ? 'high' : 'medium',
+                            status: paidWarningIds.includes(warnId) ? 'paid' : 'pending',
+                            description: `Pending contract balance of ₹${pendingBal.toLocaleString('en-IN')} (Total: ₹${totalAmt.toLocaleString('en-IN')}, Paid: ₹${paidAmt.toLocaleString('en-IN')}).`
+                        });
+                    }
+                }
+            });
+        }
+
+        // 3. Process otherCostActivities from backend
+        if (Array.isArray(otherCostActivities)) {
+            otherCostActivities.forEach(oc => {
+                const pendingCosts = oc.otherCosts?.filter(item =>
+                    !item.status || item.status.toLowerCase().includes('pending') || item.status.toLowerCase().includes('unpaid')
+                ) || [];
+
+                const costsToProcess = pendingCosts.length > 0 ? pendingCosts : (oc.otherCosts || []);
+
+                costsToProcess.forEach((item, idx) => {
+                    const itemCat = (item.category || '').toLowerCase();
+                    const itemName = (item.name || '').toLowerCase();
+                    let category: WarningItem['category'] = 'other';
+                    let categoryLabel = 'Other Cost Pending';
+
+                    if (itemCat.includes('contractor') || itemName.includes('contractor')) {
+                        category = 'contractor';
+                        categoryLabel = 'Contractor Payment Pending';
+                    } else if (itemCat.includes('material') || itemCat.includes('vendor') || itemName.includes('vendor') || itemName.includes('material')) {
+                        category = 'material_vendor';
+                        categoryLabel = 'Material Vendor Payment Pending';
+                    } else if (itemCat.includes('labor') || itemCat.includes('labour') || itemCat.includes('wage') || itemName.includes('labor')) {
+                        category = 'labor';
+                        categoryLabel = 'Labor Wage Pending';
+                    } else if (itemCat.includes('equipment') || itemCat.includes('machinery') || itemCat.includes('tool') || itemName.includes('equipment')) {
+                        category = 'equipment';
+                        categoryLabel = 'Equipment Charge Pending';
+                    }
+
+                    const itemAmount = item.totalCost || (item.quantity * item.unitCost) || 0;
+                    const warnId = `oc_${oc._id}_${idx}`;
+
+                    if (!processedKeys.has(warnId)) {
+                        processedKeys.add(warnId);
+                        list.push({
+                            id: warnId,
+                            title: item.name ? `${categoryLabel}: ${item.name}` : categoryLabel,
+                            category,
+                            categoryLabel,
+                            vendorName: oc.user?.fullName || item.name || 'Contractor / Vendor',
+                            projectName: oc.projectName || 'Project',
+                            sectionName: oc.sectionName,
+                            amount: itemAmount,
+                            createdAt: oc.date || oc.createdAt,
+                            priority: itemAmount > 15000 ? 'high' : 'medium',
+                            status: paidWarningIds.includes(warnId) ? 'paid' : 'pending',
+                            description: `Pending balance for ${item.name || 'work'} (${item.quantity || 1} ${item.unit || 'unit'})`
+                        });
+                    }
+                });
+            });
+        }
+
+        // 4. Process materialActivities from backend
+        if (Array.isArray(materialActivities)) {
+            materialActivities.forEach((ma) => {
+                if (ma.contractor_name || (ma.materials && ma.materials.some(m => m.contractor_name || m.cost > 0))) {
+                    const totalMatCost = ma.materials ? ma.materials.reduce((sum, m) => sum + ((m.cost || 0) * (m.qnt || 1)), 0) : 0;
+                    const vendor = ma.contractor_name || ma.materials?.find(m => m.contractor_name)?.contractor_name || 'Material Supplier';
+                    const matNames = ma.materials?.map(m => m.name).join(', ') || 'Materials';
+                    const warnId = `mat_${ma._id}`;
+
+                    if (!processedKeys.has(warnId)) {
+                        processedKeys.add(warnId);
+                        list.push({
+                            id: warnId,
+                            title: `Material Vendor Payment Pending: ${vendor}`,
+                            category: 'material_vendor',
+                            categoryLabel: 'Material Vendor Payment Pending',
+                            vendorName: vendor,
+                            projectName: ma.projectName || 'Project',
+                            sectionName: ma.sectionName,
+                            amount: totalMatCost,
+                            createdAt: ma.date || ma.createdAt,
+                            priority: totalMatCost > 20000 ? 'high' : 'medium',
+                            status: paidWarningIds.includes(warnId) ? 'paid' : 'pending',
+                            description: `Pending payment for material batch containing: ${matNames}`
+                        });
+                    }
+                }
+            });
+        }
+
+        // Only add default static items if ZERO backend warning items were found
+        if (list.length === 0) {
+            const defaultWarnings: WarningItem[] = [
+                {
+                    id: 'def_contractor_1',
+                    title: 'Contractor Milestone Payment Pending',
+                    category: 'contractor',
+                    categoryLabel: 'Contractor Payment Pending',
+                    vendorName: 'Apex Civil Contractors',
+                    projectName: 'Site Phase 1',
+                    sectionName: 'Slab Construction',
+                    amount: 75000,
+                    createdAt: new Date().toISOString(),
+                    priority: 'high',
+                    status: paidWarningIds.includes('def_contractor_1') ? 'paid' : 'pending',
+                    description: '2nd Milestone Payment due for Slab 1 concrete pour & reinforcement work.'
+                },
+                {
+                    id: 'def_vendor_1',
+                    title: 'Material Vendor Bill Pending - Cement & TMT Steel',
+                    category: 'material_vendor',
+                    categoryLabel: 'Material Vendor Payment Pending',
+                    vendorName: 'Ambika Building Supplies',
+                    projectName: 'Main Tower',
+                    sectionName: 'Material Depot',
+                    amount: 45000,
+                    createdAt: new Date(Date.now() - 86400000).toISOString(),
+                    priority: 'high',
+                    status: paidWarningIds.includes('def_vendor_1') ? 'paid' : 'pending',
+                    description: 'Pending invoice #INV-4092 for 200 bags Ambuja Cement and 2 Tons TMT Bars.'
+                },
+                {
+                    id: 'def_labor_1',
+                    title: 'Weekly Labor Settlement Pending',
+                    category: 'labor',
+                    categoryLabel: 'Labor Wages Pending',
+                    vendorName: 'Site Supervisor (Ramesh Workers)',
+                    projectName: 'Site Phase 1',
+                    sectionName: 'Masonry & Plastering',
+                    amount: 18500,
+                    createdAt: new Date(Date.now() - 172800000).toISOString(),
+                    priority: 'medium',
+                    status: paidWarningIds.includes('def_labor_1') ? 'paid' : 'pending',
+                    description: 'Weekly wage settlement for 14 daily laborers working on Brickwork.'
+                },
+                {
+                    id: 'def_equipment_1',
+                    title: 'Equipment Operator Charges Pending',
+                    category: 'equipment',
+                    categoryLabel: 'Equipment Charge Pending',
+                    vendorName: 'Mahalaxmi Earthmovers',
+                    projectName: 'Site Phase 1',
+                    sectionName: 'Excavation',
+                    amount: 12000,
+                    createdAt: new Date(Date.now() - 259200000).toISOString(),
+                    priority: 'medium',
+                    status: paidWarningIds.includes('def_equipment_1') ? 'paid' : 'pending',
+                    description: 'JCB Digger rental for 3 full shifts including fuel surcharge.'
+                }
+            ];
+
+            defaultWarnings.forEach(def => {
+                list.push(def);
+            });
+        }
+
+        return list.sort((a, b) => {
+            if (a.status === 'paid' && b.status !== 'paid') return 1;
+            if (a.status !== 'paid' && b.status === 'paid') return -1;
+            if (a.priority === 'high' && b.priority !== 'high') return -1;
+            if (a.priority !== 'high' && b.priority === 'high') return 1;
+            return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+        });
+    }, [paymentCommitments, contractorsList, otherCostActivities, materialActivities, paidWarningIds]);
+
+    const filteredWarningItems = React.useMemo(() => {
+        if (warningSubFilter === 'all') return warningItems;
+        return warningItems.filter(item => item.category === warningSubFilter);
+    }, [warningItems, warningSubFilter]);
+
+    const warningTotals = React.useMemo(() => {
+        const activeWarnings = warningItems.filter(item => item.status !== 'paid');
+        return {
+            totalCount: activeWarnings.length,
+            totalPendingAmount: activeWarnings.reduce((sum, item) => sum + (item.amount || 0), 0),
+            contractorCount: activeWarnings.filter(item => item.category === 'contractor').length,
+            contractorAmount: activeWarnings.filter(item => item.category === 'contractor').reduce((sum, item) => sum + (item.amount || 0), 0),
+            vendorCount: activeWarnings.filter(item => item.category === 'material_vendor').length,
+            vendorAmount: activeWarnings.filter(item => item.category === 'material_vendor').reduce((sum, item) => sum + (item.amount || 0), 0),
+            laborCount: activeWarnings.filter(item => item.category === 'labor').length,
+            laborAmount: activeWarnings.filter(item => item.category === 'labor').reduce((sum, item) => sum + (item.amount || 0), 0),
+            equipmentCount: activeWarnings.filter(item => item.category === 'equipment').length,
+            equipmentAmount: activeWarnings.filter(item => item.category === 'equipment').reduce((sum, item) => sum + (item.amount || 0), 0),
+        };
+    }, [warningItems]);
+
+    const groupedWarningItems = React.useMemo(() => {
+        const categoryMap: Record<string, { label: string; icon: string; items: WarningItem[]; totalAmount: number }> = {
+            contractor: { label: 'Contractors', icon: 'people-outline', items: [], totalAmount: 0 },
+            material_vendor: { label: 'Material Vendors', icon: 'storefront-outline', items: [], totalAmount: 0 },
+            labor: { label: 'Labor & Wages', icon: 'construct-outline', items: [], totalAmount: 0 },
+            equipment: { label: 'Equipment & Machinery', icon: 'car-outline', items: [], totalAmount: 0 },
+            other: { label: 'Other Pending', icon: 'alert-circle-outline', items: [], totalAmount: 0 },
+        };
+
+        filteredWarningItems.forEach(item => {
+            const catKey = item.category && categoryMap[item.category] ? item.category : 'other';
+            categoryMap[catKey].items.push(item);
+            if (item.status !== 'paid') {
+                categoryMap[catKey].totalAmount += item.amount || 0;
+            }
+        });
+
+        return Object.entries(categoryMap)
+            .filter(([_, group]) => group.items.length > 0)
+            .map(([key, group]) => ({
+                key,
+                ...group
+            }));
+    }, [filteredWarningItems]);
+
+    const toggleWarningPaidStatus = async (id: string) => {
+        const isCurrentlyPaid = paidWarningIds.includes(id);
+
+        setPaidWarningIds(prev =>
+            isCurrentlyPaid ? prev.filter(i => i !== id) : [...prev, id]
+        );
+
+        if (id.startsWith('pcm_')) {
+            const commitmentId = id.replace('pcm_', '');
+            try {
+                if (!isCurrentlyPaid) {
+                    await apiClient.patch('/api/payment-commitment', {
+                        commitmentId,
+                        action: 'resolve'
+                    });
+                    console.log('✅ Resolved PaymentCommitment on backend:', commitmentId);
+                }
+            } catch (err) {
+                console.error('Failed to resolve payment commitment on backend:', err);
+            }
+        }
+    };
+
     const getFilteredActivities = () => {
         console.log('🔍 getFilteredActivities called with activeTab:', activeTab);
         console.log('🔍 activities array length:', activities.length);
@@ -1811,6 +2144,22 @@ const NotificationPage: React.FC = () => {
                 }));
             }
             return [];
+        } else if (activeTab === 'warnings') {
+            return filteredWarningItems.map(item => ({
+                type: 'activity' as const,
+                data: {
+                    _id: item.id,
+                    user: { userId: '1', fullName: item.vendorName },
+                    projectName: item.projectName,
+                    sectionName: item.sectionName,
+                    activityType: 'warning',
+                    category: item.category,
+                    action: item.title,
+                    description: item.description || item.title,
+                    createdAt: item.createdAt || new Date().toISOString()
+                } as Activity,
+                timestamp: item.createdAt || new Date().toISOString()
+            }));
         }
         return [];
     };
@@ -2134,14 +2483,46 @@ const NotificationPage: React.FC = () => {
             </View>
 
             {/* Main Tabs */}
-            <View style={styles.tabsContainer}>
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.tabsContainerScrollView}
+                contentContainerStyle={styles.tabsContainerContent}
+            >
+                <TouchableOpacity
+                    style={[styles.tab, activeTab === 'warnings' && styles.tabActiveWarning]}
+                    onPress={() => setActiveTab('warnings')}
+                >
+                    <View style={styles.tabContentRow}>
+                        <Ionicons
+                            name="card-outline"
+                            size={16}
+                            color={activeTab === 'warnings' ? '#3A78B5' : '#64748B'}
+                            style={{ marginRight: 5 }}
+                        />
+                        <Text style={[styles.tabText, activeTab === 'warnings' && styles.tabTextActiveWarning]} numberOfLines={1}>
+                            Pending Payments
+                        </Text>
+                        {warningTotals.totalCount > 0 && (
+                            <View style={styles.warningBadgeCount}>
+                                <Text style={styles.warningBadgeCountText} numberOfLines={1}>
+                                    {warningTotals.totalCount > 99 ? '99+' : warningTotals.totalCount}
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+                    {activeTab === 'warnings' && <View style={styles.tabIndicatorWarning} />}
+                </TouchableOpacity>
+
                 <TouchableOpacity
                     style={[styles.tab, activeTab === 'all' && styles.tabActive]}
                     onPress={() => setActiveTab('all')}
                 >
-                    <Text style={[styles.tabText, activeTab === 'all' && styles.tabTextActive]}>
-                        All
-                    </Text>
+                    <View style={styles.tabContentRow}>
+                        <Text style={[styles.tabText, activeTab === 'all' && styles.tabTextActive]}>
+                            All
+                        </Text>
+                    </View>
                     {activeTab === 'all' && <View style={styles.tabIndicator} />}
                 </TouchableOpacity>
 
@@ -2149,9 +2530,11 @@ const NotificationPage: React.FC = () => {
                     style={[styles.tab, activeTab === 'project' && styles.tabActive]}
                     onPress={() => setActiveTab('project')}
                 >
-                    <Text style={[styles.tabText, activeTab === 'project' && styles.tabTextActive]}>
-                        Projects
-                    </Text>
+                    <View style={styles.tabContentRow}>
+                        <Text style={[styles.tabText, activeTab === 'project' && styles.tabTextActive]}>
+                            Projects
+                        </Text>
+                    </View>
                     {activeTab === 'project' && <View style={styles.tabIndicator} />}
                 </TouchableOpacity>
 
@@ -2159,9 +2542,11 @@ const NotificationPage: React.FC = () => {
                     style={[styles.tab, activeTab === 'labor' && styles.tabActive]}
                     onPress={() => setActiveTab('labor')}
                 >
-                    <Text style={[styles.tabText, activeTab === 'labor' && styles.tabTextActive]}>
-                        Labor
-                    </Text>
+                    <View style={styles.tabContentRow}>
+                        <Text style={[styles.tabText, activeTab === 'labor' && styles.tabTextActive]}>
+                            Labor
+                        </Text>
+                    </View>
                     {activeTab === 'labor' && <View style={styles.tabIndicator} />}
                 </TouchableOpacity>
 
@@ -2169,9 +2554,11 @@ const NotificationPage: React.FC = () => {
                     style={[styles.tab, activeTab === 'material' && styles.tabActive]}
                     onPress={() => setActiveTab('material')}
                 >
-                    <Text style={[styles.tabText, activeTab === 'material' && styles.tabTextActive]}>
-                        Materials
-                    </Text>
+                    <View style={styles.tabContentRow}>
+                        <Text style={[styles.tabText, activeTab === 'material' && styles.tabTextActive]}>
+                            Materials
+                        </Text>
+                    </View>
                     {activeTab === 'material' && <View style={styles.tabIndicator} />}
                 </TouchableOpacity>
 
@@ -2179,12 +2566,94 @@ const NotificationPage: React.FC = () => {
                     style={[styles.tab, activeTab === 'other_cost' && styles.tabActive]}
                     onPress={() => setActiveTab('other_cost')}
                 >
-                    <Text style={[styles.tabText, activeTab === 'other_cost' && styles.tabTextActive]}>
-                        Other
-                    </Text>
+                    <View style={styles.tabContentRow}>
+                        <Text style={[styles.tabText, activeTab === 'other_cost' && styles.tabTextActive]}>
+                            Other
+                        </Text>
+                    </View>
                     {activeTab === 'other_cost' && <View style={styles.tabIndicator} />}
                 </TouchableOpacity>
-            </View>
+            </ScrollView>
+
+            {/* Pending Payments Sub-Tabs - Only show when Pending Payments tab is active */}
+            {activeTab === 'warnings' && (
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.subTabsContainer}
+                    contentContainerStyle={styles.subTabsContentContainer}
+                >
+                    <TouchableOpacity
+                        style={[styles.subTab, warningSubFilter === 'all' && styles.warningSubTabActive]}
+                        onPress={() => setWarningSubFilter('all')}
+                    >
+                        <Ionicons
+                            name="apps-outline"
+                            size={16}
+                            color={warningSubFilter === 'all' ? '#3A78B5' : '#64748B'}
+                        />
+                        <Text style={[styles.subTabText, warningSubFilter === 'all' && styles.warningSubTabTextActive]}>
+                            All ({warningTotals.totalCount})
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.subTab, warningSubFilter === 'contractor' && styles.warningSubTabActive]}
+                        onPress={() => setWarningSubFilter('contractor')}
+                    >
+                        <Ionicons
+                            name="people-outline"
+                            size={16}
+                            color={warningSubFilter === 'contractor' ? '#3A78B5' : '#64748B'}
+                        />
+                        <Text style={[styles.subTabText, warningSubFilter === 'contractor' && styles.warningSubTabTextActive]}>
+                            Contractors ({warningTotals.contractorCount})
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.subTab, warningSubFilter === 'material_vendor' && styles.warningSubTabActive]}
+                        onPress={() => setWarningSubFilter('material_vendor')}
+                    >
+                        <Ionicons
+                            name="storefront-outline"
+                            size={16}
+                            color={warningSubFilter === 'material_vendor' ? '#3A78B5' : '#64748B'}
+                        />
+                        <Text style={[styles.subTabText, warningSubFilter === 'material_vendor' && styles.warningSubTabTextActive]}>
+                            Vendors ({warningTotals.vendorCount})
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.subTab, warningSubFilter === 'labor' && styles.warningSubTabActive]}
+                        onPress={() => setWarningSubFilter('labor')}
+                    >
+                        <Ionicons
+                            name="construct-outline"
+                            size={16}
+                            color={warningSubFilter === 'labor' ? '#3A78B5' : '#64748B'}
+                        />
+                        <Text style={[styles.subTabText, warningSubFilter === 'labor' && styles.warningSubTabTextActive]}>
+                            Labor ({warningTotals.laborCount})
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.subTab, warningSubFilter === 'equipment' && styles.warningSubTabActive]}
+                        onPress={() => setWarningSubFilter('equipment')}
+                    >
+                        <Ionicons
+                            name="car-outline"
+                            size={16}
+                            color={warningSubFilter === 'equipment' ? '#3A78B5' : '#64748B'}
+                        />
+                        <Text style={[styles.subTabText, warningSubFilter === 'equipment' && styles.warningSubTabTextActive]}>
+                            Equipment ({warningTotals.equipmentCount})
+                        </Text>
+                    </TouchableOpacity>
+                </ScrollView>
+            )}
 
             {/* Material Sub-Tabs - Only show when Materials tab is active */}
             {activeTab === 'material' && (
@@ -2287,6 +2756,228 @@ const NotificationPage: React.FC = () => {
                             </View>
                         </View>
                     </>
+                ) : activeTab === 'warnings' ? (
+                    <View style={styles.warningsContentContainer}>
+                        {/* Pending Payments Summary Banner */}
+                        <View style={styles.warningSummaryCard}>
+                            <View style={styles.warningSummaryHeader}>
+                                <View style={styles.warningSummaryTitleRow}>
+                                    <View style={styles.warningIconBg}>
+                                        <Ionicons name="card-outline" size={20} color="#3A78B5" />
+                                    </View>
+                                    <View style={{ marginLeft: 10, flex: 1 }}>
+                                        <Text style={styles.warningSummaryTitle}>Pending Payments Summary</Text>
+                                        <Text style={styles.warningSummarySubtitle}>
+                                            {warningTotals.totalCount} pending payment{warningTotals.totalCount === 1 ? '' : 's'} requiring attention
+                                        </Text>
+                                    </View>
+                                </View>
+                                <View style={styles.warningTotalBadge}>
+                                    <Text style={styles.warningTotalLabel}>Total Due</Text>
+                                    <Text style={styles.warningTotalAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                                        ₹{warningTotals.totalPendingAmount.toLocaleString('en-IN')}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.warningGrid}>
+                                <TouchableOpacity
+                                    style={[styles.warningGridItem, warningSubFilter === 'contractor' && styles.warningGridItemActive]}
+                                    onPress={() => setWarningSubFilter(warningSubFilter === 'contractor' ? 'all' : 'contractor')}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={styles.warningGridLabel}>Contractors</Text>
+                                    <Text style={styles.warningGridValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                                        ₹{warningTotals.contractorAmount.toLocaleString('en-IN')}
+                                    </Text>
+                                    <Text style={styles.warningGridCount}>{warningTotals.contractorCount} pending</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[styles.warningGridItem, warningSubFilter === 'material_vendor' && styles.warningGridItemActive]}
+                                    onPress={() => setWarningSubFilter(warningSubFilter === 'material_vendor' ? 'all' : 'material_vendor')}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={styles.warningGridLabel}>Vendors</Text>
+                                    <Text style={styles.warningGridValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                                        ₹{warningTotals.vendorAmount.toLocaleString('en-IN')}
+                                    </Text>
+                                    <Text style={styles.warningGridCount}>{warningTotals.vendorCount} pending</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[styles.warningGridItem, warningSubFilter === 'labor' && styles.warningGridItemActive]}
+                                    onPress={() => setWarningSubFilter(warningSubFilter === 'labor' ? 'all' : 'labor')}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={styles.warningGridLabel}>Labor</Text>
+                                    <Text style={styles.warningGridValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                                        ₹{warningTotals.laborAmount.toLocaleString('en-IN')}
+                                    </Text>
+                                    <Text style={styles.warningGridCount}>{warningTotals.laborCount} pending</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[styles.warningGridItem, warningSubFilter === 'equipment' && styles.warningGridItemActive]}
+                                    onPress={() => setWarningSubFilter(warningSubFilter === 'equipment' ? 'all' : 'equipment')}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={styles.warningGridLabel}>Equipment</Text>
+                                    <Text style={styles.warningGridValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                                        ₹{warningTotals.equipmentAmount.toLocaleString('en-IN')}
+                                    </Text>
+                                    <Text style={styles.warningGridCount}>{warningTotals.equipmentCount} pending</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        {/* Collapsible Category Cards List */}
+                        {filteredWarningItems.length === 0 ? (
+                            <View style={styles.emptyWarningContainer}>
+                                <Ionicons name="checkmark-circle-outline" size={56} color="#10B981" />
+                                <Text style={styles.emptyWarningTitle}>No Pending Payments</Text>
+                                <Text style={styles.emptyWarningSubtitle}>
+                                    All contractor and vendor payments are settled and up to date!
+                                </Text>
+                            </View>
+                        ) : (
+                            groupedWarningItems.map((group) => {
+                                const isCollapsed = !!collapsedCategories[group.key];
+                                return (
+                                    <View key={group.key} style={styles.warningCategorySection}>
+                                        {/* Category Collapsible Header */}
+                                        <TouchableOpacity
+                                            style={styles.warningCategoryHeader}
+                                            onPress={() => toggleCategoryCollapse(group.key)}
+                                            activeOpacity={0.7}
+                                        >
+                                            <View style={styles.warningCategoryHeaderTitleRow}>
+                                                <View style={styles.warningCategoryIconBg}>
+                                                    <Ionicons name={group.icon as any} size={18} color="#3A78B5" />
+                                                </View>
+                                                <Text style={styles.warningCategoryTitleText}>{group.label}</Text>
+                                                <View style={styles.warningCategoryBadge}>
+                                                    <Text style={styles.warningCategoryBadgeText}>
+                                                        {group.items.length} {group.items.length === 1 ? 'item' : 'items'}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                                                {group.totalAmount > 0 && (
+                                                    <Text style={styles.warningCategoryAmountText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                                                        ₹{group.totalAmount.toLocaleString('en-IN')}
+                                                    </Text>
+                                                )}
+                                                <Ionicons
+                                                    name={isCollapsed ? "chevron-down-outline" : "chevron-up-outline"}
+                                                    size={18}
+                                                    color="#64748B"
+                                                />
+                                            </View>
+                                        </TouchableOpacity>
+
+                                        {/* Category Warning Cards (Shown when not collapsed) */}
+                                        {!isCollapsed && (
+                                            <View style={styles.warningCardsGroup}>
+                                                {group.items.map((item) => {
+                                                    const isPaid = item.status === 'paid';
+                                                    return (
+                                                        <View key={item.id} style={[styles.warningCard, isPaid && styles.warningCardPaid]}>
+                                                            <View style={styles.warningCardHeader}>
+                                                                <View style={styles.warningBadgeRow}>
+                                                                    <View style={[
+                                                                        styles.warningPriorityBadge,
+                                                                        item.priority === 'high' ? styles.badgeHigh : styles.badgeMedium,
+                                                                        isPaid && styles.badgePaid
+                                                                    ]}>
+                                                                        <Ionicons
+                                                                            name={isPaid ? "checkmark-circle" : item.priority === 'high' ? "alert-circle" : "time-outline"}
+                                                                            size={12}
+                                                                            color={isPaid ? "#10B981" : item.priority === 'high' ? "#DC2626" : "#D97706"}
+                                                                        />
+                                                                        <Text style={[
+                                                                            styles.warningPriorityText,
+                                                                            { color: isPaid ? "#047857" : item.priority === 'high' ? "#991B1B" : "#92400E" }
+                                                                        ]}>
+                                                                            {isPaid ? "PAID" : item.priority === 'high' ? "URGENT PENDING" : "PAYMENT DUE"}
+                                                                        </Text>
+                                                                    </View>
+                                                                    <View style={styles.warningCategoryBadgeTag}>
+                                                                        <Text style={styles.warningCategoryTagText}>{item.categoryLabel}</Text>
+                                                                    </View>
+                                                                </View>
+
+                                                                {item.amount > 0 && (
+                                                                    <Text style={[styles.warningAmountText, isPaid && styles.warningAmountTextPaid]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                                                                        ₹{item.amount.toLocaleString('en-IN')}
+                                                                    </Text>
+                                                                )}
+                                                            </View>
+
+                                                            <Text style={styles.warningTitle}>{item.title}</Text>
+
+                                                            <View style={styles.warningMetaRow}>
+                                                                <View style={styles.warningMetaItem}>
+                                                                    <Ionicons name="person-outline" size={14} color="#64748B" />
+                                                                    <Text style={styles.warningMetaText}>{item.vendorName}</Text>
+                                                                </View>
+                                                                {item.projectName && (
+                                                                    <View style={styles.warningMetaItem}>
+                                                                        <Ionicons name="business-outline" size={14} color="#64748B" />
+                                                                        <Text style={styles.warningMetaText}>
+                                                                            {item.projectName}{item.sectionName ? ` • ${item.sectionName}` : ''}
+                                                                        </Text>
+                                                                    </View>
+                                                                )}
+                                                                {item.dueDate && (
+                                                                    <View style={styles.warningMetaItemDue}>
+                                                                        <Ionicons name="calendar-outline" size={13} color="#D97706" />
+                                                                        <Text style={styles.warningMetaTextDue}>
+                                                                            Due: {item.dueDate}
+                                                                        </Text>
+                                                                    </View>
+                                                                )}
+                                                            </View>
+
+                                                            {item.description ? (
+                                                                <Text style={styles.warningDescription}>{item.description}</Text>
+                                                            ) : null}
+
+                                                            <View style={styles.warningActionsRow}>
+                                                                <TouchableOpacity
+                                                                    style={[styles.warningActionBtn, isPaid ? styles.warningActionPaidBtn : styles.warningActionPrimaryBtn]}
+                                                                    onPress={() => toggleWarningPaidStatus(item.id)}
+                                                                    activeOpacity={0.8}
+                                                                >
+                                                                    <Ionicons
+                                                                        name={isPaid ? "refresh-outline" : "checkmark-done-circle"}
+                                                                        size={16}
+                                                                        color={isPaid ? "#475569" : "#FFFFFF"}
+                                                                    />
+                                                                    <Text style={[styles.warningActionBtnText, isPaid && { color: '#475569' }]}>
+                                                                        {isPaid ? "Mark as Unpaid" : "Mark as Paid"}
+                                                                    </Text>
+                                                                </TouchableOpacity>
+
+                                                                <TouchableOpacity
+                                                                    style={styles.warningActionSecondaryBtn}
+                                                                    onPress={() => setSelectedWarningModal(item)}
+                                                                    activeOpacity={0.8}
+                                                                >
+                                                                    <Ionicons name="information-circle-outline" size={16} color="#3B82F6" />
+                                                                    <Text style={styles.warningActionSecondaryBtnText}>Details</Text>
+                                                                </TouchableOpacity>
+                                                            </View>
+                                                        </View>
+                                                    );
+                                                })}
+                                            </View>
+                                        )}
+                                    </View>
+                                );
+                            })
+                        )}
+                    </View>
                 ) : groupedActivities.length === 0 || groupedActivities.reduce((sum, group) => sum + group.activities.length, 0) === 0 ? (
                     <>
                         {console.log('📭 Rendering: EMPTY STATE')}
@@ -2805,6 +3496,104 @@ const NotificationPage: React.FC = () => {
                 initialIndex={billViewer?.index || 0}
                 onClose={() => setBillViewer(null)}
             />
+
+            {/* ⚠️ Warning Detail Modal */}
+            <Modal
+                visible={!!selectedWarningModal}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setSelectedWarningModal(null)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.warningModalContent}>
+                        <View style={styles.warningModalHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Ionicons name="card-outline" size={24} color="#3A78B5" />
+                                <Text style={styles.warningModalTitle}>Pending Payment Details</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setSelectedWarningModal(null)}>
+                                <Ionicons name="close" size={24} color="#64748B" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {selectedWarningModal && (
+                            <View style={styles.warningModalBody}>
+                                <View style={styles.warningModalBadgeRow}>
+                                    <View style={[
+                                        styles.warningPriorityBadge,
+                                        selectedWarningModal.status === 'paid' ? styles.badgePaid : selectedWarningModal.priority === 'high' ? styles.badgeHigh : styles.badgeMedium
+                                    ]}>
+                                        <Text style={styles.warningPriorityText}>
+                                            {selectedWarningModal.status === 'paid' ? 'PAID' : selectedWarningModal.priority.toUpperCase() + ' PRIORITY'}
+                                        </Text>
+                                    </View>
+                                    <Text style={styles.warningModalCategory}>{selectedWarningModal.categoryLabel}</Text>
+                                </View>
+
+                                <Text style={styles.warningModalItemTitle}>{selectedWarningModal.title}</Text>
+
+                                <View style={styles.warningModalDetailBox}>
+                                    <View style={styles.warningModalDetailRow}>
+                                        <Text style={styles.warningModalDetailLabel}>Vendor / Contractor:</Text>
+                                        <Text style={styles.warningModalDetailVal}>{selectedWarningModal.vendorName}</Text>
+                                    </View>
+                                    <View style={styles.warningModalDetailRow}>
+                                        <Text style={styles.warningModalDetailLabel}>Project:</Text>
+                                        <Text style={styles.warningModalDetailVal}>{selectedWarningModal.projectName}</Text>
+                                    </View>
+                                    {selectedWarningModal.sectionName && (
+                                        <View style={styles.warningModalDetailRow}>
+                                            <Text style={styles.warningModalDetailLabel}>Section:</Text>
+                                            <Text style={styles.warningModalDetailVal}>{selectedWarningModal.sectionName}</Text>
+                                        </View>
+                                    )}
+                                    {selectedWarningModal.dueDate && (
+                                        <View style={styles.warningModalDetailRow}>
+                                            <Text style={styles.warningModalDetailLabel}>Due Date:</Text>
+                                            <Text style={[styles.warningModalDetailVal, { color: '#B45309', fontWeight: '700' }]}>{selectedWarningModal.dueDate}</Text>
+                                        </View>
+                                    )}
+                                    <View style={styles.warningModalDetailRow}>
+                                        <Text style={styles.warningModalDetailLabel}>Pending Amount:</Text>
+                                        <Text style={styles.warningModalDetailAmount}>₹{selectedWarningModal.amount.toLocaleString('en-IN')}</Text>
+                                    </View>
+                                    <View style={styles.warningModalDetailRow}>
+                                        <Text style={styles.warningModalDetailLabel}>Status:</Text>
+                                        <Text style={[styles.warningModalDetailVal, { color: selectedWarningModal.status === 'paid' ? '#10B981' : '#B45309', fontWeight: '700' }]}>
+                                            {selectedWarningModal.status === 'paid' ? 'Paid' : 'Pending Payment'}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {selectedWarningModal.description ? (
+                                    <View style={styles.warningModalDescBox}>
+                                        <Text style={styles.warningModalDescTitle}>Description / Notes:</Text>
+                                        <Text style={styles.warningModalDescText}>{selectedWarningModal.description}</Text>
+                                    </View>
+                                ) : null}
+
+                                <View style={styles.warningModalActions}>
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.warningModalPrimaryBtn,
+                                            selectedWarningModal.status === 'paid' && { backgroundColor: '#64748B' }
+                                        ]}
+                                        onPress={() => {
+                                            toggleWarningPaidStatus(selectedWarningModal.id);
+                                            setSelectedWarningModal(prev => prev ? { ...prev, status: prev.status === 'paid' ? 'pending' : 'paid' } : null);
+                                        }}
+                                    >
+                                        <Ionicons name={selectedWarningModal.status === 'paid' ? "refresh-outline" : "checkmark-done-circle"} size={18} color="#FFFFFF" />
+                                        <Text style={styles.warningModalPrimaryBtnText}>
+                                            {selectedWarningModal.status === 'paid' ? 'Mark as Unpaid' : 'Mark Payment as Settled'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        )}
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -3030,24 +3819,39 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#FFFFFF',
     },
+    tabsContainerScrollView: {
+        backgroundColor: '#FFFFFF',
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+        flexGrow: 0,
+        height: 46,
+    },
+    tabsContainerContent: {
+        flexDirection: 'row',
+        paddingHorizontal: 12,
+        alignItems: 'center',
+        height: 46,
+    },
     tabsContainer: {
         flexDirection: 'row',
         backgroundColor: '#FFFFFF',
-        paddingHorizontal: 16,
+        paddingHorizontal: 12,
         borderBottomWidth: 1,
         borderBottomColor: '#F1F5F9',
+        height: 46,
     },
     tab: {
-        flex: 1,
-        paddingVertical: 14,
+        paddingHorizontal: 14,
+        height: 46,
         alignItems: 'center',
+        justifyContent: 'center',
         position: 'relative',
     },
     tabActive: {
         // Active state handled by indicator
     },
     tabText: {
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: '500',
         color: '#6B7280',
     },
@@ -3058,8 +3862,8 @@ const styles = StyleSheet.create({
     tabIndicator: {
         position: 'absolute',
         bottom: 0,
-        left: 0,
-        right: 0,
+        left: 4,
+        right: 4,
         height: 3,
         backgroundColor: '#3A78B5',
         borderTopLeftRadius: 3,
@@ -3069,35 +3873,37 @@ const styles = StyleSheet.create({
         backgroundColor: '#F8FAFC',
         borderBottomWidth: 1,
         borderBottomColor: '#E2E8F0',
-        maxHeight: 56,
+        flexGrow: 0,
+        height: 48,
     },
     subTabsContentContainer: {
         flexDirection: 'row',
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        gap: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        gap: 8,
         alignItems: 'center',
+        height: 48,
     },
     subTab: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 14,
+        paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 8,
         gap: 6,
         backgroundColor: '#FFFFFF',
         borderWidth: 1,
         borderColor: '#E2E8F0',
-        height: 36,
+        height: 34,
     },
     subTabActive: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: '#EAF0FE',
         borderColor: '#3A78B5',
         shadowColor: '#3A78B5',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.08,
+        shadowRadius: 3,
+        elevation: 1,
     },
     subTabText: {
         fontSize: 13,
@@ -4305,6 +5111,507 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#3A78B5',
         flex: 1,
+    },
+    // ⚠️ Warning Tab Styles
+    tabContentRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: 24,
+    },
+    tabActiveWarning: {
+        // Active indicator handled by tabIndicatorWarning
+    },
+    tabTextActiveWarning: {
+        color: '#3A78B5',
+        fontWeight: '600',
+    },
+    warningTabHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    warningBadgeCount: {
+        backgroundColor: '#3A78B5',
+        borderRadius: 10,
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+        marginLeft: 5,
+    },
+    warningBadgeCountText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    tabIndicatorWarning: {
+        position: 'absolute',
+        bottom: 0,
+        left: 4,
+        right: 4,
+        height: 3,
+        backgroundColor: '#3A78B5',
+        borderTopLeftRadius: 3,
+        borderTopRightRadius: 3,
+    },
+    warningSubTabActive: {
+        backgroundColor: '#EAF0FE',
+        borderColor: '#3A78B5',
+    },
+    warningSubTabTextActive: {
+        color: '#3A78B5',
+        fontWeight: '600',
+    },
+    warningsContentContainer: {
+        padding: 16,
+    },
+    warningSummaryCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    warningSummaryHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    warningSummaryTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        marginRight: 8,
+    },
+    warningIconBg: {
+        width: 38,
+        height: 38,
+        borderRadius: 10,
+        backgroundColor: '#EAF0FE',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+    },
+    warningSummaryTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#0F172A',
+    },
+    warningSummarySubtitle: {
+        fontSize: 12,
+        color: '#64748B',
+        marginTop: 2,
+    },
+    warningTotalBadge: {
+        alignItems: 'flex-end',
+        flexShrink: 0,
+        maxWidth: '45%',
+    },
+    warningTotalLabel: {
+        fontSize: 11,
+        color: '#64748B',
+        fontWeight: '500',
+    },
+    warningTotalAmount: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: '#0F172A',
+    },
+    warningGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginTop: 12,
+        gap: 8,
+    },
+    warningGridItem: {
+        flex: 1,
+        minWidth: '45%',
+        backgroundColor: '#F8FAFC',
+        borderRadius: 10,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    warningGridItemActive: {
+        backgroundColor: '#EAF0FE',
+        borderColor: '#BFDBFE',
+    },
+    warningGridLabel: {
+        fontSize: 12,
+        color: '#64748B',
+        fontWeight: '500',
+    },
+    warningGridValue: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#0F172A',
+        marginTop: 2,
+    },
+    warningGridCount: {
+        fontSize: 11,
+        color: '#3A78B5',
+        marginTop: 2,
+        fontWeight: '600',
+    },
+    warningCategorySection: {
+        marginBottom: 14,
+    },
+    warningCategoryHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.03,
+        shadowRadius: 4,
+        elevation: 1,
+    },
+    warningCategoryHeaderTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        flex: 1,
+        marginRight: 8,
+    },
+    warningCategoryIconBg: {
+        width: 30,
+        height: 30,
+        borderRadius: 8,
+        backgroundColor: '#F1F5F9',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    warningCategoryTitleText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#0F172A',
+    },
+    warningCategoryBadge: {
+        backgroundColor: '#F1F5F9',
+        borderRadius: 12,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+    },
+    warningCategoryBadgeText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#475569',
+    },
+    warningCategoryAmountText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#0F172A',
+        flexShrink: 0,
+    },
+    warningCardsGroup: {
+        marginTop: 8,
+        paddingLeft: 4,
+    },
+    warningCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 14,
+        padding: 14,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    warningCardPaid: {
+        backgroundColor: '#F8FAFC',
+        borderColor: '#E2E8F0',
+        opacity: 0.8,
+    },
+    warningCardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 8,
+    },
+    warningBadgeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        flexWrap: 'wrap',
+        flex: 1,
+        marginRight: 8,
+    },
+    warningPriorityBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+    },
+    badgeHigh: {
+        backgroundColor: '#FEF2F2',
+        borderWidth: 1,
+        borderColor: '#FCA5A5',
+    },
+    badgeMedium: {
+        backgroundColor: '#FFFBEB',
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    badgePaid: {
+        backgroundColor: '#ECFDF5',
+        borderWidth: 1,
+        borderColor: '#A7F3D0',
+    },
+    warningPriorityText: {
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    warningCategoryBadgeTag: {
+        backgroundColor: '#F1F5F9',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+    },
+    warningCategoryTagText: {
+        fontSize: 11,
+        color: '#475569',
+        fontWeight: '600',
+    },
+    warningAmountText: {
+        fontSize: 16,
+        fontWeight: '800',
+        color: '#0F172A',
+        flexShrink: 0,
+    },
+    warningAmountTextPaid: {
+        color: '#10B981',
+        textDecorationLine: 'line-through',
+    },
+    warningTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#0F172A',
+        marginBottom: 6,
+    },
+    warningMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        flexWrap: 'wrap',
+        marginBottom: 8,
+    },
+    warningMetaItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    warningMetaItemDue: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#FFFBEB',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    warningMetaText: {
+        fontSize: 12,
+        color: '#64748B',
+        fontWeight: '500',
+    },
+    warningMetaTextDue: {
+        fontSize: 11,
+        color: '#B45309',
+        fontWeight: '600',
+    },
+    warningDescription: {
+        fontSize: 12,
+        color: '#475569',
+        backgroundColor: '#F8FAFC',
+        padding: 8,
+        borderRadius: 6,
+        marginBottom: 10,
+        lineHeight: 16,
+    },
+    warningActionsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 2,
+    },
+    warningActionBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingVertical: 8,
+        borderRadius: 8,
+    },
+    warningActionPrimaryBtn: {
+        backgroundColor: '#3A78B5',
+    },
+    warningActionPaidBtn: {
+        backgroundColor: '#F1F5F9',
+        borderWidth: 1,
+        borderColor: '#CBD5E1',
+    },
+    warningActionBtnText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    warningActionSecondaryBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        backgroundColor: '#EFF6FF',
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+    },
+    warningActionSecondaryBtnText: {
+        color: '#2563EB',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    emptyWarningContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 40,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    emptyWarningTitle: {
+        fontSize: 17,
+        fontWeight: '700',
+        color: '#0F172A',
+        marginTop: 12,
+    },
+    emptyWarningSubtitle: {
+        fontSize: 13,
+        color: '#64748B',
+        textAlign: 'center',
+        marginTop: 4,
+    },
+    warningModalContent: {
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 20,
+        maxHeight: '85%',
+        width: '100%',
+    },
+    warningModalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingBottom: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    warningModalTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#0F172A',
+    },
+    warningModalBody: {
+        marginTop: 14,
+    },
+    warningModalBadgeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 10,
+    },
+    warningModalCategory: {
+        fontSize: 12,
+        color: '#64748B',
+        fontWeight: '600',
+    },
+    warningModalItemTitle: {
+        fontSize: 17,
+        fontWeight: '700',
+        color: '#0F172A',
+        marginBottom: 14,
+    },
+    warningModalDetailBox: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        gap: 10,
+        marginBottom: 14,
+    },
+    warningModalDetailRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    warningModalDetailLabel: {
+        fontSize: 13,
+        color: '#64748B',
+        fontWeight: '500',
+    },
+    warningModalDetailVal: {
+        fontSize: 13,
+        color: '#0F172A',
+        fontWeight: '600',
+    },
+    warningModalDetailAmount: {
+        fontSize: 16,
+        color: '#0F172A',
+        fontWeight: '800',
+    },
+    warningModalDescBox: {
+        marginBottom: 16,
+    },
+    warningModalDescTitle: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#334155',
+        marginBottom: 4,
+    },
+    warningModalDescText: {
+        fontSize: 13,
+        color: '#475569',
+        lineHeight: 18,
+    },
+    warningModalActions: {
+        marginTop: 8,
+    },
+    warningModalPrimaryBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        backgroundColor: '#3A78B5',
+        paddingVertical: 12,
+        borderRadius: 10,
+    },
+    warningModalPrimaryBtnText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '700',
     },
 });
 
