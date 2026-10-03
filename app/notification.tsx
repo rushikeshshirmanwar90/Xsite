@@ -2881,67 +2881,96 @@ const NotificationPage: React.FC = () => {
                                             <View style={styles.warningCardsGroup}>
                                                 {group.items.map((item) => {
                                                     const isPaid = item.status === 'paid';
+                                                    const isUrgent = !isPaid && item.priority === 'high';
+                                                    // Solid status badge, same treatment as the Material tab's IMPORTED / USED badges.
+                                                    const statusColor = isPaid ? '#10B981' : isUrgent ? '#EF4444' : '#F59E0B';
+                                                    const statusIcon = isPaid ? 'checkmark-circle' : isUrgent ? 'alert-circle' : 'time';
+                                                    const statusLabel = isPaid ? 'PAID' : isUrgent ? 'URGENT' : 'PAYMENT DUE';
+                                                    const vendorInitial = (item.vendorName || '?').trim().charAt(0).toUpperCase() || '?';
                                                     return (
-                                                        <View key={item.id} style={[styles.warningCard, isPaid && styles.warningCardPaid]}>
-                                                            <View style={styles.warningCardHeader}>
-                                                                <View style={styles.warningBadgeRow}>
+                                                        <View key={item.id} style={[styles.materialActivityCard, isPaid && styles.pendingCardPaid]}>
+                                                            <View style={styles.materialActivityGradient}>
+                                                                {/* Header — status badge + category tag */}
+                                                                <View style={styles.materialActivityHeader}>
                                                                     <View style={[
-                                                                        styles.warningPriorityBadge,
-                                                                        item.priority === 'high' ? styles.badgeHigh : styles.badgeMedium,
-                                                                        isPaid && styles.badgePaid
+                                                                        styles.activityBadge,
+                                                                        {
+                                                                            backgroundColor: statusColor,
+                                                                            shadowColor: statusColor,
+                                                                            shadowOffset: { width: 0, height: 2 },
+                                                                            shadowOpacity: 0.3,
+                                                                            shadowRadius: 4,
+                                                                            elevation: 3,
+                                                                        }
                                                                     ]}>
-                                                                        <Ionicons
-                                                                            name={isPaid ? "checkmark-circle" : item.priority === 'high' ? "alert-circle" : "time-outline"}
-                                                                            size={12}
-                                                                            color={isPaid ? "#10B981" : item.priority === 'high' ? "#DC2626" : "#D97706"}
-                                                                        />
-                                                                        <Text style={[
-                                                                            styles.warningPriorityText,
-                                                                            { color: isPaid ? "#047857" : item.priority === 'high' ? "#991B1B" : "#92400E" }
-                                                                        ]}>
-                                                                            {isPaid ? "PAID" : item.priority === 'high' ? "URGENT PENDING" : "PAYMENT DUE"}
-                                                                        </Text>
+                                                                        <Ionicons name={statusIcon as any} size={16} color="#FFFFFF" />
+                                                                        <Text style={[styles.activityBadgeText, { color: '#FFFFFF' }]}>{statusLabel}</Text>
                                                                     </View>
-                                                                    <View style={styles.warningCategoryBadgeTag}>
-                                                                        <Text style={styles.warningCategoryTagText}>{item.categoryLabel}</Text>
+                                                                    <View style={styles.pendingCategoryTag}>
+                                                                        <Ionicons name={group.icon as any} size={13} color="#3A78B5" />
+                                                                        <Text style={styles.pendingCategoryTagText}>{item.categoryLabel}</Text>
                                                                     </View>
                                                                 </View>
 
+                                                                {/* Project / Section / Due date chips */}
+                                                                {(item.projectName || item.sectionName || item.dueDate) && (
+                                                                    <View style={styles.projectInfo}>
+                                                                        {item.projectName ? (
+                                                                            <View style={styles.projectInfoItem}>
+                                                                                <Ionicons name="folder-outline" size={14} color="#64748B" />
+                                                                                <Text style={styles.projectInfoText}>{item.projectName}</Text>
+                                                                            </View>
+                                                                        ) : null}
+                                                                        {item.sectionName ? (
+                                                                            <View style={styles.projectInfoItem}>
+                                                                                <Ionicons name="layers-outline" size={14} color="#64748B" />
+                                                                                <Text style={styles.projectInfoText}>{item.sectionName}</Text>
+                                                                            </View>
+                                                                        ) : null}
+                                                                        {item.dueDate ? (
+                                                                            <View style={[styles.projectInfoItem, !isPaid && styles.pendingDueChip]}>
+                                                                                <Ionicons name="calendar-outline" size={14} color={isPaid ? '#64748B' : '#B45309'} />
+                                                                                <Text style={[styles.projectInfoText, !isPaid && styles.pendingDueChipText]}>Due {item.dueDate}</Text>
+                                                                            </View>
+                                                                        ) : null}
+                                                                    </View>
+                                                                )}
+
+                                                                {/* What the payment is for */}
+                                                                <View style={styles.materialsList}>
+                                                                    <View style={styles.materialItem}>
+                                                                        <View style={[styles.materialIconSmall, { backgroundColor: '#EAF0FE' }]}>
+                                                                            <Ionicons name={group.icon as any} size={18} color="#3A78B5" />
+                                                                        </View>
+                                                                        <View style={styles.materialDetails}>
+                                                                            <Text style={styles.materialName} numberOfLines={2}>{item.title}</Text>
+                                                                        </View>
+                                                                    </View>
+                                                                </View>
+
+                                                                {/* Amount due — highlighted like the Material tab's Total Cost */}
                                                                 {item.amount > 0 && (
-                                                                    <Text style={[styles.warningAmountText, isPaid && styles.warningAmountTextPaid]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-                                                                        ₹{item.amount.toLocaleString('en-IN')}
-                                                                    </Text>
-                                                                )}
-                                                            </View>
-
-                                                            <Text style={styles.warningTitle}>{item.title}</Text>
-
-                                                            <View style={styles.warningMetaRow}>
-                                                                <View style={styles.warningMetaItem}>
-                                                                    <Ionicons name="person-outline" size={14} color="#64748B" />
-                                                                    <Text style={styles.warningMetaText}>{item.vendorName}</Text>
-                                                                </View>
-                                                                {item.projectName && (
-                                                                    <View style={styles.warningMetaItem}>
-                                                                        <Ionicons name="business-outline" size={14} color="#64748B" />
-                                                                        <Text style={styles.warningMetaText}>
-                                                                            {item.projectName}{item.sectionName ? ` • ${item.sectionName}` : ''}
+                                                                    <View style={[styles.pendingAmountContainer, isPaid && styles.totalCostContainer]}>
+                                                                        <Text style={[styles.pendingAmountLabel, isPaid && styles.totalCostLabel]}>
+                                                                            {isPaid ? 'Amount Paid' : 'Amount Due'}
+                                                                        </Text>
+                                                                        <Text
+                                                                            style={[styles.pendingAmountValue, isPaid && styles.totalCostValue]}
+                                                                            numberOfLines={1}
+                                                                            adjustsFontSizeToFit
+                                                                            minimumFontScale={0.75}
+                                                                        >
+                                                                            ₹{item.amount.toLocaleString('en-IN')}
                                                                         </Text>
                                                                     </View>
                                                                 )}
-                                                                {item.dueDate && (
-                                                                    <View style={styles.warningMetaItemDue}>
-                                                                        <Ionicons name="calendar-outline" size={13} color="#D97706" />
-                                                                        <Text style={styles.warningMetaTextDue}>
-                                                                            Due: {item.dueDate}
-                                                                        </Text>
-                                                                    </View>
-                                                                )}
-                                                            </View>
 
-                                                            {item.description ? (
-                                                                <Text style={styles.warningDescription}>{item.description}</Text>
-                                                            ) : null}
+                                                                {item.description ? (
+                                                                    <View style={styles.pendingNote}>
+                                                                        <Ionicons name="chatbox-outline" size={14} color="#64748B" />
+                                                                        <Text style={styles.messageText}>{item.description}</Text>
+                                                                    </View>
+                                                                ) : null}
 
                                                             <View style={styles.warningActionsRow}>
                                                                 <TouchableOpacity
@@ -2964,9 +2993,23 @@ const NotificationPage: React.FC = () => {
                                                                     onPress={() => setSelectedWarningModal(item)}
                                                                     activeOpacity={0.8}
                                                                 >
-                                                                    <Ionicons name="information-circle-outline" size={16} color="#3B82F6" />
+                                                                    <Ionicons name="information-circle-outline" size={16} color="#3A78B5" />
                                                                     <Text style={styles.warningActionSecondaryBtnText}>Details</Text>
                                                                 </TouchableOpacity>
+                                                            </View>
+
+                                                                {/* Footer — who is to be paid, like the Material tab's user footer */}
+                                                                <View style={[styles.materialActivityFooter, { marginTop: 14 }]}>
+                                                                    <View style={[styles.userInfo, { flex: 1, marginRight: 8 }]}>
+                                                                        <View style={styles.userAvatar}>
+                                                                            <Text style={styles.userAvatarText}>{vendorInitial}</Text>
+                                                                        </View>
+                                                                        <Text style={[styles.userName, { flexShrink: 1 }]} numberOfLines={1}>{item.vendorName}</Text>
+                                                                    </View>
+                                                                    {item.createdAt ? (
+                                                                        <Text style={styles.activityTimeNew}>{formatTimeAgo(item.createdAt)}</Text>
+                                                                    ) : null}
+                                                                </View>
                                                             </View>
                                                         </View>
                                                     );
@@ -5165,16 +5208,14 @@ const styles = StyleSheet.create({
     },
     warningSummaryCard: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        padding: 16,
-        marginBottom: 16,
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderRadius: 20,
+        padding: 18,
+        marginBottom: 18,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 6,
-        elevation: 2,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.1,
+        shadowRadius: 16,
+        elevation: 6,
     },
     warningSummaryHeader: {
         flexDirection: 'row',
@@ -5269,7 +5310,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         backgroundColor: '#FFFFFF',
-        borderRadius: 12,
+        borderRadius: 14,
         paddingHorizontal: 14,
         paddingVertical: 12,
         borderWidth: 1,
@@ -5288,10 +5329,10 @@ const styles = StyleSheet.create({
         marginRight: 8,
     },
     warningCategoryIconBg: {
-        width: 30,
-        height: 30,
-        borderRadius: 8,
-        backgroundColor: '#F1F5F9',
+        width: 32,
+        height: 32,
+        borderRadius: 10,
+        backgroundColor: '#EAF0FE',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -5318,8 +5359,66 @@ const styles = StyleSheet.create({
         flexShrink: 0,
     },
     warningCardsGroup: {
-        marginTop: 8,
-        paddingLeft: 4,
+        marginTop: 12,
+    },
+    // Pending payment cards reuse the Material tab's card styles; these are the extras.
+    pendingCardPaid: {
+        opacity: 0.75,
+    },
+    pendingCategoryTag: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: '#EAF0FE',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 10,
+        flexShrink: 1,
+        marginLeft: 8,
+    },
+    pendingCategoryTagText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#3A78B5',
+    },
+    pendingDueChip: {
+        backgroundColor: '#FFFBEB',
+    },
+    pendingDueChipText: {
+        color: '#B45309',
+        fontWeight: '600',
+    },
+    pendingAmountContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#FFFBEB',
+        padding: 12,
+        borderRadius: 10,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    pendingAmountLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#92400E',
+    },
+    pendingAmountValue: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#B45309',
+        flexShrink: 1,
+        marginLeft: 12,
+    },
+    pendingNote: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 8,
+        backgroundColor: '#F8FAFC',
+        padding: 10,
+        borderRadius: 10,
+        marginBottom: 12,
     },
     warningCard: {
         backgroundColor: '#FFFFFF',
@@ -5459,8 +5558,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 6,
-        paddingVertical: 8,
-        borderRadius: 8,
+        paddingVertical: 11,
+        borderRadius: 12,
     },
     warningActionPrimaryBtn: {
         backgroundColor: '#3A78B5',
@@ -5472,24 +5571,22 @@ const styles = StyleSheet.create({
     },
     warningActionBtnText: {
         color: '#FFFFFF',
-        fontSize: 12,
-        fontWeight: '600',
+        fontSize: 13,
+        fontWeight: '700',
     },
     warningActionSecondaryBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        borderRadius: 8,
-        backgroundColor: '#EFF6FF',
-        borderWidth: 1,
-        borderColor: '#BFDBFE',
+        gap: 5,
+        paddingVertical: 11,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        backgroundColor: '#EAF0FE',
     },
     warningActionSecondaryBtnText: {
-        color: '#2563EB',
-        fontSize: 12,
-        fontWeight: '600',
+        color: '#3A78B5',
+        fontSize: 13,
+        fontWeight: '700',
     },
     emptyWarningContainer: {
         alignItems: 'center',
