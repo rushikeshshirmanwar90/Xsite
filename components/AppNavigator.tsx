@@ -4,11 +4,14 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Toaster } from "sonner-native";
-import * as Notifications from 'expo-notifications';
+import type * as NotificationsModule from 'expo-notifications';
 import Constants from 'expo-constants';
 
 // ✅ Check if we're running in Expo Go (which doesn't support push notifications in SDK 53+)
 const isExpoGo = Constants.appOwnership === 'expo';
+
+// Importing expo-notifications throws on Android in Expo Go, so only load it outside Expo Go.
+const Notifications: typeof NotificationsModule = isExpoGo ? null : require('expo-notifications');
 
 // ✅ Configure notification behavior (only if not in Expo Go)
 if (!isExpoGo) {
@@ -118,7 +121,7 @@ const AppNavigator: React.FC = () => {
 
     try {
       Notifications.getLastNotificationResponseAsync()
-        .then((response: Notifications.NotificationResponse | null) => {
+        .then((response: NotificationsModule.NotificationResponse | null) => {
           if (!response) return;
 
           const id = response.notification?.request?.identifier;

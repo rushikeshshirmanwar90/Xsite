@@ -12,7 +12,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
+import type * as NotificationsModule from 'expo-notifications';
+// Importing expo-notifications throws on Android in Expo Go, so only load it outside Expo Go.
+const Notifications: typeof NotificationsModule = require('expo-constants').default.appOwnership === 'expo' ? null : require('expo-notifications');
 import Constants from 'expo-constants';
 import SimpleNotificationService from '@/services/SimpleNotificationService';
 import { useAuth } from '@/contexts/AuthContext';

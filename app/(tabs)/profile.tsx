@@ -9,11 +9,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from '@/utils/axiosConfig';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState, useRef } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router/react-navigation';
 import QRCode from 'react-native-qrcode-svg';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
-import ViewShot from 'react-native-view-shot';
+import ViewShot, { ViewShotRef } from 'react-native-view-shot';
 import {
     Alert,
     Modal,
@@ -75,8 +75,8 @@ const CompanyProfile: React.FC = () => {
     const [isSharing, setIsSharing] = useState(false);
 
     // Refs for capturing QR code views
-    const embeddedQRRef = useRef<ViewShot | null>(null);
-    const modalQRRef = useRef<ViewShot | null>(null);
+    const embeddedQRRef = useRef<ViewShotRef | null>(null);
+    const modalQRRef = useRef<ViewShotRef | null>(null);
 
     // Check if current user is staff
     const isCurrentUserStaff = isStaff(user);
@@ -679,7 +679,7 @@ const CompanyProfile: React.FC = () => {
         );
     };
 
-    const shareQRCode = async (viewShotRef: React.RefObject<ViewShot | null>) => {
+    const shareQRCode = async (viewShotRef: React.RefObject<ViewShotRef | null>) => {
         if (!viewShotRef.current || !user) {
             Alert.alert('Error', 'QR code not ready for sharing. Please try again.');
             return;

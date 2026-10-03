@@ -15,7 +15,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import * as Print from 'expo-print';
+import { printPdfToFile } from '@/utils/printPdf';
 import * as Sharing from 'expo-sharing';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -707,7 +707,8 @@ export default function ContractorScreen() {
       }));
 
       const html = buildReportHTML(selected, laborMap);
-      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      const fileSlug = String(projectName || 'Project').replace(/[^a-zA-Z0-9]/g, '_');
+      const uri = await printPdfToFile(html, `Contractor_Report_${fileSlug}_${new Date().toISOString().split('T')[0]}.pdf`);
 
       const isAvailable = await Sharing.isAvailableAsync();
       if (isAvailable) {

@@ -8,7 +8,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "xsite",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.codewithrushi.xsite",
@@ -28,7 +27,6 @@
         "backgroundImage": "./assets/images/images/splash.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "edgeToEdgeEnabled": false,
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.CAMERA",
@@ -131,7 +129,12 @@
           "photosPermission": "Allow $(PRODUCT_NAME) to access your photos to upload QR code images."
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "@react-native-community/datetimepicker",
+      "expo-font",
+      "expo-image",
+      "expo-sharing",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true,

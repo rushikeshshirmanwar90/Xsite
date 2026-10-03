@@ -34,29 +34,26 @@ import { toast } from 'sonner-native';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Enable LayoutAnimation on Android (no-op on the new architecture, harmless otherwise).
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 const OPTION_CONFIG: Record<string, { icon: string; color: string; bg: string; label: string }> = {
-  material:          { icon: 'cube',           color: '#7C3AED', bg: '#FAF5FF', label: 'Material'           },
-  contractor:        { icon: 'people',         color: '#16A34A', bg: '#F0FDF4', label: 'Contractor'         },
-  equipmentCost:     { icon: 'hardware-chip',  color: '#2563EB', bg: '#EAF0FE', label: 'Equipment'          },
-  otherCost:         { icon: 'cash',           color: '#E11D48', bg: '#FFF1F2', label: 'Other'              },
-  report:            { icon: 'bar-chart',      color: '#F59E0B', bg: '#FEF0E3', label: 'Cost Report'        },
+  material: { icon: 'construct', color: '#D97706', bg: '#FFFBEB', label: 'Material Used' },
+  contractor: { icon: 'people', color: '#16A34A', bg: '#F0FDF4', label: 'Contractor' },
+  equipmentCost: { icon: 'hardware-chip', color: '#2563EB', bg: '#EAF0FE', label: 'Equipment' },
+  otherCost: { icon: 'cash', color: '#E11D48', bg: '#FFF1F2', label: 'Other' },
+  report: { icon: 'bar-chart', color: '#F59E0B', bg: '#FEF0E3', label: 'Cost Report' },
 };
 
 const MATERIAL_SUB_OPTIONS = [
-  { key: 'available', icon: 'cube-outline',      color: '#7C3AED', bg: '#FAF5FF', label: 'Material Available', desc: 'View all imported materials' },
-  { key: 'used',      icon: 'construct-outline', color: '#D97706', bg: '#FFFBEB', label: 'Material Used',      desc: 'View material consumption' },
-  { key: 'analysis',  icon: 'bar-chart-outline', color: '#3A78B5', bg: '#EAF0FE', label: 'Analysis',           desc: 'Stock levels & cost breakdown PDF' },
+  { key: 'available', icon: 'cube-outline', color: '#7C3AED', bg: '#FAF5FF', label: 'Material Available', desc: 'View all imported materials' },
+  { key: 'used', icon: 'construct-outline', color: '#D97706', bg: '#FFFBEB', label: 'Material Used', desc: 'View material consumption' },
+  { key: 'analysis', icon: 'bar-chart-outline', color: '#3A78B5', bg: '#EAF0FE', label: 'Analysis', desc: 'Stock levels & cost breakdown PDF' },
 ];
 
 const REPORT_SUB_OPTIONS = [
-  { key: 'materialAnalysis', icon: 'cube-outline',         color: '#7C3AED', bg: '#FAF5FF', label: 'Material Analysis Report',  desc: 'Stock levels, costs & usage breakdown' },
-  { key: 'equipmentCost',    icon: 'hardware-chip-outline', color: '#3A78B5', bg: '#EAF0FE', label: 'Equipment Cost Report',      desc: 'Equipment expenses & details' },
-  { key: 'contractor',       icon: 'people-outline',        color: '#16A34A', bg: '#F0FDF4', label: 'Contractor Report',          desc: 'Labour & contractor summary' },
-  { key: 'otherCost',        icon: 'cash-outline',          color: '#E11D48', bg: '#FFF1F2', label: 'Other Cost Report',          desc: 'Miscellaneous expenses' },
+  { key: 'materialAnalysis', icon: 'cube-outline', color: '#7C3AED', bg: '#FAF5FF', label: 'Material Analysis Report', desc: 'Stock levels, costs & usage breakdown' },
+  { key: 'equipmentCost', icon: 'hardware-chip-outline', color: '#3A78B5', bg: '#EAF0FE', label: 'Equipment Cost Report', desc: 'Equipment expenses & details' },
+  { key: 'contractor', icon: 'people-outline', color: '#16A34A', bg: '#F0FDF4', label: 'Contractor Report', desc: 'Labour & contractor summary' },
+  { key: 'otherCost', icon: 'cash-outline', color: '#E11D48', bg: '#FFF1F2', label: 'Other Cost Report', desc: 'Miscellaneous expenses' },
 ];
 
 // ─── Report Generation Overlay ────────────────────────────────────────────────
@@ -69,10 +66,10 @@ const REPORT_STAGES = [
 
 const ReportGeneratingOverlay: React.FC<{ visible: boolean; label: string }> = ({ visible, label }) => {
   // Every animation here uses useNativeDriver: true — zero JS thread cost
-  const spinAnim    = useRef(new Animated.Value(0)).current;
-  const pulseAnim   = useRef(new Animated.Value(1)).current;
-  const fadeAnim    = useRef(new Animated.Value(0)).current;
-  const slideAnim   = useRef(new Animated.Value(48)).current;
+  const spinAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(48)).current;
   const shimmerAnim = useRef(new Animated.Value(0)).current; // replaces progressAnim
   const [stageIdx, setStageIdx] = useState(0);
 
@@ -81,8 +78,8 @@ const ReportGeneratingOverlay: React.FC<{ visible: boolean; label: string }> = (
       fadeAnim.setValue(0);
       slideAnim.setValue(48);
       shimmerAnim.setValue(0);
-      spinAnim.stopAnimation();    spinAnim.setValue(0);
-      pulseAnim.stopAnimation();   pulseAnim.setValue(1);
+      spinAnim.stopAnimation(); spinAnim.setValue(0);
+      pulseAnim.stopAnimation(); pulseAnim.setValue(1);
       shimmerAnim.stopAnimation();
       setStageIdx(0);
       return;
@@ -92,7 +89,7 @@ const ReportGeneratingOverlay: React.FC<{ visible: boolean; label: string }> = (
 
     // Entrance
     Animated.parallel([
-      Animated.timing(fadeAnim,  { toValue: 1, duration: 280, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 280, useNativeDriver: true }),
       Animated.spring(slideAnim, { toValue: 0, tension: 70, friction: 10, useNativeDriver: true }),
     ]).start();
 
@@ -106,7 +103,7 @@ const ReportGeneratingOverlay: React.FC<{ visible: boolean; label: string }> = (
     const pulse = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.1, duration: 750, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1,   duration: 750, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 750, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       ])
     );
     pulse.start();
@@ -123,8 +120,8 @@ const ReportGeneratingOverlay: React.FC<{ visible: boolean; label: string }> = (
     return () => { spin.stop(); pulse.stop(); shimmer.stop(); clearInterval(iv); };
   }, [visible]);
 
-  const rotate       = spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
-  const shimmerX     = shimmerAnim.interpolate({ inputRange: [0, 1], outputRange: [-180, 280] });
+  const rotate = spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  const shimmerX = shimmerAnim.interpolate({ inputRange: [0, 1], outputRange: [-180, 280] });
 
   if (!visible) return null;
 
@@ -173,7 +170,7 @@ const getSectionIcon = (type: string, isCompleted: boolean = false) => {
     case 'rowhouse':
     case 'row house':
     case 'row-house': return 'home';
-    default:          return 'grid';
+    default: return 'grid';
   }
 };
 
@@ -208,7 +205,7 @@ const SectionAccordionItem: React.FC<{
   onToggle: () => void;
   onViewBuildings?: () => void;
 }> = ({ section, index, isExpanded, isCompleted, isLoadingCompletion, options, onToggle, onViewBuildings }) => {
-  const chevron  = useRef(new Animated.Value(isExpanded ? 1 : 0)).current;
+  const chevron = useRef(new Animated.Value(isExpanded ? 1 : 0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -231,7 +228,7 @@ const SectionAccordionItem: React.FC<{
   const rotate = chevron.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
 
   const statusColor = isCompleted ? '#16A34A' : '#3A78B5';
-  const statusBg    = isCompleted ? '#F0FDF4' : '#EAF0FE';
+  const statusBg = isCompleted ? '#F0FDF4' : '#EAF0FE';
   const accentColor = isCompleted ? '#22C55E' : '#3A78B5';
 
   return (
@@ -333,34 +330,34 @@ const ProjectSections = () => {
 
   // Row house mode — when a rowHouseId is passed, this screen lists the buildings
   // that live inside that row house instead of the project's top-level sections.
-  const rowHouseId  = Array.isArray(params.rowHouseId)  ? params.rowHouseId[0]  : params.rowHouseId;
+  const rowHouseId = Array.isArray(params.rowHouseId) ? params.rowHouseId[0] : params.rowHouseId;
   const rowHouseName = Array.isArray(params.rowHouseName) ? params.rowHouseName[0] : params.rowHouseName;
   const isRowHouseMode = !!rowHouseId;
 
-  const [sections, setSections]       = useState<ProjectSection[]>([]);
-  const [showAddModal, setShowAddModal]   = useState(false);
+  const [sections, setSections] = useState<ProjectSection[]>([]);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [newSectionName, setNewSectionName] = useState('');
   const [newSectionType, setNewSectionType] = useState('building');
   const [newBuildingCount, setNewBuildingCount] = useState('4');
-  const [isAdding, setIsAdding]           = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
   // Row house building picker (choose which building an activity applies to)
   const [rhPicker, setRhPicker] = useState<{ rowHouse: ProjectSection; optionKey: string; materialKey?: string } | null>(null);
   const [rhBuildings, setRhBuildings] = useState<ProjectSection[]>([]);
   const [rhBuildingsLoading, setRhBuildingsLoading] = useState(false);
-  const [projectCompleted, setProjectCompleted]   = useState(false);
+  const [projectCompleted, setProjectCompleted] = useState(false);
   const [isUpdatingProjectCompletion, setIsUpdatingProjectCompletion] = useState(false);
   const [sectionCompletions, setSectionCompletions] = useState<{ [key: string]: boolean }>({});
   const [isLoadingSectionCompletions, setIsLoadingSectionCompletions] = useState(false);
   const [generatingStockReport, setGeneratingStockReport] = useState(false);
   const [expandedSectionId, setExpandedSectionId] = useState<string | null>(null);
-  const [resolvedClientId, setResolvedClientId]   = useState<string>('');
+  const [resolvedClientId, setResolvedClientId] = useState<string>('');
   // Centered popup for Material / Cost Report sub-options
   const [optionPopup, setOptionPopup] = useState<{ type: 'material' | 'report'; section: ProjectSection } | null>(null);
-  const [contractorList, setContractorList]             = useState<any[]>([]);
+  const [contractorList, setContractorList] = useState<any[]>([]);
   const [showContractorPicker, setShowContractorPicker] = useState(false);
-  const [selectedForReport, setSelectedForReport]       = useState<Set<string>>(new Set());
-  const [isGeneratingReport, setIsGeneratingReport]     = useState(false);
-  const [reportGenerating, setReportGenerating]   = useState(false);
+  const [selectedForReport, setSelectedForReport] = useState<Set<string>>(new Set());
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [reportGenerating, setReportGenerating] = useState(false);
   const [reportGeneratingLabel, setReportGeneratingLabel] = useState('');
 
   // Permission helpers
@@ -449,6 +446,20 @@ const ProjectSections = () => {
     });
   };
 
+  // Material stock is shared by the whole project, so it opens without a section.
+  const goToProjectStock = () => {
+    router.push({
+      pathname: '../material-available',
+      params: {
+        projectId: id as string,
+        projectName: name as string,
+        sectionName: 'Project Stock',
+        materialAvailable: materialAvailable as string,
+        materialUsed: materialUsed as string,
+      },
+    });
+  };
+
   const goToContractor = (section: ProjectSection) => {
     if (contractorId && contractorType && userId) {
       router.push({
@@ -519,7 +530,7 @@ const ProjectSections = () => {
             setReportGenerating(false);
             break;
           }
-          
+
           let userName = 'Admin';
           try {
             const userDetailsString = await AsyncStorage.getItem('user');
@@ -527,7 +538,7 @@ const ProjectSections = () => {
               const ud = JSON.parse(userDetailsString);
               userName = ud.firstName && ud.lastName ? `${ud.firstName} ${ud.lastName}` : ud.firstName || ud.name || ud.username || 'Admin';
             }
-          } catch {}
+          } catch { }
 
           const pdfGen = new PDFReportGenerator({}, { name: userName });
           const sectionTitle = section?.name ? `${name} - ${section.name}` : (name as string || 'Project');
@@ -554,7 +565,7 @@ const ProjectSections = () => {
             setReportGenerating(false);
             break;
           }
-          
+
           let userName = 'Admin';
           try {
             const userDetailsString = await AsyncStorage.getItem('user');
@@ -562,7 +573,7 @@ const ProjectSections = () => {
               const ud = JSON.parse(userDetailsString);
               userName = ud.firstName && ud.lastName ? `${ud.firstName} ${ud.lastName}` : ud.firstName || ud.name || ud.username || 'Admin';
             }
-          } catch {}
+          } catch { }
 
           const pdfGen = new PDFReportGenerator({}, { name: userName });
           await pdfGen.generateOtherCostReport(rawEntries, (name as string || 'Project'));
@@ -613,27 +624,27 @@ const ProjectSections = () => {
   });
 
   const fmtCurrency = (v: number) => `₹${v.toLocaleString('en-IN')}`;
-  const fmtDateRpt  = (d: string) => {
+  const fmtDateRpt = (d: string) => {
     try { return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }); } catch { return d; }
   };
 
   const paymentRowsHTML = (payments: any[]) => {
     if (!payments?.length) return '';
     const byDate: Record<string, any[]> = {};
-    payments.forEach(p=>{ const k=new Date(p.paymentDate).toDateString();(byDate[k]=byDate[k]||[]).push(p); });
-    return Object.entries(byDate).sort(([a],[b])=>new Date(a).getTime()-new Date(b).getTime()).map(([date,ps])=>{
-      const dayTotal=ps.reduce((s,p)=>s+p.amount,0);
+    payments.forEach(p => { const k = new Date(p.paymentDate).toDateString(); (byDate[k] = byDate[k] || []).push(p); });
+    return Object.entries(byDate).sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime()).map(([date, ps]) => {
+      const dayTotal = ps.reduce((s, p) => s + p.amount, 0);
       return `<tr style="background:#059669;"><td colspan="3" style="padding:10px;color:white;font-weight:600;font-size:13px;">💰 ${fmtDateRpt(date)} — Paid: ${fmtCurrency(dayTotal)}</td></tr>`
-        +ps.map(p=>`<tr style="background:#f0fdf4;"><td style="padding:8px;border:1px solid #e2e8f0;font-size:12px;"><span style="background:#dcfce7;color:#166534;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;">${(p.paymentType||'payment').toUpperCase()}</span></td><td style="padding:8px;border:1px solid #e2e8f0;font-size:12px;">${p.notes||'Payment recorded'}</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:right;font-weight:600;color:#059669;font-size:12px;">${fmtCurrency(p.amount)}</td></tr>`).join('');
+        + ps.map(p => `<tr style="background:#f0fdf4;"><td style="padding:8px;border:1px solid #e2e8f0;font-size:12px;"><span style="background:#dcfce7;color:#166534;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;">${(p.paymentType || 'payment').toUpperCase()}</span></td><td style="padding:8px;border:1px solid #e2e8f0;font-size:12px;">${p.notes || 'Payment recorded'}</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:right;font-weight:600;color:#059669;font-size:12px;">${fmtCurrency(p.amount)}</td></tr>`).join('');
     }).join('');
   };
 
   const buildReportHTML = (selected: any[]) => {
-    const now = new Date().toLocaleDateString('en-IN', { weekday:'long', day:'2-digit', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' } as any);
-    const totalAmount = selected.reduce((s,c)=>s+(c.totalAmount||0),0);
-    const totalPaid   = selected.reduce((s,c)=>s+(c.totalPaid||0),0);
+    const now = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' } as any);
+    const totalAmount = selected.reduce((s, c) => s + (c.totalAmount || 0), 0);
+    const totalPaid = selected.reduce((s, c) => s + (c.totalPaid || 0), 0);
     const css = `body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:20px;background:#fff;color:#1e293b;line-height:1.4;}table{width:100%;border-collapse:collapse;margin-bottom:16px;background:white;box-shadow:0 1px 3px rgba(0,0,0,0.1);}th{background:#374151;color:white;padding:10px 12px;text-align:left;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;}td{padding:10px;border:1px solid #e2e8f0;font-size:13px;}.no-data{text-align:center;padding:30px;color:#64748b;font-style:italic;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:16px;}.section-title{font-size:15px;font-weight:700;color:#1e293b;margin:20px 0 10px 0;padding:10px 14px;background:#f1f5f9;border-left:4px solid #3A78B5;border-radius:4px;}.summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px;}.summary-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center;}.summary-card h3{margin:0 0 6px 0;font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;}.summary-card p{margin:0;font-size:16px;font-weight:700;color:#1e293b;}.footer{margin-top:40px;padding:16px;background:#f8fafc;border-radius:8px;text-align:center;font-size:12px;color:#64748b;}`;
-    const sections = selected.map(c=>{
+    const sections = selected.map(c => {
       const staffName = getContractorDisplayName(c);
       const contractName = c.contractType || 'Contract';
       return `<div style="margin-bottom:36px;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
@@ -642,14 +653,14 @@ const ProjectSections = () => {
           <div style="font-size:13px;opacity:0.85;margin-top:3px;">${staffName}</div>
         </div>
         <div style="padding:16px 20px;">
-          <div class="summary-grid"><div class="summary-card"><h3>Total Amount</h3><p>${fmtCurrency(c.totalAmount||0)}</p></div><div class="summary-card"><h3>Paid Amount</h3><p style="color:#059669;">${fmtCurrency(c.totalPaid||0)}</p></div></div>
+          <div class="summary-grid"><div class="summary-card"><h3>Total Amount</h3><p>${fmtCurrency(c.totalAmount || 0)}</p></div><div class="summary-card"><h3>Paid Amount</h3><p style="color:#059669;">${fmtCurrency(c.totalPaid || 0)}</p></div></div>
           <div class="section-title">Transaction Details</div>
-          ${(c.payments||[]).length?`<table><thead><tr><th>Type</th><th>Notes</th><th style="text-align:right;">Amount</th></tr></thead><tbody>${paymentRowsHTML(c.payments)}</tbody></table>`:'<div class="no-data">No transactions recorded.</div>'}
+          ${(c.payments || []).length ? `<table><thead><tr><th>Type</th><th>Notes</th><th style="text-align:right;">Amount</th></tr></thead><tbody>${paymentRowsHTML(c.payments)}</tbody></table>` : '<div class="no-data">No transactions recorded.</div>'}
         </div></div>`;
     }).join('');
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Contractor Report</title><style>${css}.main-header{text-align:center;margin-bottom:24px;padding:20px;background:#3A78B5;color:white;border-radius:12px;}.main-header h1{margin:0 0 6px 0;font-size:24px;font-weight:700;}.main-header p{margin:3px 0;font-size:13px;opacity:0.9;}</style></head><body>
-      <div class="main-header"><h1>Contractor Report</h1><p><strong>${name as string}</strong></p><p>${selected.length} Contractor${selected.length!==1?'s':''} selected</p><p>Generated: ${now}</p></div>
-      ${selected.length>1?`<div style="margin-bottom:24px;"><h2 style="font-size:16px;font-weight:700;margin-bottom:12px;">Project Summary</h2><div class="summary-grid"><div class="summary-card"><h3>Total Amount</h3><p>${fmtCurrency(totalAmount)}</p></div><div class="summary-card"><h3>Paid Amount</h3><p style="color:#059669;">${fmtCurrency(totalPaid)}</p></div></div></div>`:''}
+      <div class="main-header"><h1>Contractor Report</h1><p><strong>${name as string}</strong></p><p>${selected.length} Contractor${selected.length !== 1 ? 's' : ''} selected</p><p>Generated: ${now}</p></div>
+      ${selected.length > 1 ? `<div style="margin-bottom:24px;"><h2 style="font-size:16px;font-weight:700;margin-bottom:12px;">Project Summary</h2><div class="summary-grid"><div class="summary-card"><h3>Total Amount</h3><p>${fmtCurrency(totalAmount)}</p></div><div class="summary-card"><h3>Paid Amount</h3><p style="color:#059669;">${fmtCurrency(totalPaid)}</p></div></div></div>` : ''}
       ${sections}
       <div class="footer"><p><strong>Construction Management System</strong></p><p>Generated: ${new Date().toISOString()}</p></div>
     </body></html>`;
@@ -677,18 +688,21 @@ const ProjectSections = () => {
     }
   };
 
+  // Opens a section's Material Used page directly (row houses ask for the building first).
+  const openSectionMaterial = (section: ProjectSection) => handleMaterialSubOption('used', section);
+
+  const canSeeSectionMaterial = () => hasPermission('addMaterialUsage');
+
   const getSectionOptions = (section: ProjectSection): SectionOption[] => {
     const options: SectionOption[] = [];
-    if (hasPermission('addMaterial') || hasPermission('addMaterialUsage'))
-      options.push({ key: 'material',      label: 'Material',    icon: 'cube-outline',          onPress: () => setOptionPopup({ type: 'material', section }) });
+    if (canSeeSectionMaterial())
+      options.push({ key: 'material', label: 'Material Used', icon: 'construct-outline', onPress: () => openSectionMaterial(section) });
     if (hasPermission('contractor'))
-      options.push({ key: 'contractor',    label: contractorLabel, icon: 'people-outline',      onPress: () => goToContractor(section) });
+      options.push({ key: 'contractor', label: contractorLabel, icon: 'people-outline', onPress: () => goToContractor(section) });
     if (hasPermission('addEquipmentCost'))
-      options.push({ key: 'equipmentCost', label: 'Equipment',   icon: 'hardware-chip-outline', onPress: () => goToEquipment(section) });
+      options.push({ key: 'equipmentCost', label: 'Equipment', icon: 'hardware-chip-outline', onPress: () => goToEquipment(section) });
     if (hasPermission('addOtherCost'))
-      options.push({ key: 'otherCost',     label: 'Other',       icon: 'cash-outline',          onPress: () => goToOtherCost() });
-    if (hasPermission('generateReport'))
-      options.push({ key: 'report',        label: 'Cost Report', icon: 'bar-chart-outline',     onPress: () => setOptionPopup({ type: 'report', section }) });
+      options.push({ key: 'otherCost', label: 'Other', icon: 'cash-outline', onPress: () => goToOtherCost() });
     return options;
   };
 
@@ -700,9 +714,7 @@ const ProjectSections = () => {
       openBuildingPicker(section, 'material', key);
       return;
     }
-    if (key === 'available') {
-      goToMaterials(section, 'imported');
-    } else if (key === 'used') {
+    if (key === 'used') {
       goToMaterials(section, 'used');
     } else if (key === 'analysis') {
       router.push({
@@ -720,9 +732,8 @@ const ProjectSections = () => {
   };
 
   const getFilteredMaterialSubOptions = () => MATERIAL_SUB_OPTIONS.filter(opt => {
-    if (opt.key === 'available') return hasPermission('addMaterial');
-    if (opt.key === 'used')      return hasPermission('addMaterialUsage');
-    if (opt.key === 'analysis')  return hasPermission('generateReport');
+    if (opt.key === 'used') return hasPermission('addMaterialUsage');
+    if (opt.key === 'analysis') return hasPermission('generateReport');
     return userIsAdmin;
   });
 
@@ -761,25 +772,23 @@ const ProjectSections = () => {
   // A row house shows the same options as a building, but each activity first
   // asks which building inside the row house it applies to.
   const ROW_HOUSE_OPTION_LABEL: Record<string, string> = {
-    material:      'Material',
-    contractor:    contractorLabel,
+    material: 'Material',
+    contractor: contractorLabel,
     equipmentCost: 'Equipment',
-    otherCost:     'Other Cost',
-    report:        'Cost Report',
+    otherCost: 'Other Cost',
+    report: 'Cost Report',
   };
 
   const getRowHouseOptions = (section: ProjectSection): SectionOption[] => {
     const options: SectionOption[] = [];
-    if (hasPermission('addMaterial') || hasPermission('addMaterialUsage'))
-      options.push({ key: 'material',      label: 'Material',    icon: 'cube-outline',          onPress: () => setOptionPopup({ type: 'material', section }) });
+    if (canSeeSectionMaterial())
+      options.push({ key: 'material', label: 'Material Used', icon: 'construct-outline', onPress: () => openSectionMaterial(section) });
     if (hasPermission('contractor'))
-      options.push({ key: 'contractor',    label: contractorLabel, icon: 'people-outline',      onPress: () => openBuildingPicker(section, 'contractor') });
+      options.push({ key: 'contractor', label: contractorLabel, icon: 'people-outline', onPress: () => openBuildingPicker(section, 'contractor') });
     if (hasPermission('addEquipmentCost'))
-      options.push({ key: 'equipmentCost', label: 'Equipment',   icon: 'hardware-chip-outline', onPress: () => openBuildingPicker(section, 'equipmentCost') });
+      options.push({ key: 'equipmentCost', label: 'Equipment', icon: 'hardware-chip-outline', onPress: () => openBuildingPicker(section, 'equipmentCost') });
     if (hasPermission('addOtherCost'))
-      options.push({ key: 'otherCost',     label: 'Other',       icon: 'cash-outline',          onPress: () => goToOtherCost() });
-    if (hasPermission('generateReport'))
-      options.push({ key: 'report',        label: 'Cost Report', icon: 'bar-chart-outline',     onPress: () => openBuildingPicker(section, 'report') });
+      options.push({ key: 'otherCost', label: 'Other', icon: 'cash-outline', onPress: () => goToOtherCost() });
     return options;
   };
 
@@ -806,10 +815,10 @@ const ProjectSections = () => {
     setRhPicker(null);
     if (!optionKey) return;
     switch (optionKey) {
-      case 'material':      handleMaterialSubOption(materialKey || 'used', building); break;
-      case 'contractor':    goToContractor(building); break;
+      case 'material': handleMaterialSubOption(materialKey || 'used', building); break;
+      case 'contractor': goToContractor(building); break;
       case 'equipmentCost': goToEquipment(building); break;
-      case 'report':        setOptionPopup({ type: 'report', section: building }); break;
+      case 'report': setOptionPopup({ type: 'report', section: building }); break;
     }
   };
 
@@ -892,16 +901,16 @@ const ProjectSections = () => {
       }
 
       if (newSectionType === 'building') res = await apiClient.post(`/api/building`, payload);
-      else                              res = await apiClient.post(`/api/otherSection`, payload);
+      else res = await apiClient.post(`/api/otherSection`, payload);
 
       if (res && (res.status === 200 || res.status === 201)) {
         let newSectionData: any = null;
         const rd = res.data as Record<string, any>;
-        if (rd._id || rd.sectionId)   newSectionData = rd;
-        else if (rd.section)          newSectionData = rd.section;
-        else if (rd.data)             newSectionData = rd.data;
-        else if (rd.building)         newSectionData = rd.building;
-        else if (rd.otherSection)     newSectionData = rd.otherSection;
+        if (rd._id || rd.sectionId) newSectionData = rd;
+        else if (rd.section) newSectionData = rd.section;
+        else if (rd.data) newSectionData = rd.data;
+        else if (rd.building) newSectionData = rd.building;
+        else if (rd.otherSection) newSectionData = rd.otherSection;
 
         const formattedSection: ProjectSection = {
           _id: newSectionData?._id || `temp-${Date.now()}`,
@@ -959,9 +968,9 @@ const ProjectSections = () => {
     const qs = Object.entries({ projectId, clientId, page: 1, limit: REPORT_LIMIT, sortBy: 'createdAt', sortOrder: 'desc' })
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join('&');
     const [avRes, usedRes] = await Promise.all([apiClient.get(`/api/material?${qs}`), apiClient.get(`/api/material-usage?${qs}`)]);
-    const avData   = avRes.data   as any;
+    const avData = avRes.data as any;
     const usedData = usedRes.data as any;
-    const avList   = avData.MaterialAvailable   || avData.materials   || [];
+    const avList = avData.MaterialAvailable || avData.materials || [];
     const usedList = usedData.MaterialUsed || usedData.materials || [];
     const grouped: { [key: string]: { name: string; unit: string; specs: Record<string, any>; currentlyAvailable: number; totalUsed: number; importedCost: number; purchasers: Set<string> } } = {};
     const getGroup = (n: string, u: string, s: any) => {
@@ -970,8 +979,8 @@ const ProjectSections = () => {
       return grouped[key];
     };
     const resolveCost = (m: any, qty: number) => m.totalCost !== undefined && m.totalCost !== null ? Number(m.totalCost) : Number(m.perUnitCost ?? m.cost ?? 0) * qty;
-    avList.forEach((m: any)   => { const qty = Number(m.qnt || 0); const g = getGroup(m.name, m.unit, m.specs); g.currentlyAvailable += qty; g.importedCost += resolveCost(m, qty); });
-    usedList.forEach((m: any) => { const qty = Number(m.qnt || 0); const g = getGroup(m.name, m.unit, m.specs); g.totalUsed += qty;          g.importedCost += resolveCost(m, qty); });
+    avList.forEach((m: any) => { const qty = Number(m.qnt || 0); const g = getGroup(m.name, m.unit, m.specs); g.currentlyAvailable += qty; g.importedCost += resolveCost(m, qty); });
+    usedList.forEach((m: any) => { const qty = Number(m.qnt || 0); const g = getGroup(m.name, m.unit, m.specs); g.totalUsed += qty; g.importedCost += resolveCost(m, qty); });
     try {
       const { domain } = await import('@/lib/domain');
       const { getAuthHeaders } = await import('@/utils/axiosConfig');
@@ -988,7 +997,7 @@ const ProjectSections = () => {
     } catch { /* non-fatal */ }
     return Object.values(grouped).map(g => {
       const totalImported = g.currentlyAvailable + g.totalUsed;
-      return { name: g.name, specs: g.specs, unit: g.unit, totalImported, totalUsed: g.totalUsed, currentlyAvailable: g.currentlyAvailable, perUnitCost: totalImported > 0 ? g.importedCost / totalImported : 0, totalCost: g.importedCost, purchasedBy: Array.from(g.purchasers) };
+      return { name: g.name, specs: g.specs, unit: g.unit, totalImported, totalUsed: g.totalUsed, currentlyAvailable: g.currentlyAvailable, perUnitCost: totalImported > 0 ? g.importedCost / totalImported : 0, totalCost: g.importedCost, vendors: Array.from(g.purchasers) };
     });
   };
 
@@ -1005,7 +1014,7 @@ const ProjectSections = () => {
           const ud = JSON.parse(userDetailsString);
           userName = ud.firstName && ud.lastName ? `${ud.firstName} ${ud.lastName}` : ud.firstName || ud.name || ud.username || 'Admin';
         }
-      } catch {}
+      } catch { }
       const pdfGen = new PDFReportGenerator({}, { name: userName });
       await pdfGen.generateMaterialStockReport(rows, (name as string) || 'Project');
     } catch (error: any) {
@@ -1045,8 +1054,8 @@ const ProjectSections = () => {
   };
 
   const completedCount = Object.values(sectionCompletions).filter(Boolean).length;
-  const totalCount     = sections.length;
-  const progressPct    = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+  const totalCount = sections.length;
+  const progressPct = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
@@ -1098,6 +1107,17 @@ const ProjectSections = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Section list heading + project-wide material stock (shared by all sections) */}
+        <View style={stockStyles.listHeading}>
+          <Text style={stockStyles.listHeadingTitle}>{isRowHouseMode ? 'Buildings' : 'Sections'}</Text>
+          {hasPermission('addMaterial') && (
+            <TouchableOpacity style={stockStyles.stockBtn} activeOpacity={0.85} onPress={goToProjectStock}>
+              <Ionicons name="cube-outline" size={18} color="#FFFFFF" />
+              <Text style={stockStyles.stockBtnText}>Add / View Material</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         {/* Summary pills */}
         {totalCount > 0 && (
           <View style={styles.summaryRow}>
@@ -1118,7 +1138,7 @@ const ProjectSections = () => {
 
         {sections && sections.length > 0 ? (
           sections.map((section, index) => {
-            const sectionId  = section.sectionId || section._id;
+            const sectionId = section.sectionId || section._id;
             const isCompleted = sectionCompletions[sectionId] || false;
             const isLoadingCompletion = isLoadingSectionCompletions && !Object.prototype.hasOwnProperty.call(sectionCompletions, sectionId);
             const sectionKey = sectionId || String(index);
@@ -1199,10 +1219,10 @@ const ProjectSections = () => {
           activeOpacity={1}
           onPress={() => setOptionPopup(null)}
         >
-          <TouchableOpacity activeOpacity={1} style={popupStyles.card} onPress={() => {}}>
+          <TouchableOpacity activeOpacity={1} style={popupStyles.card} onPress={() => { }}>
             {optionPopup && (() => {
               const isMat = optionPopup.type === 'material';
-              const cfg   = OPTION_CONFIG[isMat ? 'material' : 'report'];
+              const cfg = OPTION_CONFIG[isMat ? 'material' : 'report'];
               const items = isMat ? getFilteredMaterialSubOptions() : REPORT_SUB_OPTIONS;
               const onSelect = isMat
                 ? (key: string) => handleMaterialSubOption(key, optionPopup.section)
@@ -1391,9 +1411,9 @@ const ProjectSections = () => {
                 <Text style={styles.modalInputLabel}>Section Type</Text>
                 <View style={styles.typeRow}>
                   {[
-                    { key: 'building',  label: 'Building',   icon: 'business' },
-                    { key: 'rowhouse',  label: 'Row House',  icon: 'home'     },
-                    { key: 'other',     label: 'Other',      icon: 'grid'     },
+                    { key: 'building', label: 'Building', icon: 'business' },
+                    { key: 'rowhouse', label: 'Row House', icon: 'home' },
+                    { key: 'other', label: 'Other', icon: 'grid' },
                   ].map(t => (
                     <TouchableOpacity
                       key={t.key}
@@ -1457,7 +1477,7 @@ const ProjectSections = () => {
         onRequestClose={() => setRhPicker(null)}
       >
         <TouchableOpacity style={popupStyles.backdrop} activeOpacity={1} onPress={() => setRhPicker(null)}>
-          <TouchableOpacity activeOpacity={1} style={popupStyles.card} onPress={() => {}}>
+          <TouchableOpacity activeOpacity={1} style={popupStyles.card} onPress={() => { }}>
             <View style={popupStyles.header}>
               <View style={[popupStyles.headerIcon, { backgroundColor: '#F0FDF4' }]}>
                 <Ionicons name="home" size={20} color="#10B981" />
@@ -1536,34 +1556,34 @@ const rhPickerStyles = StyleSheet.create({
 
 // ─── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root:               { flex: 1, backgroundColor: '#F8FAFC' },
+  root: { flex: 1, backgroundColor: '#F8FAFC' },
 
   // Header
-  header:             { backgroundColor: '#FFFFFF', paddingBottom: 18, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  headerInner:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8, gap: 12 },
-  backBtn:            { width: 40, height: 40, borderRadius: 13, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' },
-  headerCenter:       { flex: 1 },
-  headerAddBtn:       { width: 40, height: 40, borderRadius: 13, backgroundColor: '#3A78B5', justifyContent: 'center', alignItems: 'center' },
-  headerProjectName:  { fontSize: 18, fontWeight: '800', color: '#0F172A', letterSpacing: -0.3 },
-  headerSubtitle:     { fontSize: 12.5, color: '#64748B', marginTop: 2, fontWeight: '500' },
-  reportBtn:          { width: 40, height: 40, borderRadius: 13, backgroundColor: '#EAF0FE', borderWidth: 1, borderColor: '#E0E7FF', justifyContent: 'center', alignItems: 'center' },
+  header: { backgroundColor: '#FFFFFF', paddingBottom: 18, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  headerInner: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8, gap: 12 },
+  backBtn: { width: 40, height: 40, borderRadius: 13, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' },
+  headerCenter: { flex: 1 },
+  headerAddBtn: { width: 40, height: 40, borderRadius: 13, backgroundColor: '#3A78B5', justifyContent: 'center', alignItems: 'center' },
+  headerProjectName: { fontSize: 18, fontWeight: '800', color: '#0F172A', letterSpacing: -0.3 },
+  headerSubtitle: { fontSize: 12.5, color: '#64748B', marginTop: 2, fontWeight: '500' },
+  reportBtn: { width: 40, height: 40, borderRadius: 13, backgroundColor: '#EAF0FE', borderWidth: 1, borderColor: '#E0E7FF', justifyContent: 'center', alignItems: 'center' },
 
   // Progress
-  progressBlock:      { paddingHorizontal: 16, marginTop: 14 },
-  progressLabelRow:   { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 7 },
-  progressLabel:      { fontSize: 12, color: '#64748B', fontWeight: '500' },
-  progressPct:        { fontSize: 12, fontWeight: '800', color: '#3A78B5' },
-  progressTrack:      { height: 8, backgroundColor: '#EAF0FE', borderRadius: 99, overflow: 'hidden' },
-  progressFill:       { height: '100%', borderRadius: 99, backgroundColor: '#3A78B5' },
+  progressBlock: { paddingHorizontal: 16, marginTop: 14 },
+  progressLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 7 },
+  progressLabel: { fontSize: 12, color: '#64748B', fontWeight: '500' },
+  progressPct: { fontSize: 12, fontWeight: '800', color: '#3A78B5' },
+  progressTrack: { height: 8, backgroundColor: '#EAF0FE', borderRadius: 99, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 99, backgroundColor: '#3A78B5' },
 
   // Scroll
-  scrollView:         { flex: 1 },
-  scrollContent:      { padding: 16, paddingTop: 20 },
+  scrollView: { flex: 1 },
+  scrollContent: { padding: 16, paddingTop: 20 },
 
   // Summary pills
-  summaryRow:         { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  summaryPill:        { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99 },
-  summaryPillText:    { fontSize: 12, fontWeight: '700' },
+  summaryRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  summaryPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99 },
+  summaryPillText: { fontSize: 12, fontWeight: '700' },
 
   // Section card
   sectionCard: {
@@ -1604,25 +1624,25 @@ const styles = StyleSheet.create({
   rowHousePillText: { fontSize: 11.5, fontWeight: '600', color: '#10B981' },
   rowHouseChevron: { width: 32, height: 32, borderRadius: 11, backgroundColor: '#F0FDF4', justifyContent: 'center', alignItems: 'center' },
   rowHouseHint: { fontSize: 12, color: '#64748B', lineHeight: 17, marginTop: 8 },
-  sectionHeaderRow:   { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingLeft: 20, paddingRight: 16, gap: 12 },
-  indexBadge:         { width: 30, height: 30, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  indexBadgeText:     { fontSize: 12, fontWeight: '800' },
-  sectionIconWrap:    { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  sectionInfo:        { flex: 1 },
-  sectionName:        { fontSize: 16, fontWeight: '700', color: '#0F172A', letterSpacing: -0.2 },
-  sectionMeta:        { flexDirection: 'row', marginTop: 5, gap: 6 },
-  statusPill:         { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99 },
-  statusDot:          { width: 6, height: 6, borderRadius: 3 },
-  statusPillText:     { fontSize: 11, fontWeight: '700' },
-  chevronWrap:        { width: 32, height: 32 },
-  chevronCircle:      { width: 32, height: 32, borderRadius: 11, backgroundColor: '#EAF0FE', justifyContent: 'center', alignItems: 'center' },
-  viewBuildingsBtn:   { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#BBF7D0', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, marginRight: 8 },
+  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingLeft: 20, paddingRight: 16, gap: 12 },
+  indexBadge: { width: 30, height: 30, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  indexBadgeText: { fontSize: 12, fontWeight: '800' },
+  sectionIconWrap: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  sectionInfo: { flex: 1 },
+  sectionName: { fontSize: 16, fontWeight: '700', color: '#0F172A', letterSpacing: -0.2 },
+  sectionMeta: { flexDirection: 'row', marginTop: 5, gap: 6 },
+  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99 },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusPillText: { fontSize: 11, fontWeight: '700' },
+  chevronWrap: { width: 32, height: 32 },
+  chevronCircle: { width: 32, height: 32, borderRadius: 11, backgroundColor: '#EAF0FE', justifyContent: 'center', alignItems: 'center' },
+  viewBuildingsBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#BBF7D0', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, marginRight: 8 },
   viewBuildingsBtnText: { fontSize: 12, fontWeight: '700', color: '#10B981' },
 
   // Options
-  optionsContainer:   { paddingHorizontal: 16, paddingBottom: 14 },
-  optionsDivider:     { height: 1, backgroundColor: '#F1F5F9', marginBottom: 10 },
-  optionsGrid:        { gap: 8 },
+  optionsContainer: { paddingHorizontal: 16, paddingBottom: 14 },
+  optionsDivider: { height: 1, backgroundColor: '#F1F5F9', marginBottom: 10 },
+  optionsGrid: { gap: 8 },
   optionChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1634,17 +1654,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#EEF2F8',
   },
-  optionChipIcon:     { width: 38, height: 38, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  optionChipLabel:    { flex: 1, fontSize: 14, fontWeight: '600', color: '#334155' },
+  optionChipIcon: { width: 38, height: 38, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  optionChipLabel: { flex: 1, fontSize: 14, fontWeight: '600', color: '#334155' },
 
   // Empty state
-  emptyState:         { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, paddingHorizontal: 24 },
-  emptyIconWrap:      { width: 100, height: 100, borderRadius: 28, justifyContent: 'center', alignItems: 'center', marginBottom: 20, backgroundColor: '#EAF0FE', borderWidth: 1, borderColor: '#E0E7FF' },
-  emptyTitle:         { fontSize: 20, fontWeight: '800', color: '#0F172A', marginBottom: 8, letterSpacing: -0.3 },
-  emptySubtitle:      { fontSize: 14, color: '#64748B', textAlign: 'center', lineHeight: 22, maxWidth: '80%', marginBottom: 28 },
-  emptyAddBtn:        { borderRadius: 14, overflow: 'hidden' },
-  emptyAddBtnInner:   { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14, paddingHorizontal: 28, backgroundColor: '#3A78B5' },
-  emptyAddBtnText:    { fontSize: 15, fontWeight: '700', color: '#FFFFFF', letterSpacing: 0.3 },
+  emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, paddingHorizontal: 24 },
+  emptyIconWrap: { width: 100, height: 100, borderRadius: 28, justifyContent: 'center', alignItems: 'center', marginBottom: 20, backgroundColor: '#EAF0FE', borderWidth: 1, borderColor: '#E0E7FF' },
+  emptyTitle: { fontSize: 20, fontWeight: '800', color: '#0F172A', marginBottom: 8, letterSpacing: -0.3 },
+  emptySubtitle: { fontSize: 14, color: '#64748B', textAlign: 'center', lineHeight: 22, maxWidth: '80%', marginBottom: 28 },
+  emptyAddBtn: { borderRadius: 14, overflow: 'hidden' },
+  emptyAddBtnInner: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14, paddingHorizontal: 28, backgroundColor: '#3A78B5' },
+  emptyAddBtnText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF', letterSpacing: 0.3 },
 
   // Completion button
   completionBtn: {
@@ -1659,25 +1679,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E0E7FF',
   },
-  completionBtnDone:      { borderColor: '#BBF7D0', backgroundColor: '#F0FDF4' },
-  completionBtnText:      { fontSize: 15, fontWeight: '700', color: '#3A78B5' },
-  completionBtnTextDone:  { color: '#16A34A' },
+  completionBtnDone: { borderColor: '#BBF7D0', backgroundColor: '#F0FDF4' },
+  completionBtnText: { fontSize: 15, fontWeight: '700', color: '#3A78B5' },
+  completionBtnTextDone: { color: '#16A34A' },
 
   // FAB
 
   // Modal
-  modalOverlay:   { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'flex-end' },
-  modalSheet:     { backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 24, paddingBottom: 36, paddingTop: 12 },
-  modalHandle:    { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0', alignSelf: 'center', marginBottom: 20 },
-  modalHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
-  modalTitle:     { fontSize: 20, fontWeight: '800', color: '#0F172A', letterSpacing: -0.3 },
-  modalSubtitle:  { fontSize: 13, color: '#64748B', marginTop: 3 },
-  modalCloseBtn:  { width: 34, height: 34, borderRadius: 11, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'flex-end' },
+  modalSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 24, paddingBottom: 36, paddingTop: 12 },
+  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0', alignSelf: 'center', marginBottom: 20 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: '#0F172A', letterSpacing: -0.3 },
+  modalSubtitle: { fontSize: 13, color: '#64748B', marginTop: 3 },
+  modalCloseBtn: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' },
   modalInputGroup: { marginBottom: 20 },
   modalInputLabel: { fontSize: 12, fontWeight: '700', color: '#64748B', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.8 },
-  modalInputWrap:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 4 },
-  modalInput:      { flex: 1, fontSize: 15, color: '#0F172A', paddingVertical: 12 },
-  typeRow:         { flexDirection: 'row', gap: 10 },
+  modalInputWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 4 },
+  modalInput: { flex: 1, fontSize: 15, color: '#0F172A', paddingVertical: 12 },
+  typeRow: { flexDirection: 'row', gap: 10 },
   typeChip: {
     flex: 1,
     flexDirection: 'column',
@@ -1689,11 +1709,11 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     borderRadius: 14,
   },
-  typeChipActive:     { backgroundColor: '#EAF0FE', borderColor: '#3A78B5' },
-  typeChipText:       { fontSize: 12, fontWeight: '600', color: '#64748B' },
+  typeChipActive: { backgroundColor: '#EAF0FE', borderColor: '#3A78B5' },
+  typeChipText: { fontSize: 12, fontWeight: '600', color: '#64748B' },
   typeChipTextActive: { color: '#3A78B5' },
   // Report sub-options
-  reportOptionsGrid:   { gap: 10, marginBottom: 8 },
+  reportOptionsGrid: { gap: 10, marginBottom: 8 },
   reportOptionCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1705,17 +1725,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#EEF2F8',
   },
-  reportOptionIcon:    { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  reportOptionText:    { flex: 1 },
-  reportOptionLabel:   { fontSize: 14, fontWeight: '700', color: '#0F172A', marginBottom: 2 },
-  reportOptionDesc:    { fontSize: 12, color: '#64748B', fontWeight: '500' },
+  reportOptionIcon: { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  reportOptionText: { flex: 1 },
+  reportOptionLabel: { fontSize: 14, fontWeight: '700', color: '#0F172A', marginBottom: 2 },
+  reportOptionDesc: { fontSize: 12, color: '#64748B', fontWeight: '500' },
 
-  modalActions:    { flexDirection: 'row', gap: 12, marginTop: 8 },
-  modalCancelBtn:  { flex: 1, paddingVertical: 15, backgroundColor: '#F8FAFC', borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
+  modalActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
+  modalCancelBtn: { flex: 1, paddingVertical: 15, backgroundColor: '#F8FAFC', borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
   modalCancelText: { fontSize: 15, fontWeight: '700', color: '#64748B' },
-  modalAddBtn:     { flex: 1.5, borderRadius: 14, overflow: 'hidden' },
+  modalAddBtn: { flex: 1.5, borderRadius: 14, overflow: 'hidden' },
   modalAddBtnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 15, backgroundColor: '#3A78B5' },
-  modalAddText:    { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
+  modalAddText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
 });
 
 // ─── Material sub-dropdown styles ─────────────────────────────────────────────
@@ -1756,7 +1776,7 @@ const popupStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  title:    { fontSize: 16.5, fontWeight: '800', color: '#0F172A', letterSpacing: -0.2 },
+  title: { fontSize: 16.5, fontWeight: '800', color: '#0F172A', letterSpacing: -0.2 },
   subtitle: { fontSize: 12.5, color: '#64748B', marginTop: 1, fontWeight: '500' },
   closeBtn: {
     width: 34,
@@ -1786,7 +1806,7 @@ const popupStyles = StyleSheet.create({
     alignItems: 'center',
   },
   itemLabel: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
-  itemDesc:  { fontSize: 11.5, color: '#94A3B8', marginTop: 1 },
+  itemDesc: { fontSize: 11.5, color: '#94A3B8', marginTop: 1 },
 });
 
 // ─── Cost Summary entry card styles ───────────────────────────────────────────
@@ -1845,6 +1865,13 @@ const summaryBtnStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+});
+
+const stockStyles = StyleSheet.create({
+  listHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 },
+  listHeadingTitle: { fontSize: 17, fontWeight: '800', color: '#0F172A', letterSpacing: -0.2 },
+  stockBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: '#3A78B5' },
+  stockBtnText: { fontSize: 13.5, fontWeight: '700', color: '#FFFFFF' },
 });
 
 export default ProjectSections;

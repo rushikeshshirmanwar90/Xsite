@@ -3,6 +3,7 @@ import CostSummarySkeleton from '@/components/CostSummarySkeleton';
 import { isAdmin, useUser } from '@/hooks/useUser';
 import { getClientId } from '@/functions/clientId';
 import apiClient from '@/utils/axiosConfig';
+import { fetchMaterialStockRows, MaterialStockRow } from '@/utils/materialStockReport';
 import { PDFReportGenerator } from '@/utils/pdfReportGenerator';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -23,9 +24,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface BreakdownRow {
@@ -43,19 +41,27 @@ interface CategorySummary {
   rows: BreakdownRow[];
 }
 
-// Single theme accent (matches the shared Header / app-wide primary blue) —
-// every category uses the same color, only the icon glyph differs.
+// Single theme accent (app-wide primary blue) — every category uses the same
+// color, only the icon glyph differs.
 const THEME_COLOR = '#3A78B5';
 const THEME_BG = '#EAF0FE';
 
 const CATEGORY_META = {
-  material:   { label: 'Materials',   icon: 'cube' },
-  contractor: { label: 'Contractors', icon: 'people' },
-  equipment:  { label: 'Equipment',   icon: 'hardware-chip' },
-  other:      { label: 'Other Costs', icon: 'cash' },
+  material:   { label: 'Materials',   icon: 'cube',          color: THEME_COLOR, bg: THEME_BG },
+  contractor: { label: 'Contractors', icon: 'people',        color: THEME_COLOR, bg: THEME_BG },
+  equipment:  { label: 'Equipment',   icon: 'hardware-chip', color: THEME_COLOR, bg: THEME_BG },
+  other:      { label: 'Other Costs', icon: 'cash',          color: THEME_COLOR, bg: THEME_BG },
 } as const;
 
+const COLLAPSED_ROW_LIMIT = 6;
+
 const fmtCurrency = (v: number) => `₹${Math.round(v).toLocaleString('en-IN')}`;
+
+const fmtPct = (part: number, whole: number) => {
+  if (whole <= 0 || part <= 0) return '0%';
+  const pct = (part / whole) * 100;
+  return pct < 1 ? '<1%' : `${Math.round(pct)}%`;
+};
 
 const getUserName = async (): Promise<string> => {
   try {
@@ -71,66 +77,81 @@ const getUserName = async (): Promise<string> => {
 // ─── Category Card ─────────────────────────────────────────────────────────────
 const CategoryCard: React.FC<{
   category: CategorySummary;
+  grandTotal: number;
   expanded: boolean;
   onToggle: () => void;
   onGenerateReport: () => void;
   isGeneratingReport: boolean;
-}> = ({ category, expanded, onToggle, onGenerateReport, isGeneratingReport }) => {
+}> = ({ category, grandTotal, expanded, onToggle, onGenerateReport, isGeneratingReport }) => {
+  const meta = CATEGORY_META[category.key];
+  const [showAll, setShowAll] = useState(false);
+  const share = grandTotal > 0 ? (category.total / grandTotal) * 100 : 0;
+  const visibleRows = showAll ? category.rows : category.rows.slice(0, COLLAPSED_ROW_LIMIT);
+  const hiddenCount = category.rows.length - visibleRows.length;
+
   return (
     <View style={cardStyles.card}>
-      {/* Card header */}
-      <View style={cardStyles.headerRow}>
-        <View style={cardStyles.iconWrap}>
-          <Ionicons name={category.icon as any} size={22} color={THEME_COLOR} />
+      <TouchableOpacity style={cardStyles.headerRow} activeOpacity={0.75} onPress={onToggle}>
+        <View style={[cardStyles.iconWrap, { backgroundColor: meta.bg }]}>
+          <Ionicons name={meta.icon as any} size={21} color={meta.color} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={cardStyles.label}>{category.label}</Text>
           <Text style={cardStyles.countText}>
-            {category.count} {category.count === 1 ? 'entry' : 'entries'}
+            {category.count} {category.count === 1 ? 'entry' : 'entries'} · {fmtPct(category.total, grandTotal)} of total
           </Text>
         </View>
-        <Text style={cardStyles.amount}>{fmtCurrency(category.total)}</Text>
+        <View style={cardStyles.amountCol}>
+          <Text style={cardStyles.amount}>{fmtCurrency(category.total)}</Text>
+          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color="#94A3B8" />
+        </View>
+      </TouchableOpacity>
+
+      {/* Share of the project total */}
+      <View style={cardStyles.shareTrack}>
+        <View style={[cardStyles.shareFill, { width: `${share}%`, backgroundColor: meta.color }]} />
       </View>
 
-      {/* Actions */}
-      <View style={cardStyles.actionsRow}>
-        <TouchableOpacity style={cardStyles.actionBtn} activeOpacity={0.7} onPress={onToggle}>
-          <Text style={cardStyles.actionBtnText}>{expanded ? 'Hide Details' : 'View Details'}</Text>
-          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={15} color={THEME_COLOR} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[cardStyles.actionBtn, cardStyles.reportBtn]}
-          activeOpacity={0.7}
-          onPress={onGenerateReport}
-          disabled={isGeneratingReport}
-        >
-          {isGeneratingReport ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <>
-              <Ionicons name="document-text-outline" size={15} color="#FFFFFF" />
-              <Text style={cardStyles.reportBtnText}>Generate Report</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {/* Breakdown rows */}
       {expanded && (
         <View style={cardStyles.breakdown}>
           {category.rows.length === 0 ? (
             <Text style={cardStyles.emptyRowText}>No entries recorded yet.</Text>
           ) : (
-            category.rows.map((row, i) => (
-              <View key={`${row.name}-${i}`} style={[cardStyles.breakdownRow, i > 0 && cardStyles.breakdownRowBorder]}>
-                <View style={{ flex: 1, marginRight: 12 }}>
-                  <Text style={cardStyles.rowName} numberOfLines={1}>{row.name}</Text>
-                  {row.sub ? <Text style={cardStyles.rowSub} numberOfLines={1}>{row.sub}</Text> : null}
+            <>
+              {visibleRows.map((row, i) => (
+                <View key={`${row.name}-${i}`} style={[cardStyles.breakdownRow, i > 0 && cardStyles.breakdownRowBorder]}>
+                  <View style={{ flex: 1, marginRight: 12 }}>
+                    <Text style={cardStyles.rowName} numberOfLines={1}>{row.name}</Text>
+                    {row.sub ? <Text style={cardStyles.rowSub} numberOfLines={1}>{row.sub}</Text> : null}
+                  </View>
+                  <Text style={cardStyles.rowAmount}>{fmtCurrency(row.amount)}</Text>
                 </View>
-                <Text style={cardStyles.rowAmount}>{fmtCurrency(row.amount)}</Text>
-              </View>
-            ))
+              ))}
+              {category.rows.length > COLLAPSED_ROW_LIMIT && (
+                <TouchableOpacity style={cardStyles.showAllBtn} activeOpacity={0.7} onPress={() => setShowAll(v => !v)}>
+                  <Text style={[cardStyles.showAllText, { color: meta.color }]}>
+                    {showAll ? 'Show less' : `Show ${hiddenCount} more`}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </>
           )}
+
+          <TouchableOpacity
+            style={[cardStyles.reportBtn, { borderColor: meta.color }]}
+            activeOpacity={0.75}
+            onPress={onGenerateReport}
+            disabled={isGeneratingReport}
+          >
+            {isGeneratingReport ? (
+              <ActivityIndicator size="small" color={meta.color} />
+            ) : (
+              <>
+                <Ionicons name="document-text-outline" size={16} color={meta.color} />
+                <Text style={[cardStyles.reportBtnText, { color: meta.color }]}>Generate PDF Report</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
       )}
     </View>
@@ -166,65 +187,27 @@ const CostSummary = () => {
 
   // Raw records kept alongside the display summaries — the PDF generators need
   // the original shapes, not the flattened breakdown rows shown on screen.
-  const [materialStockRows, setMaterialStockRows] = useState<any[]>([]);
+  const [materialStockRows, setMaterialStockRows] = useState<MaterialStockRow[]>([]);
   const [equipmentList, setEquipmentList] = useState<any[]>([]);
   const [otherCostEntries, setOtherCostEntries] = useState<any[]>([]);
   const [contractorList, setContractorList] = useState<any[]>([]);
 
   // ── Fetchers (each isolated so one failure doesn't blank the whole page) ────
-  const buildSpecsKey = (specs: any) => {
-    if (!specs || typeof specs !== 'object' || Object.keys(specs).length === 0) return '';
-    return Object.keys(specs).sort().filter(k => specs[k] !== null && specs[k] !== undefined && specs[k] !== '').map(k => `${k}:${specs[k]}`).join('|');
-  };
-
   const fetchMaterialsSummary = async (): Promise<CategorySummary> => {
     const meta = CATEGORY_META.material;
     const base: CategorySummary = { key: 'material', ...meta, total: 0, count: 0, rows: [] };
     try {
       const clientId = await getClientId();
       if (!clientId) return base;
-      const qs = { projectId, clientId, page: 1, limit: 5000, sortBy: 'createdAt', sortOrder: 'desc' };
-      const [avRes, usedRes] = await Promise.all([
-        apiClient.get('/api/material', { params: qs }),
-        apiClient.get('/api/material-usage', { params: qs }),
-      ]);
-      const avList: any[] = (avRes.data as any).MaterialAvailable || (avRes.data as any).materials || [];
-      const usedList: any[] = (usedRes.data as any).MaterialUsed || (usedRes.data as any).materials || [];
-
-      const resolveCost = (m: any, qty: number) =>
-        m.totalCost !== undefined && m.totalCost !== null
-          ? Number(m.totalCost)
-          : Number(m.perUnitCost ?? m.cost ?? 0) * qty;
-
-      // Group by name+unit+specs — same grouping the material stock PDF report uses
-      const grouped: { [key: string]: { name: string; unit: string; specs: any; currentlyAvailable: number; totalUsed: number; importedCost: number } } = {};
-      const getGroup = (n: string, u: string, s: any) => {
-        const key = `${n}-${u}-${buildSpecsKey(s)}`;
-        if (!grouped[key]) grouped[key] = { name: n, unit: u, specs: s || {}, currentlyAvailable: 0, totalUsed: 0, importedCost: 0 };
-        return grouped[key];
-      };
-      avList.forEach((m: any) => { const qty = Number(m.qnt || 0); const g = getGroup(m.name, m.unit, m.specs); g.currentlyAvailable += qty; g.importedCost += resolveCost(m, qty); });
-      usedList.forEach((m: any) => { const qty = Number(m.qnt || 0); const g = getGroup(m.name, m.unit, m.specs); g.totalUsed += qty; g.importedCost += resolveCost(m, qty); });
-
-      const stockRows = Object.values(grouped).map(g => {
-        const totalImported = g.currentlyAvailable + g.totalUsed;
-        return {
-          name: g.name,
-          specs: g.specs,
-          unit: g.unit,
-          totalImported,
-          totalUsed: g.totalUsed,
-          currentlyAvailable: g.currentlyAvailable,
-          perUnitCost: totalImported > 0 ? g.importedCost / totalImported : 0,
-          totalCost: g.importedCost,
-        };
-      });
+      // Same loader as the material screen's stock report, so the PDF (incl.
+      // vendors) matches it exactly.
+      const stockRows = await fetchMaterialStockRows(projectId, clientId);
       setMaterialStockRows(stockRows);
 
       const rows: BreakdownRow[] = stockRows
         .slice()
         .sort((a, b) => b.totalCost - a.totalCost)
-        .map(g => ({ name: g.name, sub: `${g.totalImported} ${g.unit}`, amount: g.totalCost }));
+        .map(g => ({ name: g.name, sub: `${g.totalImported} ${g.unit} bought · ${g.totalUsed} ${g.unit} used`, amount: g.totalCost }));
 
       return { ...base, total: rows.reduce((s, r) => s + r.amount, 0), count: rows.length, rows };
     } catch {
@@ -402,9 +385,6 @@ const CostSummary = () => {
           <Text style={styles.headerTitle} numberOfLines={1}>Cost Summary</Text>
           <Text style={styles.headerSubtitle} numberOfLines={1}>{projectName}</Text>
         </View>
-        <View style={styles.headerIconWrap}>
-          <Ionicons name="pie-chart" size={20} color={THEME_COLOR} />
-        </View>
       </View>
 
       {loading || userLoading || !userIsAdmin ? (
@@ -420,39 +400,59 @@ const CostSummary = () => {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[THEME_COLOR]} tintColor={THEME_COLOR} />
           }
         >
-          {/* Grand total card */}
+          {/* ── Total cost used vs. total project cost (budget) ──────────────── */}
           <View style={styles.totalCard}>
-            <View style={styles.totalIconWrap}>
-              <Ionicons name="wallet" size={24} color="#FFFFFF" />
-            </View>
-            <Text style={styles.totalLabel}>Total Project Cost</Text>
+            <Text style={styles.totalLabel}>Total Cost Used</Text>
             <Text style={styles.totalAmount}>{fmtCurrency(grandTotal)}</Text>
 
-            {budget > 0 ? (
-              <>
+            {budget > 0 && (
+              <View style={styles.budgetBlock}>
                 <View style={styles.budgetBarTrack}>
                   <View
                     style={[
                       styles.budgetBarFill,
-                      { width: `${budgetPct}%`, backgroundColor: isOverBudget ? '#FCA5A5' : '#FFFFFF' },
+                      { width: `${budgetPct}%`, backgroundColor: isOverBudget ? '#DC2626' : THEME_COLOR },
                     ]}
                   />
                 </View>
-                <Text style={styles.totalSub}>
-                  {budgetPct.toFixed(1)}% of {fmtCurrency(budget)} budget
-                  {isOverBudget ? ` • ${fmtCurrency(grandTotal - budget)} over` : ''}
-                </Text>
-              </>
-            ) : (
-              <Text style={styles.totalSub}>Materials • Contractors • Equipment • Other</Text>
+                <View style={styles.budgetLabelRow}>
+                  <Text style={styles.budgetPctText}>{((grandTotal / budget) * 100).toFixed(1)}% used</Text>
+                  <Text style={[styles.budgetStatus, { color: isOverBudget ? '#DC2626' : THEME_COLOR }]}>
+                    {isOverBudget
+                      ? `${fmtCurrency(grandTotal - budget)} over`
+                      : `${fmtCurrency(budget - grandTotal)} left`}
+                  </Text>
+                </View>
+              </View>
             )}
+
+            <View style={styles.projectCostRow}>
+              <Text style={styles.projectCostLabel}>Total Project Cost</Text>
+              <Text style={styles.projectCostAmount}>{budget > 0 ? fmtCurrency(budget) : 'Not set'}</Text>
+            </View>
+
+            {/* Legend — amount and share for every category */}
+            <View style={styles.legendGrid}>
+              {categories.map(c => (
+                <View key={c.key} style={styles.legendItem}>
+                  <View style={styles.legendLabelRow}>
+                    <View style={[styles.legendDot, { backgroundColor: CATEGORY_META[c.key].color }]} />
+                    <Text style={styles.legendLabel} numberOfLines={1}>{c.label}</Text>
+                    <Text style={styles.legendPct}>{fmtPct(c.total, grandTotal)}</Text>
+                  </View>
+                  <Text style={styles.legendAmount} numberOfLines={1}>{fmtCurrency(c.total)}</Text>
+                </View>
+              ))}
+            </View>
           </View>
 
-          {/* Category cards */}
+          {/* ── Category breakdown ─────────────────────────────────────────── */}
+          <Text style={styles.sectionHeading}>Breakdown</Text>
           {categories.map((cat) => (
             <CategoryCard
               key={cat.key}
               category={cat}
+              grandTotal={grandTotal}
               expanded={expandedKey === cat.key}
               onToggle={() => toggleExpand(cat.key)}
               onGenerateReport={() => handleGenerateReport(cat.key)}
@@ -483,10 +483,7 @@ export default CostSummary;
 
 // ─── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -497,202 +494,87 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E2E8F0',
     gap: 12,
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F1F5F9',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1E293B',
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    color: '#64748B',
-    marginTop: 1,
-  },
-  headerIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: THEME_BG,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: '#64748B',
-  },
-  scrollContent: {
-    padding: 16,
-  },
+  backBtn: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9' },
+  headerTitle: { fontSize: 18, fontWeight: '800', color: '#0F172A', letterSpacing: -0.3 },
+  headerSubtitle: { fontSize: 13, color: '#64748B', marginTop: 1 },
+  scrollContent: { padding: 16 },
+
+  // Total card
   totalCard: {
-    backgroundColor: THEME_COLOR,
-    borderRadius: 16,
-    padding: 20,
-    alignItems: 'center',
-    marginBottom: 16,
-    shadowColor: THEME_COLOR,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 6,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 22,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    elevation: 3,
   },
-  totalIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-  totalLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.85)',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  totalAmount: {
-    fontSize: 30,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    marginTop: 4,
-  },
-  totalSub: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.85)',
-    marginTop: 8,
-  },
-  budgetBarTrack: {
-    width: '100%',
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    marginTop: 14,
-    overflow: 'hidden',
-  },
-  budgetBarFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
+  totalLabel: { fontSize: 13, fontWeight: '600', color: '#64748B' },
+  totalAmount: { fontSize: 32, fontWeight: '800', color: '#0F172A', letterSpacing: -0.8, marginTop: 2, fontVariant: ['tabular-nums'] },
+  legendGrid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 18, rowGap: 14 },
+  legendItem: { width: '50%', paddingRight: 10 },
+  legendLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendLabel: { flexShrink: 1, fontSize: 12.5, color: '#475569', fontWeight: '600' },
+  legendPct: { fontSize: 12, color: '#94A3B8', fontWeight: '600' },
+  legendAmount: { fontSize: 15.5, fontWeight: '700', color: '#0F172A', marginTop: 3, marginLeft: 14, fontVariant: ['tabular-nums'] },
+  budgetBlock: { marginTop: 14 },
+  projectCostRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+  projectCostLabel: { fontSize: 13.5, fontWeight: '600', color: '#475569' },
+  projectCostAmount: { fontSize: 16, fontWeight: '800', color: '#0F172A', fontVariant: ['tabular-nums'] },
+  budgetBarTrack: { height: 8, borderRadius: 4, backgroundColor: '#F1F5F9', overflow: 'hidden' },
+  budgetBarFill: { height: '100%', borderRadius: 4 },
+  budgetLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 7 },
+  budgetStatus: { fontSize: 13, fontWeight: '700' },
+  budgetPctText: { fontSize: 12.5, fontWeight: '600', color: '#64748B' },
+
+  sectionHeading: { fontSize: 16, fontWeight: '800', color: '#0F172A', letterSpacing: -0.2, marginBottom: 12 },
 });
 
 const cardStyles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
   },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: THEME_BG,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  countText: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 1,
-  },
-  amount: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 14,
-  },
-  actionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 9,
-    borderRadius: 10,
-    backgroundColor: THEME_BG,
-  },
-  actionBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: THEME_COLOR,
-  },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  iconWrap: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  label: { fontSize: 15.5, fontWeight: '700', color: '#0F172A' },
+  countText: { fontSize: 12, color: '#64748B', marginTop: 2 },
+  amountCol: { alignItems: 'flex-end', gap: 2 },
+  amount: { fontSize: 16.5, fontWeight: '800', color: '#0F172A', fontVariant: ['tabular-nums'] },
+  shareTrack: { height: 4, borderRadius: 2, backgroundColor: '#F1F5F9', marginTop: 14, overflow: 'hidden' },
+  shareFill: { height: '100%', borderRadius: 2 },
+  breakdown: { marginTop: 12 },
+  breakdownRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
+  breakdownRowBorder: { borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+  rowName: { fontSize: 14, fontWeight: '600', color: '#1F2937' },
+  rowSub: { fontSize: 12, color: '#64748B', marginTop: 2 },
+  rowAmount: { fontSize: 14, fontWeight: '700', color: '#1F2937', fontVariant: ['tabular-nums'] },
+  showAllBtn: { paddingVertical: 10, alignItems: 'center' },
+  showAllText: { fontSize: 13, fontWeight: '700' },
+  emptyRowText: { fontSize: 13, color: '#94A3B8', paddingVertical: 12, textAlign: 'center' },
   reportBtn: {
-    backgroundColor: THEME_COLOR,
-  },
-  reportBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  breakdown: {
-    marginTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    paddingTop: 4,
-  },
-  breakdownRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingVertical: 11,
+    borderRadius: 12,
+    borderWidth: 1,
   },
-  breakdownRowBorder: {
-    borderTopWidth: 1,
-    borderTopColor: '#F8FAFC',
-  },
-  rowName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  rowSub: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 1,
-  },
-  rowAmount: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  emptyRowText: {
-    fontSize: 13,
-    color: '#94A3B8',
-    paddingVertical: 12,
-    textAlign: 'center',
-  },
+  reportBtnText: { fontSize: 13.5, fontWeight: '700' },
 });

@@ -10,7 +10,9 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useSimpleNotifications } from '@/hooks/useSimpleNotifications';
 import SimpleNotificationService from '@/services/SimpleNotificationService';
-import * as Notifications from 'expo-notifications';
+import type * as NotificationsModule from 'expo-notifications';
+// Importing expo-notifications throws on Android in Expo Go, so only load it outside Expo Go.
+const Notifications: typeof NotificationsModule = require('expo-constants').default.appOwnership === 'expo' ? null : require('expo-notifications');
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { domain } from '@/lib/domain';
 
