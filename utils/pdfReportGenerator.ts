@@ -1502,9 +1502,9 @@ export class PDFReportGenerator {
             
             // Generate PDF
             console.log('📄 Calling Print.printToFileAsync...');
-            const { uri } = await Print.printToFileAsync({
+            const { uri, base64: pdfBase64 } = await Print.printToFileAsync({
                 html: htmlContent,
-                base64: false,
+                base64: true,
                 margins: {
                     left: 20,
                     top: 20,
@@ -1534,9 +1534,11 @@ export class PDFReportGenerator {
                         console.log('📄 Deleted existing file at custom location');
                     }
                     
-                    // Copy the original file to the new location
-                    const originalFile = new File(uri);
-                    originalFile.copy(customFile);
+                    // expo-print's output in the raw cache dir isn't readable by expo-file-system /
+                    // expo-sharing (e.g. in Expo Go), so write the PDF bytes into the document dir.
+                    if (!pdfBase64) throw new Error('PDF data missing');
+                    customFile.create();
+                    customFile.write(pdfBase64, { encoding: 'base64' });
                     
                     // Verify the file was copied successfully
                     if (customFile.exists) {
@@ -1544,14 +1546,6 @@ export class PDFReportGenerator {
                         console.log('✅ PDF successfully copied with custom filename to:', customUri);
                         const fileInfo = customFile.info();
                         console.log('📄 File size:', fileInfo.size, 'bytes');
-                        
-                        // Delete the original temporary file to avoid confusion
-                        try {
-                            originalFile.delete();
-                            console.log('📄 Deleted original temporary file');
-                        } catch (deleteError) {
-                            console.warn('⚠️ Could not delete original temp file:', deleteError);
-                        }
                     } else {
                         console.warn('⚠️ Custom file not found after copy, using original');
                         actualFilename = 'Complete_Project_Report.pdf'; // Fallback name
@@ -1973,9 +1967,9 @@ export class PDFReportGenerator {
             `;
 
             // Generate PDF
-            const { uri } = await Print.printToFileAsync({
+            const { uri, base64: pdfBase64 } = await Print.printToFileAsync({
                 html: fullHTML,
-                base64: false,
+                base64: true,
                 margins: { left: 16, top: 16, right: 16, bottom: 16 },
             });
 
@@ -1991,11 +1985,13 @@ export class PDFReportGenerator {
                 if (documentDir) {
                     const customFile = new File(documentDir, customFilename);
                     if (customFile.exists) customFile.delete();
-                    const originalFile = new File(uri);
-                    originalFile.copy(customFile);
+                    // expo-print's output in the raw cache dir isn't readable by expo-file-system /
+                    // expo-sharing (e.g. in Expo Go), so write the PDF bytes into the document dir.
+                    if (!pdfBase64) throw new Error('PDF data missing');
+                    customFile.create();
+                    customFile.write(pdfBase64, { encoding: 'base64' });
                     if (customFile.exists) {
                         finalUri = customFile.uri;
-                        try { originalFile.delete(); } catch (_) {}
                     }
                 }
             } catch (_) { /* use original uri */ }
@@ -2062,7 +2058,7 @@ export class PDFReportGenerator {
     }
 
     // ✅ NEW: Generate a current material stock report — Sr No, Material Name,
-    // Purchase qty, Per Unit Cost, Total Cost, Purchased By, Used, Remaining.
+    // Purchase qty, Per Unit Cost, Total Cost, Vendor, Used, Remaining.
     async generateMaterialStockReport(
         materials: Array<{
             name: string;
@@ -2073,7 +2069,7 @@ export class PDFReportGenerator {
             currentlyAvailable: number;
             perUnitCost: number;
             totalCost: number;
-            purchasedBy?: string[];
+            vendors?: string[];
         }>,
         reportTitle: string
     ): Promise<void> {
@@ -2112,14 +2108,11 @@ export class PDFReportGenerator {
             });
 
             const grandTotalImportValue = sortedMaterials.reduce((sum, m) => sum + (m.totalCost || 0), 0);
-            const totalImportedQty = sortedMaterials.reduce((sum, m) => sum + (m.totalImported || 0), 0);
-            const totalUsedQty = sortedMaterials.reduce((sum, m) => sum + (m.totalUsed || 0), 0);
-            const totalAvailableQty = sortedMaterials.reduce((sum, m) => sum + (m.currentlyAvailable || 0), 0);
 
             const tableRows = sortedMaterials.map((m, idx) => {
                 const specsString = buildSpecsString(m.specs);
-                const purchasersText = (m.purchasedBy && m.purchasedBy.length > 0)
-                    ? m.purchasedBy.join(', ')
+                const vendorsText = (m.vendors && m.vendors.length > 0)
+                    ? m.vendors.join(', ')
                     : '—';
                 return `
                 <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
@@ -2140,7 +2133,7 @@ export class PDFReportGenerator {
                         <div style="font-weight: 700; color: #059669; font-size: 12px; margin-top: 2px;">${formatCurrency(m.totalCost)}</div>
                     </td>
                     <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; font-size: 11px; color: #475569;">
-                        ${purchasersText}
+                        ${vendorsText}
                     </td>
                     <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: center; vertical-align: top; font-weight: 600; color: #b45309; font-size: 12px;">
                         ${(m.totalUsed || 0).toLocaleString('en-IN')}
@@ -2225,7 +2218,7 @@ export class PDFReportGenerator {
                                     <th style="padding: 10px 8px; text-align: left; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0;">Material Name</th>
                                     <th style="padding: 10px 8px; text-align: center; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 80px;">Purchase</th>
                                     <th style="padding: 10px 8px; text-align: center; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 110px;">Cost</th>
-                                    <th style="padding: 10px 8px; text-align: left; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 120px;">Purchased By</th>
+                                    <th style="padding: 10px 8px; text-align: left; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 120px;">Vendor</th>
                                     <th style="padding: 10px 8px; text-align: center; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 70px;">Used</th>
                                     <th style="padding: 10px 8px; text-align: center; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; width: 80px;">Remaining</th>
                                 </tr>
@@ -2236,19 +2229,13 @@ export class PDFReportGenerator {
                                     <td colspan="2" style="padding: 12px 8px; border-top: 2px solid #10b981; font-weight: 700; font-size: 12px; color: #059669;">
                                         GRAND TOTAL
                                     </td>
-                                    <td style="padding: 12px 8px; border-top: 2px solid #10b981; text-align: center; font-weight: 800; font-size: 13px; color: #059669;">
-                                        ${totalImportedQty.toLocaleString('en-IN')}
-                                    </td>
+                                    <td style="padding: 12px 8px; border-top: 2px solid #10b981;"></td>
                                     <td style="padding: 12px 8px; border-top: 2px solid #10b981; text-align: center; font-weight: 800; font-size: 13px; color: #059669;">
                                         ${formatCurrency(grandTotalImportValue)}
                                     </td>
                                     <td style="padding: 12px 8px; border-top: 2px solid #10b981;"></td>
-                                    <td style="padding: 12px 8px; border-top: 2px solid #10b981; text-align: center; font-weight: 700; font-size: 13px; color: #b45309;">
-                                        ${totalUsedQty.toLocaleString('en-IN')}
-                                    </td>
-                                    <td style="padding: 12px 8px; border-top: 2px solid #10b981; text-align: center; font-weight: 700; font-size: 13px; color: #1d4ed8;">
-                                        ${totalAvailableQty.toLocaleString('en-IN')}
-                                    </td>
+                                    <td style="padding: 12px 8px; border-top: 2px solid #10b981;"></td>
+                                    <td style="padding: 12px 8px; border-top: 2px solid #10b981;"></td>
                                 </tr>
                             </tbody>
                         </table>
@@ -2263,9 +2250,9 @@ export class PDFReportGenerator {
             `;
 
             // Generate PDF
-            const { uri } = await Print.printToFileAsync({
+            const { uri, base64: pdfBase64 } = await Print.printToFileAsync({
                 html: fullHTML,
-                base64: false,
+                base64: true,
                 margins: { left: 16, top: 16, right: 16, bottom: 16 },
             });
 
@@ -2281,11 +2268,13 @@ export class PDFReportGenerator {
                 if (documentDir) {
                     const customFile = new File(documentDir, customFilename);
                     if (customFile.exists) customFile.delete();
-                    const originalFile = new File(uri);
-                    originalFile.copy(customFile);
+                    // expo-print's output in the raw cache dir isn't readable by expo-file-system /
+                    // expo-sharing (e.g. in Expo Go), so write the PDF bytes into the document dir.
+                    if (!pdfBase64) throw new Error('PDF data missing');
+                    customFile.create();
+                    customFile.write(pdfBase64, { encoding: 'base64' });
                     if (customFile.exists) {
                         finalUri = customFile.uri;
-                        try { originalFile.delete(); } catch (_) { }
                     }
                 }
             } catch (_) { /* use original uri */ }
@@ -2555,9 +2544,9 @@ export class PDFReportGenerator {
             `;
 
             // Generate PDF
-            const { uri } = await Print.printToFileAsync({
+            const { uri, base64: pdfBase64 } = await Print.printToFileAsync({
                 html: fullHTML,
-                base64: false,
+                base64: true,
                 margins: { left: 16, top: 16, right: 16, bottom: 16 },
             });
 
@@ -2573,11 +2562,13 @@ export class PDFReportGenerator {
                 if (documentDir) {
                     const customFile = new File(documentDir, customFilename);
                     if (customFile.exists) customFile.delete();
-                    const originalFile = new File(uri);
-                    originalFile.copy(customFile);
+                    // expo-print's output in the raw cache dir isn't readable by expo-file-system /
+                    // expo-sharing (e.g. in Expo Go), so write the PDF bytes into the document dir.
+                    if (!pdfBase64) throw new Error('PDF data missing');
+                    customFile.create();
+                    customFile.write(pdfBase64, { encoding: 'base64' });
                     if (customFile.exists) {
                         finalUri = customFile.uri;
-                        try { originalFile.delete(); } catch (_) { }
                     }
                 }
             } catch (_) { /* use original uri */ }
@@ -2802,9 +2793,9 @@ export class PDFReportGenerator {
             `;
 
             // Generate PDF
-            const { uri } = await Print.printToFileAsync({
+            const { uri, base64: pdfBase64 } = await Print.printToFileAsync({
                 html: fullHTML,
-                base64: false,
+                base64: true,
                 margins: { left: 16, top: 16, right: 16, bottom: 16 },
             });
 
@@ -2820,11 +2811,13 @@ export class PDFReportGenerator {
                 if (documentDir) {
                     const customFile = new File(documentDir, customFilename);
                     if (customFile.exists) customFile.delete();
-                    const originalFile = new File(uri);
-                    originalFile.copy(customFile);
+                    // expo-print's output in the raw cache dir isn't readable by expo-file-system /
+                    // expo-sharing (e.g. in Expo Go), so write the PDF bytes into the document dir.
+                    if (!pdfBase64) throw new Error('PDF data missing');
+                    customFile.create();
+                    customFile.write(pdfBase64, { encoding: 'base64' });
                     if (customFile.exists) {
                         finalUri = customFile.uri;
-                        try { originalFile.delete(); } catch (_) { }
                     }
                 }
             } catch (_) { /* use original uri */ }

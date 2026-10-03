@@ -220,7 +220,7 @@ const ContractorReportGenerator: React.FC<ContractorReportGeneratorProps> = ({
                 ? generateAllContractorsHTML()
                 : generateSingleContractorHTML();
 
-            const { uri } = await Print.printToFileAsync({ html: htmlContent, base64: false });
+            const { uri, base64: pdfBase64 } = await Print.printToFileAsync({ html: htmlContent, base64: true });
 
             const nameSlug = isProjectMode
                 ? projectName.replace(/[^a-zA-Z0-9]/g, '_')
@@ -234,7 +234,10 @@ const ContractorReportGenerator: React.FC<ContractorReportGeneratorProps> = ({
                 const permanentUri = `${FileSystem.documentDirectory || FileSystem.cacheDirectory}${filename}`;
                 const info = await FileSystem.getInfoAsync(permanentUri);
                 if (info.exists) await FileSystem.deleteAsync(permanentUri);
-                await FileSystem.moveAsync({ from: uri, to: permanentUri });
+                // expo-print's output in the raw cache dir isn't readable by expo-file-system /
+                // expo-sharing (e.g. in Expo Go), so write the PDF bytes ourselves.
+                if (!pdfBase64) throw new Error('PDF data missing');
+                await FileSystem.writeAsStringAsync(permanentUri, pdfBase64, { encoding: FileSystem.EncodingType.Base64 });
                 finalUri = permanentUri;
             } catch {
                 /* fall back to the original uri */

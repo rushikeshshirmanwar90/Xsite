@@ -1,4 +1,5 @@
 import Header from '@/components/details/Header';
+import { fetchMaterialStockRows } from '@/utils/materialStockReport';
 import MaterialCardEnhanced from '@/components/details/MaterialCardEnhanced';
 import { MaterialListSkeleton } from '@/components/details/MaterialCardSkeleton';
 import MaterialFormModal from '@/components/details/MaterialFormModel';
@@ -1907,123 +1908,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     // Fetches the COMPLETE project-wide material lists directly from the API (not the
     // paginated `materials.available`/`materials.used` state, which only ever holds one
     // page — e.g. 10 items — at a time) and groups them by name/unit for the stock report.
-    const fetchAllMaterialsForStockReport = async (): Promise<Array<{
-        name: string;
-        unit: string;
-        specs?: Record<string, any>;
-        totalImported: number;
-        totalUsed: number;
-        currentlyAvailable: number;
-        perUnitCost: number;
-        totalCost: number;
-        purchasedBy: string[];
-    }>> => {
+    const fetchAllMaterialsForStockReport = async () => {
         const clientId = await getClientId();
-        if (!clientId || !projectId) {
-            throw new Error('Missing project or client information');
-        }
-
-        const { domain } = await import('@/lib/domain');
-        const { getAuthHeaders } = await import('@/utils/axiosConfig');
-
-        // API caps `limit` at 5000 server-side — large enough to cover a project's full
-        // material list in a single request instead of paging through it.
-        const REPORT_LIMIT = 5000;
-        const buildQueryString = (extra: Record<string, any> = {}) => {
-            const queryParams = { projectId, clientId, page: 1, limit: REPORT_LIMIT, sortBy: 'createdAt', sortOrder: 'desc', ...extra };
-            return Object.entries(queryParams)
-                .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
-                .join('&');
-        };
-
-        const [availableResponse, usedResponse] = await Promise.all([
-            fetch(`${domain}/api/material?${buildQueryString()}`, { method: 'GET', headers: { ...getAuthHeaders() } }),
-            fetch(`${domain}/api/material-usage?${buildQueryString()}`, { method: 'GET', headers: { ...getAuthHeaders() } }),
-        ]);
-
-        if (!availableResponse.ok) {
-            throw new Error(`Available materials API failed: ${availableResponse.status}`);
-        }
-        if (!usedResponse.ok) {
-            throw new Error(`Used materials API failed: ${usedResponse.status}`);
-        }
-
-        const availableData = await availableResponse.json();
-        const usedData = await usedResponse.json();
-
-        const availableList = availableData.MaterialAvailable || availableData.materials || [];
-        const usedList = usedData.MaterialUsed || usedData.materials || [];
-
-        // Key on name + unit + specs — so materials sharing a name but with different
-        // specs (e.g. different grade/size/brand) get their own row instead of being merged.
-        const grouped: { [key: string]: { name: string; unit: string; specs: Record<string, any>; currentlyAvailable: number; totalUsed: number; importedCost: number; purchasers: Set<string> } } = {};
-
-        const getGroup = (entryName: string, entryUnit: string, entrySpecs: any) => {
-            const specsKey = buildSpecsKey(entrySpecs);
-            const key = `${entryName}-${entryUnit}-${specsKey}`;
-            if (!grouped[key]) {
-                grouped[key] = { name: entryName, unit: entryUnit, specs: entrySpecs || {}, currentlyAvailable: 0, totalUsed: 0, importedCost: 0, purchasers: new Set() };
-            }
-            return grouped[key];
-        };
-
-        const resolveCost = (m: any, qty: number) => {
-            if (m.totalCost !== undefined && m.totalCost !== null) return Number(m.totalCost);
-            return Number(m.perUnitCost ?? m.cost ?? 0) * qty;
-        };
-
-        availableList.forEach((m: any) => {
-            const qty = Number(m.qnt || 0);
-            const group = getGroup(m.name, m.unit, m.specs);
-            group.currentlyAvailable += qty;
-            group.importedCost += resolveCost(m, qty);
-        });
-
-        usedList.forEach((m: any) => {
-            const qty = Number(m.qnt || 0);
-            const group = getGroup(m.name, m.unit, m.specs);
-            group.totalUsed += qty;
-            group.importedCost += resolveCost(m, qty);
-        });
-
-        // Fetch imported activities to get "purchased by" user names per material
-        try {
-            const activityRes = await fetch(
-                `${domain}/api/materialActivity?projectId=${projectId}&activity=imported&clientId=${clientId}&limit=${REPORT_LIMIT}`,
-                { method: 'GET', headers: { ...getAuthHeaders() } }
-            );
-            if (activityRes.ok) {
-                const activityData = await activityRes.json();
-                const activities = activityData.data?.activities || activityData.activities || [];
-                activities.forEach((act: any) => {
-                    const userName = act.user?.fullName;
-                    if (!userName) return;
-                    (act.materials || []).forEach((m: any) => {
-                        const specsKey = buildSpecsKey(m.specs);
-                        const key = `${m.name}-${m.unit}-${specsKey}`;
-                        if (grouped[key]) grouped[key].purchasers.add(userName);
-                    });
-                });
-            }
-        } catch {
-            // non-fatal — report generates without purchaser info
-        }
-
-        return Object.values(grouped).map(group => {
-            const totalImported = group.currentlyAvailable + group.totalUsed;
-            const perUnitCost = totalImported > 0 ? group.importedCost / totalImported : 0;
-            return {
-                name: group.name,
-                unit: group.unit,
-                specs: group.specs,
-                totalImported,
-                totalUsed: group.totalUsed,
-                currentlyAvailable: group.currentlyAvailable,
-                perUnitCost,
-                totalCost: group.importedCost,
-                purchasedBy: Array.from(group.purchasers),
-            };
-        });
+        return fetchMaterialStockRows(projectId, clientId || '');
     };
 
     // Generates a project-wide current material stock report — Sr No, Material Name,
