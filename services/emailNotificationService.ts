@@ -15,6 +15,9 @@ export interface NotificationPayload {
 }
 
 export class NotificationService {
+    static sendStaffWelcomeMessage(notificationPayload: { recipientEmail: string; recipientName: string; subject: string; message: string; type: string; clientId: string; staffId: string | undefined; companyName: string; metadata: { role: string; addedBy: string; addedAt: string; }; }) {
+        throw new Error('Method not implemented.');
+    }
     private static instance: NotificationService;
     
     private constructor() {}

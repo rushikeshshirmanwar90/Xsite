@@ -1,10 +1,10 @@
+import { Colors } from '@/constants/theme';
 import { getClientId } from '@/functions/clientId';
-import { domain } from '@/lib/domain';
 import { Staff } from '@/types/staff';
 import { Ionicons } from '@expo/vector-icons';
 import apiClient from '@/utils/axiosConfig';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     RefreshControl,
@@ -16,6 +16,11 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+const INK = '#0F172A';
+
+// The API returns at most this many; a full page means there may be older ones
+const ACTIVITY_LIMIT = 100;
 
 interface Activity {
     _id: string;
@@ -45,12 +50,33 @@ interface GroupedActivities {
     [date: string]: Activity[];
 }
 
+// Tinted tones from the shared palette — each label holds ≥4.5:1 on its tint.
+// Green means something was added, red that something was removed; everything else is neutral blue.
+const ACTION_TONES: Record<string, { bg: string; fg: string }> = {
+    create: { bg: Colors.successLight, fg: Colors.successText },
+    import: { bg: Colors.successLight, fg: Colors.successText },
+    delete: { bg: Colors.errorLight, fg: Colors.errorText },
+};
+const DEFAULT_TONE = { bg: Colors.primaryLight, fg: Colors.primaryDark };
+
+// "mini_section" → "Mini section", "site-engineer" → "Site engineer"
+const humanize = (value?: string) => {
+    const words = (value || '').replace(/[-_]/g, ' ').trim();
+    return words ? words.charAt(0).toUpperCase() + words.slice(1) : '';
+};
+
 const StaffDetailScreen: React.FC = () => {
     const router = useRouter();
     const params = useLocalSearchParams();
 
-    // Parse staff data from params
-    const staff: Staff = JSON.parse(params.staff as string);
+    // Parse staff data from params once; a bad or missing param shows a message instead of crashing
+    const staff = useMemo<Staff | null>(() => {
+        try {
+            return params.staff ? JSON.parse(params.staff as string) : null;
+        } catch {
+            return null;
+        }
+    }, [params.staff]);
 
     const [activities, setActivities] = useState<Activity[]>([]);
     const [groupedActivities, setGroupedActivities] = useState<GroupedActivities>({});
@@ -60,6 +86,10 @@ const StaffDetailScreen: React.FC = () => {
 
     // Fetch activities for this staff member
     const fetchStaffActivities = async (showLoading = true) => {
+        if (!staff) {
+            setLoading(false);
+            return;
+        }
         try {
             if (showLoading) {
                 setLoading(true);
@@ -68,30 +98,26 @@ const StaffDetailScreen: React.FC = () => {
 
             const clientId = await getClientId();
             if (!clientId) {
-                setError('Client ID not found');
+                setError('Your session has expired. Sign in again to see activity.');
                 return;
             }
 
             console.log('🔍 Fetching activities for staff:', staff.firstName, staff.lastName);
-            console.log('🔍 Staff ID:', staff._id);
-            console.log('🔍 Client ID:', clientId);
 
             // Fetch activities where user.userId matches staff._id
             const response = await apiClient.get(`/api/activity`, {
                 params: {
                     clientId: clientId,
                     userId: staff._id,
-                    limit: 100, // Get more activities for this staff member
+                    limit: ACTIVITY_LIMIT,
                 }
             });
-
-            console.log('📦 Activities API response:', response.data);
 
             const responseData = response.data as any;
             if (responseData.success && responseData.data) {
                 const activitiesData = responseData.data.activities || [];
                 console.log('✅ Found', activitiesData.length, 'activities for staff');
-                
+
                 setActivities(activitiesData);
                 groupActivitiesByDate(activitiesData);
             } else {
@@ -101,8 +127,7 @@ const StaffDetailScreen: React.FC = () => {
             }
         } catch (error: any) {
             console.error('❌ Error fetching staff activities:', error);
-            console.error('❌ Error response:', error.response?.data);
-            setError('Failed to load activities');
+            setError('Check your connection, then try again.');
             setActivities([]);
             setGroupedActivities({});
         } finally {
@@ -113,12 +138,12 @@ const StaffDetailScreen: React.FC = () => {
     // Group activities by date
     const groupActivitiesByDate = (activities: Activity[]) => {
         const grouped: GroupedActivities = {};
-        
+
         activities.forEach(activity => {
             // Use the date field from activity, or fall back to createdAt
             const activityDate = activity.date || activity.createdAt;
             const dateKey = new Date(activityDate).toDateString();
-            
+
             if (!grouped[dateKey]) {
                 grouped[dateKey] = [];
             }
@@ -127,79 +152,60 @@ const StaffDetailScreen: React.FC = () => {
 
         // Sort activities within each date by time (newest first)
         Object.keys(grouped).forEach(date => {
-            grouped[date].sort((a, b) => 
+            grouped[date].sort((a, b) =>
                 new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime()
             );
         });
 
-        console.log('📊 Grouped activities by date:', Object.keys(grouped));
         setGroupedActivities(grouped);
     };
 
-    // Format time from date string
+    // "2:05 PM"
     const formatTime = (dateString: string) => {
         return new Date(dateString).toLocaleTimeString('en-US', {
-            hour: '2-digit',
+            hour: 'numeric',
             minute: '2-digit',
             hour12: true
         });
     };
 
-    // Format date for display
+    // "Today", "Yesterday", "Monday, Oct 13" — the year only when it isn't this year
     const formatDate = (dateString: string) => {
         const date = new Date(dateString);
         const today = new Date();
         const yesterday = new Date(today);
         yesterday.setDate(yesterday.getDate() - 1);
 
-        if (date.toDateString() === today.toDateString()) {
-            return 'Today';
-        } else if (date.toDateString() === yesterday.toDateString()) {
-            return 'Yesterday';
-        } else {
-            return date.toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
-        }
+        if (date.toDateString() === today.toDateString()) return 'Today';
+        if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+        return date.toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'short',
+            day: 'numeric',
+            ...(date.getFullYear() !== today.getFullYear() ? { year: 'numeric' } : {}),
+        });
     };
 
     // Get activity icon based on activity type
     const getActivityIcon = (activityType: string, category: string) => {
         switch (category) {
             case 'project':
-                return activityType.includes('created') ? 'add-circle' : 
-                       activityType.includes('updated') ? 'create' : 'trash';
+                return activityType.includes('created') ? 'add-circle-outline' :
+                    activityType.includes('updated') ? 'create-outline' : 'trash-outline';
             case 'section':
-                return 'layers';
+                return 'layers-outline';
             case 'mini_section':
-                return 'grid';
+                return 'grid-outline';
             case 'material':
-                return 'cube';
+                return 'cube-outline';
+            case 'labor':
+                return 'hammer-outline';
+            case 'equipment':
+                return 'construct-outline';
             case 'staff':
-                return 'people';
+                return 'people-outline';
             default:
-                return 'ellipse';
-        }
-    };
-
-    // Get activity color based on action
-    const getActivityColor = (action: string) => {
-        switch (action) {
-            case 'create':
-                return '#10B981'; // Green
-            case 'update':
-                return '#3A78B5'; // Blue
-            case 'delete':
-                return '#EF4444'; // Red
-            case 'assign':
-                return '#3A78B5'; // Purple
-            case 'import':
-                return '#F59E0B'; // Orange
-            default:
-                return '#6B7280'; // Gray
+                return 'ellipse-outline';
         }
     };
 
@@ -216,156 +222,186 @@ const StaffDetailScreen: React.FC = () => {
     }, []);
 
     // Get sorted date keys (newest first)
-    const sortedDateKeys = Object.keys(groupedActivities).sort((a, b) => 
+    const sortedDateKeys = Object.keys(groupedActivities).sort((a, b) =>
         new Date(b).getTime() - new Date(a).getTime()
     );
 
+    const backButton = (
+        <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+        >
+            <Ionicons name="arrow-back" size={22} color={INK} />
+        </TouchableOpacity>
+    );
+
+    if (!staff) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.header}>{backButton}</View>
+                <View style={styles.stateContainer}>
+                    <Text style={styles.stateTitle}>Couldn’t open this staff member</Text>
+                    <Text style={styles.stateBody}>Go back to Team and choose them again.</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    const fullName = `${staff.firstName} ${staff.lastName}`;
+    const role = humanize(staff.role) || 'Staff';
+    const initials = ((staff.firstName?.[0] ?? '') + (staff.lastName?.[0] ?? '')).toUpperCase() || '?';
+    const countLabel = activities.length >= ACTIVITY_LIMIT ? `${ACTIVITY_LIMIT}+` : `${activities.length}`;
+
     return (
         <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-            
-            {/* Header */}
+            <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
+
+            {/* Header — names the screen; the person is introduced once, below */}
             <View style={styles.header}>
-                <TouchableOpacity 
-                    style={styles.backButton}
-                    onPress={() => router.back()}
-                >
-                    <Ionicons name="arrow-back" size={24} color="#1F2937" />
-                </TouchableOpacity>
-                
-                <View style={styles.headerContent}>
-                    <Text style={styles.headerTitle}>
-                        {staff.firstName} {staff.lastName}
-                    </Text>
-                    <Text style={styles.headerSubtitle}>
-                        {staff.role} • Activity History
-                    </Text>
-                </View>
+                {backButton}
+                <Text style={styles.headerTitle} accessibilityRole="header">Activity</Text>
             </View>
 
-            {/* Staff Info Card */}
-            <View style={styles.staffCard}>
-                <View style={styles.staffAvatar}>
-                    <Text style={styles.staffAvatarText}>
-                        {staff.firstName.charAt(0)}{staff.lastName.charAt(0)}
-                    </Text>
-                </View>
-                <View style={styles.staffInfo}>
-                    <Text style={styles.staffName}>
-                        {staff.firstName} {staff.lastName}
-                    </Text>
-                    <Text style={styles.staffRole}>{staff.role}</Text>
-                    <Text style={styles.staffEmail}>{staff.email}</Text>
-                </View>
-                <View style={styles.activityCount}>
-                    <Text style={styles.activityCountNumber}>{activities.length}</Text>
-                    <Text style={styles.activityCountLabel}>Activities</Text>
-                </View>
-            </View>
-
-            {/* Activities List */}
             <ScrollView
-                style={styles.activitiesList}
+                style={styles.scroll}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        colors={['#3A78B5']}
-                        tintColor="#3A78B5"
+                        colors={[Colors.primary]}
+                        tintColor={Colors.primary}
                     />
                 }
                 contentContainerStyle={styles.scrollContent}
             >
+                {/* Who this is, and how much they've logged */}
+                <View style={styles.profile}>
+                    <View style={styles.avatar}>
+                        <Text style={styles.avatarText}>{initials}</Text>
+                    </View>
+                    <View style={styles.profileInfo}>
+                        <Text style={styles.profileName} numberOfLines={2}>{fullName}</Text>
+                        <Text style={styles.profileRole}>{role}</Text>
+                        {!!staff.email && (
+                            <Text style={styles.profileEmail} numberOfLines={1}>{staff.email}</Text>
+                        )}
+                    </View>
+                    {!loading && !error && (
+                        <View
+                            style={styles.countBlock}
+                            accessible
+                            accessibilityLabel={`${countLabel} ${activities.length === 1 ? 'activity' : 'activities'}`}
+                        >
+                            <Text style={styles.countNumber}>{countLabel}</Text>
+                            <Text style={styles.countLabel}>{activities.length === 1 ? 'activity' : 'activities'}</Text>
+                        </View>
+                    )}
+                </View>
+
                 {loading ? (
-                    <View style={styles.centerContainer}>
-                        <ActivityIndicator size="large" color="#3A78B5" />
-                        <Text style={styles.loadingText}>Loading activities...</Text>
+                    <View style={styles.stateContainer}>
+                        <ActivityIndicator size="large" color={Colors.primary} />
+                        <Text style={styles.loadingText}>Loading activity…</Text>
                     </View>
                 ) : error ? (
-                    <View style={styles.centerContainer}>
-                        <Ionicons name="alert-circle" size={48} color="#EF4444" />
-                        <Text style={styles.errorText}>{error}</Text>
-                        <TouchableOpacity 
+                    <View style={styles.stateContainer}>
+                        <View style={[styles.stateIconBadge, { backgroundColor: Colors.errorLight }]}>
+                            <Ionicons name="cloud-offline-outline" size={30} color={Colors.errorText} />
+                        </View>
+                        <Text style={styles.stateTitle}>Couldn’t load activity</Text>
+                        <Text style={styles.stateBody}>{error}</Text>
+                        <TouchableOpacity
                             style={styles.retryButton}
                             onPress={() => fetchStaffActivities()}
+                            accessibilityRole="button"
                         >
-                            <Text style={styles.retryButtonText}>Retry</Text>
+                            <Ionicons name="refresh" size={17} color="#FFFFFF" />
+                            <Text style={styles.retryButtonText}>Try Again</Text>
                         </TouchableOpacity>
                     </View>
                 ) : activities.length === 0 ? (
-                    <View style={styles.centerContainer}>
-                        <Ionicons name="document-text-outline" size={64} color="#CBD5E1" />
-                        <Text style={styles.emptyTitle}>No Activities Found</Text>
-                        <Text style={styles.emptySubtitle}>
-                            This staff member hasn't performed any activities yet.
+                    <View style={styles.stateContainer}>
+                        <View style={styles.stateIconBadge}>
+                            <Ionicons name="time-outline" size={30} color={Colors.primaryDark} />
+                        </View>
+                        <Text style={styles.stateTitle}>No activity yet</Text>
+                        <Text style={styles.stateBody}>
+                            Materials, labor and updates {staff.firstName} adds will show up here.
                         </Text>
                     </View>
                 ) : (
-                    <View style={styles.activitiesContainer}>
+                    <View style={styles.timeline}>
                         {sortedDateKeys.map(dateKey => (
                             <View key={dateKey} style={styles.dateGroup}>
-                                <Text style={styles.dateHeader}>
-                                    {formatDate(dateKey)}
-                                </Text>
-                                
-                                {groupedActivities[dateKey].map((activity, index) => (
-                                    <View key={activity._id} style={styles.activityItem}>
-                                        <View style={styles.activityTimeline}>
-                                            <View style={[
-                                                styles.activityDot,
-                                                { backgroundColor: getActivityColor(activity.action) }
-                                            ]}>
-                                                <Ionicons 
-                                                    name={getActivityIcon(activity.activityType, activity.category) as any}
-                                                    size={12} 
-                                                    color="white" 
-                                                />
-                                            </View>
-                                            {index < groupedActivities[dateKey].length - 1 && (
-                                                <View style={styles.timelineLine} />
-                                            )}
-                                        </View>
-                                        
-                                        <View style={styles.activityContent}>
-                                            <View style={styles.activityHeader}>
-                                                <Text style={styles.activityDescription}>
-                                                    {activity.description}
-                                                </Text>
-                                                <Text style={styles.activityTime}>
-                                                    {formatTime(activity.date || activity.createdAt)}
-                                                </Text>
-                                            </View>
-                                            
-                                            {activity.message && (
-                                                <Text style={styles.activityMessage}>
-                                                    {activity.message}
-                                                </Text>
-                                            )}
-                                            
-                                            <View style={styles.activityMeta}>
-                                                <View style={[
-                                                    styles.categoryBadge,
-                                                    { backgroundColor: getActivityColor(activity.action) + '20' }
-                                                ]}>
-                                                    <Text style={[
-                                                        styles.categoryText,
-                                                        { color: getActivityColor(activity.action) }
-                                                    ]}>
-                                                        {activity.category}
-                                                    </Text>
+                                <View style={styles.dateHeaderRow}>
+                                    <Text style={styles.dateHeader} accessibilityRole="header">{formatDate(dateKey)}</Text>
+                                    <Text style={styles.dateCount}>{groupedActivities[dateKey].length}</Text>
+                                </View>
+
+                                {groupedActivities[dateKey].map((activity, index) => {
+                                    const tone = ACTION_TONES[activity.action] ?? DEFAULT_TONE;
+                                    const isLast = index === groupedActivities[dateKey].length - 1;
+                                    const time = formatTime(activity.date || activity.createdAt);
+                                    const category = humanize(activity.category);
+                                    return (
+                                        <View key={activity._id} style={styles.activityItem}>
+                                            {/* Timeline rail: the icon marks the kind of thing, the tint whether it was added or removed */}
+                                            <View style={styles.rail}>
+                                                <View style={[styles.railDot, { backgroundColor: tone.bg }]}>
+                                                    <Ionicons
+                                                        name={getActivityIcon(activity.activityType, activity.category) as any}
+                                                        size={15}
+                                                        color={tone.fg}
+                                                    />
                                                 </View>
-                                                
-                                                {activity.projectName && (
-                                                    <Text style={styles.projectName}>
-                                                        📁 {activity.projectName}
-                                                    </Text>
+                                                {!isLast && <View style={styles.railLine} />}
+                                            </View>
+
+                                            <View
+                                                style={[styles.activityCard, isLast && styles.activityCardLast]}
+                                                accessible
+                                                accessibilityLabel={[
+                                                    activity.description,
+                                                    time,
+                                                    category,
+                                                    activity.projectName,
+                                                    activity.message,
+                                                ].filter(Boolean).join(', ')}
+                                            >
+                                                <View style={styles.activityHeader}>
+                                                    <Text style={styles.activityDescription}>{activity.description}</Text>
+                                                    <Text style={styles.activityTime}>{time}</Text>
+                                                </View>
+
+                                                {!!activity.message && (
+                                                    <Text style={styles.activityMessage}>{activity.message}</Text>
                                                 )}
+
+                                                <View style={styles.activityMeta}>
+                                                    {!!category && (
+                                                        <View style={[styles.categoryBadge, { backgroundColor: tone.bg }]}>
+                                                            <Text style={[styles.categoryText, { color: tone.fg }]}>{category}</Text>
+                                                        </View>
+                                                    )}
+                                                    {!!activity.projectName && (
+                                                        <View style={styles.projectTag}>
+                                                            <Ionicons name="folder-outline" size={13} color={Colors.textSecondary} />
+                                                            <Text style={styles.projectName} numberOfLines={1}>{activity.projectName}</Text>
+                                                        </View>
+                                                    )}
+                                                </View>
                                             </View>
                                         </View>
-                                    </View>
-                                ))}
+                                    );
+                                })}
                             </View>
                         ))}
+
+                        {activities.length >= ACTIVITY_LIMIT && (
+                            <Text style={styles.limitNote}>Showing the latest {ACTIVITY_LIMIT} activities.</Text>
+                        )}
                     </View>
                 )}
             </ScrollView>
@@ -376,228 +412,274 @@ const StaffDetailScreen: React.FC = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F9FAFB',
+        backgroundColor: Colors.background,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
+        gap: 12,
         paddingHorizontal: 16,
-        paddingVertical: 12,
-        backgroundColor: '#FFFFFF',
-        borderBottomWidth: 1,
-        borderBottomColor: '#E5E7EB',
+        paddingVertical: 10,
+        minHeight: 64,
+        backgroundColor: Colors.surface,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: Colors.border,
     },
     backButton: {
-        padding: 8,
-        marginRight: 8,
-    },
-    headerContent: {
-        flex: 1,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: Colors.fill,
     },
     headerTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1F2937',
+        fontSize: 22,
+        fontWeight: '800',
+        color: INK,
+        letterSpacing: -0.5,
     },
-    headerSubtitle: {
-        fontSize: 14,
-        color: '#6B7280',
-        marginTop: 2,
-    },
-    staffCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#FFFFFF',
-        margin: 16,
-        padding: 16,
-        borderRadius: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    staffAvatar: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: '#3A78B5',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 16,
-    },
-    staffAvatarText: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: '#FFFFFF',
-    },
-    staffInfo: {
-        flex: 1,
-    },
-    staffName: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#1F2937',
-        marginBottom: 4,
-    },
-    staffRole: {
-        fontSize: 14,
-        color: '#3A78B5',
-        fontWeight: '500',
-        marginBottom: 2,
-    },
-    staffEmail: {
-        fontSize: 12,
-        color: '#6B7280',
-    },
-    activityCount: {
-        alignItems: 'center',
-    },
-    activityCountNumber: {
-        fontSize: 24,
-        fontWeight: '700',
-        color: '#3A78B5',
-    },
-    activityCountLabel: {
-        fontSize: 12,
-        color: '#6B7280',
-        marginTop: 2,
-    },
-    activitiesList: {
+    scroll: {
         flex: 1,
     },
     scrollContent: {
         flexGrow: 1,
+        paddingBottom: 32,
     },
-    centerContainer: {
-        flex: 1,
+
+    // Profile
+    profile: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 14,
+        backgroundColor: Colors.surface,
+        marginHorizontal: 16,
+        marginTop: 16,
+        padding: 16,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#E8EDF4',
+    },
+    avatar: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: Colors.primaryLight,
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 32,
-        minHeight: 300,
     },
-    loadingText: {
-        marginTop: 16,
-        fontSize: 16,
-        color: '#6B7280',
+    avatarText: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: Colors.primaryDark,
     },
-    errorText: {
-        marginTop: 16,
-        fontSize: 16,
-        color: '#EF4444',
+    profileInfo: {
+        flex: 1,
+        gap: 2,
+    },
+    profileName: {
+        fontSize: 19,
+        fontWeight: '800',
+        color: INK,
+        letterSpacing: -0.3,
+    },
+    profileRole: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#334155',
+    },
+    profileEmail: {
+        fontSize: 13,
+        color: Colors.textSecondary,
+    },
+    countBlock: {
+        alignItems: 'flex-end',
+    },
+    countNumber: {
+        fontSize: 26,
+        fontWeight: '800',
+        color: INK,
+        letterSpacing: -0.6,
+        fontVariant: ['tabular-nums'],
+    },
+    countLabel: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: Colors.textSecondary,
+    },
+
+    // Loading / error / empty
+    stateContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 48,
+        paddingHorizontal: 24,
+        minHeight: 280,
+    },
+    stateIconBadge: {
+        width: 64,
+        height: 64,
+        borderRadius: 20,
+        backgroundColor: Colors.primaryLight,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    stateTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: INK,
+        letterSpacing: -0.2,
         textAlign: 'center',
     },
+    stateBody: {
+        fontSize: 15,
+        lineHeight: 21,
+        color: Colors.textSecondary,
+        textAlign: 'center',
+        marginTop: 6,
+        maxWidth: 300,
+    },
+    loadingText: {
+        marginTop: 14,
+        fontSize: 15,
+        color: Colors.textSecondary,
+    },
     retryButton: {
-        marginTop: 16,
-        paddingHorizontal: 24,
-        paddingVertical: 12,
-        backgroundColor: '#3A78B5',
-        borderRadius: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 20,
+        paddingHorizontal: 22,
+        minHeight: 48,
+        borderRadius: 24,
+        backgroundColor: Colors.primary,
     },
     retryButtonText: {
         color: '#FFFFFF',
-        fontWeight: '600',
+        fontSize: 15,
+        fontWeight: '700',
     },
-    emptyTitle: {
-        marginTop: 16,
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#1F2937',
-    },
-    emptySubtitle: {
-        marginTop: 8,
-        fontSize: 14,
-        color: '#6B7280',
-        textAlign: 'center',
-    },
-    activitiesContainer: {
-        padding: 16,
+
+    // Timeline
+    timeline: {
+        paddingHorizontal: 16,
+        paddingTop: 8,
     },
     dateGroup: {
-        marginBottom: 24,
+        marginTop: 20,
     },
-    dateHeader: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#1F2937',
+    dateHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+        gap: 8,
         marginBottom: 12,
         paddingLeft: 4,
     },
+    dateHeader: {
+        fontSize: 17,
+        fontWeight: '700',
+        color: INK,
+        letterSpacing: -0.3,
+    },
+    dateCount: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: Colors.textSecondary,
+        fontVariant: ['tabular-nums'],
+    },
     activityItem: {
         flexDirection: 'row',
-        marginBottom: 16,
     },
-    activityTimeline: {
+    rail: {
         alignItems: 'center',
-        marginRight: 16,
+        width: 32,
+        marginRight: 12,
     },
-    activityDot: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
+    railDot: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    timelineLine: {
+    railLine: {
         width: 2,
         flex: 1,
-        backgroundColor: '#E5E7EB',
-        marginTop: 8,
+        backgroundColor: Colors.border,
+        marginVertical: 4,
+        borderRadius: 1,
     },
-    activityContent: {
+    activityCard: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
-        padding: 16,
-        borderRadius: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 1,
+        backgroundColor: Colors.surface,
+        padding: 14,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#E8EDF4',
+        marginBottom: 12,
+    },
+    activityCardLast: {
+        marginBottom: 0,
     },
     activityHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
-        marginBottom: 8,
+        gap: 10,
     },
     activityDescription: {
         flex: 1,
-        fontSize: 14,
-        fontWeight: '500',
-        color: '#1F2937',
-        marginRight: 8,
+        fontSize: 15,
+        fontWeight: '600',
+        color: INK,
+        lineHeight: 20,
     },
     activityTime: {
-        fontSize: 12,
-        color: '#6B7280',
+        fontSize: 13,
+        color: Colors.textSecondary,
+        fontVariant: ['tabular-nums'],
     },
     activityMessage: {
-        fontSize: 12,
-        color: '#6B7280',
-        marginBottom: 8,
-        fontStyle: 'italic',
+        fontSize: 14,
+        lineHeight: 19,
+        color: '#475569',
+        marginTop: 6,
     },
     activityMeta: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginTop: 10,
     },
     categoryBadge: {
         paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
+        paddingVertical: 3,
+        borderRadius: 8,
     },
     categoryText: {
-        fontSize: 10,
-        fontWeight: '600',
-        textTransform: 'uppercase',
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    projectTag: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        flexShrink: 1,
     },
     projectName: {
-        fontSize: 12,
-        color: '#6B7280',
-        flex: 1,
-        textAlign: 'right',
+        flexShrink: 1,
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#475569',
+    },
+    limitNote: {
+        fontSize: 13,
+        color: Colors.textSecondary,
+        textAlign: 'center',
+        marginTop: 24,
     },
 });
 

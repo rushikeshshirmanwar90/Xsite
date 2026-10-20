@@ -12,6 +12,7 @@ import {
     Image,
     Modal,
     Platform,
+    Pressable,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -134,11 +135,29 @@ interface WarningItem {
     description?: string;
 }
 
+const INK = '#0F172A';
+
+const ACTIVITY_FILTERS: { key: TabType; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'project', label: 'Projects' },
+    { key: 'labor', label: 'Labor' },
+    { key: 'material', label: 'Materials' },
+    { key: 'other_cost', label: 'Other Costs' },
+];
+
+const MATERIAL_FILTERS: { key: MaterialSubTab; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'imported', label: 'Imported' },
+    { key: 'used', label: 'Used' },
+    { key: 'transferred', label: 'Transferred' },
+];
+
 // Tinted badges — dark label on a light tint keeps every badge ≥4.5:1, where the old
 // solid fills with white uppercase text sat around 2–2.5:1.
+// Red is kept for payments that are urgent; using material is routine, so it stays neutral.
 const BADGE_TONES = {
     imported: { bg: Colors.successLight, fg: Colors.successText },
-    used: { bg: Colors.errorLight, fg: Colors.errorText },
+    used: { bg: Colors.fill, fg: '#334155' },
     transferred: { bg: Colors.primaryLight, fg: Colors.primaryDark },
     labor: { bg: Colors.warningLight, fg: Colors.warningText },
     equipment: { bg: Colors.primaryLight, fg: Colors.primaryDark },
@@ -146,6 +165,13 @@ const BADGE_TONES = {
     paid: { bg: Colors.successLight, fg: Colors.successText },
     urgent: { bg: Colors.errorLight, fg: Colors.errorText },
     due: { bg: Colors.warningLight, fg: Colors.warningText },
+};
+
+// One wording for a payment's state, shared by the card and the details sheet
+const getPaymentStatus = (item: WarningItem): { label: string; icon: string; tone: 'paid' | 'urgent' | 'due' } => {
+    if (item.status === 'paid') return { label: 'Paid', icon: 'checkmark-circle', tone: 'paid' };
+    if (item.priority === 'high') return { label: 'Urgent', icon: 'alert-circle', tone: 'urgent' };
+    return { label: 'Payment Due', icon: 'time', tone: 'due' };
 };
 
 const NotificationPage: React.FC = () => {
@@ -165,6 +191,11 @@ const NotificationPage: React.FC = () => {
             setActiveTab(params.tab as TabType);
         }
     }, [params?.tab]);
+    // Last activity filter, so leaving Payments returns to it
+    const lastActivityTabRef = useRef<TabType>(activeTab === 'warnings' ? 'all' : activeTab);
+    useEffect(() => {
+        if (activeTab !== 'warnings') lastActivityTabRef.current = activeTab;
+    }, [activeTab]);
     const [materialSubTab, setMaterialSubTab] = useState<MaterialSubTab>('all');
     const [warningSubFilter, setWarningSubFilter] = useState<WarningSubFilter>('all');
     const [paidWarningIds, setPaidWarningIds] = useState<string[]>([]);
@@ -1002,6 +1033,7 @@ const NotificationPage: React.FC = () => {
                                     {isLaborActivity ? 'Labor added' : 'Equipment added'}
                                 </Text>
                             </View>
+                            <Text style={styles.activityTimeNew}>{formatTimeAgo(activity.createdAt)}</Text>
                         </View>
 
                         {/* Project/Section Info */}
@@ -1034,14 +1066,11 @@ const NotificationPage: React.FC = () => {
                                 {entries.map((entry: any, index: number) => (
                                     <React.Fragment key={index}>
                                         <View style={styles.materialItem}>
-                                            <View style={[
-                                                styles.materialIconSmall,
-                                                { backgroundColor: `${icon.color}15` }
-                                            ]}>
+                                            <View style={styles.materialIconSmall}>
                                                 <Ionicons
                                                     name={isLaborActivity ? 'person-outline' : 'construct-outline'}
                                                     size={18}
-                                                    color={icon.color}
+                                                    color={Colors.textSecondary}
                                                 />
                                             </View>
                                             <View style={styles.materialDetails}>
@@ -1110,9 +1139,6 @@ const NotificationPage: React.FC = () => {
                                 </View>
                                 <Text style={styles.userName}>{displayUser.fullName}</Text>
                             </View>
-                            <Text style={styles.activityTimeNew}>
-                                {formatTimeAgo(activity.createdAt)}
-                            </Text>
                         </View>
                     </View>
                 </View>
@@ -1158,6 +1184,7 @@ const NotificationPage: React.FC = () => {
                                     {badgeLabel}
                                 </Text>
                             </View>
+                            <Text style={styles.activityTimeNew}>{formatTimeAgo(activity.createdAt)}</Text>
                         </View>
 
                         {(activity.projectName || activity.sectionName || activity.miniSectionName) && (
@@ -1238,9 +1265,6 @@ const NotificationPage: React.FC = () => {
                                 </View>
                                 <Text style={styles.userName}>{displayUser.fullName}</Text>
                             </View>
-                            <Text style={styles.activityTimeNew}>
-                                {formatTimeAgo(activity.createdAt)}
-                            </Text>
                         </View>
                     </View>
                 </View>
@@ -1346,6 +1370,7 @@ const NotificationPage: React.FC = () => {
                                 {isImported ? 'Imported' : isUsed ? 'Used' : 'Transferred'}
                             </Text>
                         </View>
+                        <Text style={styles.activityTimeNew}>{formatTimeAgo(activity.date || activity.createdAt)}</Text>
                     </View>
 
                     {/* Project/Section Info */}
@@ -1410,14 +1435,13 @@ const NotificationPage: React.FC = () => {
                             const matIcon = getMaterialIcon(material.name);
                             return (
                                 <View key={index} style={styles.materialItem}>
-                                    <View style={[
-                                        styles.materialIconSmall,
-                                        { backgroundColor: `${matIcon.color}15` }
-                                    ]}>
+                                    {/* The icon's shape still hints at the material; one neutral
+                                        tint keeps colour free to mean status */}
+                                    <View style={styles.materialIconSmall}>
                                         <Ionicons
                                             name={matIcon.icon as any}
                                             size={18}
-                                            color={matIcon.color}
+                                            color={Colors.textSecondary}
                                         />
                                     </View>
                                     <View style={styles.materialDetails}>
@@ -1500,10 +1524,6 @@ const NotificationPage: React.FC = () => {
                             </View>
                             <Text style={styles.userName}>{displayUser.fullName}</Text>
                         </View>
-                        {/* Add time ago display similar to regular activities */}
-                        <Text style={styles.activityTimeNew}>
-                            {formatTimeAgo(activity.date || activity.createdAt)}
-                        </Text>
                     </View>
                 </View>
             </View>
@@ -1530,6 +1550,7 @@ const NotificationPage: React.FC = () => {
                                 Other cost added
                             </Text>
                         </View>
+                        <Text style={styles.activityTimeNew}>{formatTimeAgo(activity.date || activity.createdAt)}</Text>
                     </View>
 
                     {/* Project/Section Info */}
@@ -1560,14 +1581,11 @@ const NotificationPage: React.FC = () => {
                     <View style={styles.materialsList}>
                         {activity.otherCosts.map((cost, index) => (
                             <View key={index} style={styles.materialItem}>
-                                <View style={[
-                                    styles.materialIconSmall,
-                                    { backgroundColor: '#3A78B515' }
-                                ]}>
+                                <View style={styles.materialIconSmall}>
                                     <Ionicons
                                         name="briefcase-outline"
                                         size={18}
-                                        color="#3A78B5"
+                                        color={Colors.textSecondary}
                                     />
                                 </View>
                                 <View style={styles.materialDetails}>
@@ -1618,9 +1636,6 @@ const NotificationPage: React.FC = () => {
                             </View>
                             <Text style={styles.userName}>{displayUser.fullName}</Text>
                         </View>
-                        <Text style={styles.activityTimeNew}>
-                            {formatTimeAgo(activity.date || activity.createdAt)}
-                        </Text>
                     </View>
                 </View>
             </View>
@@ -2331,338 +2346,190 @@ const NotificationPage: React.FC = () => {
     const totalActivityCount = groupedActivities.reduce((sum, group) => sum + group.activities.length, 0);
     const activityCountLabel = `${totalActivityCount} ${totalActivityCount === 1 ? 'activity' : 'activities'}`;
 
+    // Activity (a log to read) and Payments (a list to act on) are separate modes.
+    // Switching back to Activity restores the filter that was last in use.
+    const isActivityMode = activeTab !== 'warnings';
+    const selectMode = (payments: boolean) => {
+        if (payments === !isActivityMode) return;
+        setActiveTab(payments ? 'warnings' : lastActivityTabRef.current);
+    };
+
+    // Several days on screen (vendor filter, or "Show Earlier Days") need their own headings
+    const showDateHeaders = selectedVendors.length > 0 || groupedActivities.length > 1;
+
+    // "Today" and "Yesterday" get the date spelled out beneath; other days get the weekday
+    const formatDayCaption = (dateString: string) => {
+        const date = new Date(dateString + 'T00:00:00');
+        if (isNaN(date.getTime())) return '';
+        const label = formatDateHeader(dateString);
+        return label === 'Today' || label === 'Yesterday'
+            ? date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+            : date.toLocaleDateString('en-US', { weekday: 'long' });
+    };
+
+    const emptySubject = ({
+        all: 'Nothing',
+        project: 'No project updates',
+        labor: 'No labor',
+        material: 'No material activity',
+        other_cost: 'No other costs',
+        warnings: 'Nothing',
+    } as Record<TabType, string>)[activeTab];
+    const emptyDay = formatDateHeader(currentDate);
+    const emptyTitle = selectedVendors.length > 0
+        ? 'No material activity for these vendors'
+        : `${emptySubject} logged ${isViewingToday ? 'today' : emptyDay === 'Yesterday' ? 'yesterday' : `on ${emptyDay}`}`;
+    const emptyBody = selectedVendors.length > 0
+        ? 'Try other vendors, or clear the filter.'
+        : isViewingToday
+            ? 'Labor, materials and costs added today will show up here.'
+            : 'Use the arrows above to check another day.';
+
+    const paymentTiles: { key: Exclude<WarningSubFilter, 'all'>; label: string; amount: number; count: number }[] = [
+        { key: 'contractor', label: 'Contractors', amount: warningTotals.contractorAmount, count: warningTotals.contractorCount },
+        { key: 'material_vendor', label: 'Vendors', amount: warningTotals.vendorAmount, count: warningTotals.vendorCount },
+        { key: 'labor', label: 'Labor', amount: warningTotals.laborAmount, count: warningTotals.laborCount },
+        { key: 'equipment', label: 'Equipment', amount: warningTotals.equipmentAmount, count: warningTotals.equipmentCount },
+    ];
+
     return (
         <SafeAreaView style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Back">
-                    <Ionicons name="arrow-back" size={22} color="#0F172A" />
+                    <Ionicons name="arrow-back" size={22} color={INK} />
                 </TouchableOpacity>
                 <View style={styles.headerContent}>
-                    <View style={styles.headerTitleContainer}>
-                        <Text style={styles.headerTitle}>Activity Feed</Text>
-                    </View>
-                    <Text style={styles.headerSubtitle}>
-                        {selectedVendors.length > 0
-                            ? `${selectedVendors.length} vendor${selectedVendors.length > 1 ? 's' : ''} selected • ${activityCountLabel}`
-                            : `${formatDateHeader(currentDate)} • ${activityCountLabel}`
-                        }
-                    </Text>
+                    <Text style={styles.headerTitle} accessibilityRole="header">Activity</Text>
+                    {isActivityMode && selectedVendors.length > 0 && (
+                        <Text style={styles.headerSubtitle} numberOfLines={1}>
+                            {selectedVendors.length} vendor{selectedVendors.length > 1 ? 's' : ''} · {activityCountLabel}
+                        </Text>
+                    )}
                 </View>
 
-                {/* Header Actions */}
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    {/* ✅ NEW: Generate Report Button */}
-                    {selectedVendors.length > 0 && (activeTab === 'material' || activeTab === 'all') && (
-                        <TouchableOpacity
-                            onPress={generateVendorReport}
-                            disabled={isGeneratingReport}
-                            style={[styles.vendorFilterButton, { marginRight: 8, backgroundColor: Colors.successText }]}
-                            accessibilityRole="button"
-                            accessibilityLabel="Generate vendor report"
-                        >
-                            {isGeneratingReport ? (
-                                <ActivityIndicator size="small" color="#FFFFFF" />
-                            ) : (
-                                <Ionicons name="document-text" size={20} color="#FFFFFF" />
-                            )}
-                        </TouchableOpacity>
-                    )}
+                {/* Vendor filter and report only apply to the activity log, not to payments */}
+                {isActivityMode && (
+                    <View style={styles.headerActions}>
+                        {selectedVendors.length > 0 && (activeTab === 'material' || activeTab === 'all') && (
+                            <TouchableOpacity
+                                onPress={generateVendorReport}
+                                disabled={isGeneratingReport}
+                                style={styles.vendorFilterButton}
+                                accessibilityRole="button"
+                                accessibilityLabel="Generate vendor report"
+                                accessibilityState={{ busy: isGeneratingReport }}
+                            >
+                                {isGeneratingReport ? (
+                                    <ActivityIndicator size="small" color={Colors.primaryDark} />
+                                ) : (
+                                    <Ionicons name="document-text-outline" size={20} color={Colors.primaryDark} />
+                                )}
+                            </TouchableOpacity>
+                        )}
 
-                    {/* Select Date — jump straight to any day's activity instead of
-                        stepping through with the prev/next arrows. Hidden while a vendor
-                        filter is on, because that view intentionally ignores dates. */}
-                    {selectedVendors.length === 0 && (
                         <TouchableOpacity
-                            onPress={handleDatePickerOpen}
-                            style={[
-                                styles.vendorFilterButton,
-                                { marginRight: 8 },
-                                !isViewingToday && styles.vendorFilterButtonActive,
-                            ]}
-                            activeOpacity={0.7}
+                            onPress={() => setShowVendorModal(true)}
+                            style={[styles.vendorFilterButton, selectedVendors.length > 0 && styles.vendorFilterButtonActive]}
                             accessibilityRole="button"
-                            accessibilityLabel="Choose date"
+                            accessibilityLabel={selectedVendors.length > 0 ? `Vendor filter, ${selectedVendors.length} selected` : 'Filter by vendor'}
                         >
                             <Ionicons
-                                name={isViewingToday ? 'calendar-outline' : 'calendar'}
+                                name={selectedVendors.length > 0 ? 'funnel' : 'funnel-outline'}
                                 size={20}
-                                color={isViewingToday ? '#3A78B5' : '#FFFFFF'}
+                                color={selectedVendors.length > 0 ? '#FFFFFF' : Colors.primaryDark}
                             />
+                            {selectedVendors.length > 0 && (
+                                <View style={styles.vendorFilterBadge}>
+                                    <Text style={styles.vendorFilterBadgeText}>{selectedVendors.length}</Text>
+                                </View>
+                            )}
                         </TouchableOpacity>
-                    )}
-
-                    {/* ✅ NEW: Vendor Filter Button (replaces refresh button) */}
-                    <TouchableOpacity
-                        onPress={() => setShowVendorModal(true)}
-                        style={[styles.vendorFilterButton, selectedVendors.length > 0 && styles.vendorFilterButtonActive]}
-                        accessibilityRole="button"
-                        accessibilityLabel={selectedVendors.length > 0 ? `Vendor filter, ${selectedVendors.length} selected` : 'Filter by vendor'}
-                    >
-                        <Ionicons
-                            name={selectedVendors.length > 0 ? "funnel" : "funnel-outline"}
-                            size={20}
-                            color={selectedVendors.length > 0 ? "#FFFFFF" : "#3A78B5"}
-                        />
-                        {selectedVendors.length > 0 && (
-                            <View style={styles.vendorFilterBadge}>
-                                <Text style={styles.vendorFilterBadgeText}>{selectedVendors.length}</Text>
-                            </View>
-                        )}
-                    </TouchableOpacity>
-                </View>
+                    </View>
+                )}
             </View>
 
-            {/* Main Tabs */}
-            <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.tabsContainerScrollView}
-                contentContainerStyle={styles.tabsContainerContent}
-            >
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'warnings' && styles.tabActiveWarning]}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected: activeTab === 'warnings' }}
-                    onPress={() => setActiveTab('warnings')}
-                >
-                    <View style={styles.tabContentRow}>
-                        <Ionicons
-                            name="card-outline"
-                            size={16}
-                            color={activeTab === 'warnings' ? '#3A78B5' : '#64748B'}
-                            style={{ marginRight: 5 }}
-                        />
-                        <Text style={[styles.tabText, activeTab === 'warnings' && styles.tabTextActiveWarning]} numberOfLines={1}>
-                            Pending Payments
-                        </Text>
-                        {warningTotals.totalCount > 0 && (
-                            <View style={styles.warningBadgeCount}>
-                                <Text style={styles.warningBadgeCountText} numberOfLines={1}>
-                                    {warningTotals.totalCount > 99 ? '99+' : warningTotals.totalCount}
-                                </Text>
-                            </View>
-                        )}
-                    </View>
-                    {activeTab === 'warnings' && <View style={styles.tabIndicatorWarning} />}
-                </TouchableOpacity>
+            {/* Activity / Payments switch, then the filters for whichever is showing.
+                Activity is a log to read; Payments is a list to act on, so they get a
+                switch of their own instead of sharing one strip of tabs. */}
+            <View style={styles.filterBar}>
+                <View style={styles.segmented} accessibilityRole="tablist">
+                    {[
+                        { key: 'activity', label: 'Activity', payments: false, count: 0 },
+                        { key: 'payments', label: 'Payments', payments: true, count: warningTotals.totalCount },
+                    ].map(seg => {
+                        const selected = isActivityMode !== seg.payments;
+                        return (
+                            <Pressable
+                                key={seg.key}
+                                style={[styles.segment, selected && styles.segmentSelected]}
+                                onPress={() => selectMode(seg.payments)}
+                                accessibilityRole="tab"
+                                accessibilityState={{ selected }}
+                                accessibilityLabel={seg.count > 0 ? `${seg.label}, ${seg.count} pending` : seg.label}
+                            >
+                                <Text style={[styles.segmentText, selected && styles.segmentTextSelected]}>{seg.label}</Text>
+                                {seg.count > 0 && (
+                                    <View style={styles.segmentBadge}>
+                                        <Text style={styles.segmentBadgeText}>{seg.count > 99 ? '99+' : seg.count}</Text>
+                                    </View>
+                                )}
+                            </Pressable>
+                        );
+                    })}
+                </View>
 
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'all' && styles.tabActive]}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected: activeTab === 'all' }}
-                    onPress={() => setActiveTab('all')}
-                >
-                    <View style={styles.tabContentRow}>
-                        <Text style={[styles.tabText, activeTab === 'all' && styles.tabTextActive]}>
-                            All
-                        </Text>
-                    </View>
-                    {activeTab === 'all' && <View style={styles.tabIndicator} />}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'project' && styles.tabActive]}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected: activeTab === 'project' }}
-                    onPress={() => setActiveTab('project')}
-                >
-                    <View style={styles.tabContentRow}>
-                        <Text style={[styles.tabText, activeTab === 'project' && styles.tabTextActive]}>
-                            Projects
-                        </Text>
-                    </View>
-                    {activeTab === 'project' && <View style={styles.tabIndicator} />}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'labor' && styles.tabActive]}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected: activeTab === 'labor' }}
-                    onPress={() => setActiveTab('labor')}
-                >
-                    <View style={styles.tabContentRow}>
-                        <Text style={[styles.tabText, activeTab === 'labor' && styles.tabTextActive]}>
-                            Labor
-                        </Text>
-                    </View>
-                    {activeTab === 'labor' && <View style={styles.tabIndicator} />}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'material' && styles.tabActive]}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected: activeTab === 'material' }}
-                    onPress={() => setActiveTab('material')}
-                >
-                    <View style={styles.tabContentRow}>
-                        <Text style={[styles.tabText, activeTab === 'material' && styles.tabTextActive]}>
-                            Materials
-                        </Text>
-                    </View>
-                    {activeTab === 'material' && <View style={styles.tabIndicator} />}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'other_cost' && styles.tabActive]}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected: activeTab === 'other_cost' }}
-                    onPress={() => setActiveTab('other_cost')}
-                >
-                    <View style={styles.tabContentRow}>
-                        <Text style={[styles.tabText, activeTab === 'other_cost' && styles.tabTextActive]}>
-                            Other
-                        </Text>
-                    </View>
-                    {activeTab === 'other_cost' && <View style={styles.tabIndicator} />}
-                </TouchableOpacity>
-            </ScrollView>
-
-            {/* Pending Payments Sub-Tabs - Only show when Pending Payments tab is active */}
-            {activeTab === 'warnings' && (
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.subTabsContainer}
-                    contentContainerStyle={styles.subTabsContentContainer}
-                >
-                    <TouchableOpacity
-                        style={[styles.subTab, warningSubFilter === 'all' && styles.warningSubTabActive]}
-                        onPress={() => setWarningSubFilter('all')}
+                {isActivityMode && (
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.chipRow}
+                        style={styles.chipScroll}
                     >
-                        <Ionicons
-                            name="apps-outline"
-                            size={16}
-                            color={warningSubFilter === 'all' ? '#3A78B5' : '#64748B'}
-                        />
-                        <Text style={[styles.subTabText, warningSubFilter === 'all' && styles.warningSubTabTextActive]}>
-                            All ({warningTotals.totalCount})
-                        </Text>
-                    </TouchableOpacity>
+                        {ACTIVITY_FILTERS.map(filter => {
+                            const selected = activeTab === filter.key;
+                            return (
+                                <Pressable
+                                    key={filter.key}
+                                    style={[styles.chip, selected && styles.chipSelected]}
+                                    onPress={() => setActiveTab(filter.key)}
+                                    accessibilityRole="button"
+                                    accessibilityState={{ selected }}
+                                >
+                                    <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{filter.label}</Text>
+                                </Pressable>
+                            );
+                        })}
+                    </ScrollView>
+                )}
 
-                    <TouchableOpacity
-                        style={[styles.subTab, warningSubFilter === 'contractor' && styles.warningSubTabActive]}
-                        onPress={() => setWarningSubFilter('contractor')}
+                {/* Materials narrow further — shown only once Materials is chosen */}
+                {activeTab === 'material' && (
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.subChipRow}
+                        style={styles.chipScroll}
                     >
-                        <Ionicons
-                            name="people-outline"
-                            size={16}
-                            color={warningSubFilter === 'contractor' ? '#3A78B5' : '#64748B'}
-                        />
-                        <Text style={[styles.subTabText, warningSubFilter === 'contractor' && styles.warningSubTabTextActive]}>
-                            Contractors ({warningTotals.contractorCount})
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.subTab, warningSubFilter === 'material_vendor' && styles.warningSubTabActive]}
-                        onPress={() => setWarningSubFilter('material_vendor')}
-                    >
-                        <Ionicons
-                            name="storefront-outline"
-                            size={16}
-                            color={warningSubFilter === 'material_vendor' ? '#3A78B5' : '#64748B'}
-                        />
-                        <Text style={[styles.subTabText, warningSubFilter === 'material_vendor' && styles.warningSubTabTextActive]}>
-                            Vendors ({warningTotals.vendorCount})
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.subTab, warningSubFilter === 'labor' && styles.warningSubTabActive]}
-                        onPress={() => setWarningSubFilter('labor')}
-                    >
-                        <Ionicons
-                            name="construct-outline"
-                            size={16}
-                            color={warningSubFilter === 'labor' ? '#3A78B5' : '#64748B'}
-                        />
-                        <Text style={[styles.subTabText, warningSubFilter === 'labor' && styles.warningSubTabTextActive]}>
-                            Labor ({warningTotals.laborCount})
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.subTab, warningSubFilter === 'equipment' && styles.warningSubTabActive]}
-                        onPress={() => setWarningSubFilter('equipment')}
-                    >
-                        <Ionicons
-                            name="car-outline"
-                            size={16}
-                            color={warningSubFilter === 'equipment' ? '#3A78B5' : '#64748B'}
-                        />
-                        <Text style={[styles.subTabText, warningSubFilter === 'equipment' && styles.warningSubTabTextActive]}>
-                            Equipment ({warningTotals.equipmentCount})
-                        </Text>
-                    </TouchableOpacity>
-                </ScrollView>
-            )}
-
-            {/* Material Sub-Tabs - Only show when Materials tab is active */}
-            {activeTab === 'material' && (
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.subTabsContainer}
-                    contentContainerStyle={styles.subTabsContentContainer}
-                >
-                    <TouchableOpacity
-                        style={[styles.subTab, materialSubTab === 'all' && styles.subTabActive]}
-                        onPress={() => setMaterialSubTab('all')}
-                    >
-                        <Ionicons
-                            name="apps-outline"
-                            size={16}
-                            color={materialSubTab === 'all' ? '#3A78B5' : '#64748B'}
-                        />
-                        <Text style={[styles.subTabText, materialSubTab === 'all' && styles.subTabTextActive]}>
-                            All
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.subTab, materialSubTab === 'imported' && styles.subTabActive]}
-                        onPress={() => setMaterialSubTab('imported')}
-                    >
-                        <Ionicons
-                            name="download-outline"
-                            size={16}
-                            color={materialSubTab === 'imported' ? '#10B981' : '#64748B'}
-                        />
-                        <Text style={[styles.subTabText, materialSubTab === 'imported' && styles.subTabTextActive]}>
-                            Imported
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.subTab, materialSubTab === 'used' && styles.subTabActive]}
-                        onPress={() => setMaterialSubTab('used')}
-                    >
-                        <Ionicons
-                            name="arrow-forward-outline"
-                            size={16}
-                            color={materialSubTab === 'used' ? '#EF4444' : '#64748B'}
-                        />
-                        <Text style={[styles.subTabText, materialSubTab === 'used' && styles.subTabTextActive]}>
-                            Used
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.subTab, materialSubTab === 'transferred' && styles.subTabActive]}
-                        onPress={() => setMaterialSubTab('transferred')}
-                    >
-                        <Ionicons
-                            name="swap-horizontal-outline"
-                            size={16}
-                            color={materialSubTab === 'transferred' ? '#3A78B5' : '#64748B'}
-                        />
-                        <Text style={[styles.subTabText, materialSubTab === 'transferred' && styles.subTabTextActive]}>
-                            Transferred
-                        </Text>
-                    </TouchableOpacity>
-                </ScrollView>
-            )}
+                        {MATERIAL_FILTERS.map(filter => {
+                            const selected = materialSubTab === filter.key;
+                            return (
+                                <Pressable
+                                    key={filter.key}
+                                    style={[styles.subChip, selected && styles.subChipSelected]}
+                                    onPress={() => setMaterialSubTab(filter.key)}
+                                    hitSlop={{ top: 6, bottom: 6 }}
+                                    accessibilityRole="button"
+                                    accessibilityState={{ selected }}
+                                    accessibilityLabel={`Materials, ${filter.label}`}
+                                >
+                                    <Text style={[styles.subChipText, selected && styles.subChipTextSelected]}>{filter.label}</Text>
+                                </Pressable>
+                            );
+                        })}
+                    </ScrollView>
+                )}
+            </View>
 
             {/* Content */}
             <ScrollView
@@ -2677,6 +2544,67 @@ const NotificationPage: React.FC = () => {
                     />
                 }
             >
+                {/* Day stepper — the feed is read one site day at a time, so the day is the
+                    page heading. It stays put while the next day loads; vendor filters span
+                    every date, so it hides for them. */}
+                {isActivityMode && selectedVendors.length === 0 && (
+                    <View style={styles.dayStepper}>
+                        <View style={styles.dayStepperRow}>
+                            <TouchableOpacity
+                                style={styles.dayStepButton}
+                                onPress={handlePreviousDay}
+                                disabled={!hasPrevDate || loading}
+                                accessibilityRole="button"
+                                accessibilityLabel="Previous day"
+                                accessibilityState={{ disabled: !hasPrevDate || loading }}
+                            >
+                                <Ionicons name="chevron-back" size={22} color={(!hasPrevDate || loading) ? Colors.textTertiary : INK} />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.dayStepTitleButton}
+                                onPress={handleDatePickerOpen}
+                                activeOpacity={0.6}
+                                accessibilityRole="button"
+                                accessibilityLabel={`${formatDateHeader(currentDate)}, ${loading ? 'loading' : activityCountLabel}`}
+                                accessibilityHint="Choose another day"
+                            >
+                                <View style={styles.dayStepTitleRow}>
+                                    <Text style={styles.dayStepTitle} numberOfLines={1}>{formatDateHeader(currentDate)}</Text>
+                                    <Ionicons name="chevron-down" size={16} color={Colors.textSecondary} />
+                                </View>
+                                <Text style={styles.dayStepCaption} numberOfLines={1}>
+                                    {formatDayCaption(currentDate)} · {loading ? 'Loading…' : activityCountLabel}
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.dayStepButton}
+                                onPress={handleNextDay}
+                                disabled={!hasNextDate || loading}
+                                accessibilityRole="button"
+                                accessibilityLabel="Next day"
+                                accessibilityState={{ disabled: !hasNextDate || loading }}
+                            >
+                                <Ionicons name="chevron-forward" size={22} color={(!hasNextDate || loading) ? Colors.textTertiary : INK} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* One tap back to today — a far-off date otherwise means stepping
+                            back through the arrows one day at a time */}
+                        {!isViewingToday && (
+                            <TouchableOpacity
+                                style={styles.backToTodayButton}
+                                onPress={handleGoToToday}
+                                disabled={loading}
+                                accessibilityRole="button"
+                            >
+                                <Ionicons name="arrow-undo-outline" size={15} color={Colors.primaryDark} />
+                                <Text style={styles.backToTodayText}>Back to Today</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                )}
                 {loading ? (
                     <View style={styles.loadingContainer}>
                         <ActivityListSkeleton count={4} />
@@ -2700,86 +2628,55 @@ const NotificationPage: React.FC = () => {
                     </>
                 ) : activeTab === 'warnings' ? (
                     <View style={styles.warningsContentContainer}>
-                        {/* Pending Payments Summary Banner */}
+                        {/* Total due, with one tile per category. The tiles are the only
+                            filter for this list — tap one to narrow, tap it again for all. */}
                         <View style={styles.warningSummaryCard}>
-                            <View style={styles.warningSummaryHeader}>
-                                <View style={styles.warningSummaryTitleRow}>
-                                    <View style={styles.warningIconBg}>
-                                        <Ionicons name="card-outline" size={20} color="#3A78B5" />
-                                    </View>
-                                    <View style={{ marginLeft: 10, flex: 1 }}>
-                                        <Text style={styles.warningSummaryTitle}>Pending Payments Summary</Text>
-                                        <Text style={styles.warningSummarySubtitle}>
-                                            {warningTotals.totalCount} pending payment{warningTotals.totalCount === 1 ? '' : 's'} requiring attention
-                                        </Text>
-                                    </View>
-                                </View>
-                                <View style={styles.warningTotalBadge}>
-                                    <Text style={styles.warningTotalLabel}>Total Due</Text>
-                                    <Text style={styles.warningTotalAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-                                        ₹{warningTotals.totalPendingAmount.toLocaleString('en-IN')}
-                                    </Text>
-                                </View>
-                            </View>
+                            <Text style={styles.warningTotalLabel}>Total Due</Text>
+                            <Text style={styles.warningTotalAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+                                ₹{warningTotals.totalPendingAmount.toLocaleString('en-IN')}
+                            </Text>
+                            <Text style={styles.warningSummarySubtitle}>
+                                {warningTotals.totalCount} pending payment{warningTotals.totalCount === 1 ? '' : 's'}
+                            </Text>
 
                             <View style={styles.warningGrid}>
-                                <TouchableOpacity
-                                    style={[styles.warningGridItem, warningSubFilter === 'contractor' && styles.warningGridItemActive]}
-                                    onPress={() => setWarningSubFilter(warningSubFilter === 'contractor' ? 'all' : 'contractor')}
-                                    activeOpacity={0.8}
-                                >
-                                    <Text style={styles.warningGridLabel}>Contractors</Text>
-                                    <Text style={styles.warningGridValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-                                        ₹{warningTotals.contractorAmount.toLocaleString('en-IN')}
-                                    </Text>
-                                    <Text style={styles.warningGridCount}>{warningTotals.contractorCount} pending</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    style={[styles.warningGridItem, warningSubFilter === 'material_vendor' && styles.warningGridItemActive]}
-                                    onPress={() => setWarningSubFilter(warningSubFilter === 'material_vendor' ? 'all' : 'material_vendor')}
-                                    activeOpacity={0.8}
-                                >
-                                    <Text style={styles.warningGridLabel}>Vendors</Text>
-                                    <Text style={styles.warningGridValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-                                        ₹{warningTotals.vendorAmount.toLocaleString('en-IN')}
-                                    </Text>
-                                    <Text style={styles.warningGridCount}>{warningTotals.vendorCount} pending</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    style={[styles.warningGridItem, warningSubFilter === 'labor' && styles.warningGridItemActive]}
-                                    onPress={() => setWarningSubFilter(warningSubFilter === 'labor' ? 'all' : 'labor')}
-                                    activeOpacity={0.8}
-                                >
-                                    <Text style={styles.warningGridLabel}>Labor</Text>
-                                    <Text style={styles.warningGridValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-                                        ₹{warningTotals.laborAmount.toLocaleString('en-IN')}
-                                    </Text>
-                                    <Text style={styles.warningGridCount}>{warningTotals.laborCount} pending</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    style={[styles.warningGridItem, warningSubFilter === 'equipment' && styles.warningGridItemActive]}
-                                    onPress={() => setWarningSubFilter(warningSubFilter === 'equipment' ? 'all' : 'equipment')}
-                                    activeOpacity={0.8}
-                                >
-                                    <Text style={styles.warningGridLabel}>Equipment</Text>
-                                    <Text style={styles.warningGridValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-                                        ₹{warningTotals.equipmentAmount.toLocaleString('en-IN')}
-                                    </Text>
-                                    <Text style={styles.warningGridCount}>{warningTotals.equipmentCount} pending</Text>
-                                </TouchableOpacity>
+                                {paymentTiles.map(tile => {
+                                    const selected = warningSubFilter === tile.key;
+                                    return (
+                                        <TouchableOpacity
+                                            key={tile.key}
+                                            style={[styles.warningGridItem, selected && styles.warningGridItemActive]}
+                                            onPress={() => setWarningSubFilter(selected ? 'all' : tile.key)}
+                                            activeOpacity={0.8}
+                                            accessibilityRole="button"
+                                            accessibilityState={{ selected }}
+                                            accessibilityLabel={`${tile.label}, ₹${tile.amount.toLocaleString('en-IN')}, ${tile.count} pending`}
+                                            accessibilityHint={selected ? 'Shows all payments' : `Shows only ${tile.label.toLowerCase()}`}
+                                        >
+                                            <View style={styles.warningGridLabelRow}>
+                                                <Text style={[styles.warningGridLabel, selected && styles.warningGridLabelActive]}>{tile.label}</Text>
+                                                {selected && <Ionicons name="checkmark-circle" size={16} color={Colors.primaryDark} />}
+                                            </View>
+                                            <Text style={styles.warningGridValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                                                ₹{tile.amount.toLocaleString('en-IN')}
+                                            </Text>
+                                            <Text style={styles.warningGridCount}>{tile.count} pending</Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
                             </View>
                         </View>
 
-                        {/* Collapsible Category Cards List */}
                         {filteredWarningItems.length === 0 ? (
                             <View style={styles.emptyWarningContainer}>
-                                <Ionicons name="checkmark-circle-outline" size={48} color={Colors.successText} />
-                                <Text style={styles.emptyWarningTitle}>No Pending Payments</Text>
+                                <View style={[styles.emptyIconBadge, { backgroundColor: Colors.successLight }]}>
+                                    <Ionicons name="checkmark-done-outline" size={30} color={Colors.successText} />
+                                </View>
+                                <Text style={styles.emptyWarningTitle}>All Paid Up</Text>
                                 <Text style={styles.emptyWarningSubtitle}>
-                                    All contractor and vendor payments are settled and up to date!
+                                    {warningSubFilter === 'all'
+                                        ? 'No contractor, vendor, labor or equipment payments are waiting.'
+                                        : `Nothing is owed to ${paymentTiles.find(t => t.key === warningSubFilter)?.label.toLowerCase() ?? 'this category'}.`}
                                 </Text>
                             </View>
                         ) : (
@@ -2787,100 +2684,90 @@ const NotificationPage: React.FC = () => {
                                 const isCollapsed = !!collapsedCategories[group.key];
                                 return (
                                     <View key={group.key} style={styles.warningCategorySection}>
-                                        {/* Category Collapsible Header */}
                                         <TouchableOpacity
                                             style={styles.warningCategoryHeader}
                                             onPress={() => toggleCategoryCollapse(group.key)}
                                             activeOpacity={0.7}
+                                            accessibilityRole="button"
+                                            accessibilityState={{ expanded: !isCollapsed }}
+                                            accessibilityLabel={`${group.label}, ${group.items.length} ${group.items.length === 1 ? 'item' : 'items'}${group.totalAmount > 0 ? `, ₹${group.totalAmount.toLocaleString('en-IN')} due` : ''}`}
                                         >
                                             <View style={styles.warningCategoryHeaderTitleRow}>
                                                 <View style={styles.warningCategoryIconBg}>
-                                                    <Ionicons name={group.icon as any} size={18} color="#3A78B5" />
+                                                    <Ionicons name={group.icon as any} size={18} color={Colors.primaryDark} />
                                                 </View>
-                                                <Text style={styles.warningCategoryTitleText}>{group.label}</Text>
+                                                <Text style={styles.warningCategoryTitleText} numberOfLines={1}>{group.label}</Text>
                                                 <View style={styles.warningCategoryBadge}>
-                                                    <Text style={styles.warningCategoryBadgeText}>
-                                                        {group.items.length} {group.items.length === 1 ? 'item' : 'items'}
-                                                    </Text>
+                                                    <Text style={styles.warningCategoryBadgeText}>{group.items.length}</Text>
                                                 </View>
                                             </View>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                                            <View style={styles.warningCategoryHeaderRight}>
                                                 {group.totalAmount > 0 && (
                                                     <Text style={styles.warningCategoryAmountText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                                                         ₹{group.totalAmount.toLocaleString('en-IN')}
                                                     </Text>
                                                 )}
                                                 <Ionicons
-                                                    name={isCollapsed ? "chevron-down-outline" : "chevron-up-outline"}
+                                                    name={isCollapsed ? 'chevron-down' : 'chevron-up'}
                                                     size={18}
-                                                    color="#64748B"
+                                                    color={Colors.textSecondary}
                                                 />
                                             </View>
                                         </TouchableOpacity>
 
-                                        {/* Category Warning Cards (Shown when not collapsed) */}
                                         {!isCollapsed && (
                                             <View style={styles.warningCardsGroup}>
                                                 {group.items.map((item) => {
                                                     const isPaid = item.status === 'paid';
-                                                    const isUrgent = !isPaid && item.priority === 'high';
-                                                    // Solid status badge, same treatment as the Material tab's IMPORTED / USED badges.
-                                                    const statusTone = BADGE_TONES[isPaid ? 'paid' : isUrgent ? 'urgent' : 'due'];
-                                                    const statusIcon = isPaid ? 'checkmark-circle' : isUrgent ? 'alert-circle' : 'time';
-                                                    const statusLabel = isPaid ? 'Paid' : isUrgent ? 'Urgent' : 'Payment due';
+                                                    const status = getPaymentStatus(item);
+                                                    const statusTone = BADGE_TONES[status.tone];
                                                     const vendorInitial = (item.vendorName || '?').trim().charAt(0).toUpperCase() || '?';
                                                     return (
                                                         <View key={item.id} style={[styles.materialActivityCard, isPaid && styles.pendingCardPaid]}>
                                                             <View style={styles.materialActivityGradient}>
-                                                                {/* Header — status badge + category tag */}
+                                                                {/* Status and when it was raised */}
                                                                 <View style={styles.materialActivityHeader}>
                                                                     <View style={[styles.activityBadge, { backgroundColor: statusTone.bg }]}>
-                                                                        <Ionicons name={statusIcon as any} size={15} color={statusTone.fg} />
-                                                                        <Text style={[styles.activityBadgeText, { color: statusTone.fg }]}>{statusLabel}</Text>
+                                                                        <Ionicons name={status.icon as any} size={15} color={statusTone.fg} />
+                                                                        <Text style={[styles.activityBadgeText, { color: statusTone.fg }]}>{status.label}</Text>
                                                                     </View>
-                                                                    <View style={styles.pendingCategoryTag}>
-                                                                        <Ionicons name={group.icon as any} size={13} color="#3A78B5" />
-                                                                        <Text style={styles.pendingCategoryTagText}>{item.categoryLabel}</Text>
-                                                                    </View>
+                                                                    {item.createdAt ? (
+                                                                        <Text style={styles.activityTimeNew}>{formatTimeAgo(item.createdAt)}</Text>
+                                                                    ) : null}
                                                                 </View>
 
-                                                                {/* Project / Section / Due date chips */}
+                                                                {/* What it's for, and who gets paid */}
+                                                                <Text style={styles.paymentTitle}>{item.title}</Text>
+                                                                <View style={styles.paymentPayee}>
+                                                                    <View style={styles.paymentPayeeAvatar}>
+                                                                        <Text style={styles.paymentPayeeAvatarText}>{vendorInitial}</Text>
+                                                                    </View>
+                                                                    <Text style={styles.paymentPayeeName} numberOfLines={1}>{item.vendorName}</Text>
+                                                                </View>
+
                                                                 {(item.projectName || item.sectionName || item.dueDate) && (
                                                                     <View style={styles.projectInfo}>
                                                                         {item.projectName ? (
                                                                             <View style={styles.projectInfoItem}>
-                                                                                <Ionicons name="folder-outline" size={14} color="#64748B" />
+                                                                                <Ionicons name="folder-outline" size={14} color={Colors.textSecondary} />
                                                                                 <Text style={styles.projectInfoText}>{item.projectName}</Text>
                                                                             </View>
                                                                         ) : null}
                                                                         {item.sectionName ? (
                                                                             <View style={styles.projectInfoItem}>
-                                                                                <Ionicons name="layers-outline" size={14} color="#64748B" />
+                                                                                <Ionicons name="layers-outline" size={14} color={Colors.textSecondary} />
                                                                                 <Text style={styles.projectInfoText}>{item.sectionName}</Text>
                                                                             </View>
                                                                         ) : null}
                                                                         {item.dueDate ? (
                                                                             <View style={[styles.projectInfoItem, !isPaid && styles.pendingDueChip]}>
-                                                                                <Ionicons name="calendar-outline" size={14} color={isPaid ? '#64748B' : '#B45309'} />
+                                                                                <Ionicons name="calendar-outline" size={14} color={isPaid ? Colors.textSecondary : Colors.warningText} />
                                                                                 <Text style={[styles.projectInfoText, !isPaid && styles.pendingDueChipText]}>Due {item.dueDate}</Text>
                                                                             </View>
                                                                         ) : null}
                                                                     </View>
                                                                 )}
 
-                                                                {/* What the payment is for */}
-                                                                <View style={styles.materialsList}>
-                                                                    <View style={styles.materialItem}>
-                                                                        <View style={[styles.materialIconSmall, { backgroundColor: '#EAF0FE' }]}>
-                                                                            <Ionicons name={group.icon as any} size={18} color="#3A78B5" />
-                                                                        </View>
-                                                                        <View style={styles.materialDetails}>
-                                                                            <Text style={styles.materialName} numberOfLines={2}>{item.title}</Text>
-                                                                        </View>
-                                                                    </View>
-                                                                </View>
-
-                                                                {/* Amount due — highlighted like the Material tab's Total Cost */}
                                                                 {item.amount > 0 && (
                                                                     <View style={[styles.pendingAmountContainer, isPaid && styles.totalCostContainer]}>
                                                                         <Text style={[styles.pendingAmountLabel, isPaid && styles.totalCostLabel]}>
@@ -2899,48 +2786,37 @@ const NotificationPage: React.FC = () => {
 
                                                                 {item.description ? (
                                                                     <View style={styles.pendingNote}>
-                                                                        <Ionicons name="chatbox-outline" size={14} color="#64748B" />
+                                                                        <Ionicons name="chatbox-outline" size={14} color={Colors.textSecondary} />
                                                                         <Text style={styles.messageText}>{item.description}</Text>
                                                                     </View>
                                                                 ) : null}
 
-                                                            <View style={styles.warningActionsRow}>
-                                                                <TouchableOpacity
-                                                                    style={[styles.warningActionBtn, isPaid ? styles.warningActionPaidBtn : styles.warningActionPrimaryBtn]}
-                                                                    onPress={() => toggleWarningPaidStatus(item.id)}
-                                                                    activeOpacity={0.8}
-                                                                >
-                                                                    <Ionicons
-                                                                        name={isPaid ? "refresh-outline" : "checkmark-done-circle"}
-                                                                        size={16}
-                                                                        color={isPaid ? "#475569" : "#FFFFFF"}
-                                                                    />
-                                                                    <Text style={[styles.warningActionBtnText, isPaid && { color: '#475569' }]}>
-                                                                        {isPaid ? "Mark as Unpaid" : "Mark as Paid"}
-                                                                    </Text>
-                                                                </TouchableOpacity>
+                                                                <View style={styles.warningActionsRow}>
+                                                                    <TouchableOpacity
+                                                                        style={[styles.warningActionBtn, isPaid ? styles.warningActionPaidBtn : styles.warningActionPrimaryBtn]}
+                                                                        onPress={() => toggleWarningPaidStatus(item.id)}
+                                                                        activeOpacity={0.8}
+                                                                        accessibilityRole="button"
+                                                                    >
+                                                                        <Ionicons
+                                                                            name={isPaid ? 'arrow-undo-outline' : 'checkmark'}
+                                                                            size={17}
+                                                                            color={isPaid ? '#334155' : '#FFFFFF'}
+                                                                        />
+                                                                        <Text style={[styles.warningActionBtnText, isPaid && { color: '#334155' }]}>
+                                                                            {isPaid ? 'Mark as Unpaid' : 'Mark as Paid'}
+                                                                        </Text>
+                                                                    </TouchableOpacity>
 
-                                                                <TouchableOpacity
-                                                                    style={styles.warningActionSecondaryBtn}
-                                                                    onPress={() => setSelectedWarningModal(item)}
-                                                                    activeOpacity={0.8}
-                                                                >
-                                                                    <Ionicons name="information-circle-outline" size={16} color="#3A78B5" />
-                                                                    <Text style={styles.warningActionSecondaryBtnText}>Details</Text>
-                                                                </TouchableOpacity>
-                                                            </View>
-
-                                                                {/* Footer — who is to be paid, like the Material tab's user footer */}
-                                                                <View style={[styles.materialActivityFooter, { marginTop: 14 }]}>
-                                                                    <View style={[styles.userInfo, { flex: 1, marginRight: 8 }]}>
-                                                                        <View style={styles.userAvatar}>
-                                                                            <Text style={styles.userAvatarText}>{vendorInitial}</Text>
-                                                                        </View>
-                                                                        <Text style={[styles.userName, { flexShrink: 1 }]} numberOfLines={1}>{item.vendorName}</Text>
-                                                                    </View>
-                                                                    {item.createdAt ? (
-                                                                        <Text style={styles.activityTimeNew}>{formatTimeAgo(item.createdAt)}</Text>
-                                                                    ) : null}
+                                                                    <TouchableOpacity
+                                                                        style={styles.warningActionSecondaryBtn}
+                                                                        onPress={() => setSelectedWarningModal(item)}
+                                                                        activeOpacity={0.8}
+                                                                        accessibilityRole="button"
+                                                                        accessibilityLabel={`Details for ${item.title}`}
+                                                                    >
+                                                                        <Text style={styles.warningActionSecondaryBtnText}>Details</Text>
+                                                                    </TouchableOpacity>
                                                                 </View>
                                                             </View>
                                                         </View>
@@ -2953,308 +2829,94 @@ const NotificationPage: React.FC = () => {
                             })
                         )}
                     </View>
-                ) : groupedActivities.length === 0 || groupedActivities.reduce((sum, group) => sum + group.activities.length, 0) === 0 ? (
-                    <>
-                        {/* Simple "No activity today" message while keeping all UI elements */}
-                        <View style={styles.simpleEmptyState}>
-                            {selectedVendors.length > 0 && (activeTab === 'project' || activeTab === 'labor') ? (
-                                <View style={styles.simpleEmptyContainer}>
-                                    <Ionicons name="funnel-outline" size={56} color="#3A78B5" />
-                                    <Text style={styles.simpleEmptyTitle}>
-                                        To see {activeTab === 'project' ? 'Project' : 'Labor'} activities, please remove the vendor filter.
-                                    </Text>
-                                    <TouchableOpacity
-                                        style={styles.removeFilterButton}
-                                        onPress={() => setSelectedVendors([])}
-                                        activeOpacity={0.8}
-                                    >
-                                        <Ionicons name="close-circle-outline" size={17} color="#FFFFFF" style={{ marginRight: 8 }} />
-                                        <Text style={styles.removeFilterButtonText}>Remove Filter</Text>
-                                    </TouchableOpacity>
+                ) : totalActivityCount === 0 ? (
+                    <View style={styles.simpleEmptyState}>
+                        {selectedVendors.length > 0 && (activeTab === 'project' || activeTab === 'labor') ? (
+                            <View style={styles.simpleEmptyContainer}>
+                                <View style={styles.emptyIconBadge}>
+                                    <Ionicons name="funnel-outline" size={30} color={Colors.primaryDark} />
                                 </View>
-                            ) : (
-                                <View style={styles.simpleEmptyContainer}>
-                                    <Ionicons name="calendar-outline" size={48} color="#94A3B8" />
-                                    <Text style={styles.simpleEmptyTitle}>
-                                        {(() => {
-                                            if (selectedVendors.length > 0) {
-                                                return 'No material activity found for selected vendor';
-                                            }
-                                            const today = new Date().toLocaleDateString('en-CA');
-                                            if (currentDate === today) {
-                                                return 'No activity today';
-                                            } else {
-                                                return `No activity on ${formatDateHeader(currentDate)}`;
-                                            }
-                                        })()}
-                                    </Text>
+                                <Text style={styles.simpleEmptyTitle}>Vendor filter is on</Text>
+                                <Text style={styles.simpleEmptyBody}>
+                                    Vendors only apply to materials. Clear the filter to see {activeTab === 'project' ? 'project' : 'labor'} activity.
+                                </Text>
+                                <TouchableOpacity
+                                    style={styles.removeFilterButton}
+                                    onPress={() => setSelectedVendors([])}
+                                    activeOpacity={0.8}
+                                    accessibilityRole="button"
+                                >
+                                    <Text style={styles.removeFilterButtonText}>Clear Vendor Filter</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : (
+                            <View style={styles.simpleEmptyContainer}>
+                                <View style={styles.emptyIconBadge}>
+                                    <Ionicons name="calendar-clear-outline" size={30} color={Colors.primaryDark} />
                                 </View>
-                            )}
-                        </View>
-
-                        {/* Show Date Navigation Controls even when no activities */}
-                        {selectedVendors.length === 0 && (
-                            <View style={styles.compactDateNavigation}>
-                                {/* Compact Date Navigation Bar */}
-                                <View style={styles.dateNavigationBar}>
-                                    {/* Previous Day Button */}
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.compactNavButton,
-                                            styles.prevButton,
-                                            (!hasPrevDate || loading) && styles.navButtonDisabled
-                                        ]}
-                                        onPress={handlePreviousDay}
-                                            accessibilityRole="button"
-                                            accessibilityLabel="Previous day"
-                                        disabled={!hasPrevDate || loading}
-                                        activeOpacity={0.7}
-                                    >
-                                        <Ionicons
-                                            name="chevron-back"
-                                            size={20}
-                                            color={(!hasPrevDate || loading) ? '#94A3B8' : Colors.primaryDark}
-                                        />
-                                    </TouchableOpacity>
-
-                                    {/* Current Date Display - Compact - Clickable */}
-                                    <TouchableOpacity
-                                        style={styles.compactDateDisplay}
-                                        onPress={handleDatePickerOpen}
-                                        activeOpacity={0.7}
-                                    >
-                                        <View style={styles.compactDateBadge}>
-                                            <Ionicons name="calendar-outline" size={16} color={Colors.primaryDark} />
-                                            <Text style={styles.compactDateText}>
-                                                {formatDateHeader(currentDate)}
-                                            </Text>
-                                            <Ionicons name="chevron-down" size={14} color={Colors.primaryDark} />
-                                        </View>
-                                        <Text style={styles.compactActivityCount}>
-                                            0 activities
-                                        </Text>
-                                    </TouchableOpacity>
-
-                                    {/* Next Day Button */}
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.compactNavButton,
-                                            styles.nextButton,
-                                            (!hasNextDate || loading) && styles.navButtonDisabled
-                                        ]}
-                                        onPress={handleNextDay}
-                                            accessibilityRole="button"
-                                            accessibilityLabel="Next day"
-                                        disabled={!hasNextDate || loading}
-                                        activeOpacity={0.7}
-                                    >
-                                        <Ionicons
-                                            name="chevron-forward"
-                                            size={20}
-                                            color={(!hasNextDate || loading) ? '#94A3B8' : Colors.primaryDark}
-                                        />
-                                    </TouchableOpacity>
-                                </View>
-
-                                {/* Loading indicator - show when loading with enhanced animation */}
-                                {loading && (
-                                    <View style={styles.compactLoadingIndicator}>
-                                        <ActivityIndicator size="small" color={Colors.primary} />
-                                        <Text style={styles.compactLoadingText}>Loading date...</Text>
-                                    </View>
-                                )}
-
-                                {/* Optional: Date navigation info - very compact */}
-                                {availableDates.length > 1 && (
-                                    <View style={styles.compactNavigationInfo}>
-                                        <Text style={styles.compactInfoText}>
-                                            {availableDates.length} dates with activities available
-                                        </Text>
-                                    </View>
-                                )}
-
-                                {/* One tap back to today — picking a far-off date otherwise
-                                    means stepping back through the arrows one day at a time */}
-                                {!isViewingToday && (
-                                    <TouchableOpacity
-                                        style={styles.todayButton}
-                                        onPress={handleGoToToday}
-                                        disabled={loading}
-                                        activeOpacity={0.7}
-                                    >
-                                        <Ionicons name="today-outline" size={16} color={Colors.primaryDark} />
-                                        <Text style={styles.todayButtonText}>Back to Today</Text>
-                                    </TouchableOpacity>
-                                )}
+                                <Text style={styles.simpleEmptyTitle}>{emptyTitle}</Text>
+                                <Text style={styles.simpleEmptyBody}>{emptyBody}</Text>
                             </View>
                         )}
-                    </>
+                    </View>
                 ) : (
-                    <>
-                        <Animated.View
-                            style={[
-                                styles.activitiesList,
-                                {
-                                    opacity: fadeAnim,
-                                    transform: [{ translateY: slideAnim }],
-                                }
-                            ]}
-                        >
-                            {groupedActivities.map((dateGroup, dateIndex) => {
-                                return (
-                                    <View key={dateGroup.date} style={styles.dateGroupContainer}>
-                                        {/* Date Header */}
-                                        <View style={styles.dateHeader}>
-                                            <Text style={styles.dateHeaderText} accessibilityRole="header">
-                                                {formatDateHeader(dateGroup.date)}
-                                            </Text>
-                                            <Text style={styles.activityCountText}>
-                                                {dateGroup.activities.length} {dateGroup.activities.length === 1 ? 'activity' : 'activities'}
-                                            </Text>
-                                        </View>
-
-                                        {/* Activities for this date */}
-                                        {dateGroup.activities.map((item, index) => {
-                                            return (
-                                                <React.Fragment key={`${dateGroup.date}-${item.type}-${item.data._id}`}>
-                                                    {item.type === 'activity'
-                                                        ? renderActivityItem(item.data as Activity)
-                                                        : item.type === 'material'
-                                                            ? renderMaterialActivityItem(item.data as MaterialActivity)
-                                                            : renderOtherCostActivityItem(item.data as OtherCostActivity)
-                                                    }
-                                                </React.Fragment>
-                                            );
-                                        })}
+                    <Animated.View
+                        style={[
+                            styles.activitiesList,
+                            {
+                                opacity: fadeAnim,
+                                transform: [{ translateY: slideAnim }],
+                            }
+                        ]}
+                    >
+                        {groupedActivities.map((dateGroup) => (
+                            <View key={dateGroup.date} style={styles.dateGroupContainer}>
+                                {/* The day stepper already names a single day; headers only
+                                    help once several days are on screen */}
+                                {showDateHeaders && (
+                                    <View style={styles.dateHeader}>
+                                        <Text style={styles.dateHeaderText} accessibilityRole="header">
+                                            {formatDateHeader(dateGroup.date)}
+                                        </Text>
+                                        <Text style={styles.activityCountText}>
+                                            {dateGroup.activities.length} {dateGroup.activities.length === 1 ? 'activity' : 'activities'}
+                                        </Text>
                                     </View>
-                                );
-                            })}
+                                )}
 
-                            {/* Load More Button for Date Mode */}
-                            {hasMoreDates && (
-                                <View style={styles.loadMoreContainer}>
-                                    <TouchableOpacity
-                                        style={[styles.loadMoreButton, loadingMore && styles.loadMoreButtonDisabled]}
-                                        onPress={handleLoadMore}
-                                        disabled={loadingMore}
-                                        activeOpacity={0.7}
-                                    >
-                                        {loadingMore ? (
-                                            <>
-                                                <ActivityIndicator size="small" color="#FFFFFF" />
-                                                <Text style={styles.loadMoreText}>Loading...</Text>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Ionicons name="chevron-down" size={20} color="#FFFFFF" />
-                                                <Text style={styles.loadMoreText}>Load More Activities</Text>
-                                            </>
-                                        )}
-                                    </TouchableOpacity>
-                                    <Text style={styles.loadMoreHint}>
-                                        Showing activities by date • Load more to see older activities
-                                    </Text>
-                                </View>
-                            )}
+                                {dateGroup.activities.map((item) => (
+                                    <React.Fragment key={`${dateGroup.date}-${item.type}-${item.data._id}`}>
+                                        {item.type === 'activity'
+                                            ? renderActivityItem(item.data as Activity)
+                                            : item.type === 'material'
+                                                ? renderMaterialActivityItem(item.data as MaterialActivity)
+                                                : renderOtherCostActivityItem(item.data as OtherCostActivity)
+                                        }
+                                    </React.Fragment>
+                                ))}
+                            </View>
+                        ))}
 
-                            {/* Date Navigation Controls */}
-                            {selectedVendors.length === 0 && (
-                                <View style={styles.compactDateNavigation}>
-                                    {/* Compact Date Navigation Bar */}
-                                    <View style={styles.dateNavigationBar}>
-                                        {/* Previous Day Button */}
-                                        <TouchableOpacity
-                                            style={[
-                                                styles.compactNavButton,
-                                                styles.prevButton,
-                                                (!hasPrevDate || loading) && styles.navButtonDisabled
-                                            ]}
-                                            onPress={handlePreviousDay}
-                                            accessibilityRole="button"
-                                            accessibilityLabel="Previous day"
-                                            disabled={!hasPrevDate || loading}
-                                            activeOpacity={0.7}
-                                        >
-                                            <Ionicons
-                                                name="chevron-back"
-                                                size={20}
-                                                color={(!hasPrevDate || loading) ? '#94A3B8' : Colors.primaryDark}
-                                            />
-                                        </TouchableOpacity>
-
-                                        {/* Current Date Display - Compact - Clickable */}
-                                        <TouchableOpacity
-                                            style={styles.compactDateDisplay}
-                                            onPress={handleDatePickerOpen}
-                                            activeOpacity={0.7}
-                                        >
-                                            <View style={styles.compactDateBadge}>
-                                                <Ionicons name="calendar-outline" size={16} color={Colors.primaryDark} />
-                                                <Text style={styles.compactDateText}>
-                                                    {formatDateHeader(currentDate)}
-                                                </Text>
-                                                <Ionicons name="chevron-down" size={14} color={Colors.primaryDark} />
-                                            </View>
-                                            <Text style={styles.compactActivityCount}>
-                                                {activityCountLabel}
-                                            </Text>
-                                        </TouchableOpacity>
-
-                                        {/* Next Day Button */}
-                                        <TouchableOpacity
-                                            style={[
-                                                styles.compactNavButton,
-                                                styles.nextButton,
-                                                (!hasNextDate || loading) && styles.navButtonDisabled
-                                            ]}
-                                            onPress={handleNextDay}
-                                            accessibilityRole="button"
-                                            accessibilityLabel="Next day"
-                                            disabled={!hasNextDate || loading}
-                                            activeOpacity={0.7}
-                                        >
-                                            <Ionicons
-                                                name="chevron-forward"
-                                                size={20}
-                                                color={(!hasNextDate || loading) ? '#94A3B8' : Colors.primaryDark}
-                                            />
-                                        </TouchableOpacity>
-                                    </View>
-
-                                    {/* Loading indicator - show when loading with enhanced animation */}
-                                    {loading && (
-                                        <View style={styles.compactLoadingIndicator}>
-                                            <ActivityIndicator size="small" color={Colors.primary} />
-                                            <Text style={styles.compactLoadingText}>Loading date...</Text>
-                                        </View>
+                        {hasMoreDates && (
+                            <View style={styles.loadMoreContainer}>
+                                <TouchableOpacity
+                                    style={[styles.loadMoreButton, loadingMore && styles.loadMoreButtonDisabled]}
+                                    onPress={handleLoadMore}
+                                    disabled={loadingMore}
+                                    activeOpacity={0.7}
+                                    accessibilityRole="button"
+                                    accessibilityState={{ busy: loadingMore }}
+                                >
+                                    {loadingMore ? (
+                                        <ActivityIndicator size="small" color={Colors.primaryDark} />
+                                    ) : (
+                                        <Ionicons name="chevron-down" size={18} color={Colors.primaryDark} />
                                     )}
-
-                                    {/* Optional: Date navigation info - very compact */}
-                                    {availableDates.length > 1 && (
-                                        <View style={styles.compactNavigationInfo}>
-                                            <Text style={styles.compactInfoText}>
-                                                {availableDates.indexOf(currentDate) + 1} of {availableDates.length} dates
-                                            </Text>
-                                        </View>
-                                    )}
-
-                                    {/* One tap back to today — picking a far-off date otherwise
-                                        means stepping back through the arrows one day at a time */}
-                                    {!isViewingToday && (
-                                        <TouchableOpacity
-                                            style={styles.todayButton}
-                                            onPress={handleGoToToday}
-                                            disabled={loading}
-                                            activeOpacity={0.7}
-                                        >
-                                            <Ionicons name="today-outline" size={16} color={Colors.primaryDark} />
-                                            <Text style={styles.todayButtonText}>Back to Today</Text>
-                                        </TouchableOpacity>
-                                    )}
-                                </View>
-                            )}
-                        </Animated.View>
-                    </>
+                                    <Text style={styles.loadMoreText}>{loadingMore ? 'Loading…' : 'Show Earlier Days'}</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                    </Animated.View>
                 )}
             </ScrollView>
 
@@ -3330,7 +2992,9 @@ const NotificationPage: React.FC = () => {
                             </View>
                             <TouchableOpacity
                                 onPress={() => setShowVendorModal(false)}
-                                style={styles.modalCloseButton}
+                                style={styles.sheetCloseButton}
+                                accessibilityRole="button"
+                                accessibilityLabel="Close"
                             >
                                 <Ionicons name="close" size={24} color="#64748B" />
                             </TouchableOpacity>
@@ -3344,6 +3008,8 @@ const NotificationPage: React.FC = () => {
                                     styles.vendorItem,
                                     selectedVendors.length === 0 && styles.vendorItemActive
                                 ]}
+                                accessibilityRole="checkbox"
+                                accessibilityState={{ checked: selectedVendors.length === 0 }}
                                 onPress={() => {
                                     setSelectedVendors([]);
                                 }}
@@ -3387,6 +3053,8 @@ const NotificationPage: React.FC = () => {
                                                 styles.vendorItem,
                                                 isSelected && styles.vendorItemActive
                                             ]}
+                                            accessibilityRole="checkbox"
+                                            accessibilityState={{ checked: isSelected }}
                                             onPress={() => {
                                                 if (isSelected) {
                                                     // Remove vendor from selection
@@ -3477,90 +3145,84 @@ const NotificationPage: React.FC = () => {
                 <View style={styles.modalOverlay}>
                     <View style={styles.warningModalContent}>
                         <View style={styles.warningModalHeader}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <Ionicons name="card-outline" size={24} color="#3A78B5" />
-                                <Text style={styles.warningModalTitle}>Pending Payment Details</Text>
-                            </View>
-                            <TouchableOpacity onPress={() => setSelectedWarningModal(null)}>
-                                <Ionicons name="close" size={24} color="#64748B" />
+                            <Text style={styles.warningModalTitle} accessibilityRole="header">Payment Details</Text>
+                            <TouchableOpacity
+                                onPress={() => setSelectedWarningModal(null)}
+                                style={styles.sheetCloseButton}
+                                accessibilityRole="button"
+                                accessibilityLabel="Close"
+                            >
+                                <Ionicons name="close" size={20} color={Colors.textSecondary} />
                             </TouchableOpacity>
                         </View>
 
-                        {selectedWarningModal && (
+                        {selectedWarningModal && (() => {
+                            const modalStatus = getPaymentStatus(selectedWarningModal);
+                            const modalTone = BADGE_TONES[modalStatus.tone];
+                            const modalPaid = selectedWarningModal.status === 'paid';
+                            return (
                             <View style={styles.warningModalBody}>
                                 <View style={styles.warningModalBadgeRow}>
-                                    <View style={[
-                                        styles.warningPriorityBadge,
-                                        selectedWarningModal.status === 'paid' ? styles.badgePaid : selectedWarningModal.priority === 'high' ? styles.badgeHigh : styles.badgeMedium
-                                    ]}>
-                                        <Text style={styles.warningPriorityText}>
-                                            {selectedWarningModal.status === 'paid' ? 'PAID' : selectedWarningModal.priority.toUpperCase() + ' PRIORITY'}
-                                        </Text>
+                                    <View style={[styles.activityBadge, { backgroundColor: modalTone.bg }]}>
+                                        <Ionicons name={modalStatus.icon as any} size={15} color={modalTone.fg} />
+                                        <Text style={[styles.activityBadgeText, { color: modalTone.fg }]}>{modalStatus.label}</Text>
                                     </View>
-                                    <Text style={styles.warningModalCategory}>{selectedWarningModal.categoryLabel}</Text>
                                 </View>
 
                                 <Text style={styles.warningModalItemTitle}>{selectedWarningModal.title}</Text>
 
                                 <View style={styles.warningModalDetailBox}>
                                     <View style={styles.warningModalDetailRow}>
-                                        <Text style={styles.warningModalDetailLabel}>Vendor / Contractor:</Text>
+                                        <Text style={styles.warningModalDetailLabel}>Pay To</Text>
                                         <Text style={styles.warningModalDetailVal}>{selectedWarningModal.vendorName}</Text>
                                     </View>
                                     <View style={styles.warningModalDetailRow}>
-                                        <Text style={styles.warningModalDetailLabel}>Project:</Text>
+                                        <Text style={styles.warningModalDetailLabel}>Project</Text>
                                         <Text style={styles.warningModalDetailVal}>{selectedWarningModal.projectName}</Text>
                                     </View>
                                     {selectedWarningModal.sectionName && (
                                         <View style={styles.warningModalDetailRow}>
-                                            <Text style={styles.warningModalDetailLabel}>Section:</Text>
+                                            <Text style={styles.warningModalDetailLabel}>Section</Text>
                                             <Text style={styles.warningModalDetailVal}>{selectedWarningModal.sectionName}</Text>
                                         </View>
                                     )}
                                     {selectedWarningModal.dueDate && (
                                         <View style={styles.warningModalDetailRow}>
-                                            <Text style={styles.warningModalDetailLabel}>Due Date:</Text>
-                                            <Text style={[styles.warningModalDetailVal, { color: '#B45309', fontWeight: '700' }]}>{selectedWarningModal.dueDate}</Text>
+                                            <Text style={styles.warningModalDetailLabel}>Due</Text>
+                                            <Text style={[styles.warningModalDetailVal, !modalPaid && { color: Colors.warningText, fontWeight: '700' }]}>{selectedWarningModal.dueDate}</Text>
                                         </View>
                                     )}
                                     <View style={styles.warningModalDetailRow}>
-                                        <Text style={styles.warningModalDetailLabel}>Pending Amount:</Text>
+                                        <Text style={styles.warningModalDetailLabel}>{modalPaid ? 'Amount Paid' : 'Amount Due'}</Text>
                                         <Text style={styles.warningModalDetailAmount}>₹{selectedWarningModal.amount.toLocaleString('en-IN')}</Text>
-                                    </View>
-                                    <View style={styles.warningModalDetailRow}>
-                                        <Text style={styles.warningModalDetailLabel}>Status:</Text>
-                                        <Text style={[styles.warningModalDetailVal, { color: selectedWarningModal.status === 'paid' ? '#10B981' : '#B45309', fontWeight: '700' }]}>
-                                            {selectedWarningModal.status === 'paid' ? 'Paid' : 'Pending Payment'}
-                                        </Text>
                                     </View>
                                 </View>
 
                                 {selectedWarningModal.description ? (
                                     <View style={styles.warningModalDescBox}>
-                                        <Text style={styles.warningModalDescTitle}>Description / Notes:</Text>
+                                        <Text style={styles.warningModalDescTitle}>Notes</Text>
                                         <Text style={styles.warningModalDescText}>{selectedWarningModal.description}</Text>
                                     </View>
                                 ) : null}
 
                                 <View style={styles.warningModalActions}>
                                     <TouchableOpacity
-                                        style={[
-                                            styles.warningModalPrimaryBtn,
-                                            selectedWarningModal.status === 'paid' && { backgroundColor: '#64748B' }
-                                        ]}
+                                        style={[styles.warningModalPrimaryBtn, modalPaid && styles.warningActionPaidBtn]}
                                         onPress={() => {
                                             toggleWarningPaidStatus(selectedWarningModal.id);
                                             setSelectedWarningModal(prev => prev ? { ...prev, status: prev.status === 'paid' ? 'pending' : 'paid' } : null);
                                         }}
+                                        accessibilityRole="button"
                                     >
-                                        <Ionicons name={selectedWarningModal.status === 'paid' ? "refresh-outline" : "checkmark-done-circle"} size={18} color="#FFFFFF" />
-                                        <Text style={styles.warningModalPrimaryBtnText}>
-                                            {selectedWarningModal.status === 'paid' ? 'Mark as Unpaid' : 'Mark Payment as Settled'}
+                                        <Ionicons name={modalPaid ? 'arrow-undo-outline' : 'checkmark'} size={18} color={modalPaid ? '#334155' : '#FFFFFF'} />
+                                        <Text style={[styles.warningModalPrimaryBtnText, modalPaid && { color: '#334155' }]}>
+                                            {modalPaid ? 'Mark as Unpaid' : 'Mark as Paid'}
                                         </Text>
                                     </TouchableOpacity>
                                 </View>
                             </View>
-                        )}
+                            );
+                        })()}
                     </View>
                 </View>
             </Modal>
@@ -3580,8 +3242,6 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         minHeight: 64,
         backgroundColor: Colors.surface,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: Colors.border,
     },
     backButton: {
         width: 44,
@@ -3595,25 +3255,17 @@ const styles = StyleSheet.create({
     headerContent: {
         flex: 1,
     },
-    headerTitleContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
     headerTitle: {
-        fontSize: 20,
+        fontSize: 22,
         fontWeight: '800',
-        color: '#0F172A',
-        letterSpacing: -0.4,
+        color: INK,
+        letterSpacing: -0.5,
     },
     headerSubtitle: {
         fontSize: 13,
         color: Colors.textSecondary,
         marginTop: 1,
         fontWeight: '500',
-    },
-    refreshButton: {
-        padding: 8,
     },
     // ✅ NEW: Vendor Filter Button Styles
     vendorFilterButton: {
@@ -3682,9 +3334,6 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: '#64748B',
         marginTop: 2,
-    },
-    modalCloseButton: {
-        padding: 4,
     },
     vendorList: {
         maxHeight: 400,
@@ -3797,92 +3446,6 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         color: '#FFFFFF',
-    },
-    tabsContainerScrollView: {
-        backgroundColor: Colors.surface,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: Colors.border,
-        flexGrow: 0,
-        height: 48,
-    },
-    tabsContainerContent: {
-        flexDirection: 'row',
-        paddingHorizontal: 8,
-        alignItems: 'center',
-        height: 48,
-    },
-    tabsContainer: {
-        flexDirection: 'row',
-        backgroundColor: '#FFFFFF',
-        paddingHorizontal: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
-        height: 46,
-    },
-    tab: {
-        paddingHorizontal: 14,
-        height: 48,
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative',
-    },
-    tabActive: {
-        // Active state handled by indicator
-    },
-    tabText: {
-        fontSize: 14.5,
-        fontWeight: '500',
-        color: Colors.textSecondary,
-    },
-    tabTextActive: {
-        color: Colors.primaryDark,
-        fontWeight: '700',
-    },
-    tabIndicator: {
-        position: 'absolute',
-        bottom: 0,
-        left: 4,
-        right: 4,
-        height: 3,
-        backgroundColor: '#3A78B5',
-        borderTopLeftRadius: 3,
-        borderTopRightRadius: 3,
-    },
-    subTabsContainer: {
-        backgroundColor: Colors.background,
-        flexGrow: 0,
-        height: 56,
-    },
-    subTabsContentContainer: {
-        flexDirection: 'row',
-        paddingHorizontal: 16,
-        gap: 8,
-        alignItems: 'center',
-        height: 56,
-    },
-    subTab: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 14,
-        borderRadius: 20,
-        gap: 6,
-        backgroundColor: Colors.surface,
-        borderWidth: 1,
-        borderColor: Colors.border,
-        height: 38,
-    },
-    subTabActive: {
-        backgroundColor: Colors.primaryLight,
-        borderColor: Colors.primaryLight,
-    },
-    subTabText: {
-        fontSize: 13.5,
-        fontWeight: '600',
-        color: Colors.textSecondary,
-    },
-    subTabTextActive: {
-        color: Colors.primaryDark,
-        fontWeight: '700',
     },
     scrollView: {
         flex: 1,
@@ -4079,6 +3642,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
+        backgroundColor: Colors.fill,
     },
     materialDetails: {
         flex: 1,
@@ -4136,7 +3700,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: Colors.successLight,
+        backgroundColor: Colors.fill,
         paddingVertical: 12,
         paddingHorizontal: 14,
         borderRadius: 14,
@@ -4145,12 +3709,12 @@ const styles = StyleSheet.create({
     totalCostLabel: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#166534',
+        color: '#475569',
     },
     totalCostValue: {
         fontSize: 19,
         fontWeight: '800',
-        color: Colors.successText,
+        color: INK,
         letterSpacing: -0.3,
         fontVariant: ['tabular-nums'],
     },
@@ -4554,11 +4118,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
-        backgroundColor: Colors.primary,
-        paddingHorizontal: 24,
-        minHeight: 48,
-        borderRadius: 24,
-        minWidth: 220,
+        backgroundColor: Colors.primaryLight,
+        paddingHorizontal: 22,
+        minHeight: 46,
+        borderRadius: 23,
     },
     loadMoreButtonSecondary: {
         backgroundColor: '#FFFFFF',
@@ -4568,22 +4131,15 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
     },
     loadMoreButtonDisabled: {
-        backgroundColor: '#94A3B8',
+        opacity: 0.6,
     },
     loadMoreText: {
-        color: '#FFFFFF',
+        color: Colors.primaryDark,
         fontSize: 15,
         fontWeight: '700',
     },
     loadMoreTextSecondary: {
         color: '#3A78B5',
-    },
-    loadMoreHint: {
-        marginTop: 12,
-        fontSize: 13,
-        color: '#64748B',
-        textAlign: 'center',
-        lineHeight: 18,
     },
     // Traditional Pagination Styles
     paginationContainer: {
@@ -4769,120 +4325,8 @@ const styles = StyleSheet.create({
         fontStyle: 'italic',
     },
     // Compact Date Navigation Styles
-    compactDateNavigation: {
-        backgroundColor: Colors.surface,
-        alignSelf: 'stretch',
-        marginVertical: 12,
-        borderRadius: 18,
-        borderWidth: 1,
-        borderColor: '#E8EDF4',
-        overflow: 'hidden',
-    },
-    dateNavigationBar: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 10,
-        paddingVertical: 10,
-        justifyContent: 'space-between',
-    },
-    compactNavButton: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: Colors.primaryLight,
-        flexShrink: 0,
-    },
-    prevButton: {
-        // Specific styles for previous button if needed
-    },
-    nextButton: {
-        // Specific styles for next button if needed
-    },
-    navButtonDisabled: {
-        backgroundColor: Colors.fill,
-        opacity: 0.7,
-    },
-    compactNavButtonText: {
-        fontSize: 11, // Further reduced from 12 to make buttons more compact
-        fontWeight: '600',
-        color: '#10B981',
-    },
     navButtonTextDisabled: {
         color: '#9CA3AF',
-    },
-    compactDateDisplay: {
-        alignItems: 'center',
-        flex: 1,
-        paddingHorizontal: 10,
-        minWidth: 0,
-    },
-    compactDateBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        minHeight: 40,
-        paddingHorizontal: 14,
-        borderRadius: 20,
-        backgroundColor: Colors.primaryLight,
-        maxWidth: '100%',
-    },
-    compactDateText: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: Colors.primaryDark,
-        flexShrink: 1,
-        textAlign: 'center',
-    },
-    compactActivityCount: {
-        fontSize: 12,
-        color: Colors.textSecondary,
-        fontWeight: '500',
-        textAlign: 'center',
-        marginTop: 4,
-    },
-    compactLoadingIndicator: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 8,
-        paddingHorizontal: 16,
-        backgroundColor: '#F8FAFC',
-        borderTopWidth: 1,
-        borderTopColor: '#F1F5F9',
-        gap: 6,
-    },
-    compactLoadingText: {
-        fontSize: 12.5,
-        color: Colors.textSecondary,
-    },
-    compactNavigationInfo: {
-        alignItems: 'center',
-        paddingVertical: 8,
-        paddingHorizontal: 16,
-        borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: Colors.border,
-    },
-    compactInfoText: {
-        fontSize: 12.5,
-        color: Colors.textSecondary,
-        fontWeight: '500',
-    },
-    todayButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 6,
-        minHeight: 46,
-        borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: Colors.border,
-    },
-    todayButtonText: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: Colors.primaryDark,
     },
     // iOS date picker sheet (Android uses the OS dialog instead)
     datePickerBackdrop: {
@@ -4945,12 +4389,11 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     simpleEmptyTitle: {
-        fontSize: 17,
-        fontWeight: '600',
-        color: '#334155',
-        marginTop: 14,
+        fontSize: 18,
+        fontWeight: '700',
+        color: INK,
+        letterSpacing: -0.2,
         textAlign: 'center',
-        lineHeight: 23,
     },
     removeFilterButton: {
         flexDirection: 'row',
@@ -5028,55 +4471,9 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     // ⚠️ Warning Tab Styles
-    tabContentRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: 24,
-    },
-    tabActiveWarning: {
-        // Active indicator handled by tabIndicatorWarning
-    },
-    tabTextActiveWarning: {
-        color: Colors.primaryDark,
-        fontWeight: '700',
-    },
     warningTabHeaderRow: {
         flexDirection: 'row',
         alignItems: 'center',
-    },
-    warningBadgeCount: {
-        backgroundColor: Colors.errorText,
-        borderRadius: 10,
-        minWidth: 20,
-        height: 20,
-        paddingHorizontal: 6,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginLeft: 6,
-    },
-    warningBadgeCountText: {
-        color: '#FFFFFF',
-        fontSize: 11,
-        fontWeight: '700',
-    },
-    tabIndicatorWarning: {
-        position: 'absolute',
-        bottom: 0,
-        left: 4,
-        right: 4,
-        height: 3,
-        backgroundColor: '#3A78B5',
-        borderTopLeftRadius: 3,
-        borderTopRightRadius: 3,
-    },
-    warningSubTabActive: {
-        backgroundColor: Colors.primaryLight,
-        borderColor: Colors.primaryLight,
-    },
-    warningSubTabTextActive: {
-        color: Colors.primaryDark,
-        fontWeight: '700',
     },
     warningsContentContainer: {
         padding: 16,
@@ -5094,53 +4491,22 @@ const styles = StyleSheet.create({
         shadowRadius: 12,
         elevation: 2,
     },
-    warningSummaryHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingBottom: 14,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: Colors.border,
-    },
-    warningSummaryTitleRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flex: 1,
-        marginRight: 8,
-    },
-    warningIconBg: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        backgroundColor: Colors.primaryLight,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    warningSummaryTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#0F172A',
-    },
     warningSummarySubtitle: {
         fontSize: 13,
         color: Colors.textSecondary,
         marginTop: 2,
     },
-    warningTotalBadge: {
-        alignItems: 'flex-end',
-        flexShrink: 0,
-        maxWidth: '45%',
-    },
     warningTotalLabel: {
-        fontSize: 12.5,
+        fontSize: 13,
         color: Colors.textSecondary,
-        fontWeight: '500',
+        fontWeight: '600',
     },
     warningTotalAmount: {
-        fontSize: 21,
+        fontSize: 32,
         fontWeight: '800',
-        color: '#0F172A',
-        letterSpacing: -0.4,
+        color: INK,
+        letterSpacing: -0.8,
+        marginTop: 2,
         fontVariant: ['tabular-nums'],
     },
     warningGrid: {
@@ -5164,9 +4530,10 @@ const styles = StyleSheet.create({
         borderColor: Colors.primary,
     },
     warningGridLabel: {
+        flexShrink: 1,
         fontSize: 13,
         color: Colors.textSecondary,
-        fontWeight: '500',
+        fontWeight: '600',
     },
     warningGridValue: {
         fontSize: 16,
@@ -5240,22 +4607,6 @@ const styles = StyleSheet.create({
     pendingCardPaid: {
         opacity: 0.85,
     },
-    pendingCategoryTag: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-        backgroundColor: Colors.fill,
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 20,
-        flexShrink: 1,
-        marginLeft: 8,
-    },
-    pendingCategoryTagText: {
-        fontSize: 12.5,
-        fontWeight: '600',
-        color: '#475569',
-    },
     pendingDueChip: {
         backgroundColor: '#FFFBEB',
     },
@@ -5328,33 +4679,6 @@ const styles = StyleSheet.create({
         flexWrap: 'wrap',
         flex: 1,
         marginRight: 8,
-    },
-    warningPriorityBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 6,
-    },
-    badgeHigh: {
-        backgroundColor: '#FEF2F2',
-        borderWidth: 1,
-        borderColor: '#FCA5A5',
-    },
-    badgeMedium: {
-        backgroundColor: '#FFFBEB',
-        borderWidth: 1,
-        borderColor: '#FDE68A',
-    },
-    badgePaid: {
-        backgroundColor: '#ECFDF5',
-        borderWidth: 1,
-        borderColor: '#A7F3D0',
-    },
-    warningPriorityText: {
-        fontSize: 10,
-        fontWeight: '700',
     },
     warningCategoryBadgeTag: {
         backgroundColor: '#F1F5F9',
@@ -5476,8 +4800,7 @@ const styles = StyleSheet.create({
     emptyWarningTitle: {
         fontSize: 17,
         fontWeight: '700',
-        color: '#0F172A',
-        marginTop: 12,
+        color: INK,
     },
     emptyWarningSubtitle: {
         fontSize: 14,
@@ -5515,11 +4838,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 8,
         marginBottom: 10,
-    },
-    warningModalCategory: {
-        fontSize: 12,
-        color: '#64748B',
-        fontWeight: '600',
     },
     warningModalItemTitle: {
         fontSize: 17,
@@ -5578,14 +4896,271 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
-        backgroundColor: '#3A78B5',
-        paddingVertical: 12,
-        borderRadius: 10,
+        backgroundColor: Colors.primary,
+        minHeight: 48,
+        borderRadius: 24,
     },
     warningModalPrimaryBtnText: {
         color: '#FFFFFF',
-        fontSize: 14,
+        fontSize: 15,
         fontWeight: '700',
+    },
+    // Header actions
+    headerActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    sheetCloseButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: Colors.fill,
+    },
+
+    // Activity / Payments switch and filter chips
+    filterBar: {
+        backgroundColor: Colors.surface,
+        paddingHorizontal: 16,
+        paddingBottom: 12,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: Colors.border,
+    },
+    segmented: {
+        flexDirection: 'row',
+        backgroundColor: Colors.fill,
+        borderRadius: 14,
+        padding: 4,
+        gap: 4,
+    },
+    segment: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        minHeight: 40,
+        borderRadius: 10,
+    },
+    segmentSelected: {
+        backgroundColor: Colors.surface,
+        shadowColor: INK,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.08,
+        shadowRadius: 3,
+        elevation: 2,
+    },
+    segmentText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: Colors.textSecondary,
+    },
+    segmentTextSelected: {
+        color: INK,
+    },
+    segmentBadge: {
+        minWidth: 20,
+        height: 20,
+        paddingHorizontal: 6,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: Colors.errorText,
+    },
+    segmentBadgeText: {
+        fontSize: 11.5,
+        fontWeight: '700',
+        color: '#FFFFFF',
+        fontVariant: ['tabular-nums'],
+    },
+    chipScroll: {
+        marginHorizontal: -16,
+        flexGrow: 0,
+    },
+    chipRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 16,
+        paddingTop: 12,
+    },
+    chip: {
+        minHeight: 36,
+        paddingHorizontal: 16,
+        borderRadius: 18,
+        justifyContent: 'center',
+        backgroundColor: Colors.surface,
+        borderWidth: 1,
+        borderColor: Colors.border,
+    },
+    chipSelected: {
+        backgroundColor: INK,
+        borderColor: INK,
+    },
+    chipText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#334155',
+    },
+    chipTextSelected: {
+        color: '#FFFFFF',
+    },
+    subChipRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 16,
+        paddingTop: 8,
+    },
+    subChip: {
+        minHeight: 32,
+        paddingHorizontal: 12,
+        borderRadius: 16,
+        justifyContent: 'center',
+    },
+    subChipSelected: {
+        backgroundColor: Colors.primaryLight,
+    },
+    subChipText: {
+        fontSize: 13.5,
+        fontWeight: '600',
+        color: Colors.textSecondary,
+    },
+    subChipTextSelected: {
+        color: Colors.primaryDark,
+    },
+
+    // Day stepper — the heading of the feed
+    dayStepper: {
+        marginHorizontal: 16,
+        marginTop: 16,
+        alignItems: 'center',
+    },
+    dayStepperRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'stretch',
+    },
+    dayStepButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: Colors.surface,
+        borderWidth: 1,
+        borderColor: Colors.border,
+    },
+    dayStepTitleButton: {
+        flex: 1,
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        minHeight: 44,
+        justifyContent: 'center',
+    },
+    dayStepTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    dayStepTitle: {
+        flexShrink: 1,
+        fontSize: 22,
+        fontWeight: '800',
+        color: INK,
+        letterSpacing: -0.5,
+    },
+    dayStepCaption: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: Colors.textSecondary,
+        marginTop: 2,
+        fontVariant: ['tabular-nums'],
+    },
+    backToTodayButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        minHeight: 36,
+        paddingHorizontal: 14,
+        borderRadius: 18,
+        marginTop: 10,
+        backgroundColor: Colors.primaryLight,
+    },
+    backToTodayText: {
+        fontSize: 13.5,
+        fontWeight: '700',
+        color: Colors.primaryDark,
+    },
+
+    // Empty states
+    emptyIconBadge: {
+        width: 64,
+        height: 64,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: Colors.primaryLight,
+        marginBottom: 16,
+    },
+    simpleEmptyBody: {
+        fontSize: 15,
+        lineHeight: 21,
+        color: Colors.textSecondary,
+        textAlign: 'center',
+        marginTop: 6,
+        maxWidth: 300,
+    },
+
+    // Payment cards
+    paymentTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: INK,
+        lineHeight: 22,
+    },
+    paymentPayee: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 8,
+        marginBottom: 12,
+    },
+    paymentPayeeAvatar: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: Colors.primaryLight,
+    },
+    paymentPayeeAvatarText: {
+        fontSize: 11.5,
+        fontWeight: '700',
+        color: Colors.primaryDark,
+    },
+    paymentPayeeName: {
+        flexShrink: 1,
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#334155',
+    },
+    warningGridLabelRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 4,
+    },
+    warningGridLabelActive: {
+        color: Colors.primaryDark,
+    },
+    warningCategoryHeaderRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        flexShrink: 0,
     },
 });
 

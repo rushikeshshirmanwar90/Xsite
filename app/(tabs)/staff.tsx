@@ -7,6 +7,7 @@ import AdminCard from '@/components/staff/AdminCard';
 import StaffQRScannerModal from '@/components/staff/StaffQRScannerModal';
 import ManualStaffAssignModal from '@/components/staff/ManualStaffAssignModal';
 import ManagePaymentModal from '@/components/staff/ManagePaymentModal';
+import { Colors } from '@/constants/theme';
 import { getClientId } from '@/functions/clientId';
 import { addStaff, removeStaff } from '@/functions/staff';
 import { isAdmin, useUser } from '@/hooks/useUser';
@@ -35,13 +36,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { staffStorage } from '@/utils/staffStorage';
 import { toast } from 'sonner-native';
 
+// One tint for every permission — a colour per row read as six different kinds of thing
 const ALL_PERMISSIONS = [
-    { key: 'addMaterial',      label: 'Add Material',    icon: 'cube-outline',          color: '#7C3AED', bg: '#FAF5FF' },
-    { key: 'addMaterialUsage', label: 'Material Usage',  icon: 'construct-outline',     color: '#D97706', bg: '#FFFBEB' },
-    { key: 'addOtherCost',     label: 'Other Cost',      icon: 'cash-outline',          color: '#E11D48', bg: '#FFF1F2' },
-    { key: 'addEquipmentCost', label: 'Equipment Cost',  icon: 'hardware-chip-outline', color: '#2563EB', bg: '#EAF0FE' },
-    { key: 'contractor',       label: 'Contractor',      icon: 'people-outline',        color: '#16A34A', bg: '#F0FDF4' },
-    { key: 'generateReport',   label: 'Generate Report', icon: 'bar-chart-outline',     color: '#F59E0B', bg: '#FEF0E3' },
+    { key: 'addMaterial', label: 'Add Materials', icon: 'cube-outline' },
+    { key: 'addMaterialUsage', label: 'Record Material Use', icon: 'construct-outline' },
+    { key: 'addOtherCost', label: 'Add Other Costs', icon: 'cash-outline' },
+    { key: 'addEquipmentCost', label: 'Add Equipment Costs', icon: 'hardware-chip-outline' },
+    { key: 'contractor', label: 'Manage Contractors', icon: 'people-outline' },
+    { key: 'generateReport', label: 'Generate Reports', icon: 'bar-chart-outline' },
 ];
 
 interface Admin {
@@ -88,10 +90,10 @@ const StaffManagement: React.FC = () => {
     // Get user role for access control
     const { user } = useUser();
     const userIsAdmin = isAdmin(user);
-    
+
     // Initialize notification hook at component level
     const { sendProjectNotification } = useSimpleNotifications();
-    
+
     // Router for navigation
     const router = useRouter();
 
@@ -101,14 +103,14 @@ const StaffManagement: React.FC = () => {
             console.log('🔍 Fetching clientId...');
             const id = await getClientId();
             console.log('✅ ClientId received:', id);
-            
+
             if (!id) {
                 console.error('❌ No valid clientId found. User may need to log in again.');
                 toast.error('Session expired. Please log in again.');
                 setLoading(false);
                 return;
             }
-            
+
             setClientId(id);
         }
         fetchClientId()
@@ -119,12 +121,12 @@ const StaffManagement: React.FC = () => {
     useEffect(() => {
         const fetchData = async () => {
             console.log('🔍 Attempting to fetch staff data with clientId:', clientId);
-            
+
             if (!clientId) {
                 console.log('⚠️ ClientId is not available yet, skipping API call');
                 return;
             }
-            
+
             setLoading(true);
             await fetchStaffAndAdminData();
         };
@@ -137,37 +139,37 @@ const StaffManagement: React.FC = () => {
         try {
             console.log('📡 Making API calls with clientId:', clientId);
             console.log('📡 Domain:', domain);
-            
+
             // ✅ FIXED: Try new API first (using client's staffs array)
             console.log('🔍 Trying new Staff API (client staffs array)...');
             let staffUrl = `${domain}/api/clients/staff?clientId=${clientId}`;
             console.log('📤 Staff URL:', staffUrl);
-            
+
             let staffRes = await apiClient.get(staffUrl);
             console.log('📥 Staff Response Status:', staffRes.status);
             console.log('📥 Staff Response Data:', JSON.stringify(staffRes.data, null, 2));
-            
+
             // ✅ FIXED: Handle the correct API response format
             let staffResponse = staffRes.data as { success?: boolean; data?: Staff[]; message?: string };
             let staffData: Staff[] = [];
-            
+
             if (staffResponse?.success && Array.isArray(staffResponse.data)) {
                 staffData = staffResponse.data;
                 console.log('✅ New API returned staff data:', staffData.length, 'items');
             } else {
                 console.log('⚠️ New API returned no data or failed, trying fallback...');
-                
+
                 // ✅ Fallback to old API if new API returns empty or fails
                 try {
                     staffUrl = `${domain}/api/users/staff?clientId=${clientId}`;
                     console.log('📤 Fallback Staff URL:', staffUrl);
-                    
+
                     staffRes = await apiClient.get(staffUrl);
                     console.log('📥 Fallback Response Status:', staffRes.status);
                     console.log('📥 Fallback Response Data:', JSON.stringify(staffRes.data, null, 2));
-                    
+
                     staffResponse = staffRes.data as { success?: boolean; data?: Staff[]; message?: string };
-                    
+
                     if (staffResponse?.success && Array.isArray(staffResponse.data)) {
                         staffData = staffResponse.data;
                         console.log('✅ Fallback API returned staff data:', staffData.length, 'items');
@@ -180,24 +182,24 @@ const StaffManagement: React.FC = () => {
                     staffData = [];
                 }
             }
-            
+
             console.log('✅ Final staff data processed:', staffData.length, 'items');
             setStaffList(Array.isArray(staffData) ? staffData : []);
-            
+
             // ✅ FIXED: Fetch Admin data with proper error handling
             console.log('🔍 Fetching Admin data...');
             try {
                 const adminUrl = `${domain}/api/users/admin?clientId=${clientId}`;
                 console.log('📤 Admin URL:', adminUrl);
-                
+
                 const adminRes = await apiClient.get(adminUrl);
                 console.log('📥 Admin Response Status:', adminRes.status);
                 console.log('📥 Admin Response Data:', JSON.stringify(adminRes.data, null, 2));
-                
+
                 // ✅ FIXED: Handle admin response format
                 const adminResponse = adminRes.data as { success?: boolean; data?: Admin | Admin[]; message?: string };
                 let adminData: Admin[] = [];
-                
+
                 if (adminResponse?.success) {
                     if (Array.isArray(adminResponse.data)) {
                         adminData = adminResponse.data;
@@ -209,13 +211,13 @@ const StaffManagement: React.FC = () => {
                     console.log('⚠️ Admin API returned no data or failed');
                     adminData = [];
                 }
-                
+
                 setAdminList(adminData);
             } catch (adminError: any) {
                 console.error('❌ Admin API error:', adminError);
                 console.error('❌ Admin error response:', adminError.response?.data);
                 console.error('❌ Admin error status:', adminError.response?.status);
-                
+
                 // Handle specific admin error cases
                 if (adminError.response?.status === 404) {
                     console.log('⚠️ Admin not found - this is normal for some clients');
@@ -225,21 +227,21 @@ const StaffManagement: React.FC = () => {
                     setAdminList([]);
                 }
             }
-            
+
             // ✅ FIXED: Fetch Client data with proper error handling
             console.log('🔍 Fetching Client data...');
             try {
                 const clientUrl = `${domain}/api/clients?id=${clientId}`;
                 console.log('📤 Client URL:', clientUrl);
-                
+
                 const clientRes = await apiClient.get(clientUrl);
                 console.log('📥 Client Response Status:', clientRes.status);
                 console.log('📥 Client Response Data:', JSON.stringify(clientRes.data, null, 2));
-                
+
                 // ✅ FIXED: Handle client response format
                 const clientResponse = clientRes.data as { success?: boolean; data?: ClientData; message?: string };
                 let clientInfo: ClientData | null = null;
-                
+
                 if (clientResponse?.success && clientResponse.data) {
                     clientInfo = clientResponse.data;
                     console.log('✅ Client data processed:', clientInfo.name || 'Unknown Company');
@@ -247,7 +249,7 @@ const StaffManagement: React.FC = () => {
                     console.log('⚠️ Client API returned no data or failed');
                     clientInfo = null;
                 }
-                
+
                 setClientData(clientInfo);
             } catch (clientError: any) {
                 console.error('❌ Client API error:', clientError);
@@ -255,19 +257,19 @@ const StaffManagement: React.FC = () => {
                 console.error('❌ Client error status:', clientError.response?.status);
                 setClientData(null);
             }
-            
+
             console.log('✅ Data loading completed successfully');
-            
+
         } catch (error) {
             console.error('❌ Error fetching data:', error);
-            
+
             // Handle specific error cases
             if (error && typeof error === 'object' && 'response' in error) {
                 const axiosError = error as any;
                 console.error('❌ Error response:', axiosError.response?.data);
                 console.error('❌ Error status:', axiosError.response?.status);
                 console.error('❌ Error config:', axiosError.config);
-                
+
                 // Handle specific error cases
                 if (axiosError.response?.status === 400) {
                     console.error('❌ 400 Error - likely missing or invalid clientId');
@@ -290,7 +292,7 @@ const StaffManagement: React.FC = () => {
                 console.error('❌ Unknown error type:', error);
                 toast.error('Failed to load staff and admin data');
             }
-            
+
             // Set empty arrays on error to prevent UI issues
             setStaffList([]);
             setAdminList([]);
@@ -310,10 +312,10 @@ const StaffManagement: React.FC = () => {
 
         console.log('🔄 Pull-to-refresh triggered');
         setRefreshing(true);
-        
+
         try {
+            // The list updating is the confirmation — no toast for an expected success
             await fetchStaffAndAdminData();
-            toast.success('Data refreshed successfully');
         } catch (error) {
             console.error('❌ Error during pull-to-refresh:', error);
             toast.error('Failed to refresh data');
@@ -326,19 +328,19 @@ const StaffManagement: React.FC = () => {
             console.log('📋 Staff member:', JSON.stringify(staffMember, null, 2));
             console.log('🏢 Company name:', companyName);
             console.log('🆔 Client ID:', clientId);
-            
+
             // Create welcome message using the notification service
             const welcomeMessage = notificationService.createWelcomeMessage(
                 `${staffMember.firstName} ${staffMember.lastName}`,
                 companyName,
                 staffMember.role
             );
-            
+
             const welcomeSubject = notificationService.createWelcomeSubject(companyName);
-            
+
             console.log('📧 Welcome subject:', welcomeSubject);
             console.log('📝 Welcome message preview:', welcomeMessage.substring(0, 100) + '...');
-            
+
             // Create notification payload
             const notificationPayload = {
                 recipientEmail: staffMember.email,
@@ -361,9 +363,9 @@ const StaffManagement: React.FC = () => {
             // Send notification using the email notification service
             console.log('🚀 Calling email notification service...');
             const success = await emailNotificationService.sendStaffWelcomeMessage(notificationPayload);
-            
+
             console.log('📊 Notification service result:', success);
-            
+
             if (success) {
                 console.log('✅ Welcome message sent successfully');
                 toast.success(`Welcome message sent to ${staffMember.firstName} ${staffMember.lastName}`);
@@ -409,7 +411,7 @@ const StaffManagement: React.FC = () => {
         try {
             console.log('🚀 Starting staff addition process...');
             console.log('📋 Staff payload:', JSON.stringify(payload, null, 2));
-            
+
             const res = await addStaff(payload, sendProjectNotification);
             console.log('📥 addStaff function result:', res);
 
@@ -417,7 +419,7 @@ const StaffManagement: React.FC = () => {
                 console.log('✅ Staff added successfully, showing success toast');
                 toast.success('Staff Added successfully');
                 setShowAddModal(false);
-                
+
                 // ✅ Update cached staff data immediately
                 const newStaffForCache = {
                     fullName: `${newStaff.firstName} ${newStaff.lastName}`,
@@ -425,24 +427,24 @@ const StaffManagement: React.FC = () => {
                 };
                 await staffStorage.addStaffMember(clientId, newStaffForCache);
                 console.log('✅ Staff added to cache for immediate availability');
-                
+
                 // Send welcome message to the new staff member
                 console.log('📧 Preparing to send welcome message...');
                 const staffWithId = { ...newStaff, _id: res._id || res.id };
                 console.log('👤 Staff with ID:', JSON.stringify(staffWithId, null, 2));
                 console.log('🏢 Company data:', JSON.stringify(clientData, null, 2));
-                
+
                 console.log('🎯 Calling sendWelcomeMessage...');
                 await sendWelcomeMessage(staffWithId, clientData.name);
                 console.log('✅ Welcome message process completed');
-                
+
                 // Refresh staff and admin list after adding new staff
                 const refreshData = async () => {
                     if (!clientId) {
                         console.log('⚠️ ClientId not available for refresh');
                         return;
                     }
-                    
+
                     console.log('🔄 Refreshing staff and admin data...');
                     setLoading(true);
                     try {
@@ -561,7 +563,7 @@ const StaffManagement: React.FC = () => {
 
         // Check if staff is assigned to any projects for this client
         const clientProjects = filterStaffProjectsByClient(staff);
-        
+
         if (clientProjects.length > 0) {
             const projectNames = clientProjects.map(p => p.projectName).join(', ');
             Alert.alert(
@@ -635,11 +637,11 @@ const StaffManagement: React.FC = () => {
             }
         } catch (error: any) {
             console.error('❌ Error in performStaffRemoval:', error);
-            
+
             if (error.response) {
                 console.error('❌ Error response:', error.response.data);
                 console.error('❌ Error status:', error.response.status);
-                
+
                 if (error.response.status === 400) {
                     const errorMessage = error.response.data?.message || 'Invalid request';
                     if (errorMessage.includes('assigned to the following project')) {
@@ -667,7 +669,7 @@ const StaffManagement: React.FC = () => {
         if (user && (staff._id === user._id || staff.email === user.email)) {
             return false;
         }
-        
+
         const fullName = `${staff.firstName} ${staff.lastName}`.toLowerCase();
         const query = searchQuery.toLowerCase();
         return (
@@ -682,7 +684,7 @@ const StaffManagement: React.FC = () => {
         if (user && (admin._id === user._id || admin.email === user.email)) {
             return false;
         }
-        
+
         const fullName = `${admin.firstName} ${admin.lastName}`.toLowerCase();
         const query = searchQuery.toLowerCase();
         return (
@@ -690,12 +692,6 @@ const StaffManagement: React.FC = () => {
             admin.email.toLowerCase().includes(query)
         );
     });
-
-    const handleAdminPress = (admin: Admin) => {
-        console.log('Admin selected:', `${admin.firstName} ${admin.lastName}`);
-        // You can add navigation to admin detail page here if needed
-        toast.success(`Admin: ${admin.firstName} ${admin.lastName}`);
-    };
 
     // Helper function to filter staff projects by current client
     const filterStaffProjectsByClient = (staff: Staff) => {
@@ -720,7 +716,7 @@ const StaffManagement: React.FC = () => {
 
     // Prepare data for single FlatList
     const listData = [];
-    
+
     // Add admin section header if there are admins
     if (filteredAdmins.length > 0) {
         listData.push({
@@ -728,7 +724,7 @@ const StaffManagement: React.FC = () => {
             id: 'admin-header',
             count: filteredAdmins.length
         });
-        
+
         // Add each admin
         filteredAdmins.forEach(admin => {
             listData.push({
@@ -738,14 +734,14 @@ const StaffManagement: React.FC = () => {
             });
         });
     }
-    
+
     // Add staff section header
     listData.push({
         type: 'staffHeader',
         id: 'staff-header',
         count: filteredStaff.length
     });
-    
+
     // Add each staff member or empty state
     if (filteredStaff.length > 0) {
         filteredStaff.forEach(staff => {
@@ -768,45 +764,32 @@ const StaffManagement: React.FC = () => {
             case 'adminHeader':
                 return (
                     <View style={styles.sectionHeader}>
-                        <View style={styles.sectionTitleContainer}>
-                            <Ionicons name="shield-checkmark" size={20} color="#3A78B5" />
-                            <Text style={styles.sectionTitle}>Administrators</Text>
-                        </View>
-                        <Text style={styles.sectionCount}>
-                            {item.count} admin{item.count !== 1 ? 's' : ''}
-                        </Text>
+                        <Text style={styles.sectionTitle} accessibilityRole="header">Administrators</Text>
+                        <Text style={styles.sectionCount}>{item.count}</Text>
                     </View>
                 );
-            
+
             case 'admin':
                 return (
-                    <View style={styles.adminContainer}>
-                        <AdminCard
-                            admin={item.data}
-                            onPress={() => handleAdminPress(item.data)}
-                        />
+                    <View style={styles.rowContainer}>
+                        <AdminCard admin={item.data} />
                     </View>
                 );
-            
+
             case 'staffHeader':
                 return (
                     <View style={styles.sectionHeader}>
-                        <View style={styles.sectionTitleContainer}>
-                            <Ionicons name="people" size={20} color="#3A78B5" />
-                            <Text style={styles.sectionTitle}>Staff Members</Text>
-                        </View>
-                        <Text style={styles.sectionCount}>
-                            {item.count} staff member{item.count !== 1 ? 's' : ''}
-                        </Text>
+                        <Text style={styles.sectionTitle} accessibilityRole="header">Staff</Text>
+                        <Text style={styles.sectionCount}>{item.count}</Text>
                     </View>
                 );
-            
+
             case 'staff': {
                 const staffData: Staff = item.data;
                 const filteredProjects = filterStaffProjectsByClient(staffData);
                 const isExpanded = expandedStaffId === staffData._id;
                 return (
-                    <View style={styles.staffContainer}>
+                    <View style={styles.rowContainer}>
                         <StaffCard
                             staff={{ ...staffData, assignedProjects: filteredProjects }}
                             onPress={() => handleStaffPress(staffData)}
@@ -814,90 +797,95 @@ const StaffManagement: React.FC = () => {
                         />
                         {isExpanded && (
                             <View style={dd.dropdown}>
-                                {/* Projects — shown directly */}
                                 {filteredProjects.length > 0 && (
                                     <View style={dd.projSection}>
                                         <Text style={dd.projTitle}>Assigned Projects</Text>
-                                        {filteredProjects.map((p, i) => (
-                                            <View key={p.projectId ?? i} style={dd.projRow}>
-                                                <Ionicons
-                                                    name={p.status === 'active' ? 'folder' : 'folder-open'}
-                                                    size={13}
-                                                    color={p.status === 'active' ? '#3A78B5' : '#94A3B8'}
-                                                />
-                                                <Text
-                                                    style={[dd.projName, p.status !== 'active' && { color: '#94A3B8' }]}
-                                                    numberOfLines={1}
+                                        {filteredProjects.map((p, i) => {
+                                            const isActive = p.status === 'active';
+                                            return (
+                                                <View
+                                                    key={p.projectId ?? i}
+                                                    style={[dd.projRow, i > 0 && dd.projRowDivider]}
+                                                    accessible
+                                                    accessibilityLabel={`${p.projectName}${isActive
+                                                        ? (p.monthlyPayment ? `, ₹${p.monthlyPayment.toLocaleString('en-IN')} a month` : '')
+                                                        : `, ${p.status}`}`}
                                                 >
-                                                    {p.projectName}
-                                                </Text>
-                                                {p.status !== 'active' ? (
-                                                    <View style={proj.closedTag}>
-                                                        <Text style={proj.closedTagText}>{p.status}</Text>
-                                                    </View>
-                                                ) : !!p.monthlyPayment && (
-                                                    <Text style={proj.payAmt}>
-                                                        ₹{p.monthlyPayment.toLocaleString('en-IN')}/mo
+                                                    <Ionicons
+                                                        name={isActive ? 'folder-outline' : 'folder-open-outline'}
+                                                        size={16}
+                                                        color={Colors.textSecondary}
+                                                    />
+                                                    <Text
+                                                        style={[dd.projName, !isActive && dd.projNameInactive]}
+                                                        numberOfLines={1}
+                                                    >
+                                                        {p.projectName}
                                                     </Text>
-                                                )}
-                                            </View>
-                                        ))}
+                                                    {!isActive ? (
+                                                        <View style={dd.statusTag}>
+                                                            <Text style={dd.statusTagText}>{p.status}</Text>
+                                                        </View>
+                                                    ) : !!p.monthlyPayment && (
+                                                        <Text style={dd.payAmt}>
+                                                            ₹{p.monthlyPayment.toLocaleString('en-IN')}<Text style={dd.payUnit}>/mo</Text>
+                                                        </Text>
+                                                    )}
+                                                </View>
+                                            );
+                                        })}
                                     </View>
                                 )}
 
-                                {/* Action list */}
+                                {/* Actions — one tint for everything except the destructive one */}
                                 <View style={dd.list}>
-                                    <TouchableOpacity style={dd.item} onPress={() => handleViewActivity(staffData)} activeOpacity={0.7}>
-                                        <Ionicons name="time-outline" size={18} color="#3A78B5" />
+                                    <TouchableOpacity style={dd.item} onPress={() => handleViewActivity(staffData)} activeOpacity={0.6} accessibilityRole="button">
+                                        <Ionicons name="time-outline" size={20} color={Colors.primaryDark} />
                                         <Text style={dd.label}>View Activity</Text>
-                                        <Ionicons name="chevron-forward" size={14} color="#CBD5E1" />
+                                        <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
                                     </TouchableOpacity>
 
-                                    {userIsAdmin && <View style={dd.sep} />}
-
                                     {userIsAdmin && (
-                                        <TouchableOpacity style={dd.item} onPress={() => handleManagePermissionsPress(staffData)} activeOpacity={0.7}>
-                                            <Ionicons name="shield-checkmark-outline" size={18} color="#7C3AED" />
-                                            <Text style={dd.label}>Manage Permissions</Text>
-                                            <Ionicons name="chevron-forward" size={14} color="#CBD5E1" />
+                                        <TouchableOpacity style={[dd.item, dd.itemDivider]} onPress={() => handleManagePermissionsPress(staffData)} activeOpacity={0.6} accessibilityRole="button">
+                                            <Ionicons name="shield-checkmark-outline" size={20} color={Colors.primaryDark} />
+                                            <Text style={dd.label}>Permissions</Text>
+                                            <Text style={dd.detail}>{(staffData.permissions || []).length} of {ALL_PERMISSIONS.length}</Text>
+                                            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
                                         </TouchableOpacity>
                                     )}
-
-                                    {userIsAdmin && filteredProjects.length > 0 && <View style={dd.sep} />}
 
                                     {userIsAdmin && filteredProjects.length > 0 && (
-                                        <TouchableOpacity style={dd.item} onPress={() => handleManagePaymentPress(staffData)} activeOpacity={0.7}>
-                                            <Ionicons name="cash-outline" size={18} color="#16A34A" />
-                                            <Text style={dd.label}>Manage Payment</Text>
-                                            <Ionicons name="chevron-forward" size={14} color="#CBD5E1" />
-                                        </TouchableOpacity>
-                                    )}
-
-                                    {userIsAdmin && <View style={dd.sep} />}
-
-                                    {userIsAdmin && (
-                                        <TouchableOpacity style={dd.item} onPress={() => handleRemoveFromSheet(staffData)} activeOpacity={0.7}>
-                                            <Ionicons name="trash-outline" size={18} color="#E11D48" />
-                                            <Text style={[dd.label, { color: '#E11D48' }]}>Remove Staff</Text>
+                                        <TouchableOpacity style={[dd.item, dd.itemDivider]} onPress={() => handleManagePaymentPress(staffData)} activeOpacity={0.6} accessibilityRole="button">
+                                            <Ionicons name="wallet-outline" size={20} color={Colors.primaryDark} />
+                                            <Text style={dd.label}>Monthly Payment</Text>
+                                            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
                                         </TouchableOpacity>
                                     )}
                                 </View>
+
+                                {/* Kept apart from the everyday actions so it isn't hit by mistake */}
+                                {userIsAdmin && (
+                                    <TouchableOpacity style={dd.removeButton} onPress={() => handleRemoveFromSheet(staffData)} activeOpacity={0.6} accessibilityRole="button">
+                                        <Ionicons name="person-remove-outline" size={18} color={Colors.errorText} />
+                                        <Text style={dd.removeLabel}>Remove from Team</Text>
+                                    </TouchableOpacity>
+                                )}
                             </View>
                         )}
                     </View>
                 );
             }
-            
+
             case 'staffEmpty':
                 return (
-                    <View style={styles.staffContainer}>
+                    <View style={styles.rowContainer}>
                         <StaffEmptyState
                             hasSearchQuery={item.hasSearchQuery}
-                            onAddPress={() => setShowAddModal(true)}
+                            onAddPress={userIsAdmin ? () => setShowAddModal(true) : undefined}
                         />
                     </View>
                 );
-            
+
             default:
                 return null;
         }
@@ -905,11 +893,9 @@ const StaffManagement: React.FC = () => {
 
     return (
         <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+            <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
 
             <StaffHeader
-                staffCount={staffList.length}
-                adminCount={adminList.length}
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
                 onScanQRPress={() => setShowQRScanner(true)}
@@ -917,7 +903,7 @@ const StaffManagement: React.FC = () => {
             />
 
             {loading ? (
-                <View style={{ paddingHorizontal: 20, paddingTop: 8 }}>
+                <View style={styles.loadingContainer}>
                     <StaffListSkeleton count={6} />
                 </View>
             ) : (
@@ -954,7 +940,7 @@ const StaffManagement: React.FC = () => {
                 onSuccess={async () => {
                     // Refresh staff list after successful assignment
                     if (!clientId) return;
-                    
+
                     setLoading(true);
                     try {
                         // ✅ Use new API to fetch staff
@@ -972,7 +958,7 @@ const StaffManagement: React.FC = () => {
                 onPaymentUpdated={handlePaymentUpdated}
             />
 
-            {/* ── Permissions Modal ───────────────────────────────────────── */}
+            {/* ── Permissions sheet ───────────────────────────────────────── */}
             <Modal
                 visible={showPermissionsModal}
                 animationType="slide"
@@ -984,112 +970,118 @@ const StaffManagement: React.FC = () => {
                         style={sheet.backdropFill}
                         activeOpacity={1}
                         onPress={() => setShowPermissionsModal(false)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Close permissions"
                     />
-                <View style={[sheet.container, perm.container]}>
-                    <View style={sheet.handle} />
-
-                    <View style={perm.header}>
-                        <View>
-                            <Text style={perm.title}>Permissions</Text>
-                            {permissionsStaff && (
-                                <Text style={perm.subtitle}>
-                                    {permissionsStaff.firstName} {permissionsStaff.lastName}
-                                </Text>
-                            )}
+                    <View style={sheet.container}>
+                        <View style={perm.header}>
+                            <View style={perm.headerText}>
+                                <Text style={perm.title} accessibilityRole="header">Permissions</Text>
+                                {permissionsStaff && (
+                                    <Text style={perm.subtitle} numberOfLines={1}>
+                                        {permissionsStaff.firstName} {permissionsStaff.lastName} · {activePermissions.length} of {ALL_PERMISSIONS.length} allowed
+                                    </Text>
+                                )}
+                            </View>
+                            <TouchableOpacity
+                                onPress={() => setShowPermissionsModal(false)}
+                                style={perm.closeBtn}
+                                accessibilityRole="button"
+                                accessibilityLabel="Close"
+                            >
+                                <Ionicons name="close" size={20} color={Colors.textSecondary} />
+                            </TouchableOpacity>
                         </View>
-                        <TouchableOpacity onPress={() => setShowPermissionsModal(false)} style={perm.closeBtn}>
-                            <Ionicons name="close" size={20} color="#64748B" />
+
+                        <Text style={perm.hint}>Choose what this person can add or do in your projects.</Text>
+
+                        <ScrollView showsVerticalScrollIndicator={false} style={perm.list}>
+                            <View style={perm.group}>
+                                {ALL_PERMISSIONS.map((p, i) => {
+                                    const active = activePermissions.includes(p.key);
+                                    return (
+                                        <TouchableOpacity
+                                            key={p.key}
+                                            style={[perm.row, i > 0 && perm.rowDivider]}
+                                            onPress={() => togglePermission(p.key)}
+                                            activeOpacity={0.6}
+                                            accessibilityRole="checkbox"
+                                            accessibilityState={{ checked: active }}
+                                            accessibilityLabel={p.label}
+                                        >
+                                            <Ionicons name={p.icon as any} size={20} color={active ? Colors.primaryDark : Colors.textSecondary} />
+                                            <Text style={[perm.rowLabel, active && perm.rowLabelActive]}>{p.label}</Text>
+                                            <Ionicons
+                                                name={active ? 'checkmark-circle' : 'ellipse-outline'}
+                                                size={24}
+                                                color={active ? Colors.primary : Colors.textTertiary}
+                                            />
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+                        </ScrollView>
+
+                        <TouchableOpacity
+                            style={[perm.saveBtn, savingPermissions && perm.saveBtnDisabled]}
+                            onPress={savePermissions}
+                            disabled={savingPermissions}
+                            activeOpacity={0.85}
+                            accessibilityRole="button"
+                            accessibilityState={{ busy: savingPermissions }}
+                        >
+                            {savingPermissions
+                                ? <ActivityIndicator size="small" color="#FFFFFF" />
+                                : <Text style={perm.saveBtnText}>Save Permissions</Text>
+                            }
                         </TouchableOpacity>
                     </View>
-
-                    <ScrollView showsVerticalScrollIndicator={false} style={{ marginBottom: 12 }}>
-                        {ALL_PERMISSIONS.map(p => {
-                            const active = activePermissions.includes(p.key);
-                            return (
-                                <TouchableOpacity
-                                    key={p.key}
-                                    style={[perm.chip, active && { backgroundColor: p.bg, borderColor: p.color }]}
-                                    onPress={() => togglePermission(p.key)}
-                                    activeOpacity={0.75}
-                                >
-                                    <View style={[perm.chipIcon, { backgroundColor: active ? p.bg : '#F1F5F9' }]}>
-                                        <Ionicons name={p.icon as any} size={18} color={active ? p.color : '#94A3B8'} />
-                                    </View>
-                                    <Text style={[perm.chipLabel, active && { color: p.color, fontWeight: '700' }]}>
-                                        {p.label}
-                                    </Text>
-                                    {active
-                                        ? <Ionicons name="checkmark-circle" size={20} color={p.color} />
-                                        : <Ionicons name="ellipse-outline" size={20} color="#CBD5E1" />
-                                    }
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </ScrollView>
-
-                    <TouchableOpacity
-                        style={[perm.saveBtn, savingPermissions && perm.saveBtnDisabled]}
-                        onPress={savePermissions}
-                        disabled={savingPermissions}
-                        activeOpacity={0.85}
-                    >
-                        {savingPermissions
-                            ? <ActivityIndicator size="small" color="#fff" />
-                            : <Text style={perm.saveBtnText}>Save Changes</Text>
-                        }
-                    </TouchableOpacity>
-                </View>
                 </View>
             </Modal>
         </SafeAreaView>
     );
 };
 
+const INK = '#0F172A';
+
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F9FAFB',
+        backgroundColor: Colors.background,
+    },
+    loadingContainer: {
+        paddingHorizontal: 16,
+        paddingTop: 8,
     },
     listContainer: {
-        paddingBottom: 20,
+        paddingBottom: 32,
     },
     sectionHeader: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        backgroundColor: '#FFFFFF',
-        borderBottomWidth: 1,
-        borderBottomColor: '#E2E8F0',
-        marginBottom: 8,
-    },
-    sectionTitleContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'baseline',
         gap: 8,
+        paddingHorizontal: 20,
+        paddingTop: 22,
+        paddingBottom: 10,
     },
     sectionTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#1E293B',
+        fontSize: 20,
+        fontWeight: '800',
+        color: INK,
+        letterSpacing: -0.4,
     },
     sectionCount: {
-        fontSize: 13,
-        fontWeight: '500',
-        color: '#64748B',
+        fontSize: 15,
+        fontWeight: '600',
+        color: Colors.textSecondary,
+        fontVariant: ['tabular-nums'],
     },
-    adminContainer: {
-        paddingHorizontal: 20,
-        paddingVertical: 8,
-    },
-    staffContainer: {
-        paddingHorizontal: 20,
-        paddingVertical: 4,
+    rowContainer: {
+        paddingHorizontal: 16,
     },
 });
 
-// ── Action Sheet Styles ────────────────────────────────────────────────────────
+// ── Bottom sheet ───────────────────────────────────────────────────────────────
 const sheet = StyleSheet.create({
     overlay: {
         flex: 1,
@@ -1104,276 +1096,209 @@ const sheet = StyleSheet.create({
         bottom: 0,
     },
     container: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: Colors.background,
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
-        paddingHorizontal: 20,
+        paddingHorizontal: 16,
+        paddingTop: 16,
         paddingBottom: 36,
-        paddingTop: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -6 },
-        shadowOpacity: 0.08,
-        shadowRadius: 20,
-        elevation: 20,
-    },
-    handle: {
-        width: 36,
-        height: 4,
-        borderRadius: 2,
-        backgroundColor: '#E2E8F0',
-        alignSelf: 'center',
-        marginBottom: 18,
-    },
-    profile: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        paddingBottom: 16,
-    },
-    profileAvatar: {
-        width: 44,
-        height: 44,
-        borderRadius: 14,
-        backgroundColor: '#EAF0FE',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    profileAvatarText: {
-        fontSize: 16,
-        fontWeight: '800',
-        color: '#3A78B5',
-    },
-    profileName: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#0F172A',
-    },
-    profileRole: {
-        fontSize: 12,
-        color: '#64748B',
-        marginTop: 2,
-        textTransform: 'capitalize',
-    },
-    divider: {
-        height: 1,
-        backgroundColor: '#F1F5F9',
-        marginVertical: 8,
-    },
-    action: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 14,
-        paddingVertical: 13,
-    },
-    actionIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    actionText: {
-        flex: 1,
-    },
-    actionLabel: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#0F172A',
-    },
-    actionSub: {
-        fontSize: 12,
-        color: '#94A3B8',
-        marginTop: 1,
-    },
-    scroll: {
-        maxHeight: 520,
-    },
-    cancelBtn: {
-        marginTop: 10,
-        paddingVertical: 14,
-        borderRadius: 14,
-        backgroundColor: '#F8FAFC',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-    },
-    cancelText: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#64748B',
+        maxHeight: '88%',
     },
 });
 
-// ── Projects Dropdown Styles ───────────────────────────────────────────────────
-const proj = StyleSheet.create({
-    payAmt: {
-        fontSize: 11,
-        fontWeight: '700',
-        color: '#16A34A',
-    },
-    closedTag: {
-        backgroundColor: '#F1F5F9',
-        paddingHorizontal: 7,
-        paddingVertical: 2,
-        borderRadius: 6,
-    },
-    closedTagText: {
-        fontSize: 10,
-        fontWeight: '600',
-        color: '#64748B',
-        textTransform: 'capitalize',
-    },
-});
-
-// ── Inline dropdown styles ─────────────────────────────────────────────────────
+// ── Inline action panel under an expanded staff card ───────────────────────────
 const dd = StyleSheet.create({
     dropdown: {
         marginBottom: 10,
-        backgroundColor: '#F8FAFC',
+        backgroundColor: Colors.surface,
         borderWidth: 1,
         borderTopWidth: 0,
-        borderColor: '#E2E8F0',
-        borderBottomLeftRadius: 16,
-        borderBottomRightRadius: 16,
-        paddingHorizontal: 12,
-        paddingTop: 12,
-        paddingBottom: 14,
-        gap: 10,
-        shadowColor: '#1E293B',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.06,
-        shadowRadius: 10,
-        elevation: 2,
+        borderColor: '#E8EDF4',
+        borderBottomLeftRadius: 18,
+        borderBottomRightRadius: 18,
+        padding: 12,
+        gap: 12,
     },
     projSection: {
-        gap: 6,
+        backgroundColor: Colors.background,
+        borderRadius: 14,
+        paddingHorizontal: 12,
+        paddingTop: 10,
+        paddingBottom: 2,
     },
     projTitle: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: '#94A3B8',
-        textTransform: 'uppercase',
-        letterSpacing: 0.8,
+        fontSize: 13,
+        fontWeight: '600',
+        color: Colors.textSecondary,
         marginBottom: 2,
     },
     projRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
-        paddingVertical: 7,
-        paddingHorizontal: 10,
-        backgroundColor: '#FFFFFF',
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#F1F5F9',
+        gap: 10,
+        minHeight: 44,
+    },
+    projRowDivider: {
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: Colors.border,
     },
     projName: {
         flex: 1,
-        fontSize: 13,
+        fontSize: 15,
         fontWeight: '500',
-        color: '#1E293B',
+        color: INK,
+    },
+    projNameInactive: {
+        color: Colors.textSecondary,
+    },
+    payAmt: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: INK,
+        fontVariant: ['tabular-nums'],
+    },
+    payUnit: {
+        fontWeight: '500',
+        color: Colors.textSecondary,
+    },
+    statusTag: {
+        backgroundColor: Colors.fill,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 8,
+    },
+    statusTagText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#475569',
+        textTransform: 'capitalize',
     },
     list: {
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderRadius: 14,
+        backgroundColor: Colors.background,
         overflow: 'hidden',
-        backgroundColor: '#FFFFFF',
     },
     item: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
-        paddingVertical: 13,
+        minHeight: 48,
         paddingHorizontal: 14,
-        backgroundColor: '#FFFFFF',
+    },
+    itemDivider: {
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: Colors.border,
     },
     label: {
         flex: 1,
-        fontSize: 14,
+        fontSize: 15,
         fontWeight: '500',
-        color: '#1E293B',
+        color: INK,
     },
-    sep: {
-        height: 1,
-        backgroundColor: '#F1F5F9',
-        marginHorizontal: 14,
+    detail: {
+        fontSize: 14,
+        color: Colors.textSecondary,
+        fontVariant: ['tabular-nums'],
+    },
+    removeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        minHeight: 44,
+        borderRadius: 14,
+    },
+    removeLabel: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: Colors.errorText,
     },
 });
 
-// ── Permissions Modal Styles ───────────────────────────────────────────────────
+// ── Permissions sheet ──────────────────────────────────────────────────────────
 const perm = StyleSheet.create({
-    container: {
-        paddingBottom: 40,
-    },
     header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: 16,
-    },
-    title: {
-        fontSize: 18,
-        fontWeight: '800',
-        color: '#0F172A',
-        letterSpacing: -0.3,
-    },
-    subtitle: {
-        fontSize: 13,
-        color: '#64748B',
-        marginTop: 2,
-    },
-    closeBtn: {
-        width: 32,
-        height: 32,
-        borderRadius: 10,
-        backgroundColor: '#F1F5F9',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    chip: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
-        paddingVertical: 13,
-        paddingHorizontal: 14,
-        backgroundColor: '#F8FAFC',
-        borderRadius: 14,
-        borderWidth: 1.5,
-        borderColor: '#E2E8F0',
-        marginBottom: 8,
+        paddingHorizontal: 4,
     },
-    chipIcon: {
-        width: 36,
-        height: 36,
-        borderRadius: 11,
+    headerText: {
+        flex: 1,
+    },
+    title: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: INK,
+        letterSpacing: -0.4,
+    },
+    subtitle: {
+        fontSize: 14,
+        color: Colors.textSecondary,
+        marginTop: 2,
+    },
+    closeBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: Colors.fill,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    chipLabel: {
-        flex: 1,
+    hint: {
         fontSize: 14,
+        lineHeight: 19,
+        color: Colors.textSecondary,
+        paddingHorizontal: 4,
+        marginTop: 10,
+        marginBottom: 12,
+    },
+    list: {
+        marginBottom: 16,
+    },
+    group: {
+        backgroundColor: Colors.surface,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#E8EDF4',
+        overflow: 'hidden',
+    },
+    row: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        minHeight: 52,
+        paddingHorizontal: 14,
+    },
+    rowDivider: {
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: Colors.border,
+    },
+    rowLabel: {
+        flex: 1,
+        fontSize: 16,
         fontWeight: '500',
-        color: '#64748B',
+        color: '#334155',
+    },
+    rowLabelActive: {
+        color: INK,
+        fontWeight: '600',
     },
     saveBtn: {
-        backgroundColor: '#3A78B5',
-        borderRadius: 14,
-        paddingVertical: 15,
+        backgroundColor: Colors.primary,
+        borderRadius: 25,
+        minHeight: 50,
         alignItems: 'center',
         justifyContent: 'center',
     },
     saveBtnDisabled: {
-        backgroundColor: '#94A3B8',
+        opacity: 0.6,
     },
     saveBtnText: {
-        fontSize: 15,
+        fontSize: 16,
         fontWeight: '700',
         color: '#FFFFFF',
     },
 });
 
 export default StaffManagement;
-
-
-

@@ -1,4 +1,5 @@
 // components/StaffEmptyState.tsx
+import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
@@ -8,6 +9,8 @@ import {
     View,
 } from 'react-native';
 
+const INK = '#0F172A';
+
 interface StaffEmptyStateProps {
     hasSearchQuery: boolean;
     onAddPress?: () => void;
@@ -16,22 +19,26 @@ interface StaffEmptyStateProps {
 const StaffEmptyState: React.FC<StaffEmptyStateProps> = ({ hasSearchQuery, onAddPress }) => {
     return (
         <View style={styles.emptyState}>
-            <Ionicons name="people-outline" size={64} color="#D1D5DB" />
-            <Text style={styles.emptyStateTitle}>
-                {hasSearchQuery ? 'No matching staff found' : 'No staff members yet'}
+            <View style={styles.iconBadge}>
+                <Ionicons name={hasSearchQuery ? 'search' : 'people-outline'} size={30} color={Colors.primaryDark} />
+            </View>
+            <Text style={styles.title}>
+                {hasSearchQuery ? 'No matching staff' : 'No staff yet'}
             </Text>
-            <Text style={styles.emptyStateSubtitle}>
+            <Text style={styles.body}>
                 {hasSearchQuery
-                    ? 'Try adjusting your search terms'
-                    : 'Add your first staff member to get started'
-                }
+                    ? 'Try a different name, email or role.'
+                    : 'Add the people who work on your sites so you can assign them to projects.'}
             </Text>
             {!hasSearchQuery && onAddPress && (
                 <TouchableOpacity
-                    style={styles.emptyStateButton}
+                    style={styles.button}
                     onPress={onAddPress}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
                 >
-                    <Text style={styles.emptyStateButtonText}>Add Staff Member</Text>
+                    <Ionicons name="person-add-outline" size={18} color="#FFFFFF" />
+                    <Text style={styles.buttonText}>Add Staff Member</Text>
                 </TouchableOpacity>
             )}
         </View>
@@ -41,34 +48,48 @@ const StaffEmptyState: React.FC<StaffEmptyStateProps> = ({ hasSearchQuery, onAdd
 const styles = StyleSheet.create({
     emptyState: {
         alignItems: 'center',
-        paddingTop: 60,
-        paddingHorizontal: 40,
+        paddingTop: 40,
+        paddingBottom: 24,
+        paddingHorizontal: 24,
     },
-    emptyStateTitle: {
+    iconBadge: {
+        width: 64,
+        height: 64,
+        borderRadius: 20,
+        backgroundColor: Colors.primaryLight,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    title: {
         fontSize: 18,
-        fontWeight: 'bold',
-        color: '#374151',
-        marginTop: 16,
-        marginBottom: 8,
+        fontWeight: '700',
+        color: INK,
+        letterSpacing: -0.2,
         textAlign: 'center',
     },
-    emptyStateSubtitle: {
-        fontSize: 14,
-        color: '#6B7280',
+    body: {
+        fontSize: 15,
+        lineHeight: 21,
+        color: Colors.textSecondary,
         textAlign: 'center',
-        lineHeight: 20,
-        marginBottom: 24,
+        marginTop: 6,
+        maxWidth: 300,
     },
-    emptyStateButton: {
-        backgroundColor: '#3A78B5',
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        borderRadius: 8,
+    button: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 20,
+        backgroundColor: Colors.primary,
+        paddingHorizontal: 22,
+        minHeight: 48,
+        borderRadius: 24,
     },
-    emptyStateButtonText: {
-        color: 'white',
-        fontWeight: '600',
-        fontSize: 14,
+    buttonText: {
+        color: '#FFFFFF',
+        fontWeight: '700',
+        fontSize: 15,
     },
 });
 

@@ -715,6 +715,15 @@ const Index: React.FC = () => {
     const ongoingCount = projects.filter(p => !p.isCompleted).length;
     const completedCount = projects.filter(p => p.isCompleted).length;
 
+    // Only offer the Ongoing / Completed tabs once there is something completed to switch to.
+    // Kept visible while loading so the layout doesn't jump for users who do have completed projects.
+    const showStatusTabs = !isStaff && (loading || completedCount > 0);
+
+    // If the last completed project goes away (e.g. after a refresh), fall back to Ongoing
+    useEffect(() => {
+        if (!loading && completedCount === 0) setShowCompletedProjects(false);
+    }, [loading, completedCount]);
+
     // Staff always see ongoing projects; everyone else follows the segmented control.
     // Pinned projects first, then alphabetical.
     const visibleProjects = projects
@@ -772,13 +781,13 @@ const Index: React.FC = () => {
 
                 <View style={homeStyles.sectionHeader}>
                     <Text style={homeStyles.sectionTitle} accessibilityRole="header">Projects</Text>
-                    {isStaff && !loading && (
+                    {!showStatusTabs && !loading && (
                         <Text style={homeStyles.sectionCount}>{ongoingCount} ongoing</Text>
                     )}
                 </View>
 
-                {/* Ongoing / Completed - Only for non-staff users */}
-                {!isStaff && (
+                {/* Ongoing / Completed - Only for non-staff users with at least one completed project */}
+                {showStatusTabs && (
                     <View style={homeStyles.segmented} accessibilityRole="tablist">
                         {[
                             { key: 'ongoing', label: 'Ongoing', count: ongoingCount, completed: false },

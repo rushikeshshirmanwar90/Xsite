@@ -1,4 +1,5 @@
 // components/StaffHeader.tsx
+import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
@@ -9,18 +10,18 @@ import {
     View,
 } from 'react-native';
 
+const INK = '#0F172A';
+
 interface StaffHeaderProps {
-    staffCount: number;
-    adminCount: number;
     searchQuery: string;
     onSearchChange: (query: string) => void;
     onScanQRPress?: () => void;
     isAdmin?: boolean;
 }
 
+// Counts live on the section headers below, which already leave out the signed-in
+// user — repeating different totals up here only made the two disagree.
 const StaffHeader: React.FC<StaffHeaderProps> = ({
-    staffCount,
-    adminCount,
     searchQuery,
     onSearchChange,
     onScanQRPress,
@@ -28,66 +29,53 @@ const StaffHeader: React.FC<StaffHeaderProps> = ({
 }) => {
     return (
         <View style={styles.header}>
-            {/* Title Section */}
-            <View style={styles.titleSection}>
-                <View style={styles.titleContainer}>
-                    <Text style={styles.headerTitle}>Team Management</Text>
-                    <View style={styles.countsContainer}>
-                        <View style={styles.countItem}>
-                            <Ionicons name="people" size={16} color="#3A78B5" />
-                            <Text style={styles.countText}>
-                                {staffCount} Staff
-                            </Text>
-                        </View>
-                        <View style={styles.countSeparator} />
-                        <View style={styles.countItem}>
-                            <Ionicons name="shield-checkmark" size={16} color="#F59E0B" />
-                            <Text style={styles.countText}>
-                                {adminCount} Admin{adminCount !== 1 ? 's' : ''}
-                            </Text>
-                        </View>
-                    </View>
-                </View>
-            </View>
+            <Text style={styles.headerTitle} accessibilityRole="header">Team</Text>
 
-            {/* Search Bar and Scan Button Row */}
             <View style={styles.searchRow}>
                 <View style={styles.searchContainer}>
-                    <Ionicons name="search-outline" size={20} color="#64748B" style={styles.searchIcon} />
+                    <Ionicons name="search" size={18} color={Colors.textSecondary} />
                     <TextInput
                         style={styles.searchInput}
-                        placeholder="Search by name, email, or role..."
-                        placeholderTextColor="#94A3B8"
+                        placeholder="Search name, email or role"
+                        placeholderTextColor={Colors.textSecondary}
                         value={searchQuery}
                         onChangeText={onSearchChange}
+                        returnKeyType="search"
+                        autoCorrect={false}
+                        autoCapitalize="none"
+                        clearButtonMode="never"
+                        accessibilityLabel="Search team"
                     />
                     {searchQuery.length > 0 && (
                         <TouchableOpacity
                             onPress={() => onSearchChange('')}
                             style={styles.clearButton}
+                            hitSlop={8}
+                            accessibilityRole="button"
+                            accessibilityLabel="Clear search"
                         >
-                            <Ionicons name="close-circle" size={20} color="#94A3B8" />
+                            <Ionicons name="close-circle" size={18} color={Colors.textSecondary} />
                         </TouchableOpacity>
                     )}
                 </View>
 
-                {/* Scan QR Button */}
                 {isAdmin && onScanQRPress && (
                     <TouchableOpacity
                         style={styles.scanButton}
                         onPress={onScanQRPress}
-                        activeOpacity={0.8}
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel="Add staff by scanning their QR code"
                     >
-                        <Ionicons name="qr-code-outline" size={22} color="#3A78B5" />
+                        <Ionicons name="qr-code-outline" size={22} color={Colors.primaryDark} />
                     </TouchableOpacity>
                 )}
             </View>
 
-            {/* View-only message for non-admin */}
             {!isAdmin && (
-                <View style={styles.viewOnlyBanner}>
-                    <Ionicons name="lock-closed-outline" size={16} color="#64748B" />
-                    <Text style={styles.viewOnlyText}>View Only - Contact admin to add staff</Text>
+                <View style={styles.viewOnlyRow}>
+                    <Ionicons name="lock-closed-outline" size={14} color={Colors.textSecondary} />
+                    <Text style={styles.viewOnlyText}>View only. Ask an admin to add or change staff.</Text>
                 </View>
             )}
         </View>
@@ -96,101 +84,63 @@ const StaffHeader: React.FC<StaffHeaderProps> = ({
 
 const styles = StyleSheet.create({
     header: {
-        backgroundColor: '#FFFFFF',
-        paddingHorizontal: 16,
-        paddingTop: 16,
-        paddingBottom: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E2E8F0',
-    },
-    titleSection: {
-        marginBottom: 16,
-    },
-    titleContainer: {
-        gap: 8,
-    },
-    countsContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
-    countItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    countText: {
-        fontSize: 14,
-        color: '#64748B',
-        fontWeight: '500',
-    },
-    countSeparator: {
-        width: 1,
-        height: 16,
-        backgroundColor: '#E2E8F0',
+        backgroundColor: Colors.surface,
+        paddingHorizontal: 20,
+        paddingTop: 12,
+        paddingBottom: 14,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: Colors.border,
     },
     headerTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: '#1E293B',
-        letterSpacing: -0.5,
+        fontSize: 28,
+        fontWeight: '800',
+        color: INK,
+        letterSpacing: -0.7,
+        marginBottom: 12,
     },
     searchRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
-        marginBottom: 8,
+        gap: 10,
     },
     searchContainer: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F8FAFC',
+        gap: 8,
+        backgroundColor: Colors.fill,
         borderRadius: 12,
-        paddingHorizontal: 14,
-        height: 48,
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-    },
-    searchIcon: {
-        marginRight: 10,
+        paddingHorizontal: 12,
+        minHeight: 44,
     },
     searchInput: {
         flex: 1,
-        fontSize: 15,
-        color: '#1E293B',
-        fontWeight: '400',
+        fontSize: 16,
+        color: INK,
+        paddingVertical: 10,
     },
     clearButton: {
-        padding: 4,
+        padding: 2,
     },
     scanButton: {
-        width: 48,
-        height: 48,
+        width: 44,
+        height: 44,
         borderRadius: 12,
-        backgroundColor: '#EAF0FE',
-        borderWidth: 2,
-        borderColor: '#3A78B5',
+        backgroundColor: Colors.primaryLight,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    viewOnlyBanner: {
+    viewOnlyRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: 8,
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        backgroundColor: '#F8FAFC',
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-        gap: 8,
+        gap: 6,
+        marginTop: 10,
     },
     viewOnlyText: {
+        flexShrink: 1,
         fontSize: 13,
         fontWeight: '500',
-        color: '#64748B',
+        color: Colors.textSecondary,
     },
 });
 

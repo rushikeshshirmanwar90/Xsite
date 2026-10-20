@@ -240,6 +240,16 @@ const AnalyticsDashboard: React.FC = () => {
   const projectsWithExpenses = ongoingProjects.length; // ✅ Ongoing projects (not completed)
   const projectsWithoutExpenses = completedProjectsList.length; // ✅ Completed projects
 
+  // The Ongoing / Completed / Total row only earns its place once something is completed —
+  // until then Ongoing and Total are the same number and there is nothing to switch to.
+  // Kept visible while loading so the row doesn't jump for users who have completed projects.
+  const showProjectStats = loading || projectsWithoutExpenses > 0;
+
+  // If the last completed project goes away (e.g. after a refresh), fall back to Ongoing
+  useEffect(() => {
+    if (!loading && projectsWithoutExpenses === 0) setShowCompletedProjects(false);
+  }, [loading, projectsWithoutExpenses]);
+
   // Calculate totals for all projects
   const totalAvailable = transformedProjectData.reduce((sum, p) => sum + p.available, 0);
   const totalUsed = transformedProjectData.reduce((sum, p) => sum + p.used, 0);
@@ -1210,6 +1220,7 @@ const AnalyticsDashboard: React.FC = () => {
           // RENDER DEFAULT COST ANALYSIS
           <>
             {/* Stats Section - Simplified */}
+            {showProjectStats && (
             <View style={styles.statsSection}>
               <TouchableOpacity 
                 style={[
@@ -1225,9 +1236,9 @@ const AnalyticsDashboard: React.FC = () => {
                 <Text style={[styles.statValue, !showCompletedProjects && styles.statValueActive]}>{projectsWithExpenses}</Text>
                 <Text style={[styles.statLabel, !showCompletedProjects && styles.statLabelActive]}>Ongoing</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[
-                  styles.statBox, 
+                  styles.statBox,
                   styles.statBoxSecondary,
                   showCompletedProjects && styles.statBoxActive
                 ]}
@@ -1244,6 +1255,7 @@ const AnalyticsDashboard: React.FC = () => {
                 <Text style={styles.statLabel}>Total</Text>
               </View>
             </View>
+            )}
 
             {activeProjects.length === 0 ? (
               <View style={styles.emptyContainer}>
