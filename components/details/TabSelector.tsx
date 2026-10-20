@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import { styles } from '@/style/details';
 import { Ionicons } from '@expo/vector-icons';
 import * as React from 'react';
@@ -40,8 +41,8 @@ const TabSelector: React.FC<TabSelectorProps> = ({ activeTab, onSelectTab }) => 
                         left: PILL_INSET,
                         width: pillWidth,
                         backgroundColor: '#FFFFFF',
-                        borderRadius: 9,
-                        shadowColor: '#000',
+                        borderRadius: 10,
+                        shadowColor: '#0F172A',
                         shadowOffset: { width: 0, height: 1 },
                         shadowOpacity: 0.08,
                         shadowRadius: 2,
@@ -59,11 +60,13 @@ const TabSelector: React.FC<TabSelectorProps> = ({ activeTab, onSelectTab }) => 
                 style={styles.tab}
                 onPress={() => onSelectTab('imported')}
                 activeOpacity={0.8}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: activeTab === 'imported' }}
             >
                 <Ionicons
                     name="download-outline"
-                    size={14}
-                    color={activeTab === 'imported' ? '#000' : '#6B7280'}
+                    size={16}
+                    color={activeTab === 'imported' ? '#0F172A' : Colors.textSecondary}
                 />
                 <Text
                     style={[styles.tabText, activeTab === 'imported' && styles.activeTabText]}
@@ -76,11 +79,13 @@ const TabSelector: React.FC<TabSelectorProps> = ({ activeTab, onSelectTab }) => 
                 style={styles.tab}
                 onPress={() => onSelectTab('used')}
                 activeOpacity={0.8}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: activeTab === 'used' }}
             >
                 <Ionicons
                     name="trending-down-outline"
-                    size={14}
-                    color={activeTab === 'used' ? '#000' : '#6B7280'}
+                    size={16}
+                    color={activeTab === 'used' ? '#0F172A' : Colors.textSecondary}
                 />
                 <Text
                     style={[styles.tabText, activeTab === 'used' && styles.activeTabText]}

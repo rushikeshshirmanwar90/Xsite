@@ -2,39 +2,42 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Skeleton } from 'moti/skeleton';
 import { SKELETON_COLORS } from '@/components/common/skeletonTheme';
+import { Colors } from '@/constants/theme';
 
-// Placeholder mirroring ProjectCard's layout (accent bar, two icon+text rows,
-// budget progress panel, CTA button) so the home screen doesn't jump once
+// Placeholder mirroring ProjectCard's layout (title + status, people line,
+// budget figure and bar, footer action) so the home screen doesn't jump once
 // real project data arrives.
 const ProjectCardSkeleton: React.FC = () => {
   return (
     <View style={styles.cardShadowWrap}>
       <View style={styles.card}>
-        <View style={styles.topAccentBar} />
-        <View style={styles.cardInner}>
-          <Skeleton.Group show>
-            {[0, 1].map((i) => (
-              <View key={i} style={styles.row}>
-                <Skeleton colors={SKELETON_COLORS} radius={10} width={32} height={32} />
-                <View style={styles.rowTextBlock}>
-                  <Skeleton colors={SKELETON_COLORS} width="70%" height={14} />
-                  <View style={{ height: 6 }} />
-                  <Skeleton colors={SKELETON_COLORS} width="45%" height={11} />
-                </View>
-              </View>
-            ))}
-
-            <View style={styles.progressPanel}>
-              <Skeleton colors={SKELETON_COLORS} width={110} height={11} />
-              <View style={{ height: 10 }} />
-              <Skeleton colors={SKELETON_COLORS} width="60%" height={15} />
+        <Skeleton.Group show>
+          <View style={styles.headerRow}>
+            <View style={{ flex: 1 }}>
+              <Skeleton colors={SKELETON_COLORS} width="65%" height={18} />
               <View style={{ height: 8 }} />
-              <Skeleton colors={SKELETON_COLORS} width="100%" height={8} radius={4} />
+              <Skeleton colors={SKELETON_COLORS} width="40%" height={12} />
             </View>
+            <Skeleton colors={SKELETON_COLORS} width={92} height={26} radius={13} />
+          </View>
 
-            <Skeleton colors={SKELETON_COLORS} width="100%" height={46} radius={14} />
-          </Skeleton.Group>
-        </View>
+          <View style={{ height: 16 }} />
+          <Skeleton colors={SKELETON_COLORS} width="55%" height={13} />
+
+          <View style={styles.budget}>
+            <View style={styles.budgetTopRow}>
+              <Skeleton colors={SKELETON_COLORS} width="50%" height={22} />
+              <Skeleton colors={SKELETON_COLORS} width={44} height={14} />
+            </View>
+            <Skeleton colors={SKELETON_COLORS} width="100%" height={6} radius={3} />
+            <View style={{ height: 10 }} />
+            <Skeleton colors={SKELETON_COLORS} width="35%" height={11} />
+          </View>
+
+          <View style={styles.footer}>
+            <Skeleton colors={SKELETON_COLORS} width={96} height={14} />
+          </View>
+        </Skeleton.Group>
       </View>
     </View>
   );
@@ -50,41 +53,47 @@ export const ProjectListSkeleton: React.FC<{ count?: number }> = ({ count = 3 })
 
 const styles = StyleSheet.create({
   cardShadowWrap: {
-    borderRadius: 24,
-    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    backgroundColor: Colors.surface,
     marginBottom: 16,
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 22,
-    elevation: 8,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 3,
   },
   card: {
-    borderRadius: 24,
+    borderRadius: 20,
     overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#EEF2F8',
+    borderColor: '#E8EDF4',
+    paddingTop: 18,
+    paddingHorizontal: 18,
   },
-  topAccentBar: {
-    height: 4,
-    width: '100%',
-    backgroundColor: '#EEF2F8',
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
   },
-  cardInner: {
-    padding: 18,
+  budget: {
+    marginTop: 18,
+    paddingTop: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
   },
-  row: {
+  budgetTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 14,
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
-  rowTextBlock: {
-    flex: 1,
-  },
-  progressPanel: {
-    marginBottom: 16,
+  footer: {
+    justifyContent: 'center',
+    minHeight: 52,
+    marginTop: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
   },
 });
 

@@ -1,4 +1,4 @@
-import { hp, iconSize, isTablet, sp, wp } from '@/utils/responsive'
+import { hp, iconSize, isTablet, wp } from '@/utils/responsive'
 import { Ionicons } from '@expo/vector-icons'
 import { Tabs } from 'expo-router'
 import React from 'react'
@@ -6,9 +6,11 @@ import { StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuth } from '@/contexts/AuthContext'
 import { LicenseGuard } from '@/components/LicenseGuard'
+import { Colors } from '@/constants/theme'
 
-const ACTIVE_COLOR   = '#3A78B5'
-const INACTIVE_COLOR = '#94A3B8'
+const ACTIVE_COLOR   = Colors.primary
+// Slate-500, not slate-400: inactive icons and labels still need ≥4.5:1 on white
+const INACTIVE_COLOR = Colors.textSecondary
 
 type IoniconName = keyof typeof Ionicons.glyphMap
 
@@ -24,20 +26,18 @@ const TabIcon = ({
   inactiveIcon: IoniconName
   size: number
 }) => (
-  <View style={styles.iconWrap}>
-    <View style={[styles.iconPill, focused && styles.iconPillActive]}>
-      <Ionicons
-        name={focused ? activeIcon : inactiveIcon}
-        size={size}
-        color={focused ? ACTIVE_COLOR : INACTIVE_COLOR}
-      />
-    </View>
+  <View style={[styles.iconPill, focused && styles.iconPillActive]}>
+    <Ionicons
+      name={focused ? activeIcon : inactiveIcon}
+      size={size}
+      color={focused ? ACTIVE_COLOR : INACTIVE_COLOR}
+    />
   </View>
 )
 
 const TabLayout = () => {
   const insets = useSafeAreaInsets()
-  const tabBarHeight = isTablet() ? hp(70) : hp(60)
+  const tabBarHeight = isTablet() ? 72 : 64
   const { user } = useAuth()
 
   // Check if user is staff - use multiple methods
@@ -48,102 +48,78 @@ const TabLayout = () => {
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarShowLabel: false, // ✅ hides the text labels
           tabBarActiveTintColor: ACTIVE_COLOR,
           tabBarInactiveTintColor: INACTIVE_COLOR,
+          tabBarLabelStyle: styles.label,
           tabBarStyle: {
-            backgroundColor: '#FFFFFF',
-            borderTopWidth: 1,
-            borderTopColor: '#E2E8F0',
+            backgroundColor: Colors.surface,
+            borderTopWidth: StyleSheet.hairlineWidth,
+            borderTopColor: Colors.border,
             height: tabBarHeight + insets.bottom,
-            paddingBottom: insets.bottom,
-            paddingTop: sp(10),
-            borderTopLeftRadius: 24,
-            borderTopRightRadius: 24,
-            shadowColor: '#1E293B',
-            shadowOffset: { width: 0, height: -4 },
-            shadowOpacity: 0.06,
-            shadowRadius: 16,
-            elevation: 12,
-          },
-          tabBarItemStyle: {
-            paddingTop: sp(2),
+            paddingBottom: insets.bottom + 6,
+            paddingTop: 8,
+            shadowColor: '#0F172A',
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.04,
+            shadowRadius: 12,
+            elevation: 8,
           },
         }}
       >
-        {/* 1️⃣ Home */}
         <Tabs.Screen
           name="index"
           options={{
+            title: 'Home',
             tabBarIcon: ({ focused }) => (
-              <TabIcon
-                focused={focused}
-                activeIcon="home"
-                inactiveIcon="home-outline"
-                size={iconSize(24)}
-              />
+              <TabIcon focused={focused} activeIcon="home" inactiveIcon="home-outline" size={iconSize(22)} />
             ),
           }}
         />
 
-        {/* 2️⃣ Dashboard */}
         <Tabs.Screen
           name="dashboard"
           options={{
+            title: 'Dashboard',
             href: isStaff ? null : '/dashboard', // Hide for staff
             tabBarIcon: ({ focused }) => (
-              <TabIcon
-                focused={focused}
-                activeIcon="pulse"
-                inactiveIcon="pulse-outline"
-                size={iconSize(25)}
-              />
+              <TabIcon focused={focused} activeIcon="pulse" inactiveIcon="pulse-outline" size={iconSize(22)} />
             ),
           }}
         />
 
-        {/* 3️⃣ Add Project - elevated center button */}
+        {/* Add Project - elevated center button; the round button is its own label */}
         <Tabs.Screen
           name="add-project"
           options={{
+            title: 'Add Project',
             href: isStaff ? null : '/add-project',
+            tabBarLabel: () => null,
+            tabBarAccessibilityLabel: 'Add project',
             tabBarIcon: ({ focused }) => (
-              <View style={styles.centerWrap}>
-                <View style={[styles.centerButton, focused && styles.centerButtonFocused]}>
-                  <Ionicons name="add" size={iconSize(30)} color="#FFFFFF" />
-                </View>
+              <View style={[styles.centerButton, focused && styles.centerButtonFocused]}>
+                <Ionicons name="add" size={iconSize(28)} color="#FFFFFF" />
               </View>
             ),
           }}
         />
 
-        {/* 4️⃣ Staff */}
         <Tabs.Screen
           name="staff"
           options={{
+            title: 'Staff',
             href: isStaff ? null : '/staff', // Hide for staff
             tabBarIcon: ({ focused }) => (
-              <TabIcon
-                focused={focused}
-                activeIcon="people"
-                inactiveIcon="people-outline"
-                size={iconSize(26)}
-              />
+              <TabIcon focused={focused} activeIcon="people" inactiveIcon="people-outline" size={iconSize(22)} />
             ),
           }}
         />
 
-        {/* 5️⃣ Profile */}
         <Tabs.Screen
           name="profile"
           options={{
+            title: 'Profile',
             tabBarIcon: ({ focused }) => (
-              <TabIcon
-                focused={focused}
-                activeIcon="person-circle"
-                inactiveIcon="person-circle-outline"
-                size={iconSize(27)}
-              />
+              <TabIcon focused={focused} activeIcon="person-circle" inactiveIcon="person-circle-outline" size={iconSize(23)} />
             ),
           }}
         />
@@ -153,43 +129,40 @@ const TabLayout = () => {
 }
 
 const styles = StyleSheet.create({
-  iconWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  label: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
   },
   iconPill: {
-    width: wp(46),
-    height: wp(34),
-    borderRadius: wp(17),
+    width: 52,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
   },
   iconPillActive: {
-    backgroundColor: '#DCEEFF',
-  },
-  centerWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: -hp(18),
+    backgroundColor: Colors.primaryLight,
   },
   centerButton: {
-    width: wp(54),
-    height: wp(54),
-    borderRadius: wp(27),
+    width: wp(52),
+    height: wp(52),
+    borderRadius: wp(26),
+    marginTop: -hp(22),
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#3A78B5',
+    backgroundColor: Colors.primary,
     borderWidth: 4,
-    borderColor: '#FFFFFF',
-    shadowColor: '#3A78B5',
+    borderColor: Colors.surface,
+    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.28,
     shadowRadius: 10,
     elevation: 8,
   },
   centerButtonFocused: {
-    backgroundColor: '#295E94',
+    backgroundColor: Colors.primaryDark,
   },
 })
 

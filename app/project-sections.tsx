@@ -1,4 +1,5 @@
 import { domain } from '@/lib/domain';
+import { Colors } from '@/constants/theme';
 import { getClientId } from '@/functions/clientId';
 import { ProjectSection } from '@/types/project';
 import { isAdmin, isStaff, StaffUser, useUser } from '@/hooks/useUser';
@@ -28,7 +29,7 @@ import {
   View,
   Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -230,44 +231,44 @@ const SectionAccordionItem: React.FC<{
 
   const rotate = chevron.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
 
-  const statusColor = isCompleted ? '#16A34A' : '#3A78B5';
-  const statusBg = isCompleted ? '#F0FDF4' : '#EAF0FE';
-  const accentColor = isCompleted ? '#22C55E' : '#3A78B5';
+  // Text colors are the darker tone so the pill label holds ≥4.5:1 on its tint
+  const statusColor = isCompleted ? Colors.successText : Colors.primaryDark;
+  const statusBg = isCompleted ? Colors.successLight : Colors.primaryLight;
+  const iconColor = isCompleted ? Colors.successText : Colors.primary;
 
   return (
-    <Animated.View style={[styles.sectionCard, { transform: [{ scale: scaleAnim }] }]}>
-      {/* Solid accent strip on left — hidden when expanded */}
-      {!isExpanded && (
-        <View style={[styles.sectionAccentStrip, { backgroundColor: accentColor }]} />
-      )}
-
+    <Animated.View style={[styles.sectionCard, isExpanded && styles.sectionCardExpanded, { transform: [{ scale: scaleAnim }] }]}>
       {/* Card header */}
       <TouchableOpacity
         style={styles.sectionHeaderRow}
         activeOpacity={0.85}
         onPress={handlePress}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: isExpanded }}
+        accessibilityLabel={`${section.name}, ${isCompleted ? 'Completed' : 'In progress'}`}
+        accessibilityHint={isExpanded ? 'Hides actions' : 'Shows actions for this section'}
       >
         {/* Icon */}
         <View style={[styles.sectionIconWrap, { backgroundColor: statusBg }]}>
           {isLoadingCompletion ? (
-            <ActivityIndicator size="small" color={statusColor} />
+            <ActivityIndicator size="small" color={iconColor} />
           ) : (
             <Ionicons
               name={getSectionIcon(section.type, isCompleted) as any}
               size={22}
-              color={statusColor}
+              color={iconColor}
             />
           )}
         </View>
 
         {/* Info */}
         <View style={styles.sectionInfo}>
-          <Text style={styles.sectionName} numberOfLines={1}>{section.name}</Text>
+          <Text style={styles.sectionName} numberOfLines={2}>{section.name}</Text>
           <View style={styles.sectionMeta}>
             <View style={[styles.statusPill, { backgroundColor: statusBg }]}>
               <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
               <Text style={[styles.statusPillText, { color: statusColor }]}>
-                {isCompleted ? 'Completed' : 'In Progress'}
+                {isCompleted ? 'Completed' : 'In progress'}
               </Text>
             </View>
           </View>
@@ -275,48 +276,51 @@ const SectionAccordionItem: React.FC<{
 
         {/* Chevron */}
         <Animated.View style={[styles.chevronWrap, { transform: [{ rotate }] }]}>
-          <View style={styles.chevronCircle}>
-            <Ionicons name="chevron-down" size={16} color="#3A78B5" />
-          </View>
+          <Ionicons name="chevron-down" size={20} color={Colors.textSecondary} />
         </Animated.View>
       </TouchableOpacity>
 
-      {/* Expanded options */}
-      {isExpanded && (
+      {/* Expanded options — one grouped list instead of separate bordered tiles */}
+      {isExpanded && (options.length > 0 || !!onViewBuildings) && (
         <View style={styles.optionsContainer}>
-          <View style={styles.optionsDivider} />
-
-          {/* View all houses — row houses only, shown under the status badge when expanded */}
-          {onViewBuildings && (
-            <TouchableOpacity
-              style={[styles.optionChip, { marginBottom: 8 }]}
-              activeOpacity={0.75}
-              onPress={onViewBuildings}
-            >
-              <View style={[styles.optionChipIcon, { backgroundColor: '#F0FDF4' }]}>
-                <Ionicons name="business" size={20} color="#10B981" />
-              </View>
-              <Text style={styles.optionChipLabel}>View all houses</Text>
-              <Ionicons name="chevron-forward" size={14} color="#CBD5E1" />
-            </TouchableOpacity>
-          )}
-
-          <View style={styles.optionsGrid}>
-            {options.map((option) => {
-              const cfg = OPTION_CONFIG[option.key] || { icon: 'ellipsis-horizontal', color: '#3A78B5', bg: '#EAF0FE', label: option.label };
-              return (
+          <View style={styles.optionsGroup}>
+            {/* View all houses — row houses only */}
+            {onViewBuildings && (
+              <>
                 <TouchableOpacity
-                  key={option.key}
-                  style={styles.optionChip}
-                  activeOpacity={0.75}
-                  onPress={option.onPress}
+                  style={styles.optionRow}
+                  activeOpacity={0.6}
+                  onPress={onViewBuildings}
+                  accessibilityRole="button"
                 >
-                  <View style={[styles.optionChipIcon, { backgroundColor: cfg.bg }]}>
-                    <Ionicons name={cfg.icon as any} size={20} color={cfg.color} />
+                  <View style={[styles.optionChipIcon, { backgroundColor: Colors.successLight }]}>
+                    <Ionicons name="business" size={18} color={Colors.successText} />
                   </View>
-                  <Text style={styles.optionChipLabel}>{option.label || cfg.label}</Text>
-                  <Ionicons name="chevron-forward" size={14} color="#CBD5E1" />
+                  <Text style={styles.optionChipLabel}>View all houses</Text>
+                  <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
                 </TouchableOpacity>
+                {options.length > 0 && <View style={styles.optionDivider} />}
+              </>
+            )}
+
+            {options.map((option, i) => {
+              const cfg = OPTION_CONFIG[option.key] || { icon: 'ellipsis-horizontal', color: Colors.primary, bg: Colors.primaryLight, label: option.label };
+              return (
+                <React.Fragment key={option.key}>
+                  {i > 0 && <View style={styles.optionDivider} />}
+                  <TouchableOpacity
+                    style={styles.optionRow}
+                    activeOpacity={0.6}
+                    onPress={option.onPress}
+                    accessibilityRole="button"
+                  >
+                    <View style={[styles.optionChipIcon, { backgroundColor: cfg.bg }]}>
+                      <Ionicons name={cfg.icon as any} size={18} color={cfg.color} />
+                    </View>
+                    <Text style={styles.optionChipLabel}>{option.label || cfg.label}</Text>
+                    <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
+                  </TouchableOpacity>
+                </React.Fragment>
               );
             })}
           </View>
@@ -329,6 +333,7 @@ const SectionAccordionItem: React.FC<{
 // ─── Main Component ────────────────────────────────────────────────────────────
 const ProjectSections = () => {
   const params = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
   const { id, name, sectionData, materialAvailable, materialUsed, contractorId, contractorType, userId } = params;
 
   // Row house mode — when a rowHouseId is passed, this screen lists the buildings
@@ -1069,8 +1074,8 @@ const ProjectSections = () => {
         <SafeAreaView edges={['top']}>
           <View style={styles.headerInner}>
             {/* Back */}
-            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.8}>
-              <Ionicons name="arrow-back" size={22} color="#475569" />
+            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Back">
+              <Ionicons name="arrow-back" size={22} color="#0F172A" />
             </TouchableOpacity>
 
             {/* Title block */}
@@ -1084,7 +1089,13 @@ const ProjectSections = () => {
             </View>
 
             {/* Add Section */}
-            <TouchableOpacity onPress={() => setShowAddModal(true)} style={styles.headerAddBtn} activeOpacity={0.85}>
+            <TouchableOpacity
+              onPress={() => setShowAddModal(true)}
+              style={styles.headerAddBtn}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel={isRowHouseMode ? 'Add building' : 'Add section'}
+            >
               <Ionicons name="add" size={24} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
@@ -1112,32 +1123,14 @@ const ProjectSections = () => {
       >
         {/* Section list heading + project-wide material stock (shared by all sections) */}
         <View style={stockStyles.listHeading}>
-          <Text style={stockStyles.listHeadingTitle}>{isRowHouseMode ? 'Buildings' : 'Sections'}</Text>
+          <Text style={stockStyles.listHeadingTitle} accessibilityRole="header">{isRowHouseMode ? 'Buildings' : 'Sections'}</Text>
           {hasPermission('addMaterial') && (
-            <TouchableOpacity style={stockStyles.stockBtn} activeOpacity={0.85} onPress={goToProjectStock}>
+            <TouchableOpacity style={stockStyles.stockBtn} activeOpacity={0.85} onPress={goToProjectStock} accessibilityRole="button">
               <Ionicons name="cube-outline" size={18} color="#FFFFFF" />
               <Text style={stockStyles.stockBtnText}>Add / View Material</Text>
             </TouchableOpacity>
           )}
         </View>
-
-        {/* Summary pills */}
-        {totalCount > 0 && (
-          <View style={styles.summaryRow}>
-            <View style={[styles.summaryPill, { backgroundColor: '#EAF0FE' }]}>
-              <Ionicons name="layers" size={14} color="#3A78B5" />
-              <Text style={[styles.summaryPillText, { color: '#3A78B5' }]}>{totalCount} Sections</Text>
-            </View>
-            <View style={[styles.summaryPill, { backgroundColor: '#F0FDF4' }]}>
-              <Ionicons name="checkmark-circle" size={14} color="#16A34A" />
-              <Text style={[styles.summaryPillText, { color: '#16A34A' }]}>{completedCount} Done</Text>
-            </View>
-            <View style={[styles.summaryPill, { backgroundColor: '#FFFBEB' }]}>
-              <Ionicons name="time" size={14} color="#D97706" />
-              <Text style={[styles.summaryPillText, { color: '#D97706' }]}>{totalCount - completedCount} Pending</Text>
-            </View>
-          </View>
-        )}
 
         {sections && sections.length > 0 ? (
           sections.map((section, index) => {
@@ -1222,7 +1215,8 @@ const ProjectSections = () => {
           activeOpacity={1}
           onPress={() => setOptionPopup(null)}
         >
-          <TouchableOpacity activeOpacity={1} style={popupStyles.card} onPress={() => { }}>
+          <TouchableOpacity activeOpacity={1} style={[popupStyles.card, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]} onPress={() => { }}>
+            <View style={popupStyles.grabber} />
             {optionPopup && (() => {
               const isMat = optionPopup.type === 'material';
               const cfg = OPTION_CONFIG[isMat ? 'material' : 'report'];
@@ -1240,7 +1234,7 @@ const ProjectSections = () => {
                       <Text style={popupStyles.title}>{cfg.label}</Text>
                       <Text style={popupStyles.subtitle} numberOfLines={1}>{optionPopup.section.name}</Text>
                     </View>
-                    <TouchableOpacity style={popupStyles.closeBtn} onPress={() => setOptionPopup(null)}>
+                    <TouchableOpacity style={popupStyles.closeBtn} onPress={() => setOptionPopup(null)} hitSlop={6} accessibilityRole="button" accessibilityLabel="Close">
                       <Ionicons name="close" size={20} color="#64748B" />
                     </TouchableOpacity>
                   </View>
@@ -1260,7 +1254,7 @@ const ProjectSections = () => {
                           <Text style={popupStyles.itemLabel}>{sub.label}</Text>
                           <Text style={popupStyles.itemDesc}>{sub.desc}</Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={15} color="#CBD5E1" />
+                        <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
                       </TouchableOpacity>
                     </View>
                   ))}
@@ -1385,7 +1379,7 @@ const ProjectSections = () => {
                   {isRowHouseMode ? `Add a building to ${rowHouseName}` : 'Organize your project into sections'}
                 </Text>
               </View>
-              <TouchableOpacity onPress={closeAddModal} style={styles.modalCloseBtn}>
+              <TouchableOpacity onPress={closeAddModal} style={styles.modalCloseBtn} hitSlop={6} accessibilityRole="button" accessibilityLabel="Close">
                 <Ionicons name="close" size={22} color="#64748B" />
               </TouchableOpacity>
             </View>
@@ -1559,51 +1553,48 @@ const rhPickerStyles = StyleSheet.create({
 
 // ─── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F8FAFC' },
+  root: { flex: 1, backgroundColor: Colors.background },
 
   // Header
-  header: { backgroundColor: '#FFFFFF', paddingBottom: 18, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  header: { backgroundColor: Colors.surface, paddingBottom: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border },
   headerInner: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8, gap: 12 },
-  backBtn: { width: 40, height: 40, borderRadius: 13, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' },
+  backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.fill, justifyContent: 'center', alignItems: 'center' },
   headerCenter: { flex: 1 },
-  headerAddBtn: { width: 40, height: 40, borderRadius: 13, backgroundColor: '#3A78B5', justifyContent: 'center', alignItems: 'center' },
-  headerProjectName: { fontSize: 18, fontWeight: '800', color: '#0F172A', letterSpacing: -0.3 },
-  headerSubtitle: { fontSize: 12.5, color: '#64748B', marginTop: 2, fontWeight: '500' },
+  headerAddBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
+  headerProjectName: { fontSize: 19, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 },
+  headerSubtitle: { fontSize: 13, color: Colors.textSecondary, marginTop: 1, fontWeight: '500' },
   reportBtn: { width: 40, height: 40, borderRadius: 13, backgroundColor: '#EAF0FE', borderWidth: 1, borderColor: '#E0E7FF', justifyContent: 'center', alignItems: 'center' },
 
   // Progress
   progressBlock: { paddingHorizontal: 16, marginTop: 14 },
   progressLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 7 },
-  progressLabel: { fontSize: 12, color: '#64748B', fontWeight: '500' },
-  progressPct: { fontSize: 12, fontWeight: '800', color: '#3A78B5' },
-  progressTrack: { height: 8, backgroundColor: '#EAF0FE', borderRadius: 99, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 99, backgroundColor: '#3A78B5' },
+  progressLabel: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500' },
+  progressPct: { fontSize: 13, fontWeight: '700', color: Colors.primaryDark, fontVariant: ['tabular-nums'] },
+  progressTrack: { height: 6, backgroundColor: Colors.fill, borderRadius: 3, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 3, backgroundColor: Colors.primary },
 
   // Scroll
   scrollView: { flex: 1 },
-  scrollContent: { padding: 16, paddingTop: 20 },
-
-  // Summary pills
-  summaryRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  summaryPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99 },
-  summaryPillText: { fontSize: 12, fontWeight: '700' },
+  scrollContent: { padding: 16, paddingTop: 22 },
 
   // Section card
   sectionCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    marginBottom: 14,
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    marginBottom: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#EEF2F8',
-    shadowColor: '#1E293B',
+    borderColor: '#E8EDF4',
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.06,
-    shadowRadius: 14,
-    elevation: 3,
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
+    elevation: 2,
     flexDirection: 'column',
   },
-  sectionAccentStrip: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4 },
+  sectionCardExpanded: {
+    borderColor: '#D5E3F3',
+  },
 
   // Row house container card (navigates into its buildings)
   rowHouseCard: {
@@ -1627,38 +1618,33 @@ const styles = StyleSheet.create({
   rowHousePillText: { fontSize: 11.5, fontWeight: '600', color: '#10B981' },
   rowHouseChevron: { width: 32, height: 32, borderRadius: 11, backgroundColor: '#F0FDF4', justifyContent: 'center', alignItems: 'center' },
   rowHouseHint: { fontSize: 12, color: '#64748B', lineHeight: 17, marginTop: 8 },
-  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingLeft: 20, paddingRight: 16, gap: 12 },
+  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingLeft: 16, paddingRight: 12, gap: 14, minHeight: 76 },
   indexBadge: { width: 30, height: 30, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   indexBadgeText: { fontSize: 12, fontWeight: '800' },
   sectionIconWrap: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
   sectionInfo: { flex: 1 },
-  sectionName: { fontSize: 16, fontWeight: '700', color: '#0F172A', letterSpacing: -0.2 },
-  sectionMeta: { flexDirection: 'row', marginTop: 5, gap: 6 },
-  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99 },
+  sectionName: { fontSize: 17, fontWeight: '700', color: '#0F172A', letterSpacing: -0.3 },
+  sectionMeta: { flexDirection: 'row', marginTop: 6, gap: 6 },
+  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 99 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
-  statusPillText: { fontSize: 11, fontWeight: '700' },
-  chevronWrap: { width: 32, height: 32 },
-  chevronCircle: { width: 32, height: 32, borderRadius: 11, backgroundColor: '#EAF0FE', justifyContent: 'center', alignItems: 'center' },
+  statusPillText: { fontSize: 12, fontWeight: '600' },
+  chevronWrap: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   viewBuildingsBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#BBF7D0', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, marginRight: 8 },
   viewBuildingsBtnText: { fontSize: 12, fontWeight: '700', color: '#10B981' },
 
   // Options
-  optionsContainer: { paddingHorizontal: 16, paddingBottom: 14 },
-  optionsDivider: { height: 1, backgroundColor: '#F1F5F9', marginBottom: 10 },
-  optionsGrid: { gap: 8 },
-  optionChip: {
+  optionsContainer: { paddingHorizontal: 12, paddingBottom: 12 },
+  optionsGroup: { backgroundColor: Colors.background, borderRadius: 14, overflow: 'hidden' },
+  optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#EEF2F8',
+    minHeight: 54,
+    paddingHorizontal: 12,
   },
-  optionChipIcon: { width: 38, height: 38, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  optionChipLabel: { flex: 1, fontSize: 14, fontWeight: '600', color: '#334155' },
+  optionDivider: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.border, marginLeft: 58 },
+  optionChipIcon: { width: 34, height: 34, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  optionChipLabel: { flex: 1, fontSize: 15, fontWeight: '600', color: '#0F172A' },
 
   // Empty state
   emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, paddingHorizontal: 24 },
@@ -1743,25 +1729,27 @@ const styles = StyleSheet.create({
 
 // ─── Material sub-dropdown styles ─────────────────────────────────────────────
 const popupStyles = StyleSheet.create({
+  // Bottom sheet — sits in thumb reach, same pattern as the project card's action sheet
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(10,18,38,0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 26,
+    backgroundColor: 'rgba(15,23,42,0.45)',
+    justifyContent: 'flex-end',
   },
   card: {
     alignSelf: 'stretch',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 22,
-    paddingHorizontal: 18,
-    paddingTop: 16,
-    paddingBottom: 12,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.18,
-    shadowRadius: 28,
-    elevation: 12,
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+  grabber: {
+    alignSelf: 'center',
+    width: 36,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#CBD5E1',
+    marginBottom: 14,
   },
   header: {
     flexDirection: 'row',
@@ -1798,7 +1786,8 @@ const popupStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingVertical: 14,
+    minHeight: 60,
+    paddingVertical: 10,
     paddingHorizontal: 4,
   },
   itemIcon: {
@@ -1808,8 +1797,8 @@ const popupStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  itemLabel: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
-  itemDesc: { fontSize: 11.5, color: '#94A3B8', marginTop: 1 },
+  itemLabel: { fontSize: 15, fontWeight: '600', color: '#0F172A' },
+  itemDesc: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
 });
 
 // ─── Cost Summary entry card styles ───────────────────────────────────────────
@@ -1821,21 +1810,21 @@ const summaryBtnStyles = StyleSheet.create({
     right: 0,
     paddingHorizontal: 16,
     paddingTop: 10,
-    backgroundColor: '#F8FAFC',
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    backgroundColor: Colors.background,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
   },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    backgroundColor: Colors.surface,
+    borderRadius: 18,
     paddingVertical: 14,
     paddingHorizontal: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E0E7FF',
+    borderColor: '#E8EDF4',
     shadowColor: '#1E293B',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
@@ -1872,9 +1861,9 @@ const summaryBtnStyles = StyleSheet.create({
 
 const stockStyles = StyleSheet.create({
   listHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 },
-  listHeadingTitle: { fontSize: 17, fontWeight: '800', color: '#0F172A', letterSpacing: -0.2 },
-  stockBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: '#3A78B5' },
-  stockBtnText: { fontSize: 13.5, fontWeight: '700', color: '#FFFFFF' },
+  listHeadingTitle: { fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.5 },
+  stockBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, minHeight: 40, borderRadius: 20, backgroundColor: Colors.primary },
+  stockBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
 });
 
 export default ProjectSections;

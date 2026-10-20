@@ -33,6 +33,15 @@ export const Colors = {
   errorLight:     '#FEF2F2',
   errorBorder:    '#FEE2E2',
 
+  // Semantic text — the fills above are too light for text on white (<3:1).
+  // These hold ≥4.5:1 on surface and background.
+  successText:    '#047857',
+  warningText:    '#B45309',
+  errorText:      '#B91C1C',
+
+  // Neutral fill for tracks, segmented controls and pressed rows
+  fill:           '#EEF2F7',
+
   // Legacy light/dark (kept for expo template compatibility)
   light: {
     text:             '#1E293B',

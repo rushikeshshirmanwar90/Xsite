@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { Animated, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
@@ -848,9 +849,9 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
         : (material.variants || []).reduce((sum, v) => sum + (Number(v.amountPaid) || 0), 0);
     const amountRemaining = material.amountRemaining ?? 0;
     const PAYMENT_CONFIG = {
-        full:    { label: 'Fully Paid',     icon: 'checkmark-circle' as const, color: '#10B981', bg: '#ECFDF5', border: '#A7F3D0' },
-        partial: { label: 'Partially Paid', icon: 'time-outline' as const,     color: '#F59E0B', bg: '#FFFBEB', border: '#FDE68A' },
-        unpaid:  { label: 'Unpaid',         icon: 'alert-circle-outline' as const, color: '#EF4444', bg: '#FEF2F2', border: '#FECACA' },
+        full:    { label: 'Fully Paid',     icon: 'checkmark-circle' as const, color: Colors.successText, bg: '#ECFDF5', border: '#A7F3D0' },
+        partial: { label: 'Partially Paid', icon: 'time-outline' as const,     color: Colors.warningText, bg: '#FFFBEB', border: '#FDE68A' },
+        unpaid:  { label: 'Unpaid',         icon: 'alert-circle-outline' as const, color: Colors.errorText, bg: '#FEF2F2', border: '#FECACA' },
     };
     const paymentCfg = paymentStatus ? PAYMENT_CONFIG[paymentStatus] : null;
     // Only render on the imported tab and only when a payment status was recorded.
@@ -952,7 +953,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                         <View style={styles.metaRow}>
                                             {showMiniSectionLabel && material.miniSectionId && (
                                                 <View style={styles.miniSectionBadge}>
-                                                    <Ionicons name="location" size={12} color="#3A78B5" />
+                                                    <Ionicons name="location" size={13} color={Colors.primaryDark} />
                                                     <Text style={styles.miniSectionText}>
                                                         {getMiniSectionName(material.miniSectionId)}
                                                     </Text>
@@ -992,7 +993,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 <Text style={styles.statsListLabel}>Remaining Material</Text>
                                 <View style={styles.statValueWithIcon}>
                                     {isLowStock && (
-                                        <Ionicons name="warning" size={12} color="#EF4444" style={styles.statAlertIcon} />
+                                        <Ionicons name="warning" size={13} color={Colors.errorText} style={styles.statAlertIcon} accessibilityLabel="Low stock" />
                                     )}
                                     <Text style={[styles.statsListValue, isLowStock && styles.statValueAlert]}>
                                         {material.currentlyAvailable !== undefined && material.currentlyAvailable !== null
@@ -1037,8 +1038,11 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                         style={[styles.doPaymentButton, { borderColor: paymentCfg.color }]}
                                         onPress={handleOpenPaymentModal}
                                         activeOpacity={0.7}
+                                        hitSlop={{ top: 6, bottom: 6 }}
+                                        accessibilityRole="button"
+                                        accessibilityLabel={`Pay vendor for ${material.name}`}
                                     >
-                                        <Ionicons name="card-outline" size={14} color={paymentCfg.color} />
+                                        <Ionicons name="card-outline" size={16} color={paymentCfg.color} />
                                         <Text style={[styles.doPaymentButtonText, { color: paymentCfg.color }]} numberOfLines={1}>Pay</Text>
                                     </TouchableOpacity>
                                 )}
@@ -1070,8 +1074,9 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 style={styles.addStockButton}
                                 onPress={handleOpenAddStockModal}
                                 activeOpacity={0.7}
+                                accessibilityRole="button"
                             >
-                                <Ionicons name="add-circle" size={16} color="#3A78B5" />
+                                <Ionicons name="add-circle" size={18} color={Colors.primary} />
                                 <Text style={styles.addStockButtonText}>Add material</Text>
                             </TouchableOpacity>
                         )}
@@ -2155,23 +2160,25 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
 
 const styles = StyleSheet.create({
     materialCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 12,
-        marginBottom: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.08,
-        shadowRadius: 4,
+        backgroundColor: Colors.surface,
+        borderRadius: 18,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#E8EDF4',
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
         elevation: 2,
     },
     cardContent: {
-        padding: 10,
+        padding: 14,
     },
     materialHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
-        marginBottom: 8,
+        marginBottom: 12,
     },
     materialTitleSection: {
         flexDirection: 'row',
@@ -2179,12 +2186,12 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     iconContainer: {
-        width: 34,
-        height: 34,
-        borderRadius: 9,
+        width: 40,
+        height: 40,
+        borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 8,
+        marginRight: 12,
     },
     iconContainerLarge: {
         width: 64,
@@ -2202,9 +2209,10 @@ const styles = StyleSheet.create({
         flexWrap: 'wrap',
     },
     materialNameText: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#1F2937',
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#0F172A',
+        letterSpacing: -0.2,
         marginRight: 8,
     },
     metaRow: {
@@ -2237,13 +2245,13 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     miniSectionText: {
-        fontSize: 10,
-        color: '#3A78B5',
+        fontSize: 12,
+        color: Colors.primaryDark,
         fontWeight: '600',
     },
     variantCountText: {
-        fontSize: 11,
-        color: '#6B7280',
+        fontSize: 12.5,
+        color: Colors.textSecondary,
         fontWeight: '500',
     },
     lowStockBadge: {
@@ -2274,8 +2282,9 @@ const styles = StyleSheet.create({
         backgroundColor: '#F3F4F6',
     },
     dateText: {
-        fontSize: 11,
-        color: '#9CA3AF',
+        fontSize: 12.5,
+        color: Colors.textSecondary,
+        fontWeight: '500',
     },
     statsSection: {
         marginBottom: 8,
@@ -2312,7 +2321,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     statValueAlert: {
-        color: '#EF4444',
+        color: Colors.errorText,
     },
     statValueWithIcon: {
         flexDirection: 'row',
@@ -2323,9 +2332,9 @@ const styles = StyleSheet.create({
         marginRight: 3,
     },
     statsListSection: {
-        backgroundColor: '#F9FAFB',
-        borderRadius: 10,
-        paddingVertical: 10,
+        backgroundColor: Colors.background,
+        borderRadius: 14,
+        paddingVertical: 12,
         paddingHorizontal: 8,
         marginBottom: 10,
         flexDirection: 'row',
@@ -2338,20 +2347,21 @@ const styles = StyleSheet.create({
         paddingHorizontal: 4,
     },
     statsListDivider: {
-        width: 1,
-        backgroundColor: '#E5E7EB',
+        width: StyleSheet.hairlineWidth,
+        backgroundColor: Colors.border,
     },
     statsListLabel: {
-        fontSize: 11,
-        color: '#6B7280',
+        fontSize: 12,
+        color: Colors.textSecondary,
         fontWeight: '500',
         textAlign: 'center',
         marginBottom: 4,
     },
     statsListValue: {
-        fontSize: 13.5,
+        fontSize: 15,
         fontWeight: '700',
-        color: '#1F2937',
+        color: '#0F172A',
+        fontVariant: ['tabular-nums'],
         textAlign: 'center',
     },
     costSection: {
@@ -2430,9 +2440,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: 8,
+        paddingVertical: 10,
         paddingHorizontal: 12,
-        borderRadius: 8,
+        borderRadius: 14,
         borderWidth: 1,
         marginTop: 10,
         gap: 8,
@@ -2442,15 +2452,15 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: '#FFFFFF',
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-        borderRadius: 16,
+        minHeight: 36,
+        paddingHorizontal: 14,
+        borderRadius: 18,
         borderWidth: 1,
-        gap: 4,
+        gap: 5,
         flexShrink: 0,
     },
     doPaymentButtonText: {
-        fontSize: 12,
+        fontSize: 13.5,
         fontWeight: '700',
     },
     commitmentOverdueRow: {
@@ -2467,9 +2477,9 @@ const styles = StyleSheet.create({
     },
     commitmentOverdueText: {
         flex: 1,
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: '700',
-        color: '#EF4444',
+        color: Colors.errorText,
     },
     commitmentPendingRow: {
         flexDirection: 'row',
@@ -2485,7 +2495,7 @@ const styles = StyleSheet.create({
     },
     commitmentPendingText: {
         flex: 1,
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: '600',
         color: '#B45309',
     },
@@ -2542,32 +2552,31 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     paymentLabel: {
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: '700',
     },
     paymentAmount: {
-        fontSize: 11,
+        fontSize: 12.5,
         fontWeight: '600',
-        color: '#64748B',
+        color: '#475569',
+        fontVariant: ['tabular-nums'],
         marginTop: 1,
     },
     addStockButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#EAF0FE',
-        paddingVertical: 8,
+        backgroundColor: Colors.primaryLight,
+        minHeight: 42,
         paddingHorizontal: 12,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#3A78B5',
+        borderRadius: 12,
         gap: 6,
-        marginTop: 8,
+        marginTop: 10,
     },
     addStockButtonText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#3A78B5',
+        fontSize: 14,
+        fontWeight: '700',
+        color: Colors.primaryDark,
     },
     modalContainer: {
         flex: 1,

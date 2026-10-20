@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import Header from '@/components/details/Header';
 import { fetchMaterialStockRows } from '@/utils/materialStockReport';
 import MaterialCardEnhanced from '@/components/details/MaterialCardEnhanced';
@@ -65,16 +66,16 @@ const dropdownStyles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 6,
-        backgroundColor: '#EAF0FE',
+        backgroundColor: Colors.primaryLight,
         paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 8,
+        minHeight: 40,
+        borderRadius: 12,
         flexShrink: 1,
     },
     triggerText: {
-        fontSize: 12.5,
-        fontWeight: '700',
-        color: '#3A78B5',
+        fontSize: 13.5,
+        fontWeight: '600',
+        color: Colors.primaryDark,
         flexShrink: 1,
     },
     fullScreenBackdrop: {
@@ -83,7 +84,7 @@ const dropdownStyles = StyleSheet.create({
     floatingMenu: {
         position: 'absolute',
         backgroundColor: '#FFFFFF',
-        borderRadius: 10,
+        borderRadius: 14,
         paddingVertical: 4,
         borderWidth: 1,
         borderColor: '#E2E8F0',
@@ -98,15 +99,15 @@ const dropdownStyles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingVertical: 12,
+        minHeight: 48,
     },
     menuItemText: {
         fontSize: 15,
         fontWeight: '500',
-        color: '#1F2937',
+        color: '#0F172A',
     },
     menuItemTextActive: {
-        color: '#3A78B5',
+        color: Colors.primaryDark,
         fontWeight: '700',
     },
 });
@@ -4575,7 +4576,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             {sectionCompleted && (
                 <View style={{ marginHorizontal: 16, marginTop: 6, marginBottom: 6 }}>
                     <View style={actionStyles.sectionCompletedBanner}>
-                        <Ionicons name="checkmark-circle" size={16} color="#059669" />
+                        <Ionicons name="checkmark-circle" size={16} color={Colors.successText} />
                         <Text style={actionStyles.sectionCompletedText}>
                             This section is completed. Material operations are disabled.
                         </Text>
@@ -4784,10 +4785,10 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                 }}
                                 disabled={!selectedMiniSection || miniSectionLoadingStates[selectedMiniSection || '']}
                                 activeOpacity={0.7}
-                                style={{
-                                    padding: 3, // Add padding for better touch target
-                                    marginRight: 3,
-                                }}
+                                style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center', marginLeft: -6, marginRight: 2 }}
+                                accessibilityRole="checkbox"
+                                accessibilityState={{ checked: !!(selectedMiniSection && miniSectionCompletions[selectedMiniSection]), disabled: !selectedMiniSection }}
+                                accessibilityLabel="Mark slab complete"
                             >
                                 <Ionicons
                                     name={
@@ -4795,14 +4796,14 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                             ? "checkmark-circle"
                                             : "checkmark-circle-outline"
                                     }
-                                    size={16}
+                                    size={22}
                                     color={
                                         !selectedMiniSection
                                             ? "#CBD5E1" // Very light gray when no selection (disabled)
                                             : miniSectionLoadingStates[selectedMiniSection || '']
                                                 ? "#94A3B8" // Medium gray when loading
                                                 : miniSectionCompletions[selectedMiniSection]
-                                                    ? "#10B981" // Green for completed
+                                                    ? Colors.successText // Green for completed
                                                     : "#64748B" // Gray for not completed
                                     }
                                 />
@@ -4826,10 +4827,10 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                     paddingHorizontal: 10,
                                                     paddingVertical: 8,
                                                     backgroundColor: '#FFFFFF', // Always white background
-                                                    borderRadius: 8,
+                                                    borderRadius: 12,
                                                     borderWidth: 1,
                                                     borderColor: '#E2E8F0', // Always show border
-                                                    minHeight: 34,
+                                                    minHeight: 40,
                                                     shadowColor: '#000',
                                                     shadowOffset: { width: 0, height: 1 },
                                                     shadowOpacity: 0.04,
@@ -4845,9 +4846,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                             >
                                                 <Text style={{
                                                     flex: 1,
-                                                    fontSize: 13,
-                                                    color: '#1F2937',
-                                                    fontWeight: '500',
+                                                    fontSize: 14,
+                                                    color: '#0F172A',
+                                                    fontWeight: '600',
                                                     marginRight: 6,
                                                 }} numberOfLines={1}>
                                                     {getSelectedSectionName()}
@@ -4862,17 +4863,19 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                             {/* Add Button */}
                                             <TouchableOpacity
                                                 style={{
-                                                    backgroundColor: '#3A78B5',
-                                                    width: 30,
-                                                    height: 30,
-                                                    borderRadius: 7,
+                                                    backgroundColor: Colors.primary,
+                                                    width: 40,
+                                                    height: 40,
+                                                    borderRadius: 12,
                                                     justifyContent: 'center',
                                                     alignItems: 'center',
                                                 }}
                                                 onPress={handleAutoAddSlab}
                                                 activeOpacity={0.7}
+                                                accessibilityRole="button"
+                                                accessibilityLabel="Add slab"
                                             >
-                                                <Ionicons name="add" size={17} color="#fff" />
+                                                <Ionicons name="add" size={20} color="#fff" />
                                             </TouchableOpacity>
                                         </View>
 
@@ -4943,19 +4946,19 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                     onPress={() => setShowUsedDatePicker(true)}
                                     style={{
                                         flexDirection: 'row', alignItems: 'center', gap: 4,
-                                        paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8,
-                                        backgroundColor: usedDateFilter ? '#3A78B5' : '#EAF0FE',
+                                        paddingHorizontal: 12, minHeight: 40, borderRadius: 12,
+                                        backgroundColor: usedDateFilter ? Colors.primary : Colors.primaryLight,
                                     }}
                                 >
-                                    <Ionicons name="calendar-outline" size={13} color={usedDateFilter ? '#fff' : '#3A78B5'} />
-                                    <Text style={{ fontSize: 12, fontWeight: '700', color: usedDateFilter ? '#fff' : '#3A78B5' }}>
+                                    <Ionicons name="calendar-outline" size={15} color={usedDateFilter ? '#fff' : Colors.primaryDark} />
+                                    <Text style={{ fontSize: 13.5, fontWeight: '700', color: usedDateFilter ? '#fff' : Colors.primaryDark }}>
                                         {usedDateFilter ? usedDateFilter.toLocaleDateString('en-IN') : 'Date'}
                                     </Text>
                                 </TouchableOpacity>
 
                                 {usedDateFilter && (
-                                    <TouchableOpacity onPress={() => setUsedDateFilter(null)}>
-                                        <Ionicons name="close-circle" size={18} color="#94A3B8" />
+                                    <TouchableOpacity onPress={() => setUsedDateFilter(null)} hitSlop={12} accessibilityRole="button" accessibilityLabel="Clear date filter">
+                                        <Ionicons name="close-circle" size={20} color={Colors.textSecondary} />
                                     </TouchableOpacity>
                                 )}
                             </View>
@@ -5013,10 +5016,11 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                             };
                             const activePhase = activePhaseFromTracker || defaultPhaseObject;
                             const STATUS_META: Record<string, { label: string; color: string }> = {
-                                NOT_STARTED: { label: 'Not Started', color: '#94A3B8' },
-                                IN_PROGRESS: { label: 'In Progress', color: '#3A78B5' },
-                                ON_HOLD: { label: 'On Hold', color: '#F59E0B' },
-                                COMPLETED: { label: 'Completed', color: '#10B981' },
+                                // Text-safe tones (≥4.5:1 on white and on their own 10% tint)
+                                NOT_STARTED: { label: 'Not Started', color: Colors.textSecondary },
+                                IN_PROGRESS: { label: 'In Progress', color: Colors.primaryDark },
+                                ON_HOLD: { label: 'On Hold', color: Colors.warningText },
+                                COMPLETED: { label: 'Completed', color: Colors.successText },
                             };
 
                             return (
@@ -5031,15 +5035,15 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                         style={{ flexDirection: 'row', alignItems: 'center' }}
                                     >
                                         <View style={{
-                                            width: 32, height: 32, borderRadius: 9,
-                                            backgroundColor: '#EAF0FE',
-                                            alignItems: 'center', justifyContent: 'center', marginRight: 9,
+                                            width: 40, height: 40, borderRadius: 12,
+                                            backgroundColor: Colors.primaryLight,
+                                            alignItems: 'center', justifyContent: 'center', marginRight: 12,
                                         }}>
-                                            <Ionicons name="construct-outline" size={16} color="#3A78B5" />
+                                            <Ionicons name="construct-outline" size={19} color={Colors.primary} />
                                         </View>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
-                                                Active Phase
+                                            <Text style={{ fontSize: 12.5, color: Colors.textSecondary, fontWeight: '500', marginBottom: 2 }}>
+                                                Active phase
                                             </Text>
                                             {/* Plain text name + a small "Change" link next to it — no box, reads naturally */}
                                             <TouchableOpacity
@@ -5054,26 +5058,26 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                     flexDirection: 'row', alignItems: 'baseline', alignSelf: 'flex-start', maxWidth: '100%',
                                                 }}
                                             >
-                                                <Text style={{ fontSize: 16, fontWeight: '800', color: '#1E293B', marginRight: 6, flexShrink: 1 }} numberOfLines={1}>
+                                                <Text style={{ fontSize: 17, fontWeight: '700', color: '#0F172A', letterSpacing: -0.3, marginRight: 8, flexShrink: 1 }} numberOfLines={1}>
                                                     {activePhase.name}
                                                 </Text>
-                                                <Text style={{ fontSize: 12, fontWeight: '600', color: '#3A78B5' }}>
+                                                <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.primary }}>
                                                     Change ›
                                                 </Text>
                                             </TouchableOpacity>
                                         </View>
                                         <View style={{
                                             backgroundColor: STATUS_META[activePhase.status]?.color + '18',
-                                            paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20, marginRight: 7,
+                                            paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, marginRight: 6,
                                         }}>
-                                            <Text style={{ fontSize: 11, fontWeight: '700', color: STATUS_META[activePhase.status]?.color }}>
+                                            <Text style={{ fontSize: 12, fontWeight: '600', color: STATUS_META[activePhase.status]?.color }}>
                                                 {STATUS_META[activePhase.status]?.label}
                                             </Text>
                                         </View>
                                         <View style={{
                                             transform: [{ rotate: isActivePhasePanelExpanded ? '180deg' : '0deg' }],
                                         }}>
-                                            <Ionicons name="chevron-down" size={18} color="#94A3B8" />
+                                            <Ionicons name="chevron-down" size={20} color={Colors.textSecondary} />
                                         </View>
                                     </TouchableOpacity>
 
@@ -5081,11 +5085,11 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                     {isActivePhasePanelExpanded && (
                                         <>
                                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6, marginTop: 11 }}>
-                                                <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Phase Progress</Text>
-                                                <Text style={{ fontSize: 13, fontWeight: '800', color: STATUS_META[activePhase.status]?.color }}>{activePhase.progress}%</Text>
+                                                <Text style={{ fontSize: 13, color: Colors.textSecondary, fontWeight: '500' }}>Phase progress</Text>
+                                                <Text style={{ fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'], color: STATUS_META[activePhase.status]?.color }}>{activePhase.progress}%</Text>
                                             </View>
-                                            <View style={{ height: 8, backgroundColor: '#E2E8F0', borderRadius: 4, overflow: 'hidden' }}>
-                                                <View style={{ height: '100%', borderRadius: 4, width: `${activePhase.progress}%` as any, backgroundColor: STATUS_META[activePhase.status]?.color }} />
+                                            <View style={{ height: 6, backgroundColor: Colors.fill, borderRadius: 3, overflow: 'hidden' }}>
+                                                <View style={{ height: '100%', borderRadius: 3, width: `${activePhase.progress}%` as any, backgroundColor: STATUS_META[activePhase.status]?.color }} />
                                             </View>
 
                                             {/* Quick progress buttons — only for phases without their own sub-phase breakdown.
@@ -5102,17 +5106,20 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                                 <TouchableOpacity
                                                                     key={pct}
                                                                     style={{
-                                                                        flex: 1, alignItems: 'center', paddingVertical: 8,
-                                                                        borderRadius: 8, borderWidth: 1,
+                                                                        flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 40,
+                                                                        borderRadius: 10, borderWidth: 1,
                                                                         borderColor: isSelected ? STATUS_META[activePhase.status]?.color || '#3A78B5' : '#E2E8F0',
                                                                         backgroundColor: isSelected ? (STATUS_META[activePhase.status]?.color || '#3A78B5') + '15' : 'transparent',
                                                                     }}
                                                                     onPress={() => updatePhaseProgress(activePhase, pct)}
                                                                     disabled={isSaving}
                                                                     activeOpacity={0.7}
+                                                                    accessibilityRole="button"
+                                                                    accessibilityState={{ selected: isSelected }}
+                                                                    accessibilityLabel={`Set progress to ${pct} percent`}
                                                                 >
                                                                     <Text style={{
-                                                                        fontSize: 12, fontWeight: '700',
+                                                                        fontSize: 13, fontWeight: '700',
                                                                         color: isSelected ? STATUS_META[activePhase.status]?.color || '#3A78B5' : '#64748B',
                                                                     }}>{pct}%</Text>
                                                                 </TouchableOpacity>
@@ -5134,19 +5141,19 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                         onPress={toggleSubPhaseSection}
                                                         style={{
                                                             flexDirection: 'row', alignItems: 'center',
-                                                            paddingHorizontal: 11, paddingVertical: 10,
+                                                            paddingHorizontal: 12, minHeight: 44,
                                                         }}
                                                     >
-                                                        <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: '#1E293B' }}>
+                                                        <Text style={{ flex: 1, fontSize: 14, fontWeight: '700', color: '#0F172A' }}>
                                                             {activePhase.name} Breakdown
                                                         </Text>
-                                                        <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '600', marginRight: 7 }}>
+                                                        <Text style={{ fontSize: 12.5, color: Colors.textSecondary, fontWeight: '600', marginRight: 8, fontVariant: ['tabular-nums'] }}>
                                                             {activePhase.subPhases.filter(sp => sp.status === 'COMPLETED').length}/{activePhase.subPhases.length}
                                                         </Text>
                                                         <View style={{
                                                             transform: [{ rotate: isSubPhaseSectionExpanded ? '180deg' : '0deg' }],
                                                         }}>
-                                                            <Ionicons name="chevron-down" size={15} color="#94A3B8" />
+                                                            <Ionicons name="chevron-down" size={18} color={Colors.textSecondary} />
                                                         </View>
                                                     </TouchableOpacity>
 
@@ -5164,11 +5171,11 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                                             <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: spMeta?.color || '#94A3B8', marginRight: 8 }} />
                                                                             <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: '#1E293B' }}>{sp.name}</Text>
                                                                             {isSaving
-                                                                                ? <Text style={{ fontSize: 12, color: '#94A3B8' }}>Saving…</Text>
+                                                                                ? <Text style={{ fontSize: 12, color: Colors.textSecondary }}>Saving…</Text>
                                                                                 : <Text style={{ fontSize: 13, fontWeight: '700', color: spMeta?.color || '#94A3B8' }}>{sp.progress}%</Text>
                                                                             }
                                                                         </View>
-                                                                        <View style={{ height: 6, backgroundColor: '#E2E8F0', borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
+                                                                        <View style={{ height: 6, backgroundColor: Colors.fill, borderRadius: 3, overflow: 'hidden', marginBottom: 10 }}>
                                                                             <View style={{ height: '100%', borderRadius: 3, width: `${sp.progress}%` as any, backgroundColor: spMeta?.color || '#94A3B8' }} />
                                                                         </View>
                                                                         <View style={{ flexDirection: 'row', gap: 6 }}>
@@ -5176,17 +5183,20 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                                                                                 <TouchableOpacity
                                                                                     key={pct}
                                                                                     style={{
-                                                                                        flex: 1, alignItems: 'center', paddingVertical: 5,
-                                                                                        borderRadius: 6, borderWidth: 1,
+                                                                                        flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 36,
+                                                                                        borderRadius: 8, borderWidth: 1,
                                                                                         borderColor: sp.progress === pct ? spMeta?.color || '#3A78B5' : '#E2E8F0',
                                                                                         backgroundColor: sp.progress === pct ? (spMeta?.color || '#3A78B5') + '15' : 'transparent',
                                                                                     }}
                                                                                     onPress={() => updateSubPhaseProgress(activePhase, sp, pct)}
                                                                                     disabled={isSaving}
+                                                                                    hitSlop={{ top: 4, bottom: 4 }}
+                                                                                    accessibilityRole="button"
+                                                                                    accessibilityLabel={`Set ${sp.name} to ${pct} percent`}
                                                                                     activeOpacity={0.7}
                                                                                 >
                                                                                     <Text style={{
-                                                                                        fontSize: 11, fontWeight: '700',
+                                                                                        fontSize: 12.5, fontWeight: '700',
                                                                                         color: sp.progress === pct ? spMeta?.color || '#3A78B5' : '#64748B',
                                                                                     }}>{pct}%</Text>
                                                                                 </TouchableOpacity>
@@ -6774,19 +6784,19 @@ const actionStyles = StyleSheet.create({
     sectionCompletedBanner: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F0FDF4',
-        paddingVertical: 8,
-        paddingHorizontal: 12,
+        backgroundColor: Colors.successLight,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
         marginBottom: 8,
-        borderRadius: 8,
+        borderRadius: 14,
         borderWidth: 1,
-        borderColor: '#BBF7D0',
+        borderColor: Colors.successBorder,
         gap: 8,
     },
     sectionCompletedText: {
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: '500',
-        color: '#059669',
+        color: Colors.successText,
         flex: 1,
     },
     // Completion Status Card for "used" tab
@@ -6887,18 +6897,15 @@ const dateGroupStyles = StyleSheet.create({
 
 const sectionStyles = StyleSheet.create({
     filtersContainer: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 10,
-        padding: 9,
-        marginTop: 6,
-        marginBottom: 4,
+        backgroundColor: Colors.surface,
+        borderRadius: 18,
+        padding: 12,
+        marginTop: 8,
+        marginBottom: 6,
         marginHorizontal: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
-        shadowRadius: 2,
-        elevation: 1,
-        gap: 6,
+        borderWidth: 1,
+        borderColor: '#E8EDF4',
+        gap: 8,
     },
     filterRow: {
         flexDirection: 'row',
@@ -7024,8 +7031,8 @@ const paginationStyles = StyleSheet.create({
         paddingHorizontal: 4,
     },
     infoText: {
-        fontSize: 14,
-        color: '#64748B',
+        fontSize: 13.5,
+        color: Colors.textSecondary,
         fontWeight: '500',
     },
 });
@@ -7206,32 +7213,28 @@ const pageBannerStyles = StyleSheet.create({
         alignItems: 'center',
         gap: 12,
         marginHorizontal: 16,
-        marginTop: 14,
+        marginTop: 16,
         marginBottom: 4,
     },
     headingTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: '#1F2937',
+        fontSize: 22,
+        fontWeight: '800',
+        color: '#0F172A',
+        letterSpacing: -0.5,
     },
     addMaterialBtn: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        backgroundColor: '#3A78B5',
-        borderRadius: 12,
-        paddingVertical: 9,
-        paddingHorizontal: 14,
+        backgroundColor: Colors.primary,
+        borderRadius: 20,
+        minHeight: 40,
+        paddingHorizontal: 16,
         flexShrink: 0,
-        shadowColor: '#3A78B5',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.25,
-        shadowRadius: 6,
-        elevation: 4,
     },
     addMaterialBtnText: {
         color: '#FFFFFF',
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: '700',
     },
 });

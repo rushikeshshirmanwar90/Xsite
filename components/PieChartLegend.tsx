@@ -69,12 +69,14 @@ const PieChartLegend: React.FC<PieChartLegendProps> = ({
 
     return (
         <View style={styles.container}>
-            {displayItems.map((item) => (
+            {displayItems.map((item, index) => (
                 <TouchableOpacity
                     key={item.key}
-                    style={styles.item}
+                    style={[styles.item, index > 0 && styles.itemDivider]}
                     onPress={() => handleItemPress(item.key, item.name)}
                     disabled={!onItemClick}
+                    accessibilityRole={onItemClick ? 'button' : undefined}
+                    accessibilityLabel={`${item.name}, ${item.value}${showPercentage && item.percentage ? `, ${item.percentage} percent` : ''}`}
                 >
                     <View style={[styles.colorIndicator, { backgroundColor: item.color }]} />
                     <View style={styles.textContainer}>
@@ -101,7 +103,7 @@ const PieChartLegend: React.FC<PieChartLegendProps> = ({
                     </View>
                     {/* Drill-down affordance — only shown when the row is tappable */}
                     {onItemClick && (
-                        <Ionicons name="chevron-forward" size={16} color="#B0BEC5" style={styles.chevron} />
+                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" style={styles.chevron} />
                     )}
                 </TouchableOpacity>
             ))}
@@ -116,7 +118,7 @@ const PieChartLegend: React.FC<PieChartLegendProps> = ({
 
 const styles = StyleSheet.create({
     container: {
-        gap: 12,
+        gap: 0,
     },
     horizontalContainer: {
         flexDirection: 'row',
@@ -127,8 +129,13 @@ const styles = StyleSheet.create({
     item: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 4,
+        minHeight: 48,
+        paddingVertical: 8,
         gap: 12,
+    },
+    itemDivider: {
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: '#E2E8F0',
     },
     chevron: {
         marginLeft: 2,
@@ -141,10 +148,9 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     colorIndicator: {
-        width: 16,
-        height: 16,
-        borderRadius: 4,
-        marginTop: 2,
+        width: 14,
+        height: 14,
+        borderRadius: 7,
     },
     textContainer: {
         flex: 1,
@@ -160,32 +166,34 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     itemName: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: '#2C3E50',
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#0F172A',
         flex: 1,
         marginRight: 8,
     },
     horizontalItemName: {
-        fontSize: 12,
-        fontWeight: '500',
-        color: '#2C3E50',
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#0F172A',
         flex: 1,
     },
     itemValue: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#34495E',
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#0F172A',
+        fontVariant: ['tabular-nums'],
     },
     horizontalItemValue: {
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: '600',
-        color: '#34495E',
+        color: '#475569',
+        fontVariant: ['tabular-nums'],
     },
     percentageText: {
-        fontSize: 12,
-        color: '#7F8C8D',
-        fontWeight: '400',
+        fontSize: 13,
+        color: '#64748B',
+        fontWeight: '500',
     },
     descriptionContainer: {
         marginTop: 4,
@@ -200,9 +208,9 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     moreText: {
-        fontSize: 12,
-        color: '#95A5A6',
-        fontStyle: 'italic',
+        fontSize: 13,
+        color: '#64748B',
+        fontWeight: '500',
         marginTop: 4,
     },
 });

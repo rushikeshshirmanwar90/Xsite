@@ -12,6 +12,7 @@ import apiClient from '@/utils/axiosConfig';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   RefreshControl,
   ScrollView,
@@ -21,6 +22,7 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Colors } from '@/constants/theme';
 
 const SLAB_ORDINALS = ['First','Second','Third','Fourth','Fifth','Sixth','Seventh','Eighth','Ninth','Tenth'];
 const slabSortOrder = (name: string): number => {
@@ -683,7 +685,7 @@ const AnalyticsDashboard: React.FC = () => {
         </View>
 
         <View style={styles.tapHint}>
-          <Ionicons name="finger-print-outline" size={15} color="#3A78B5" />
+          <Ionicons name="hand-left-outline" size={15} color={Colors.primaryDark} />
           <Text style={styles.tapHintText}>Tap a project to explore its section breakdown</Text>
         </View>
 
@@ -697,7 +699,7 @@ const AnalyticsDashboard: React.FC = () => {
             labelType="amount"
             onSlicePress={handlePress}
             centerContent={{
-              label: showCompletedProjects ? 'COMPLETED EXPENSES' : 'ONGOING EXPENSES',
+              label: showCompletedProjects ? 'Completed expenses' : 'Ongoing expenses',
               value: formatCurrency(totalBudget),
               subtitle: `${activeProjects.length} Project${activeProjects.length > 1 ? 's' : ''}`
             }}
@@ -718,7 +720,7 @@ const AnalyticsDashboard: React.FC = () => {
   const renderPhasesProjectsList = () => {
     return (
       <View style={styles.phaseTrackerContainer}>
-        <Text style={styles.sectionSubtitleHeader}>Select a Project</Text>
+        <Text style={styles.sectionSubtitleHeader} accessibilityRole="header">Select a project</Text>
         {projects.map((project) => {
           const sections = project.section || [];
           return (
@@ -734,10 +736,10 @@ const AnalyticsDashboard: React.FC = () => {
                   {project.address || 'No address specified'}
                 </Text>
                 <Text style={styles.projectListSubText}>
-                  {sections.length} {sections.length === 1 ? 'Section' : 'Sections'}
+                  {sections.length} {sections.length === 1 ? 'section' : 'sections'}
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+              <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
             </TouchableOpacity>
           );
         })}
@@ -755,13 +757,15 @@ const AnalyticsDashboard: React.FC = () => {
         <TouchableOpacity
           activeOpacity={0.7}
           onPress={handlePhasesBackPress}
+          accessibilityRole="button"
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={18} color="#3A78B5" />
+          <Ionicons name="arrow-back" size={18} color={Colors.primaryDark} />
           <Text style={styles.backButtonText}>Back to Projects</Text>
         </TouchableOpacity>
 
-        <Text style={styles.sectionSubtitleHeader}>Select a Section ({project?.name})</Text>
+        <Text style={styles.sectionSubtitleHeader} accessibilityRole="header">Select a section</Text>
+        <Text style={styles.sectionContext} numberOfLines={1}>{project?.name}</Text>
         {sections.map((section) => (
           <TouchableOpacity
             key={section._id || section.sectionId}
@@ -773,11 +777,11 @@ const AnalyticsDashboard: React.FC = () => {
               <Text style={styles.projectListName}>{section.name}</Text>
               <Text style={styles.projectListSubText}>
                 {isRowHouseType(section.type)
-                  ? 'Row House · tap to view houses'
-                  : `Type: ${section.type || 'Standard'}`}
+                  ? 'Row house · tap to view houses'
+                  : `${(section.type || 'Standard').replace(/^\w/, (c: string) => c.toUpperCase())}`}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+            <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
           </TouchableOpacity>
         ))}
       </View>
@@ -795,19 +799,21 @@ const AnalyticsDashboard: React.FC = () => {
         <TouchableOpacity
           activeOpacity={0.7}
           onPress={handlePhasesBackPress}
+          accessibilityRole="button"
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={18} color="#3A78B5" />
+          <Ionicons name="arrow-back" size={18} color={Colors.primaryDark} />
           <Text style={styles.backButtonText}>
             {isSingleSectionProject ? 'Back to Projects' : 'Back to Sections'}
           </Text>
         </TouchableOpacity>
 
-        <Text style={styles.sectionSubtitleHeader}>Select a House ({phasesRowHouseName})</Text>
+        <Text style={styles.sectionSubtitleHeader} accessibilityRole="header">Select a house</Text>
+        <Text style={styles.sectionContext} numberOfLines={1}>{phasesRowHouseName}</Text>
 
         {loadingBuildings ? (
           <View style={styles.loadingContainer}>
-            <Ionicons name="sync" size={36} color="#3A78B5" />
+            <ActivityIndicator size="large" color={Colors.primary} />
             <Text style={styles.loadingText}>Loading houses...</Text>
           </View>
         ) : phasesBuildings.length === 0 ? (
@@ -830,7 +836,7 @@ const AnalyticsDashboard: React.FC = () => {
                 <Text style={styles.projectListName}>{house.name}</Text>
                 <Text style={styles.projectListSubText}>Tap to view phases</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+              <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
             </TouchableOpacity>
           ))
         )}
@@ -856,15 +862,16 @@ const AnalyticsDashboard: React.FC = () => {
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={handlePhasesBackPress}
+          accessibilityRole="button"
             style={styles.backButton}
           >
-            <Ionicons name="arrow-back" size={18} color="#3A78B5" />
+            <Ionicons name="arrow-back" size={18} color={Colors.primaryDark} />
             <Text style={styles.backButtonText}>
               {backLabel}
             </Text>
           </TouchableOpacity>
           <View style={styles.loadingContainer}>
-            <Ionicons name="sync" size={36} color="#3A78B5" />
+            <ActivityIndicator size="large" color={Colors.primary} />
             <Text style={styles.loadingText}>Loading building phases...</Text>
           </View>
         </View>
@@ -878,9 +885,10 @@ const AnalyticsDashboard: React.FC = () => {
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={handlePhasesBackPress}
+          accessibilityRole="button"
             style={styles.backButton}
           >
-            <Ionicons name="arrow-back" size={18} color="#3A78B5" />
+            <Ionicons name="arrow-back" size={18} color={Colors.primaryDark} />
             <Text style={styles.backButtonText}>
               {backLabel}
             </Text>
@@ -911,11 +919,12 @@ const AnalyticsDashboard: React.FC = () => {
         <TouchableOpacity
           activeOpacity={0.7}
           onPress={handlePhasesBackPress}
+          accessibilityRole="button"
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={18} color="#3A78B5" />
+          <Ionicons name="arrow-back" size={18} color={Colors.primaryDark} />
           <Text style={styles.backButtonText}>
-            {isSingleSectionProject ? "Back to Projects" : "Back to Sections"}
+            {backLabel}
           </Text>
         </TouchableOpacity>
         {/* Section overall progress card */}
@@ -934,16 +943,16 @@ const AnalyticsDashboard: React.FC = () => {
           </View>
           <View style={styles.sectionStatsRow}>
             <Text style={styles.sectionStatText}>
-              Total Slabs: <Text style={{ fontWeight: '700', color: '#1E293B' }}>{miniSections.length}</Text>
+              Total slabs: <Text style={{ fontWeight: '700', color: '#0F172A' }}>{miniSections.length}</Text>
             </Text>
             <Text style={styles.sectionStatText}>
-              Tracked: <Text style={{ fontWeight: '700', color: '#3A78B5' }}>{activeTrackers.length}</Text>
+              Tracked: <Text style={{ fontWeight: '700', color: Colors.primaryDark }}>{activeTrackers.length}</Text>
             </Text>
           </View>
         </View>
 
         {/* Mini-section accordion card list */}
-        <Text style={styles.sectionSubtitleHeader}>Slabs & Phases</Text>
+        <Text style={styles.sectionSubtitleHeader} accessibilityRole="header">Slabs & phases</Text>
         {miniSections.map((miniSec) => {
           const tracker = trackers.find(t => t.miniSectionId === miniSec._id);
           const isExpanded = expandedMiniSectionId === miniSec._id;
@@ -965,8 +974,8 @@ const AnalyticsDashboard: React.FC = () => {
           const STATUS_META: Record<string, { label: string; color: string }> = {
             NOT_STARTED: { label: 'Not Started', color: '#64748B' },
             IN_PROGRESS:  { label: 'In Progress',  color: '#2563EB' },
-            ON_HOLD:      { label: 'On Hold',      color: '#D97706' },
-            COMPLETED:    { label: 'Completed',    color: '#059669' },
+            ON_HOLD:      { label: 'On Hold',      color: Colors.warningText },
+            COMPLETED:    { label: 'Completed',    color: Colors.successText },
           };
 
           const statusInfo = STATUS_META[activePhaseStatus] || STATUS_META.NOT_STARTED;
@@ -986,13 +995,16 @@ const AnalyticsDashboard: React.FC = () => {
                 activeOpacity={0.7}
                 onPress={() => setExpandedMiniSectionId(isExpanded ? null : miniSec._id)}
                 style={styles.miniSecHeader}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: isExpanded }}
+                accessibilityLabel={`${miniSec.name}, ${progress} percent complete`}
               >
                 <View style={{ flex: 1, paddingRight: 10 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
                     <Text style={styles.miniSecName}>{miniSec.name}</Text>
                     {miniSec.isCompleted && (
                       <View style={styles.completedBadge}>
-                        <Ionicons name="checkmark-circle" size={12} color="#059669" />
+                        <Ionicons name="checkmark-circle" size={13} color={Colors.successText} />
                         <Text style={styles.completedBadgeText}>Finished</Text>
                       </View>
                     )}
@@ -1004,7 +1016,7 @@ const AnalyticsDashboard: React.FC = () => {
                 
                 <View style={{ alignItems: 'flex-end', marginRight: 10 }}>
                   <Text style={styles.miniSecProgressValue}>{progress}%</Text>
-                  <Text style={styles.miniSecProgressLabel}>Overall Progress</Text>
+                  <Text style={styles.miniSecProgressLabel}>overall</Text>
                 </View>
 
                 <Ionicons
@@ -1021,7 +1033,7 @@ const AnalyticsDashboard: React.FC = () => {
 
               {isExpanded && (
                 <View style={styles.miniSecBody}>
-                  <Text style={styles.phaseTimelineTitle}>Construction Timeline</Text>
+                  <Text style={styles.phaseTimelineTitle}>Construction timeline</Text>
                   <View style={styles.timelineContainer}>
                     {phasesList.map((phase: any, index: number) => {
                       const phaseStatus = phase.status || 'NOT_STARTED';
@@ -1070,7 +1082,7 @@ const AnalyticsDashboard: React.FC = () => {
                                 { backgroundColor: phaseMeta.color + '15' }
                               ]}>
                                 <Text style={[styles.phaseStatusText, { color: phaseMeta.color }]}>
-                                  {isPhaseInProgress ? `${phaseProgress}% In Progress` : phaseMeta.label}
+                                  {isPhaseInProgress ? `${phaseProgress}% · In progress` : phaseMeta.label}
                                 </Text>
                               </View>
                             </View>
@@ -1106,7 +1118,7 @@ const AnalyticsDashboard: React.FC = () => {
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <View style={styles.projectInfo}>
-              <Text style={styles.projectName}>Analysis Dashboard</Text>
+              <Text style={styles.projectName} accessibilityRole="header">Dashboard</Text>
               <Text style={styles.projectSubtitle}>
                 {activeTab === 'phases' ? 'Building Phases' : 'Financial Overview'}
               </Text>
@@ -1116,11 +1128,13 @@ const AnalyticsDashboard: React.FC = () => {
             style={[styles.refreshButton, (refreshing || loading) && { opacity: 0.5 }]}
             onPress={onRefresh}
             disabled={refreshing || loading}
+            accessibilityRole="button"
+            accessibilityLabel="Refresh"
           >
             <Ionicons
               name={refreshing ? "sync" : "refresh"}
               size={22}
-              color={(refreshing || loading) ? "#94A3B8" : "#3A78B5"}
+              color={(refreshing || loading) ? "#94A3B8" : "#0F172A"}
             />
           </TouchableOpacity>
         </View>
@@ -1130,15 +1144,19 @@ const AnalyticsDashboard: React.FC = () => {
           <TouchableOpacity
             style={[styles.tabButton, activeTab === 'cost' && styles.activeTabButton]}
             onPress={() => setActiveTab('cost')}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeTab === 'cost' }}
           >
-            <Ionicons name="pie-chart" size={16} color={activeTab === 'cost' ? '#FFFFFF' : '#64748B'} />
+            <Ionicons name={activeTab === 'cost' ? 'pie-chart' : 'pie-chart-outline'} size={16} color={activeTab === 'cost' ? Colors.primary : Colors.textSecondary} />
             <Text style={[styles.tabText, activeTab === 'cost' && styles.activeTabText]}>Cost Analysis</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tabButton, activeTab === 'phases' && styles.activeTabButton]}
             onPress={() => setActiveTab('phases')}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeTab === 'phases' }}
           >
-            <Ionicons name="construct" size={16} color={activeTab === 'phases' ? '#FFFFFF' : '#64748B'} />
+            <Ionicons name={activeTab === 'phases' ? 'construct' : 'construct-outline'} size={16} color={activeTab === 'phases' ? Colors.primary : Colors.textSecondary} />
             <Text style={[styles.tabText, activeTab === 'phases' && styles.activeTabText]}>Project Phases</Text>
           </TouchableOpacity>
         </View>
@@ -1165,7 +1183,7 @@ const AnalyticsDashboard: React.FC = () => {
           </View>
         ) : error ? (
           <View style={styles.errorContainer}>
-            <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
+            <Ionicons name="cloud-offline-outline" size={44} color={Colors.errorText} />
             <Text style={styles.errorText}>{error}</Text>
             <TouchableOpacity
               style={[styles.retryButton, loading && { opacity: 0.5 }]}
@@ -1173,7 +1191,7 @@ const AnalyticsDashboard: React.FC = () => {
               disabled={loading}
             >
               <Text style={styles.retryButtonText}>
-                {loading ? 'Loading...' : 'Retry'}
+                {loading ? 'Loading...' : 'Try Again'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -1201,12 +1219,11 @@ const AnalyticsDashboard: React.FC = () => {
                 ]}
                 onPress={() => setShowCompletedProjects(false)}
                 activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityState={{ selected: !showCompletedProjects }}
               >
-                <Text style={styles.statValue}>{projectsWithExpenses}</Text>
-                <Text style={styles.statLabel}>Ongoing Projects</Text>
-                {!showCompletedProjects && (
-                  <View style={styles.activeIndicator} />
-                )}
+                <Text style={[styles.statValue, !showCompletedProjects && styles.statValueActive]}>{projectsWithExpenses}</Text>
+                <Text style={[styles.statLabel, !showCompletedProjects && styles.statLabelActive]}>Ongoing</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[
@@ -1216,22 +1233,21 @@ const AnalyticsDashboard: React.FC = () => {
                 ]}
                 onPress={() => setShowCompletedProjects(true)}
                 activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityState={{ selected: showCompletedProjects }}
               >
-                <Text style={styles.statValue}>{projectsWithoutExpenses}</Text>
-                <Text style={styles.statLabel}>Completed Projects</Text>
-                {showCompletedProjects && (
-                  <View style={styles.activeIndicator} />
-                )}
+                <Text style={[styles.statValue, showCompletedProjects && styles.statValueActive]}>{projectsWithoutExpenses}</Text>
+                <Text style={[styles.statLabel, showCompletedProjects && styles.statLabelActive]}>Completed</Text>
               </TouchableOpacity>
               <View style={[styles.statBox, styles.statBoxTertiary]}>
                 <Text style={styles.statValue}>{totalProjects}</Text>
-                <Text style={styles.statLabel}>Total Projects</Text>
+                <Text style={styles.statLabel}>Total</Text>
               </View>
             </View>
 
             {activeProjects.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Ionicons name="pie-chart-outline" size={64} color="#CBD5E1" />
+                <Ionicons name="pie-chart-outline" size={48} color={Colors.textTertiary} />
                 <Text style={styles.emptyTitle}>
                   {showCompletedProjects ? 'No Completed Projects' : 'No Ongoing Projects'}
                 </Text>
@@ -1262,48 +1278,48 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stickyHeader: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
     zIndex: 10,
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    margin: 20,
+    backgroundColor: Colors.surface,
+    marginHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 32,
     borderRadius: 24,
-    padding: 25,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.08,
-    shadowRadius: 25,
-    elevation: 12,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#E8EDF4',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
+    elevation: 2,
   },
   heading: {
     alignItems: 'center',
   },
   title: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: '#1E293B',
-    letterSpacing: 1,
-    marginBottom: 8,
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.4,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 14,
-    color: '#64748B',
+    color: Colors.textSecondary,
     fontWeight: '500',
+    marginTop: 2,
+    textAlign: 'center',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-    marginBottom: 10,
+    paddingTop: 10,
+    paddingBottom: 14,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -1314,21 +1330,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   projectName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#000',
-    marginBottom: 2,
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.7,
   },
   projectSubtitle: {
-    fontSize: 12,
-    color: '#64748B',
+    fontSize: 14,
+    color: Colors.textSecondary,
     fontWeight: '500',
+    marginTop: 2,
   },
   refreshButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F1F5F9',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1339,9 +1358,9 @@ const styles = StyleSheet.create({
     paddingVertical: 100,
   },
   loadingText: {
-    marginTop: 16,
+    marginTop: 14,
     fontSize: 14,
-    color: '#64748B',
+    color: Colors.textSecondary,
     fontWeight: '500',
   },
   errorContainer: {
@@ -1352,43 +1371,45 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   errorText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#EF4444',
-    fontWeight: '600',
+    marginTop: 14,
+    fontSize: 17,
+    color: '#0F172A',
+    fontWeight: '700',
     textAlign: 'center',
   },
   retryButton: {
     marginTop: 20,
-    backgroundColor: '#3A78B5',
+    backgroundColor: Colors.primary,
     paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    minHeight: 46,
+    borderRadius: 23,
+    justifyContent: 'center',
   },
   retryButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 100,
+    paddingVertical: 72,
     paddingHorizontal: 40,
   },
   emptyTitle: {
-    marginTop: 16,
+    marginTop: 14,
     fontSize: 18,
     fontWeight: '700',
-    color: '#1E293B',
+    color: '#0F172A',
+    textAlign: 'center',
   },
   emptySubtitle: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#64748B',
+    marginTop: 6,
+    fontSize: 14.5,
+    color: Colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 21,
   },
   chartContainer: {
     alignItems: 'center',
@@ -1400,78 +1421,61 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     alignSelf: 'center',
-    backgroundColor: '#EAF0FE',
-    borderWidth: 1,
-    borderColor: '#C4D8FC',
+    backgroundColor: Colors.primaryLight,
     borderRadius: 99,
     paddingHorizontal: 14,
     paddingVertical: 7,
-    marginTop: 12,
+    marginTop: 14,
   },
   tapHintText: {
-    fontSize: 12.5,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#3A78B5',
+    color: Colors.primaryDark,
   },
   statsSection: {
-    marginTop: 5,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     paddingHorizontal: 20,
-    marginBottom: 10,
+    gap: 8,
+    marginTop: 4,
+    marginBottom: 4,
   },
   statBox: {
-    backgroundColor: '#FFFFFF',
-    padding: 12,
-    borderRadius: 16,
-    alignItems: 'center',
     flex: 1,
-    marginHorizontal: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.06,
-    shadowRadius: 15,
-    elevation: 6,
-    position: 'relative',
+    backgroundColor: Colors.surface,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E8EDF4',
   },
   statBoxActive: {
-    transform: [{ scale: 1.05 }],
-    shadowOpacity: 0.15,
-    elevation: 10,
-  },
-  activeIndicator: {
-    position: 'absolute',
-    bottom: 8,
-    width: 30,
-    height: 3,
-    backgroundColor: '#3A78B5',
-    borderRadius: 2,
+    backgroundColor: Colors.primaryLight,
+    borderColor: Colors.primary,
   },
   statBoxPrimary: {
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    minHeight: 76,
   },
   statBoxSecondary: {
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    minHeight: 76,
   },
   statBoxTertiary: {
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    minHeight: 76,
+    backgroundColor: 'transparent',
+    borderStyle: 'dashed',
+    borderColor: '#CBD5E1',
   },
   statValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1E293B',
-    marginBottom: 6,
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.6,
+    fontVariant: ['tabular-nums'],
   },
   statLabel: {
-    fontSize: 11,
-    color: '#64748B',
+    fontSize: 13,
+    color: Colors.textSecondary,
     fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    textAlign: 'center',
+    marginTop: 2,
   },
   selectorBar: {
     flexDirection: 'row',
@@ -1511,17 +1515,12 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   sectionProgressCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 20,
-    padding: 20,
-    marginBottom: 20,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
+    padding: 18,
+    marginBottom: 22,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#E8EDF4',
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -1533,69 +1532,69 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     color: '#0F172A',
+    letterSpacing: -0.3,
   },
   sectionProgressSubtitle: {
-    fontSize: 12,
-    color: '#64748B',
+    fontSize: 13,
+    color: Colors.textSecondary,
     marginTop: 2,
   },
   sectionPercentageBadge: {
-    backgroundColor: '#3A78B5',
+    backgroundColor: Colors.primaryLight,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 10,
+    borderRadius: 20,
   },
   sectionPercentageText: {
-    color: '#FFFFFF',
+    color: Colors.primaryDark,
     fontWeight: '800',
-    fontSize: 15,
+    fontSize: 16,
+    fontVariant: ['tabular-nums'],
   },
   progressBarBackground: {
-    height: 10,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 5,
+    height: 8,
+    backgroundColor: Colors.fill,
+    borderRadius: 4,
     overflow: 'hidden',
     marginBottom: 12,
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#3A78B5',
-    borderRadius: 5,
+    backgroundColor: Colors.primary,
+    borderRadius: 4,
   },
   sectionStatsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   sectionStatText: {
-    fontSize: 12,
-    color: '#64748B',
+    fontSize: 13,
+    color: Colors.textSecondary,
   },
   sectionSubtitleHeader: {
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: '800',
-    color: '#1E293B',
+    color: '#0F172A',
+    letterSpacing: -0.4,
     marginBottom: 12,
     marginTop: 4,
   },
   miniSecCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    marginBottom: 12,
+    backgroundColor: Colors.surface,
+    borderRadius: 18,
+    marginBottom: 10,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
+    borderColor: '#E8EDF4',
   },
   miniSecHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#FFFFFF',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    minHeight: 68,
+    backgroundColor: Colors.surface,
   },
   miniSecName: {
     fontSize: 16,
@@ -1605,55 +1604,51 @@ const styles = StyleSheet.create({
   completedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#D1FAE5',
+    backgroundColor: Colors.successLight,
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 8,
-    gap: 3,
+    borderRadius: 10,
+    gap: 4,
   },
   completedBadgeText: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#065F46',
+    color: Colors.successText,
   },
   activePhaseSubtitle: {
-    fontSize: 12,
-    color: '#64748B',
+    fontSize: 13,
+    color: Colors.textSecondary,
     marginTop: 2,
   },
   miniSecProgressValue: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '800',
-    color: '#1E293B',
+    color: '#0F172A',
+    fontVariant: ['tabular-nums'],
   },
   miniSecProgressLabel: {
-    fontSize: 10,
-    color: '#94A3B8',
-    fontWeight: '600',
-    marginTop: 2,
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: '500',
   },
   miniSecProgressBarBg: {
     height: 4,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: Colors.fill,
     width: '100%',
   },
   miniSecProgressBarFill: {
     height: '100%',
-    backgroundColor: '#10B981',
+    backgroundColor: Colors.success,
   },
   miniSecBody: {
     padding: 16,
-    backgroundColor: '#FAFBFD',
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    backgroundColor: Colors.background,
   },
   phaseTimelineTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#64748B',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 16,
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 14,
   },
   timelineContainer: {
     paddingLeft: 4,
@@ -1677,7 +1672,7 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   timelineDotCompleted: {
-    backgroundColor: '#10B981',
+    backgroundColor: Colors.success,
   },
   timelineDotInProgress: {
     backgroundColor: '#EAF0FE',
@@ -1698,7 +1693,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   timelineLineCompleted: {
-    backgroundColor: '#10B981',
+    backgroundColor: Colors.success,
   },
   timelineContent: {
     flex: 1,
@@ -1707,23 +1702,23 @@ const styles = StyleSheet.create({
   timelinePhaseName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   timelinePhaseNameCompleted: {
     color: '#0F172A',
     fontWeight: '700',
   },
   timelinePhaseNameInProgress: {
-    color: '#3A78B5',
+    color: Colors.primaryDark,
     fontWeight: '700',
   },
   phaseStatusPill: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 9,
     paddingVertical: 3,
-    borderRadius: 8,
+    borderRadius: 10,
   },
   phaseStatusText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
   },
 
@@ -1731,35 +1726,36 @@ const styles = StyleSheet.create({
   tabHeader: {
     flexDirection: 'row',
     marginHorizontal: 20,
-    marginBottom: 14,
-    backgroundColor: '#F1F5F9',
+    marginBottom: 12,
+    backgroundColor: Colors.fill,
     borderRadius: 14,
     padding: 4,
+    gap: 4,
   },
   tabButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 11,
+    minHeight: 40,
+    borderRadius: 10,
     gap: 6,
   },
   activeTabButton: {
-    backgroundColor: '#3A78B5',
-    shadowColor: '#3A78B5',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    backgroundColor: Colors.surface,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
   },
   tabText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#64748B',
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textSecondary,
   },
   activeTabText: {
-    color: '#FFFFFF',
+    color: '#0F172A',
   },
 
   // ── Back Button ──────────────────────────────────────────────────────
@@ -1767,53 +1763,59 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingVertical: 10,
+    minHeight: 40,
     paddingHorizontal: 14,
-    backgroundColor: '#EAF0FE',
-    borderRadius: 10,
+    backgroundColor: Colors.primaryLight,
+    borderRadius: 20,
     alignSelf: 'flex-start',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#C4D8FC',
+    marginBottom: 18,
   },
   backButtonText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#3A78B5',
+    color: Colors.primaryDark,
   },
 
   // ── Project / Section List Cards ────────────────────────────────────
   projectListCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: Colors.surface,
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    minHeight: 72,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 3,
+    borderColor: '#E8EDF4',
   },
   projectListName: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
     color: '#0F172A',
-    marginBottom: 3,
+    marginBottom: 2,
   },
   projectListAddress: {
-    fontSize: 12,
-    color: '#64748B',
-    marginBottom: 4,
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginBottom: 2,
   },
   projectListSubText: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#94A3B8',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    color: Colors.primaryDark,
+  },
+  statValueActive: {
+    color: Colors.primaryDark,
+  },
+  statLabelActive: {
+    color: Colors.primaryDark,
+  },
+  sectionContext: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+    marginTop: -8,
+    marginBottom: 14,
   },
 });

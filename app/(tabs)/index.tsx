@@ -17,8 +17,12 @@ import * as Sharing from 'expo-sharing';
 import ViewShot from 'react-native-view-shot';
 import PushTokenStatusIndicator from '@/components/PushTokenStatusIndicator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Colors } from '@/constants/theme';
+import * as Haptics from 'expo-haptics';
 import {
     Alert,
+    Platform,
+    Pressable,
     RefreshControl,
     ScrollView,
     StatusBar,
@@ -46,12 +50,12 @@ const Index: React.FC = () => {
     const [pinnedProjects, setPinnedProjects] = useState<Set<string>>(new Set()); // Track pinned projects
     const [featuredProjects, setFeaturedProjects] = useState<Set<string>>(new Set()); // Track featured projects
     const [urgentPayments, setUrgentPayments] = useState<{ count: number; totalAmount: number }>({ count: 0, totalAmount: 0 });
-    const [scrollY, setScrollY] = useState(0);
+    const [isScrolled, setIsScrolled] = useState(false); // Shows the header hairline once content slides under it
     const [bannerCollapsed, setBannerCollapsed] = useState(false); // Urgent banner collapsed state
 
     const handleScroll = (event: any) => {
-        const y = event.nativeEvent.contentOffset.y;
-        setScrollY(y);
+        const scrolled = event.nativeEvent.contentOffset.y > 4;
+        if (scrolled !== isScrolled) setIsScrolled(scrolled);
     };
 
     // Helper to fetch urgent pending payments (due within 3 days or overdue)
@@ -705,318 +709,317 @@ const Index: React.FC = () => {
     };
 
     const greetingHour = new Date().getHours();
-    const timeGreeting = greetingHour < 12 ? 'Good Morning' : greetingHour < 17 ? 'Good Afternoon' : 'Good Evening';
+    const timeGreeting = greetingHour < 12 ? 'Good morning' : greetingHour < 17 ? 'Good afternoon' : 'Good evening';
     const firstName = user?.firstName || 'there';
 
+    const ongoingCount = projects.filter(p => !p.isCompleted).length;
+    const completedCount = projects.filter(p => p.isCompleted).length;
+
+    // Staff always see ongoing projects; everyone else follows the segmented control.
+    // Pinned projects first, then alphabetical.
+    const visibleProjects = projects
+        .filter(p => (isStaff || !showCompletedProjects) ? !p.isCompleted : p.isCompleted)
+        .sort((a, b) => {
+            if (a.isPinned && !b.isPinned) return -1;
+            if (!a.isPinned && b.isPinned) return 1;
+            return a.name.localeCompare(b.name);
+        });
+    // If nothing has been explicitly featured yet, default the first card to featured
+    const anyFeatured = visibleProjects.some(p => p.isFeatured);
+
+    const selectFilter = (completed: boolean) => {
+        if (completed === showCompletedProjects) return;
+        if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+        setShowCompletedProjects(completed);
+    };
+
+    const openWarnings = () => router.push({ pathname: '/notification', params: { tab: 'warnings' } } as any);
+
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+        <SafeAreaView style={homeStyles.container} edges={['top', 'left', 'right']}>
+            <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
 
-            {/* Header - static Exponentor app branding, shown to every signed-in user */}
-            <View style={homeStyles.brandHeader}>
-                <View style={homeStyles.brandLeft}>
-                    <View style={homeStyles.brandLogo}>
-                        <Text style={homeStyles.brandLogoText}>EX</Text>
-                    </View>
-                    <View style={homeStyles.brandTextBlock}>
-                        <Text style={homeStyles.brandTitle} numberOfLines={1}>Exponentor</Text>
-                        <Text style={homeStyles.brandSubtitle} numberOfLines={1}>{timeGreeting}, {firstName} 👋</Text>
-                    </View>
-                </View>
-                <TouchableOpacity style={homeStyles.heroNotifButton}
-                    onPress={() => router.push({ pathname: '/notification', params: { tab: 'warnings' } } as any)}
-                >
-                    <Ionicons name="notifications-outline" size={20} color="#3A78B5" />
-                    {urgentPayments.count > 0 && (
-                        <View style={homeStyles.notifBadgeDot}>
-                            <Text style={homeStyles.notifBadgeDotText}>
-                                {urgentPayments.count > 99 ? '99+' : urgentPayments.count}
-                            </Text>
+            {/* Fixed top: app identity, greeting, notifications and the project filter */}
+            <View style={[homeStyles.topBar, isScrolled && homeStyles.topBarScrolled]}>
+                <View style={homeStyles.brandRow}>
+                    <View style={homeStyles.brandLeft}>
+                        <View style={homeStyles.brandLogo} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                            <Text style={homeStyles.brandLogoText}>EX</Text>
                         </View>
-                    )}
-                </TouchableOpacity>
-            </View>
-
-            {/* Urgent Payment Banner – collapsible, expanded by default */}
-            {urgentPayments.count > 0 && (
-                <View style={homeStyles.urgentAlertBanner}>
-                    {/* Banner header row – always visible */}
-                    <TouchableOpacity
-                        style={homeStyles.urgentBannerHeaderRow}
-                        onPress={() => setBannerCollapsed(prev => !prev)}
-                        activeOpacity={0.7}
+                        <View style={homeStyles.brandTextBlock}>
+                            <Text style={homeStyles.brandTitle} numberOfLines={1}>Exponentor</Text>
+                            <Text style={homeStyles.brandSubtitle} numberOfLines={1}>{timeGreeting}, {firstName}</Text>
+                        </View>
+                    </View>
+                    <Pressable
+                        style={({ pressed }) => [homeStyles.notifButton, pressed && homeStyles.notifButtonPressed]}
+                        onPress={openWarnings}
+                        accessibilityRole="button"
+                        accessibilityLabel={urgentPayments.count > 0
+                            ? `Notifications, ${urgentPayments.count} urgent payment${urgentPayments.count === 1 ? '' : 's'}`
+                            : 'Notifications'}
                     >
-                        <View style={homeStyles.urgentIconContainer}>
-                            <Ionicons name="card-outline" size={18} color="#D97706" />
-                        </View>
-                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Text style={homeStyles.urgentAlertTitle}>
-                                Urgent Pending Payment{urgentPayments.count === 1 ? '' : 's'}
-                            </Text>
-                            <View style={homeStyles.urgentBadge}>
-                                <Text style={homeStyles.urgentBadgeText}>{urgentPayments.count}</Text>
-                            </View>
-                        </View>
-                        <Ionicons
-                            name={bannerCollapsed ? 'chevron-down' : 'chevron-up'}
-                            size={16}
-                            color="#B45309"
-                        />
-                    </TouchableOpacity>
-
-                    {/* Expanded content */}
-                    {!bannerCollapsed && (
-                        <>
-                            <View style={homeStyles.urgentBannerDivider} />
-                            <TouchableOpacity
-                                style={homeStyles.urgentBannerExpandedRow}
-                                onPress={() => router.push({ pathname: '/notification', params: { tab: 'warnings' } } as any)}
-                                activeOpacity={0.85}
-                            >
-                                <Text style={homeStyles.urgentAlertSubtitle} numberOfLines={1}>
-                                    ₹{urgentPayments.totalAmount.toLocaleString('en-IN')} due across {urgentPayments.count} commitment{urgentPayments.count === 1 ? '' : 's'}
+                        <Ionicons name="notifications-outline" size={22} color="#0F172A" />
+                        {urgentPayments.count > 0 && (
+                            <View style={homeStyles.notifBadge}>
+                                <Text style={homeStyles.notifBadgeText}>
+                                    {urgentPayments.count > 99 ? '99+' : urgentPayments.count}
                                 </Text>
-                                <View style={homeStyles.urgentAlertAction}>
-                                    <Text style={homeStyles.urgentAlertActionText}>Review</Text>
-                                    <Ionicons name="chevron-forward" size={14} color="#B45309" />
-                                </View>
-                            </TouchableOpacity>
-                        </>
+                            </View>
+                        )}
+                    </Pressable>
+                </View>
+
+                <View style={homeStyles.sectionHeader}>
+                    <Text style={homeStyles.sectionTitle} accessibilityRole="header">Projects</Text>
+                    {isStaff && !loading && (
+                        <Text style={homeStyles.sectionCount}>{ongoingCount} ongoing</Text>
                     )}
                 </View>
-            )}
 
-            {/* QR Code Section - Priority for unassigned staff */}
-            {isStaff && user && !clientId && (
-                <View style={styles.section}>
-                    <View style={[styles.qrCodeCard, styles.shareCard]}>
-                        <View style={styles.shareHeader}>
-                            <View style={styles.shareIconContainer}>
-                                <Ionicons name="qr-code-outline" size={24} color="#3A78B5" />
-                            </View>
-                            <View style={styles.shareContent}>
-                                <Text style={styles.shareTitle}>Get Connected</Text>
-                                <Text style={styles.shareSubtitle}>
-                                    Share your QR code with admin to join their organization
-                                </Text>
-                            </View>
-                        </View>
-
-                        {/* QR Code displayed directly */}
-                        <ViewShot ref={embeddedQRRef} options={{ format: 'png', quality: 1.0 }}>
-                            <View style={styles.embeddedQrContainer}>
-                                <QRCode
-                                    value={JSON.stringify({
-                                        staffId: user._id,
-                                        firstName: user.firstName || 'Staff',
-                                        lastName: user.lastName || 'Member',
-                                        email: user.email || '',
-                                        phoneNumber: user.phoneNumber || ('phone' in user ? user.phone : '') || '',
-                                        role: 'role' in user ? user.role : 'staff',
-                                        timestamp: new Date().toISOString()
-                                    })}
-                                    size={150}
-                                    color="#1E293B"
-                                    backgroundColor="#FFFFFF"
-                                />
-                                <View style={styles.qrCodeInfo}>
-                                    <Text style={styles.qrCodeTitle}>Staff QR Code</Text>
-                                    <Text style={styles.qrCodeSubtitle}>
-                                        {`${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Staff Member'}
-                                    </Text>
-                                    <Text style={styles.qrCodeId}>ID: {user._id}</Text>
-                                </View>
-                            </View>
-                        </ViewShot>
-
-                        <View style={styles.embeddedQrInfo}>
-                            <Text style={styles.embeddedQrTitle}>Staff Assignment QR Code</Text>
-                            <Text style={styles.embeddedQrId}>{user._id}</Text>
-                            <Text style={styles.embeddedQrInstructions}>
-                                Ask your admin to scan this QR code to assign you to their client organization and projects.
-                            </Text>
-                        </View>
-
-                        {/* Share Button */}
-                        <TouchableOpacity
-                            style={[styles.shareButton, isSharing && styles.shareButtonDisabled]}
-                            onPress={() => shareQRCode(embeddedQRRef)}
-                            activeOpacity={0.7}
-                            disabled={isSharing}
-                        >
-                            <Ionicons
-                                name={isSharing ? "hourglass-outline" : "share-outline"}
-                                size={20}
-                                color="#FFFFFF"
-                            />
-                            <Text style={styles.shareButtonText}>
-                                {isSharing ? 'Sharing...' : 'Share QR Code'}
-                            </Text>
-                        </TouchableOpacity>
-
-                        {/* Push Token Status for Staff */}
-                        <PushTokenStatusIndicator showDetails={true} />
-                    </View>
-                </View>
-            )}
-
-            {/* Section Header */}
-            <View style={homeStyles.sectionHeader}>
-                <Text style={homeStyles.sectionTitle}>Projects</Text>
-
-                {/* Toggle Button - Only for non-staff users */}
+                {/* Ongoing / Completed - Only for non-staff users */}
                 {!isStaff && (
-                    <TouchableOpacity
-                        style={[homeStyles.viewCompletedButton, showCompletedProjects && homeStyles.viewCompletedButtonActive]}
-                        onPress={() => setShowCompletedProjects(!showCompletedProjects)}
-                        activeOpacity={0.7}
-                    >
-                        <Ionicons
-                            name={showCompletedProjects ? "list-outline" : "checkmark-done-outline"}
-                            size={14}
-                            color={showCompletedProjects ? "#295E94" : "#3A78B5"}
-                        />
-                        <Text
-                            style={[homeStyles.viewCompletedButtonText, showCompletedProjects && homeStyles.viewCompletedButtonActive]}
-                            numberOfLines={1}
-                        >
-                            {showCompletedProjects ? 'View Ongoing' : 'View Completed'}
-                        </Text>
-                    </TouchableOpacity>
+                    <View style={homeStyles.segmented} accessibilityRole="tablist">
+                        {[
+                            { key: 'ongoing', label: 'Ongoing', count: ongoingCount, completed: false },
+                            { key: 'completed', label: 'Completed', count: completedCount, completed: true },
+                        ].map(seg => {
+                            const selected = showCompletedProjects === seg.completed;
+                            return (
+                                <Pressable
+                                    key={seg.key}
+                                    style={[homeStyles.segment, selected && homeStyles.segmentSelected]}
+                                    onPress={() => selectFilter(seg.completed)}
+                                    accessibilityRole="tab"
+                                    accessibilityState={{ selected }}
+                                    accessibilityLabel={loading ? seg.label : `${seg.label}, ${seg.count} projects`}
+                                >
+                                    <Text style={[homeStyles.segmentText, selected && homeStyles.segmentTextSelected]}>
+                                        {seg.label}
+                                    </Text>
+                                    {!loading && (
+                                        <View style={[homeStyles.segmentCount, selected && homeStyles.segmentCountSelected]}>
+                                            <Text style={[homeStyles.segmentCountText, selected && homeStyles.segmentCountTextSelected]}>
+                                                {seg.count}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </Pressable>
+                            );
+                        })}
+                    </View>
                 )}
             </View>
 
             <ScrollView
-                style={styles.projectsList}
+                style={homeStyles.scroll}
+                contentContainerStyle={[homeStyles.scrollContent, userIsAdmin && homeStyles.scrollContentWithFab]}
                 onScroll={handleScroll}
-                scrollEventThrottle={16}
+                scrollEventThrottle={32}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        colors={['#3A78B5']}
-                        tintColor="#3A78B5"
+                        colors={[Colors.primary]}
+                        tintColor={Colors.primary}
                         title="Pull to refresh"
-                        titleColor="#64748B"
+                        titleColor={Colors.textSecondary}
                     />
                 }
             >
-                {loading ? (
-                    <View style={{ marginBottom: 24 }}>
-                        <ProjectListSkeleton count={3} />
-                    </View>
-                ) : error ? (
-                    <View style={styles.centerContainer}>
-                        <View style={[homeStyles.stateIconBadge, { backgroundColor: '#FFF1F2', borderColor: '#FECDD3' }]}>
-                            <Ionicons name="alert-circle" size={40} color="#EF4444" />
-                        </View>
-                        <Text style={styles.errorText}>{error}</Text>
-                        <TouchableOpacity
-                            style={[styles.retryButton, loading && { opacity: 0.5 }]}
-                            onPress={() => fetchProjectData()}
-                            disabled={loading}
+                {/* Urgent Payment Banner – collapsible, expanded by default */}
+                {urgentPayments.count > 0 && (
+                    <View style={homeStyles.urgentBanner}>
+                        <Pressable
+                            style={homeStyles.urgentHeaderRow}
+                            onPress={() => setBannerCollapsed(prev => !prev)}
+                            accessibilityRole="button"
+                            accessibilityState={{ expanded: !bannerCollapsed }}
+                            accessibilityLabel={`${urgentPayments.count} urgent pending payment${urgentPayments.count === 1 ? '' : 's'}`}
                         >
-                            <Text style={styles.retryButtonText}>
-                                {loading ? 'Loading...' : 'Retry'}
+                            <View style={homeStyles.urgentIcon}>
+                                <Ionicons name="time-outline" size={18} color={Colors.warningText} />
+                            </View>
+                            <Text style={homeStyles.urgentTitle} numberOfLines={1}>
+                                {urgentPayments.count} urgent payment{urgentPayments.count === 1 ? '' : 's'}
                             </Text>
-                        </TouchableOpacity>
-                    </View>
-                ) : (
-                    <View style={{ marginBottom: 24 }}>
-                        {projects && projects.length > 0 ? (
-                            <>
-                                {/* Filter projects based on completion status */}
-                                {(() => {
-                                    console.log('🔍 Filtering projects:', {
-                                        totalProjects: projects.length,
-                                        showCompletedProjects,
-                                        isStaff,
-                                        projectsWithStatus: projects.map(p => ({
-                                            name: p.name,
-                                            isCompleted: p.isCompleted,
-                                            isPinned: p.isPinned
-                                        }))
-                                    });
+                            <Ionicons
+                                name={bannerCollapsed ? 'chevron-down' : 'chevron-up'}
+                                size={18}
+                                color={Colors.warningText}
+                            />
+                        </Pressable>
 
-                                    // For staff users, always show only ongoing projects (not completed)
-                                    // For non-staff users, respect the toggle state
-                                    const filteredProjects = isStaff
-                                        ? projects.filter(p => p.isCompleted === false)
-                                        : showCompletedProjects
-                                            ? projects.filter(p => p.isCompleted === true)
-                                            : projects.filter(p => p.isCompleted === false);
-
-                                    // Sort projects: pinned projects first, then by name
-                                    const sortedProjects = filteredProjects.sort((a, b) => {
-                                        // First, sort by pin status (pinned projects first)
-                                        if (a.isPinned && !b.isPinned) return -1;
-                                        if (!a.isPinned && b.isPinned) return 1;
-
-                                        // Then sort by name alphabetically
-                                        return a.name.localeCompare(b.name);
-                                    });
-
-                                    console.log('✅ Filtered and sorted result:', {
-                                        filteredCount: sortedProjects.length,
-                                        sortedProjects: sortedProjects.map(p => ({
-                                            name: p.name,
-                                            isCompleted: p.isCompleted,
-                                            isPinned: p.isPinned
-                                        }))
-                                    });
-
-                                    // If nothing has been explicitly featured yet, default the first card to featured
-                                    const anyFeatured = sortedProjects.some(p => p.isFeatured);
-
-                                    return sortedProjects.length > 0 ? (
-                                        sortedProjects.map((project, index) => (
-                                            <View key={index} style={{ marginBottom: 18 }}>
-                                                <ProjectCard
-                                                    key={project._id}
-                                                    project={project}
-                                                    onViewDetails={handleViewDetails}
-                                                    onPinToggle={handlePinToggle}
-                                                    onFeaturedToggle={handleFeaturedToggle}
-                                                    userType={userIsAdmin ? 'admin' : (isStaff ? 'staff' : 'client')}
-                                                    featured={project.isFeatured || (index === 0 && !anyFeatured)}
-                                                />
-                                            </View>
-                                        ))
-                                    ) : (
-                                        <View style={styles.centerContainer}>
-                                            <View style={homeStyles.stateIconBadge}>
-                                                <Ionicons
-                                                    name={isStaff ? "folder-open-outline" : (showCompletedProjects ? "checkmark-done-circle-outline" : "folder-open-outline")}
-                                                    size={40}
-                                                    color="#3A78B5"
-                                                />
-                                            </View>
-                                            <Text style={styles.emptyText}>
-                                                {isStaff ? 'No ongoing projects' : (showCompletedProjects ? 'No completed projects' : 'No ongoing projects')}
-                                            </Text>
-                                            <Text style={styles.emptySubText}>
-                                                {isStaff
-                                                    ? 'Contact your admin to assign projects to you'
-                                                    : showCompletedProjects
-                                                        ? 'Mark projects as complete to see them here'
-                                                        : 'All your projects are completed'}
-                                            </Text>
-                                        </View>
-                                    );
-                                })()}
-                            </>
-                        ) : (
-                            <View style={styles.centerContainer}>
-                                <View style={homeStyles.stateIconBadge}>
-                                    <Ionicons name="folder-open-outline" size={40} color="#3A78B5" />
+                        {!bannerCollapsed && (
+                            <Pressable
+                                style={({ pressed }) => [homeStyles.urgentBody, pressed && { opacity: 0.85 }]}
+                                onPress={openWarnings}
+                                accessibilityRole="button"
+                                accessibilityLabel="Review urgent payments"
+                            >
+                                <View style={homeStyles.urgentAmountBlock}>
+                                    <Text style={homeStyles.urgentAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                                        ₹{urgentPayments.totalAmount.toLocaleString('en-IN')}
+                                    </Text>
+                                    <Text style={homeStyles.urgentSubtitle} numberOfLines={1}>
+                                        due within 3 days or overdue
+                                    </Text>
                                 </View>
-                                <Text style={styles.emptyText}>No projects found</Text>
-                                <Text style={styles.emptySubText}>
-                                    {userIsAdmin
-                                        ? 'Tap "Add Project" to create your first project'
-                                        : 'No projects available. Contact your admin to add projects.'}
+                                <View style={homeStyles.urgentAction}>
+                                    <Text style={homeStyles.urgentActionText}>Review</Text>
+                                    <Ionicons name="arrow-forward" size={15} color="#FFFFFF" />
+                                </View>
+                            </Pressable>
+                        )}
+                    </View>
+                )}
+
+                {/* QR Code Section - Priority for unassigned staff */}
+                {isStaff && user && !clientId && (
+                    <View style={styles.section}>
+                        <View style={[styles.qrCodeCard, styles.shareCard]}>
+                            <View style={styles.shareHeader}>
+                                <View style={styles.shareIconContainer}>
+                                    <Ionicons name="qr-code-outline" size={24} color={Colors.primary} />
+                                </View>
+                                <View style={styles.shareContent}>
+                                    <Text style={styles.shareTitle}>Get Connected</Text>
+                                    <Text style={styles.shareSubtitle}>
+                                        Share your QR code with admin to join their organization
+                                    </Text>
+                                </View>
+                            </View>
+
+                            {/* QR Code displayed directly */}
+                            <ViewShot ref={embeddedQRRef} options={{ format: 'png', quality: 1.0 }}>
+                                <View style={styles.embeddedQrContainer}>
+                                    <QRCode
+                                        value={JSON.stringify({
+                                            staffId: user._id,
+                                            firstName: user.firstName || 'Staff',
+                                            lastName: user.lastName || 'Member',
+                                            email: user.email || '',
+                                            phoneNumber: user.phoneNumber || ('phone' in user ? user.phone : '') || '',
+                                            role: 'role' in user ? user.role : 'staff',
+                                            timestamp: new Date().toISOString()
+                                        })}
+                                        size={150}
+                                        color="#1E293B"
+                                        backgroundColor="#FFFFFF"
+                                    />
+                                    <View style={styles.qrCodeInfo}>
+                                        <Text style={styles.qrCodeTitle}>Staff QR Code</Text>
+                                        <Text style={styles.qrCodeSubtitle}>
+                                            {`${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Staff Member'}
+                                        </Text>
+                                        <Text style={styles.qrCodeId}>ID: {user._id}</Text>
+                                    </View>
+                                </View>
+                            </ViewShot>
+
+                            <View style={styles.embeddedQrInfo}>
+                                <Text style={styles.embeddedQrTitle}>Staff Assignment QR Code</Text>
+                                <Text style={styles.embeddedQrId}>{user._id}</Text>
+                                <Text style={styles.embeddedQrInstructions}>
+                                    Ask your admin to scan this QR code to assign you to their client organization and projects.
                                 </Text>
                             </View>
+
+                            {/* Share Button */}
+                            <TouchableOpacity
+                                style={[styles.shareButton, isSharing && styles.shareButtonDisabled]}
+                                onPress={() => shareQRCode(embeddedQRRef)}
+                                activeOpacity={0.7}
+                                disabled={isSharing}
+                            >
+                                <Ionicons
+                                    name={isSharing ? "hourglass-outline" : "share-outline"}
+                                    size={20}
+                                    color="#FFFFFF"
+                                />
+                                <Text style={styles.shareButtonText}>
+                                    {isSharing ? 'Sharing...' : 'Share QR Code'}
+                                </Text>
+                            </TouchableOpacity>
+
+                            {/* Push Token Status for Staff */}
+                            <PushTokenStatusIndicator showDetails={true} />
+                        </View>
+                    </View>
+                )}
+
+                {loading ? (
+                    <ProjectListSkeleton count={3} />
+                ) : error ? (
+                    <View style={homeStyles.stateContainer}>
+                        <View style={[homeStyles.stateIconBadge, { backgroundColor: Colors.errorLight }]}>
+                            <Ionicons name="cloud-offline-outline" size={32} color={Colors.errorText} />
+                        </View>
+                        <Text style={homeStyles.stateTitle}>Couldn't load projects</Text>
+                        <Text style={homeStyles.stateBody}>Check your connection, then try again.</Text>
+                        <Pressable
+                            style={({ pressed }) => [homeStyles.stateButton, pressed && homeStyles.stateButtonPressed]}
+                            onPress={() => fetchProjectData()}
+                            accessibilityRole="button"
+                        >
+                            <Ionicons name="refresh" size={17} color="#FFFFFF" />
+                            <Text style={homeStyles.stateButtonText}>Try Again</Text>
+                        </Pressable>
+                    </View>
+                ) : visibleProjects.length > 0 ? (
+                    visibleProjects.map((project, index) => (
+                        <View key={project._id ?? index} style={homeStyles.cardSpacing}>
+                            <ProjectCard
+                                project={project}
+                                onViewDetails={handleViewDetails}
+                                onPinToggle={handlePinToggle}
+                                onFeaturedToggle={handleFeaturedToggle}
+                                userType={userIsAdmin ? 'admin' : (isStaff ? 'staff' : 'client')}
+                                featured={project.isFeatured || (index === 0 && !anyFeatured)}
+                            />
+                        </View>
+                    ))
+                ) : (
+                    <View style={homeStyles.stateContainer}>
+                        <View style={homeStyles.stateIconBadge}>
+                            <Ionicons
+                                name={projects.length > 0 && showCompletedProjects && !isStaff ? "checkmark-done-outline" : "folder-open-outline"}
+                                size={32}
+                                color={Colors.primary}
+                            />
+                        </View>
+                        {projects.length === 0 ? (
+                            <>
+                                <Text style={homeStyles.stateTitle}>No projects yet</Text>
+                                <Text style={homeStyles.stateBody}>
+                                    {userIsAdmin
+                                        ? 'Create your first project to start tracking budget, materials and labor.'
+                                        : 'No projects available. Contact your admin to add projects.'}
+                                </Text>
+                                {userIsAdmin && (
+                                    <Pressable
+                                        style={({ pressed }) => [homeStyles.stateButton, pressed && homeStyles.stateButtonPressed]}
+                                        onPress={() => router.push('/add-project' as any)}
+                                        accessibilityRole="button"
+                                    >
+                                        <Ionicons name="add" size={18} color="#FFFFFF" />
+                                        <Text style={homeStyles.stateButtonText}>Add Project</Text>
+                                    </Pressable>
+                                )}
+                            </>
+                        ) : (
+                            <>
+                                <Text style={homeStyles.stateTitle}>
+                                    {isStaff ? 'No ongoing projects' : (showCompletedProjects ? 'No completed projects' : 'No ongoing projects')}
+                                </Text>
+                                <Text style={homeStyles.stateBody}>
+                                    {isStaff
+                                        ? 'Contact your admin to assign projects to you'
+                                        : showCompletedProjects
+                                            ? 'Mark projects as complete to see them here'
+                                            : 'All your projects are completed'}
+                                </Text>
+                            </>
                         )}
                     </View>
                 )}
@@ -1026,9 +1029,9 @@ const Index: React.FC = () => {
             {userIsAdmin && (
                 <FloatingStatsButton
                     stats={[
-                        { icon: 'briefcase', color: '#3A78B5', value: projects.length, label: 'Total Projects' },
-                        { icon: 'pulse', color: '#3A78B5', value: projects.filter((p) => !p.isCompleted).length, label: 'Active Projects' },
-                        { icon: 'checkmark-done', color: '#22C55E', value: projects.filter((p) => p.isCompleted).length, label: 'Completed' },
+                        { icon: 'briefcase', color: Colors.primary, value: projects.length, label: 'Total Projects' },
+                        { icon: 'pulse', color: Colors.primary, value: ongoingCount, label: 'Active Projects' },
+                        { icon: 'checkmark-done', color: Colors.success, value: completedCount, label: 'Completed' },
                     ]}
                 />
             )}
@@ -1037,17 +1040,33 @@ const Index: React.FC = () => {
 };
 
 export default Index;
+
+const INK = '#0F172A';
+
 const homeStyles = StyleSheet.create({
-    brandHeader: {
-        backgroundColor: '#FFFFFF',
+    container: {
+        flex: 1,
+        backgroundColor: Colors.background,
+    },
+
+    // Fixed top bar
+    topBar: {
+        backgroundColor: Colors.background,
         paddingHorizontal: 20,
-        paddingTop: 10,
-        paddingBottom: 16,
+        paddingTop: 8,
+        paddingBottom: 12,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: 'transparent',
+        zIndex: 2,
+    },
+    topBarScrolled: {
+        borderBottomColor: Colors.border,
+    },
+    brandRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
+        gap: 12,
     },
     brandLeft: {
         flexDirection: 'row',
@@ -1056,216 +1075,273 @@ const homeStyles = StyleSheet.create({
         gap: 12,
     },
     brandLogo: {
-        width: 46,
-        height: 46,
-        borderRadius: 15,
-        backgroundColor: '#3A78B5',
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: Colors.primary,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#3A78B5',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 3,
     },
     brandLogoText: {
         color: '#FFFFFF',
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '800',
-        letterSpacing: 0.4,
+        letterSpacing: 0.3,
     },
     brandTextBlock: {
         flex: 1,
     },
     brandTitle: {
-        fontSize: 18,
-        fontWeight: '800',
-        color: '#0F172A',
-        letterSpacing: -0.4,
+        fontSize: 17,
+        fontWeight: '700',
+        color: INK,
+        letterSpacing: -0.3,
     },
     brandSubtitle: {
-        fontSize: 12,
-        color: '#64748B',
+        fontSize: 13,
+        color: Colors.textSecondary,
         fontWeight: '500',
-        marginTop: 2,
+        marginTop: 1,
     },
-    heroNotifButton: {
+    notifButton: {
         width: 44,
         height: 44,
-        borderRadius: 14,
-        backgroundColor: '#DCEEFF',
+        borderRadius: 22,
+        backgroundColor: Colors.surface,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: '#B8D8F8',
+        borderColor: Colors.border,
     },
-    greetingSection: {
-        paddingHorizontal: 20,
-        paddingTop: 4,
-        paddingBottom: 10,
-        backgroundColor: '#FFFFFF',
+    notifButtonPressed: {
+        backgroundColor: Colors.fill,
     },
-    greetingTitle: {
-        fontSize: 15,
+    notifBadge: {
+        position: 'absolute',
+        top: -3,
+        right: -3,
+        backgroundColor: Colors.errorText,
+        borderRadius: 10,
+        paddingHorizontal: 5,
+        minWidth: 20,
+        height: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: Colors.background,
+    },
+    notifBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 11,
         fontWeight: '700',
-        color: '#0F172A',
-        letterSpacing: -0.2,
-        marginBottom: 2,
+        fontVariant: ['tabular-nums'],
     },
-    greetingSubtitle: {
-        fontSize: 12,
-        color: '#64748B',
-        fontWeight: '500',
-    },
+
+    // Section title + filter
     sectionHeader: {
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'baseline',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingTop: 22,
-        paddingBottom: 14,
+        marginTop: 24,
+        marginBottom: 12,
     },
     sectionTitle: {
-        fontSize: 20,
+        fontSize: 28,
         fontWeight: '800',
-        color: '#0F172A',
-        letterSpacing: -0.4,
+        color: INK,
+        letterSpacing: -0.7,
     },
-    viewCompletedButton: {
+    sectionCount: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: Colors.textSecondary,
+    },
+    segmented: {
+        flexDirection: 'row',
+        backgroundColor: Colors.fill,
+        borderRadius: 14,
+        padding: 4,
+        gap: 4,
+    },
+    segment: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 5,
-        backgroundColor: '#EAF0FE',
-        borderWidth: 1,
-        borderColor: '#C4D8FC',
-        borderRadius: 999,
-        paddingHorizontal: 13,
-        paddingVertical: 8,
-    },
-    viewCompletedButtonActive: {
-        backgroundColor: '#DCEEFF',
-        borderColor: '#B8D8F8',
-    },
-    viewCompletedButtonText: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#3A78B5',
-    },
-    viewCompletedButtonTextActive: {
-        color: '#295E94',
-    },
-    stateIconBadge: {
-        width: 84,
-        height: 84,
-        borderRadius: 28,
-        backgroundColor: '#DCEEFF',
-        alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 18,
-        alignSelf: 'center',
-        borderWidth: 1,
-        borderColor: '#B8D8F8',
+        gap: 8,
+        minHeight: 40,
+        borderRadius: 10,
     },
-    notifBadgeDot: {
-        position: 'absolute',
-        top: -2,
-        right: -2,
-        backgroundColor: '#EF4444',
-        borderRadius: 9,
-        paddingHorizontal: 4,
-        paddingVertical: 1,
-        minWidth: 18,
-        height: 18,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 1.5,
-        borderColor: '#FFFFFF',
-    },
-    notifBadgeDotText: {
-        color: '#FFFFFF',
-        fontSize: 9,
-        fontWeight: '800',
-    },
-    urgentAlertBanner: {
-        marginHorizontal: 20,
-        marginTop: 12,
-        marginBottom: 4,
-        borderRadius: 14,
-        backgroundColor: '#FFFBEB',
-        borderWidth: 1,
-        borderColor: '#FCD34D',
-        overflow: 'hidden',
-        shadowColor: '#D97706',
-        shadowOffset: { width: 0, height: 2 },
+    segmentSelected: {
+        backgroundColor: Colors.surface,
+        shadowColor: INK,
+        shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.08,
-        shadowRadius: 6,
+        shadowRadius: 3,
         elevation: 2,
     },
-    urgentBannerHeaderRow: {
+    segmentText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: Colors.textSecondary,
+    },
+    segmentTextSelected: {
+        color: INK,
+    },
+    segmentCount: {
+        minWidth: 22,
+        height: 20,
+        paddingHorizontal: 6,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#E2E8F0',
+    },
+    segmentCountSelected: {
+        backgroundColor: Colors.primaryLight,
+    },
+    segmentCountText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: Colors.textSecondary,
+        fontVariant: ['tabular-nums'],
+    },
+    segmentCountTextSelected: {
+        color: Colors.primaryDark,
+    },
+
+    // List
+    scroll: {
+        flex: 1,
+    },
+    scrollContent: {
+        paddingHorizontal: 20,
+        paddingTop: 12,
+        paddingBottom: 32,
+    },
+    scrollContentWithFab: {
+        // Clears the floating stats button so the last card's footer stays tappable
+        paddingBottom: 104,
+    },
+    cardSpacing: {
+        marginBottom: 16,
+    },
+
+    // Urgent payments
+    urgentBanner: {
+        marginBottom: 16,
+        borderRadius: 20,
+        backgroundColor: '#FFF8EB',
+        borderWidth: 1,
+        borderColor: '#FBE3B4',
+        overflow: 'hidden',
+    },
+    urgentHeaderRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 10,
         paddingHorizontal: 14,
-        paddingVertical: 12,
+        minHeight: 52,
     },
-    urgentBannerDivider: {
-        height: 1,
-        backgroundColor: '#FDE68A',
-        marginHorizontal: 14,
-    },
-    urgentBannerExpandedRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-    },
-    urgentIconContainer: {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
-        backgroundColor: '#FEF3C7',
+    urgentIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 10,
+        backgroundColor: '#FDEBC8',
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: '#FDE68A',
     },
-    urgentAlertTitle: {
-        fontSize: 14,
+    urgentTitle: {
+        flex: 1,
+        fontSize: 15,
         fontWeight: '700',
-        color: '#92400E',
+        color: '#7C2D12',
     },
-    urgentBadge: {
-        backgroundColor: '#D97706',
-        borderRadius: 10,
-        paddingHorizontal: 6,
-        paddingVertical: 1,
-    },
-    urgentBadgeText: {
-        color: '#FFFFFF',
-        fontSize: 10,
-        fontWeight: '800',
-    },
-    urgentAlertSubtitle: {
-        fontSize: 12,
-        color: '#B45309',
-        marginTop: 2,
-        fontWeight: '500',
-    },
-    urgentAlertAction: {
+    urgentBody: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
-        backgroundColor: '#FEF3C7',
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#FDE68A',
+        gap: 12,
+        paddingHorizontal: 16,
+        paddingBottom: 16,
+        paddingTop: 2,
     },
-    urgentAlertActionText: {
-        fontSize: 12,
+    urgentAmountBlock: {
+        flex: 1,
+    },
+    urgentAmount: {
+        fontSize: 26,
+        fontWeight: '800',
+        color: '#7C2D12',
+        letterSpacing: -0.6,
+        fontVariant: ['tabular-nums'],
+    },
+    urgentSubtitle: {
+        fontSize: 13,
+        color: Colors.warningText,
+        fontWeight: '500',
+        marginTop: 2,
+    },
+    urgentAction: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: Colors.warningText,
+        paddingHorizontal: 16,
+        minHeight: 40,
+        borderRadius: 20,
+    },
+    urgentActionText: {
+        fontSize: 14,
         fontWeight: '700',
-        color: '#B45309',
+        color: '#FFFFFF',
+    },
+
+    // Empty / error states
+    stateContainer: {
+        alignItems: 'center',
+        paddingVertical: 48,
+        paddingHorizontal: 24,
+    },
+    stateIconBadge: {
+        width: 72,
+        height: 72,
+        borderRadius: 24,
+        backgroundColor: Colors.primaryLight,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 20,
+    },
+    stateTitle: {
+        fontSize: 19,
+        fontWeight: '700',
+        color: INK,
+        letterSpacing: -0.3,
+        textAlign: 'center',
+        marginBottom: 6,
+    },
+    stateBody: {
+        fontSize: 15,
+        lineHeight: 21,
+        color: Colors.textSecondary,
+        textAlign: 'center',
+        maxWidth: 300,
+    },
+    stateButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 20,
+        paddingHorizontal: 22,
+        minHeight: 48,
+        borderRadius: 24,
+        backgroundColor: Colors.primary,
+    },
+    stateButtonPressed: {
+        backgroundColor: Colors.primaryDark,
+    },
+    stateButtonText: {
+        color: '#FFFFFF',
+        fontSize: 15,
+        fontWeight: '700',
     },
 });

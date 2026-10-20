@@ -1,3 +1,4 @@
+import { Colors } from "@/constants/theme";
 import { StyleSheet } from "react-native";
 
 export const styles = StyleSheet.create({
@@ -122,15 +123,12 @@ export const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: Colors.background,
   },
   headerWrapper: {
-    backgroundColor: "#FFFFFF",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
+    backgroundColor: Colors.surface,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
     zIndex: 1000,
     marginBottom: 4,
   },
@@ -145,7 +143,8 @@ export const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 8,
+    minHeight: 60,
   },
   headerLeft: {
     flexDirection: "row",
@@ -160,15 +159,12 @@ export const styles = StyleSheet.create({
     marginRight: 8,
   },
   backButton: {
-    flexDirection: 'row',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F3F4F6',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
+    backgroundColor: Colors.fill,
   },
   headerBackButton: {
     padding: 8,
@@ -181,18 +177,20 @@ export const styles = StyleSheet.create({
   breadcrumbContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 2,
-    flexWrap: "wrap",
+    marginBottom: 1,
+    overflow: "hidden",
   },
   breadcrumbText: {
-    fontSize: 12,
+    flexShrink: 1,
+    fontSize: 13,
     fontWeight: "500",
-    color: "#9CA3AF",
+    color: Colors.textSecondary,
   },
   breadcrumbTextActive: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#6B7280",
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#0F172A",
+    letterSpacing: -0.35,
   },
   breadcrumbSeparator: {
     marginHorizontal: 4,
@@ -589,9 +587,9 @@ export const styles = StyleSheet.create({
   tabContainer: {
     flexDirection: "row",
     marginHorizontal: 16,
-    marginTop: 6,
+    marginTop: 10,
     marginBottom: 6,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: Colors.fill,
     borderRadius: 12,
     padding: 4,
   },
@@ -600,9 +598,9 @@ export const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 9,
+    minHeight: 40,
     paddingHorizontal: 10,
-    borderRadius: 9,
+    borderRadius: 10,
   },
   activeTab: {
     backgroundColor: "#FFFFFF",
@@ -614,12 +612,12 @@ export const styles = StyleSheet.create({
   },
   tabText: {
     marginLeft: 6,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "600",
-    color: "#6B7280",
+    color: Colors.textSecondary,
   },
   activeTabText: {
-    color: "#1F2937",
+    color: "#0F172A",
   },
   materialsSection: {
     paddingHorizontal: 20,
@@ -1095,10 +1093,10 @@ export const styles = StyleSheet.create({
     color: '#64748B',
   },
   addContractorButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#3A78B5',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#3A78B5',

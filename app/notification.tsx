@@ -23,6 +23,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { PDFReportGenerator } from '@/utils/pdfReportGenerator';
 import BillViewerModal from '@/components/common/BillViewerModal';
+import { Colors } from '@/constants/theme';
 
 interface Activity {
     _id: string;
@@ -132,6 +133,20 @@ interface WarningItem {
     status: 'pending' | 'overdue' | 'action_required' | 'paid';
     description?: string;
 }
+
+// Tinted badges — dark label on a light tint keeps every badge ≥4.5:1, where the old
+// solid fills with white uppercase text sat around 2–2.5:1.
+const BADGE_TONES = {
+    imported: { bg: Colors.successLight, fg: Colors.successText },
+    used: { bg: Colors.errorLight, fg: Colors.errorText },
+    transferred: { bg: Colors.primaryLight, fg: Colors.primaryDark },
+    labor: { bg: Colors.warningLight, fg: Colors.warningText },
+    equipment: { bg: Colors.primaryLight, fg: Colors.primaryDark },
+    other: { bg: Colors.primaryLight, fg: Colors.primaryDark },
+    paid: { bg: Colors.successLight, fg: Colors.successText },
+    urgent: { bg: Colors.errorLight, fg: Colors.errorText },
+    due: { bg: Colors.warningLight, fg: Colors.warningText },
+};
 
 const NotificationPage: React.FC = () => {
     console.log('🏗️ NotificationPage component rendering/re-rendering');
@@ -876,14 +891,14 @@ const NotificationPage: React.FC = () => {
     const getActivityIcon = (type: string, category: string) => {
         if (category === 'project') return { name: 'folder', color: '#3A78B5' };
         if (category === 'section') return { name: 'layers', color: '#3A78B5' };
-        if (category === 'mini_section') return { name: 'grid', color: '#10B981' };
+        if (category === 'mini_section') return { name: 'grid', color: Colors.successText };
         if (category === 'phase') return { name: 'git-branch', color: '#1E293B' };
-        if (category === 'staff') return { name: 'people', color: '#EF4444' };
-        if (category === 'labor') return { name: 'hammer', color: '#F59E0B' };
-        if (category === 'material') return { name: 'cube', color: '#06B6D4' };
+        if (category === 'staff') return { name: 'people', color: Colors.errorText };
+        if (category === 'labor') return { name: 'hammer', color: Colors.warningText };
+        if (category === 'material') return { name: 'cube', color: '#0E7490' };
         if (category === 'equipment') return { name: 'construct', color: '#3A78B5' };
         if (category === 'other_cost') return { name: 'briefcase', color: '#3A78B5' };
-        return { name: 'information-circle', color: '#6B7280' };
+        return { name: 'information-circle', color: Colors.textSecondary };
     };
 
     const getMaterialActivityIcon = (activity: 'imported' | 'used' | 'transferred') => {
@@ -981,27 +996,10 @@ const NotificationPage: React.FC = () => {
                     <View style={styles.materialActivityGradient}>
                         {/* Header with activity type badge */}
                         <View style={styles.materialActivityHeader}>
-                            <View style={[
-                                styles.activityBadge,
-                                {
-                                    backgroundColor: icon.color,
-                                    shadowColor: icon.color,
-                                    shadowOffset: { width: 0, height: 2 },
-                                    shadowOpacity: 0.3,
-                                    shadowRadius: 4,
-                                    elevation: 3,
-                                }
-                            ]}>
-                                <Ionicons
-                                    name={icon.name as any}
-                                    size={16}
-                                    color="#FFFFFF"
-                                />
-                                <Text style={[
-                                    styles.activityBadgeText,
-                                    { color: '#FFFFFF' }
-                                ]}>
-                                    {isLaborActivity ? 'LABOR ADDED' : 'EQUIPMENT ADDED'}
+                            <View style={[styles.activityBadge, { backgroundColor: BADGE_TONES[isLaborActivity ? 'labor' : 'equipment'].bg }]}>
+                                <Ionicons name={icon.name as any} size={15} color={BADGE_TONES[isLaborActivity ? 'labor' : 'equipment'].fg} />
+                                <Text style={[styles.activityBadgeText, { color: BADGE_TONES[isLaborActivity ? 'labor' : 'equipment'].fg }]}>
+                                    {isLaborActivity ? 'Labor added' : 'Equipment added'}
                                 </Text>
                             </View>
                         </View>
@@ -1070,11 +1068,10 @@ const NotificationPage: React.FC = () => {
                                         </View>
                                         {entry.description ? (
                                             <View style={styles.laborDescriptionCard}>
-                                                <View style={styles.laborDescriptionAccent} />
                                                 <View style={styles.laborDescriptionContent}>
-                                                    <Ionicons name="document-text-outline" size={14} color="#F59E0B" style={{ marginTop: 1 }} />
+                                                    <Ionicons name="document-text-outline" size={14} color={Colors.warningText} style={{ marginTop: 1 }} />
                                                     <View style={{ flex: 1 }}>
-                                                        <Text style={styles.laborDescriptionLabel}>Work Done</Text>
+                                                        <Text style={styles.laborDescriptionLabel}>Work done</Text>
                                                         <Text style={styles.laborDescriptionText} numberOfLines={3}>{entry.description}</Text>
                                                     </View>
                                                 </View>
@@ -1106,7 +1103,7 @@ const NotificationPage: React.FC = () => {
                         {/* Footer with user info and time ago */}
                         <View style={styles.materialActivityFooter}>
                             <View style={styles.userInfo}>
-                                <View style={[styles.userAvatar, { backgroundColor: icon.color }]}>
+                                <View style={styles.userAvatar}>
                                     <Text style={styles.userAvatarText}>
                                         {displayUser.fullName.charAt(0).toUpperCase()}
                                     </Text>
@@ -1130,10 +1127,10 @@ const NotificationPage: React.FC = () => {
             const isSubPhaseProgress = activity.activityType === 'sub_phase_progress_updated';
             const badgeIcon = isPhaseChange ? 'git-branch' : 'trending-up';
             const badgeLabel = isPhaseChange
-                ? 'PHASE CHANGED'
+                ? 'Phase changed'
                 : isSubPhaseProgress
-                    ? 'SUB-PHASE PROGRESS'
-                    : 'PHASE PROGRESS';
+                    ? 'Sub-phase progress'
+                    : 'Phase progress';
             const progressLabel = isSubPhaseProgress && meta.subPhaseName
                 ? `${meta.phaseName} → ${meta.subPhaseName}`
                 : meta.phaseName;
@@ -1141,11 +1138,11 @@ const NotificationPage: React.FC = () => {
             // Light, flat (non-gradient) accent colors per element so the card has variety
             // without looking loud.
             const badgeBg = isPhaseChange ? '#EDE9FE' : '#FEF3C7';
-            const badgeColor = isPhaseChange ? '#7C3AED' : '#D97706';
+            const badgeColor = isPhaseChange ? '#6D28D9' : Colors.warningText;
             const fromColor = '#94A3B8';
-            const toColor = '#34D399';
-            const progressValueColor = isProgressComplete ? '#34D399' : '#D97706';
-            const progressBarColor = '#FCD34D';
+            const toColor = Colors.successText;
+            const progressValueColor = isProgressComplete ? Colors.successText : Colors.warningText;
+            const progressBarColor = isProgressComplete ? Colors.success : Colors.warning;
             const avatarColor = '#E0E7FF';
 
             return (
@@ -1253,8 +1250,8 @@ const NotificationPage: React.FC = () => {
         // Regular activity card for other types
         return (
             <View key={activity._id} style={styles.activityItemNew}>
-                <View style={[styles.iconContainerNew, { backgroundColor: icon.color }]}>
-                    <Ionicons name={icon.name as any} size={24} color="#FFFFFF" />
+                <View style={[styles.iconContainerNew, { backgroundColor: `${icon.color}1A` }]}>
+                    <Ionicons name={icon.name as any} size={22} color={icon.color} />
                 </View>
 
                 <View style={styles.activityContentNew}>
@@ -1262,7 +1259,7 @@ const NotificationPage: React.FC = () => {
                         <Text style={styles.activityDescriptionNew}>{activity.description}</Text>
                         <View style={styles.categoryBadgeNew}>
                             <Text style={styles.categoryBadgeTextNew}>
-                                {activity.category.toUpperCase()}
+                                {activity.category.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase())}
                             </Text>
                         </View>
                     </View>
@@ -1273,8 +1270,8 @@ const NotificationPage: React.FC = () => {
 
                     <View style={styles.activityFooterNew}>
                         <View style={styles.userInfoNew}>
-                            <View style={[styles.userAvatarNew, { backgroundColor: icon.color }]}>
-                                <Text style={styles.userAvatarTextNew}>
+                            <View style={[styles.userAvatarNew, { backgroundColor: `${icon.color}1A` }]}>
+                                <Text style={[styles.userAvatarTextNew, { color: icon.color }]}>
                                     {displayUser.fullName.charAt(0).toUpperCase()}
                                 </Text>
                             </View>
@@ -1320,48 +1317,6 @@ const NotificationPage: React.FC = () => {
         const isUsed = activity.activity === 'used';
         const isTransferred = activity.activity === 'transferred';
 
-        // Debug: Log the cost calculation to verify it's correct
-        if (__DEV__) {
-            console.log('Material Activity Cost Debug:', {
-                _id: activity._id,
-                materials: activity.materials.map(m => ({
-                    name: m.name,
-                    qnt: m.qnt,
-                    unit: m.unit,
-                    cost: m.cost,
-                    perUnitCost: (m as any).perUnitCost,
-                    totalCost: (m as any).totalCost,
-                })),
-                calculatedTotalCost: totalCost,
-            });
-        }
-
-        // Debug: Log the date field to see what we're getting
-        if (__DEV__) {
-            console.log('Material Activity Date Debug:', {
-                _id: activity._id,
-                date: activity.date,
-                createdAt: activity.createdAt,
-                dateType: typeof activity.date,
-                createdAtType: typeof activity.createdAt,
-                formattedTimeAgo: formatTimeAgo(activity.date || activity.createdAt),
-            });
-        }
-
-        // Debug: Log contractor_name to verify it's being received
-        if (__DEV__) {
-            console.log('🏗️ Contractor Name Debug:', {
-                _id: activity._id,
-                contractor_name: activity.contractor_name,
-                hasContractorName: !!activity.contractor_name,
-                contractorNameType: typeof activity.contractor_name,
-                materials: activity.materials.map(m => ({
-                    name: m.name,
-                    contractor_name: m.contractor_name,
-                })),
-            });
-        }
-
         // Use activity user or fallback to current user
         const displayUser = activity.user?.fullName && activity.user.fullName !== 'Unknown User'
             ? activity.user
@@ -1385,27 +1340,10 @@ const NotificationPage: React.FC = () => {
                 <View style={styles.materialActivityGradient}>
                     {/* Header with activity type badge */}
                     <View style={styles.materialActivityHeader}>
-                        <View style={[
-                            styles.activityBadge,
-                            {
-                                backgroundColor: isImported ? '#10B981' : isUsed ? '#EF4444' : '#3A78B5',
-                                shadowColor: isImported ? '#10B981' : isUsed ? '#EF4444' : '#3A78B5',
-                                shadowOffset: { width: 0, height: 2 },
-                                shadowOpacity: 0.3,
-                                shadowRadius: 4,
-                                elevation: 3,
-                            }
-                        ]}>
-                            <Ionicons
-                                name={icon.name as any}
-                                size={16}
-                                color="#FFFFFF"
-                            />
-                            <Text style={[
-                                styles.activityBadgeText,
-                                { color: '#FFFFFF' }
-                            ]}>
-                                {isImported ? 'IMPORTED' : isUsed ? 'USED' : 'TRANSFERRED'}
+                        <View style={[styles.activityBadge, { backgroundColor: BADGE_TONES[isImported ? 'imported' : isUsed ? 'used' : 'transferred'].bg }]}>
+                            <Ionicons name={icon.name as any} size={15} color={BADGE_TONES[isImported ? 'imported' : isUsed ? 'used' : 'transferred'].fg} />
+                            <Text style={[styles.activityBadgeText, { color: BADGE_TONES[isImported ? 'imported' : isUsed ? 'used' : 'transferred'].fg }]}>
+                                {isImported ? 'Imported' : isUsed ? 'Used' : 'Transferred'}
                             </Text>
                         </View>
                     </View>
@@ -1446,7 +1384,7 @@ const NotificationPage: React.FC = () => {
                                 </View>
                                 <Ionicons name="arrow-forward" size={16} color="#64748B" />
                                 <View style={styles.transferProject}>
-                                    <Ionicons name="folder" size={16} color="#10B981" />
+                                    <Ionicons name="folder" size={16} color={Colors.successText} />
                                     <Text style={styles.transferProjectName}>
                                         {activity.transferDetails.toProject.name}
                                     </Text>
@@ -1459,7 +1397,7 @@ const NotificationPage: React.FC = () => {
                     {activity.contractor_name && (
                         <View style={styles.contractorInfoContainer}>
                             <View style={styles.contractorInfoItem}>
-                                <Ionicons name="person-outline" size={14} color="#3A78B5" />
+                                <Ionicons name="person-outline" size={14} color={Colors.primaryDark} />
                                 <Text style={styles.contractorLabel}>Contractor:</Text>
                                 <Text style={styles.contractorName}>{activity.contractor_name}</Text>
                             </View>
@@ -1526,10 +1464,11 @@ const NotificationPage: React.FC = () => {
                                 </Text>
                                 <TouchableOpacity
                                     style={styles.billViewAllBtn}
+                                    hitSlop={10}
                                     onPress={() => setBillViewer({ images: billUrls, index: 0 })}
                                     activeOpacity={0.7}
                                 >
-                                    <Text style={styles.billViewAllText}>View Bill</Text>
+                                    <Text style={styles.billViewAllText}>View bill</Text>
                                     <Ionicons name="chevron-forward" size={13} color="#3A78B5" />
                                 </TouchableOpacity>
                             </View>
@@ -1585,27 +1524,10 @@ const NotificationPage: React.FC = () => {
                 <View style={styles.materialActivityGradient}>
                     {/* Header with activity type badge */}
                     <View style={styles.materialActivityHeader}>
-                        <View style={[
-                            styles.activityBadge,
-                            {
-                                backgroundColor: '#3A78B5',
-                                shadowColor: '#3A78B5',
-                                shadowOffset: { width: 0, height: 2 },
-                                shadowOpacity: 0.3,
-                                shadowRadius: 4,
-                                elevation: 3,
-                            }
-                        ]}>
-                            <Ionicons
-                                name={icon.name as any}
-                                size={16}
-                                color="#FFFFFF"
-                            />
-                            <Text style={[
-                                styles.activityBadgeText,
-                                { color: '#FFFFFF' }
-                            ]}>
-                                OTHER COST ADDED
+                        <View style={[styles.activityBadge, { backgroundColor: BADGE_TONES.other.bg }]}>
+                            <Ionicons name={icon.name as any} size={15} color={BADGE_TONES.other.fg} />
+                            <Text style={[styles.activityBadgeText, { color: BADGE_TONES.other.fg }]}>
+                                Other cost added
                             </Text>
                         </View>
                     </View>
@@ -1689,7 +1611,7 @@ const NotificationPage: React.FC = () => {
                     {/* Footer with user info and time ago */}
                     <View style={styles.materialActivityFooter}>
                         <View style={styles.userInfo}>
-                            <View style={[styles.userAvatar, { backgroundColor: '#3A78B5' }]}>
+                            <View style={styles.userAvatar}>
                                 <Text style={styles.userAvatarText}>
                                     {displayUser.fullName.charAt(0).toUpperCase()}
                                 </Text>
@@ -2406,12 +2328,15 @@ const NotificationPage: React.FC = () => {
         });
     }
 
+    const totalActivityCount = groupedActivities.reduce((sum, group) => sum + group.activities.length, 0);
+    const activityCountLabel = `${totalActivityCount} ${totalActivityCount === 1 ? 'activity' : 'activities'}`;
+
     return (
         <SafeAreaView style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#1F2937" />
+                <TouchableOpacity onPress={() => router.back()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Back">
+                    <Ionicons name="arrow-back" size={22} color="#0F172A" />
                 </TouchableOpacity>
                 <View style={styles.headerContent}>
                     <View style={styles.headerTitleContainer}>
@@ -2419,8 +2344,8 @@ const NotificationPage: React.FC = () => {
                     </View>
                     <Text style={styles.headerSubtitle}>
                         {selectedVendors.length > 0
-                            ? `${selectedVendors.length} vendor${selectedVendors.length > 1 ? 's' : ''} selected • ${groupedActivities.reduce((sum, group) => sum + group.activities.length, 0)} activities`
-                            : `${formatDateHeader(currentDate)} • ${groupedActivities.reduce((sum, group) => sum + group.activities.length, 0)} activities`
+                            ? `${selectedVendors.length} vendor${selectedVendors.length > 1 ? 's' : ''} selected • ${activityCountLabel}`
+                            : `${formatDateHeader(currentDate)} • ${activityCountLabel}`
                         }
                     </Text>
                 </View>
@@ -2432,7 +2357,9 @@ const NotificationPage: React.FC = () => {
                         <TouchableOpacity
                             onPress={generateVendorReport}
                             disabled={isGeneratingReport}
-                            style={[styles.vendorFilterButton, { marginRight: 8, backgroundColor: '#10B981', borderColor: '#10B981' }]}
+                            style={[styles.vendorFilterButton, { marginRight: 8, backgroundColor: Colors.successText }]}
+                            accessibilityRole="button"
+                            accessibilityLabel="Generate vendor report"
                         >
                             {isGeneratingReport ? (
                                 <ActivityIndicator size="small" color="#FFFFFF" />
@@ -2454,6 +2381,8 @@ const NotificationPage: React.FC = () => {
                                 !isViewingToday && styles.vendorFilterButtonActive,
                             ]}
                             activeOpacity={0.7}
+                            accessibilityRole="button"
+                            accessibilityLabel="Choose date"
                         >
                             <Ionicons
                                 name={isViewingToday ? 'calendar-outline' : 'calendar'}
@@ -2467,6 +2396,8 @@ const NotificationPage: React.FC = () => {
                     <TouchableOpacity
                         onPress={() => setShowVendorModal(true)}
                         style={[styles.vendorFilterButton, selectedVendors.length > 0 && styles.vendorFilterButtonActive]}
+                        accessibilityRole="button"
+                        accessibilityLabel={selectedVendors.length > 0 ? `Vendor filter, ${selectedVendors.length} selected` : 'Filter by vendor'}
                     >
                         <Ionicons
                             name={selectedVendors.length > 0 ? "funnel" : "funnel-outline"}
@@ -2491,6 +2422,8 @@ const NotificationPage: React.FC = () => {
             >
                 <TouchableOpacity
                     style={[styles.tab, activeTab === 'warnings' && styles.tabActiveWarning]}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: activeTab === 'warnings' }}
                     onPress={() => setActiveTab('warnings')}
                 >
                     <View style={styles.tabContentRow}>
@@ -2516,6 +2449,8 @@ const NotificationPage: React.FC = () => {
 
                 <TouchableOpacity
                     style={[styles.tab, activeTab === 'all' && styles.tabActive]}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: activeTab === 'all' }}
                     onPress={() => setActiveTab('all')}
                 >
                     <View style={styles.tabContentRow}>
@@ -2528,6 +2463,8 @@ const NotificationPage: React.FC = () => {
 
                 <TouchableOpacity
                     style={[styles.tab, activeTab === 'project' && styles.tabActive]}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: activeTab === 'project' }}
                     onPress={() => setActiveTab('project')}
                 >
                     <View style={styles.tabContentRow}>
@@ -2540,6 +2477,8 @@ const NotificationPage: React.FC = () => {
 
                 <TouchableOpacity
                     style={[styles.tab, activeTab === 'labor' && styles.tabActive]}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: activeTab === 'labor' }}
                     onPress={() => setActiveTab('labor')}
                 >
                     <View style={styles.tabContentRow}>
@@ -2552,6 +2491,8 @@ const NotificationPage: React.FC = () => {
 
                 <TouchableOpacity
                     style={[styles.tab, activeTab === 'material' && styles.tabActive]}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: activeTab === 'material' }}
                     onPress={() => setActiveTab('material')}
                 >
                     <View style={styles.tabContentRow}>
@@ -2564,6 +2505,8 @@ const NotificationPage: React.FC = () => {
 
                 <TouchableOpacity
                     style={[styles.tab, activeTab === 'other_cost' && styles.tabActive]}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: activeTab === 'other_cost' }}
                     onPress={() => setActiveTab('other_cost')}
                 >
                     <View style={styles.tabContentRow}>
@@ -2740,9 +2683,8 @@ const NotificationPage: React.FC = () => {
                     </View>
                 ) : error ? (
                     <>
-                        {console.log('❌ Rendering: ERROR STATE -', error)}
                         <View style={styles.centerContainer}>
-                            <Ionicons name="alert-circle-outline" size={64} color="#EF4444" />
+                            <Ionicons name="cloud-offline-outline" size={48} color={Colors.errorText} />
                             <Text style={styles.errorText}>{error}</Text>
                             <Text style={styles.errorHint}>
                                 This could be due to network issues or server problems.{'\n'}
@@ -2834,7 +2776,7 @@ const NotificationPage: React.FC = () => {
                         {/* Collapsible Category Cards List */}
                         {filteredWarningItems.length === 0 ? (
                             <View style={styles.emptyWarningContainer}>
-                                <Ionicons name="checkmark-circle-outline" size={56} color="#10B981" />
+                                <Ionicons name="checkmark-circle-outline" size={48} color={Colors.successText} />
                                 <Text style={styles.emptyWarningTitle}>No Pending Payments</Text>
                                 <Text style={styles.emptyWarningSubtitle}>
                                     All contractor and vendor payments are settled and up to date!
@@ -2883,28 +2825,18 @@ const NotificationPage: React.FC = () => {
                                                     const isPaid = item.status === 'paid';
                                                     const isUrgent = !isPaid && item.priority === 'high';
                                                     // Solid status badge, same treatment as the Material tab's IMPORTED / USED badges.
-                                                    const statusColor = isPaid ? '#10B981' : isUrgent ? '#EF4444' : '#F59E0B';
+                                                    const statusTone = BADGE_TONES[isPaid ? 'paid' : isUrgent ? 'urgent' : 'due'];
                                                     const statusIcon = isPaid ? 'checkmark-circle' : isUrgent ? 'alert-circle' : 'time';
-                                                    const statusLabel = isPaid ? 'PAID' : isUrgent ? 'URGENT' : 'PAYMENT DUE';
+                                                    const statusLabel = isPaid ? 'Paid' : isUrgent ? 'Urgent' : 'Payment due';
                                                     const vendorInitial = (item.vendorName || '?').trim().charAt(0).toUpperCase() || '?';
                                                     return (
                                                         <View key={item.id} style={[styles.materialActivityCard, isPaid && styles.pendingCardPaid]}>
                                                             <View style={styles.materialActivityGradient}>
                                                                 {/* Header — status badge + category tag */}
                                                                 <View style={styles.materialActivityHeader}>
-                                                                    <View style={[
-                                                                        styles.activityBadge,
-                                                                        {
-                                                                            backgroundColor: statusColor,
-                                                                            shadowColor: statusColor,
-                                                                            shadowOffset: { width: 0, height: 2 },
-                                                                            shadowOpacity: 0.3,
-                                                                            shadowRadius: 4,
-                                                                            elevation: 3,
-                                                                        }
-                                                                    ]}>
-                                                                        <Ionicons name={statusIcon as any} size={16} color="#FFFFFF" />
-                                                                        <Text style={[styles.activityBadgeText, { color: '#FFFFFF' }]}>{statusLabel}</Text>
+                                                                    <View style={[styles.activityBadge, { backgroundColor: statusTone.bg }]}>
+                                                                        <Ionicons name={statusIcon as any} size={15} color={statusTone.fg} />
+                                                                        <Text style={[styles.activityBadgeText, { color: statusTone.fg }]}>{statusLabel}</Text>
                                                                     </View>
                                                                     <View style={styles.pendingCategoryTag}>
                                                                         <Ionicons name={group.icon as any} size={13} color="#3A78B5" />
@@ -3023,7 +2955,6 @@ const NotificationPage: React.FC = () => {
                     </View>
                 ) : groupedActivities.length === 0 || groupedActivities.reduce((sum, group) => sum + group.activities.length, 0) === 0 ? (
                     <>
-                        {console.log('📭 Rendering: EMPTY STATE')}
                         {/* Simple "No activity today" message while keeping all UI elements */}
                         <View style={styles.simpleEmptyState}>
                             {selectedVendors.length > 0 && (activeTab === 'project' || activeTab === 'labor') ? (
@@ -3037,7 +2968,7 @@ const NotificationPage: React.FC = () => {
                                         onPress={() => setSelectedVendors([])}
                                         activeOpacity={0.8}
                                     >
-                                        <Ionicons name="trash-outline" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+                                        <Ionicons name="close-circle-outline" size={17} color="#FFFFFF" style={{ marginRight: 8 }} />
                                         <Text style={styles.removeFilterButtonText}>Remove Filter</Text>
                                     </TouchableOpacity>
                                 </View>
@@ -3074,13 +3005,15 @@ const NotificationPage: React.FC = () => {
                                             (!hasPrevDate || loading) && styles.navButtonDisabled
                                         ]}
                                         onPress={handlePreviousDay}
+                                            accessibilityRole="button"
+                                            accessibilityLabel="Previous day"
                                         disabled={!hasPrevDate || loading}
                                         activeOpacity={0.7}
                                     >
                                         <Ionicons
                                             name="chevron-back"
                                             size={20}
-                                            color={(!hasPrevDate || loading) ? '#9CA3AF' : '#10B981'}
+                                            color={(!hasPrevDate || loading) ? '#94A3B8' : Colors.primaryDark}
                                         />
                                     </TouchableOpacity>
 
@@ -3091,11 +3024,11 @@ const NotificationPage: React.FC = () => {
                                         activeOpacity={0.7}
                                     >
                                         <View style={styles.compactDateBadge}>
-                                            <Ionicons name="calendar" size={14} color="#10B981" />
+                                            <Ionicons name="calendar-outline" size={16} color={Colors.primaryDark} />
                                             <Text style={styles.compactDateText}>
                                                 {formatDateHeader(currentDate)}
                                             </Text>
-                                            <Ionicons name="chevron-down" size={12} color="#10B981" />
+                                            <Ionicons name="chevron-down" size={14} color={Colors.primaryDark} />
                                         </View>
                                         <Text style={styles.compactActivityCount}>
                                             0 activities
@@ -3110,13 +3043,15 @@ const NotificationPage: React.FC = () => {
                                             (!hasNextDate || loading) && styles.navButtonDisabled
                                         ]}
                                         onPress={handleNextDay}
+                                            accessibilityRole="button"
+                                            accessibilityLabel="Next day"
                                         disabled={!hasNextDate || loading}
                                         activeOpacity={0.7}
                                     >
                                         <Ionicons
                                             name="chevron-forward"
                                             size={20}
-                                            color={(!hasNextDate || loading) ? '#9CA3AF' : '#10B981'}
+                                            color={(!hasNextDate || loading) ? '#94A3B8' : Colors.primaryDark}
                                         />
                                     </TouchableOpacity>
                                 </View>
@@ -3124,7 +3059,7 @@ const NotificationPage: React.FC = () => {
                                 {/* Loading indicator - show when loading with enhanced animation */}
                                 {loading && (
                                     <View style={styles.compactLoadingIndicator}>
-                                        <ActivityIndicator size="small" color="#10B981" />
+                                        <ActivityIndicator size="small" color={Colors.primary} />
                                         <Text style={styles.compactLoadingText}>Loading date...</Text>
                                     </View>
                                 )}
@@ -3147,7 +3082,7 @@ const NotificationPage: React.FC = () => {
                                         disabled={loading}
                                         activeOpacity={0.7}
                                     >
-                                        <Ionicons name="today-outline" size={14} color="#3A78B5" />
+                                        <Ionicons name="today-outline" size={16} color={Colors.primaryDark} />
                                         <Text style={styles.todayButtonText}>Back to Today</Text>
                                     </TouchableOpacity>
                                 )}
@@ -3156,7 +3091,6 @@ const NotificationPage: React.FC = () => {
                     </>
                 ) : (
                     <>
-                        {console.log('✅ Rendering: ACTIVITIES LIST - Count:', groupedActivities.length)}
                         <Animated.View
                             style={[
                                 styles.activitiesList,
@@ -3167,31 +3101,20 @@ const NotificationPage: React.FC = () => {
                             ]}
                         >
                             {groupedActivities.map((dateGroup, dateIndex) => {
-                                console.log(`📅 Rendering date group ${dateIndex + 1}:`, dateGroup.date, '- Activities:', dateGroup.activities.length);
                                 return (
                                     <View key={dateGroup.date} style={styles.dateGroupContainer}>
                                         {/* Date Header */}
                                         <View style={styles.dateHeader}>
-                                            {/* Left: Activity count */}
-                                            <View style={styles.dateHeaderLeft}>
-                                                <Ionicons name="pulse-outline" size={16} color="#64748B" />
-                                                <Text style={styles.activityCountText}>
-                                                    {dateGroup.activities.length} {dateGroup.activities.length === 1 ? 'Activity' : 'Activities'}
-                                                </Text>
-                                            </View>
-
-                                            {/* Right: Date */}
-                                            <View style={styles.dateHeaderRight}>
-                                                <Text style={styles.dateHeaderText}>
-                                                    {formatDateHeader(dateGroup.date)}
-                                                </Text>
-                                                <Ionicons name="calendar-outline" size={16} color="#64748B" />
-                                            </View>
+                                            <Text style={styles.dateHeaderText} accessibilityRole="header">
+                                                {formatDateHeader(dateGroup.date)}
+                                            </Text>
+                                            <Text style={styles.activityCountText}>
+                                                {dateGroup.activities.length} {dateGroup.activities.length === 1 ? 'activity' : 'activities'}
+                                            </Text>
                                         </View>
 
                                         {/* Activities for this date */}
                                         {dateGroup.activities.map((item, index) => {
-                                            console.log(`  📌 Rendering activity ${index + 1}:`, item.type, item.data._id);
                                             return (
                                                 <React.Fragment key={`${dateGroup.date}-${item.type}-${item.data._id}`}>
                                                     {item.type === 'activity'
@@ -3247,13 +3170,15 @@ const NotificationPage: React.FC = () => {
                                                 (!hasPrevDate || loading) && styles.navButtonDisabled
                                             ]}
                                             onPress={handlePreviousDay}
+                                            accessibilityRole="button"
+                                            accessibilityLabel="Previous day"
                                             disabled={!hasPrevDate || loading}
                                             activeOpacity={0.7}
                                         >
                                             <Ionicons
                                                 name="chevron-back"
                                                 size={20}
-                                                color={(!hasPrevDate || loading) ? '#9CA3AF' : '#10B981'}
+                                                color={(!hasPrevDate || loading) ? '#94A3B8' : Colors.primaryDark}
                                             />
                                         </TouchableOpacity>
 
@@ -3264,14 +3189,14 @@ const NotificationPage: React.FC = () => {
                                             activeOpacity={0.7}
                                         >
                                             <View style={styles.compactDateBadge}>
-                                                <Ionicons name="calendar" size={14} color="#10B981" />
+                                                <Ionicons name="calendar-outline" size={16} color={Colors.primaryDark} />
                                                 <Text style={styles.compactDateText}>
                                                     {formatDateHeader(currentDate)}
                                                 </Text>
-                                                <Ionicons name="chevron-down" size={12} color="#10B981" />
+                                                <Ionicons name="chevron-down" size={14} color={Colors.primaryDark} />
                                             </View>
                                             <Text style={styles.compactActivityCount}>
-                                                {groupedActivities.reduce((sum, group) => sum + group.activities.length, 0)} activities
+                                                {activityCountLabel}
                                             </Text>
                                         </TouchableOpacity>
 
@@ -3283,13 +3208,15 @@ const NotificationPage: React.FC = () => {
                                                 (!hasNextDate || loading) && styles.navButtonDisabled
                                             ]}
                                             onPress={handleNextDay}
+                                            accessibilityRole="button"
+                                            accessibilityLabel="Next day"
                                             disabled={!hasNextDate || loading}
                                             activeOpacity={0.7}
                                         >
                                             <Ionicons
                                                 name="chevron-forward"
                                                 size={20}
-                                                color={(!hasNextDate || loading) ? '#9CA3AF' : '#10B981'}
+                                                color={(!hasNextDate || loading) ? '#94A3B8' : Colors.primaryDark}
                                             />
                                         </TouchableOpacity>
                                     </View>
@@ -3297,7 +3224,7 @@ const NotificationPage: React.FC = () => {
                                     {/* Loading indicator - show when loading with enhanced animation */}
                                     {loading && (
                                         <View style={styles.compactLoadingIndicator}>
-                                            <ActivityIndicator size="small" color="#10B981" />
+                                            <ActivityIndicator size="small" color={Colors.primary} />
                                             <Text style={styles.compactLoadingText}>Loading date...</Text>
                                         </View>
                                     )}
@@ -3320,7 +3247,7 @@ const NotificationPage: React.FC = () => {
                                             disabled={loading}
                                             activeOpacity={0.7}
                                         >
-                                            <Ionicons name="today-outline" size={14} color="#3A78B5" />
+                                            <Ionicons name="today-outline" size={16} color={Colors.primaryDark} />
                                             <Text style={styles.todayButtonText}>Back to Today</Text>
                                         </TouchableOpacity>
                                     )}
@@ -3649,19 +3576,20 @@ const styles = StyleSheet.create({
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingVertical: 18,
-        backgroundColor: '#FFFFFF',
-        borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
-        elevation: 5,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        minHeight: 64,
+        backgroundColor: Colors.surface,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: Colors.border,
     },
     backButton: {
-        padding: 8,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: Colors.fill,
         marginRight: 12,
     },
     headerContent: {
@@ -3674,40 +3602,48 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 20,
-        fontWeight: '700',
-        color: '#1F2937',
+        fontWeight: '800',
+        color: '#0F172A',
+        letterSpacing: -0.4,
     },
     headerSubtitle: {
         fontSize: 13,
-        color: '#6B7280',
-        marginTop: 2,
+        color: Colors.textSecondary,
+        marginTop: 1,
+        fontWeight: '500',
     },
     refreshButton: {
         padding: 8,
     },
     // ✅ NEW: Vendor Filter Button Styles
     vendorFilterButton: {
-        padding: 10,
-        borderRadius: 10,
-        backgroundColor: '#EAF0FE',
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: Colors.primaryLight,
         position: 'relative',
     },
     vendorFilterButtonActive: {
-        backgroundColor: '#3A78B5',
+        backgroundColor: Colors.primary,
     },
     vendorFilterBadge: {
         position: 'absolute',
-        top: 4,
-        right: 4,
-        backgroundColor: '#EF4444',
-        borderRadius: 8,
-        width: 16,
-        height: 16,
+        top: -2,
+        right: -2,
+        backgroundColor: Colors.errorText,
+        borderRadius: 10,
+        minWidth: 20,
+        height: 20,
+        paddingHorizontal: 4,
         justifyContent: 'center',
         alignItems: 'center',
+        borderWidth: 2,
+        borderColor: Colors.surface,
     },
     vendorFilterBadgeText: {
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: '700',
         color: '#FFFFFF',
     },
@@ -3863,17 +3799,17 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
     },
     tabsContainerScrollView: {
-        backgroundColor: '#FFFFFF',
-        borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
+        backgroundColor: Colors.surface,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: Colors.border,
         flexGrow: 0,
-        height: 46,
+        height: 48,
     },
     tabsContainerContent: {
         flexDirection: 'row',
-        paddingHorizontal: 12,
+        paddingHorizontal: 8,
         alignItems: 'center',
-        height: 46,
+        height: 48,
     },
     tabsContainer: {
         flexDirection: 'row',
@@ -3885,7 +3821,7 @@ const styles = StyleSheet.create({
     },
     tab: {
         paddingHorizontal: 14,
-        height: 46,
+        height: 48,
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
@@ -3894,13 +3830,13 @@ const styles = StyleSheet.create({
         // Active state handled by indicator
     },
     tabText: {
-        fontSize: 14,
+        fontSize: 14.5,
         fontWeight: '500',
-        color: '#6B7280',
+        color: Colors.textSecondary,
     },
     tabTextActive: {
-        color: '#3A78B5',
-        fontWeight: '600',
+        color: Colors.primaryDark,
+        fontWeight: '700',
     },
     tabIndicator: {
         position: 'absolute',
@@ -3913,49 +3849,40 @@ const styles = StyleSheet.create({
         borderTopRightRadius: 3,
     },
     subTabsContainer: {
-        backgroundColor: '#F8FAFC',
-        borderBottomWidth: 1,
-        borderBottomColor: '#E2E8F0',
+        backgroundColor: Colors.background,
         flexGrow: 0,
-        height: 48,
+        height: 56,
     },
     subTabsContentContainer: {
         flexDirection: 'row',
-        paddingHorizontal: 12,
-        paddingVertical: 7,
+        paddingHorizontal: 16,
         gap: 8,
         alignItems: 'center',
-        height: 48,
+        height: 56,
     },
     subTab: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 8,
+        paddingHorizontal: 14,
+        borderRadius: 20,
         gap: 6,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: Colors.surface,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
-        height: 34,
+        borderColor: Colors.border,
+        height: 38,
     },
     subTabActive: {
-        backgroundColor: '#EAF0FE',
-        borderColor: '#3A78B5',
-        shadowColor: '#3A78B5',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.08,
-        shadowRadius: 3,
-        elevation: 1,
+        backgroundColor: Colors.primaryLight,
+        borderColor: Colors.primaryLight,
     },
     subTabText: {
-        fontSize: 13,
-        fontWeight: '500',
-        color: '#64748B',
+        fontSize: 13.5,
+        fontWeight: '600',
+        color: Colors.textSecondary,
     },
     subTabTextActive: {
-        color: '#1E293B',
-        fontWeight: '600',
+        color: Colors.primaryDark,
+        fontWeight: '700',
     },
     scrollView: {
         flex: 1,
@@ -4069,19 +3996,22 @@ const styles = StyleSheet.create({
     },
     // Material Activity Card Styles
     materialActivityCard: {
-        marginBottom: 16,
+        marginBottom: 14,
         borderRadius: 20,
-        overflow: 'hidden',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.12,
-        shadowRadius: 16,
-        elevation: 8,
+        backgroundColor: Colors.surface,
+        borderWidth: 1,
+        borderColor: '#E8EDF4',
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
+        elevation: 2,
     },
     materialActivityGradient: {
-        padding: 18,
+        padding: 16,
         borderRadius: 20,
-        backgroundColor: '#FFFFFF',
+        overflow: 'hidden',
+        backgroundColor: Colors.surface,
     },
     materialActivityHeader: {
         flexDirection: 'row',
@@ -4092,15 +4022,14 @@ const styles = StyleSheet.create({
     activityBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 14,
-        paddingVertical: 7,
-        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 20,
         gap: 6,
     },
     activityBadgeText: {
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: '700',
-        letterSpacing: 0.5,
     },
     materialActivityTime: {
         fontSize: 12,
@@ -4114,24 +4043,21 @@ const styles = StyleSheet.create({
     projectInfo: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 8,
+        gap: 6,
         marginBottom: 12,
-        paddingBottom: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
     },
     projectInfoItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
-        backgroundColor: '#F8FAFC',
+        gap: 5,
+        backgroundColor: Colors.background,
         paddingHorizontal: 8,
         paddingVertical: 4,
-        borderRadius: 6,
+        borderRadius: 8,
     },
     projectInfoText: {
-        fontSize: 12,
-        color: '#64748B',
+        fontSize: 12.5,
+        color: '#475569',
         fontWeight: '500',
     },
     materialsList: {
@@ -4141,16 +4067,15 @@ const styles = StyleSheet.create({
     materialItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F8FAFC',
-        padding: 12,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
+        backgroundColor: Colors.background,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 14,
     },
     materialIconSmall: {
-        width: 40,
-        height: 40,
-        borderRadius: 10,
+        width: 38,
+        height: 38,
+        borderRadius: 11,
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
@@ -4161,71 +4086,61 @@ const styles = StyleSheet.create({
     materialName: {
         fontSize: 15,
         fontWeight: '600',
-        color: '#1E293B',
+        color: '#0F172A',
         marginBottom: 2,
     },
     materialQuantity: {
         fontSize: 13,
-        color: '#64748B',
+        color: Colors.textSecondary,
         fontWeight: '500',
+        fontVariant: ['tabular-nums'],
     },
     materialCost: {
         fontSize: 13,
-        color: '#10B981',
-        fontWeight: '600',
+        color: Colors.successText,
+        fontWeight: '700',
     },
     laborCategory: {
-        fontSize: 11,
-        color: '#64748B',
+        fontSize: 12,
+        color: Colors.textSecondary,
         marginTop: 2,
-        fontStyle: 'italic',
     },
     laborDescriptionCard: {
-        backgroundColor: '#FFFBEB',
-        borderRadius: 8,
+        backgroundColor: Colors.warningLight,
+        borderRadius: 12,
         marginTop: 6,
-        marginRight: 4,
         overflow: 'hidden',
         flexDirection: 'row',
-        borderWidth: 1,
-        borderColor: '#FDE68A',
-    },
-    laborDescriptionAccent: {
-        width: 3,
-        backgroundColor: '#F59E0B',
     },
     laborDescriptionContent: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'flex-start',
-        paddingVertical: 8,
-        paddingHorizontal: 10,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
         gap: 8,
     },
     laborDescriptionLabel: {
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: '700',
-        color: '#B45309',
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
+        color: Colors.warningText,
         marginBottom: 2,
     },
     laborDescriptionText: {
-        fontSize: 12,
+        fontSize: 13,
         color: '#78350F',
-        lineHeight: 17,
+        lineHeight: 18,
         fontWeight: '500',
     },
     totalCostContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: '#F0FDF4',
-        padding: 12,
-        borderRadius: 10,
+        backgroundColor: Colors.successLight,
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        borderRadius: 14,
         marginBottom: 12,
-        borderWidth: 1,
-        borderColor: '#BBF7D0',
     },
     totalCostLabel: {
         fontSize: 14,
@@ -4233,9 +4148,11 @@ const styles = StyleSheet.create({
         color: '#166534',
     },
     totalCostValue: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#15803D',
+        fontSize: 19,
+        fontWeight: '800',
+        color: Colors.successText,
+        letterSpacing: -0.3,
+        fontVariant: ['tabular-nums'],
     },
     phaseProgressContainer: {
         flexDirection: 'row',
@@ -4251,13 +4168,14 @@ const styles = StyleSheet.create({
         marginRight: 8,
     },
     phaseProgressValue: {
-        fontSize: 13,
+        fontSize: 13.5,
         fontWeight: '700',
-        color: '#1E293B',
+        color: '#0F172A',
+        fontVariant: ['tabular-nums'],
     },
     phaseProgressBarTrack: {
         height: 6,
-        backgroundColor: '#E2E8F0',
+        backgroundColor: Colors.fill,
         borderRadius: 3,
         overflow: 'hidden',
         marginBottom: 12,
@@ -4270,27 +4188,24 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'flex-start',
         gap: 8,
-        backgroundColor: '#F8FAFC',
-        padding: 10,
-        borderRadius: 8,
+        backgroundColor: Colors.background,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 12,
         marginBottom: 12,
-        borderLeftWidth: 3,
-        borderLeftColor: '#3A78B5',
     },
     messageText: {
         flex: 1,
-        fontSize: 13,
+        fontSize: 13.5,
         color: '#475569',
-        lineHeight: 18,
+        lineHeight: 19,
     },
     // 🧾 Vendor bill block on material activity cards
     billContainer: {
-        backgroundColor: '#F8FAFF',
-        borderRadius: 10,
-        padding: 10,
+        backgroundColor: Colors.background,
+        borderRadius: 14,
+        padding: 12,
         marginBottom: 12,
-        borderWidth: 1,
-        borderColor: '#DBEAFE',
         gap: 10,
     },
     billHeaderRow: {
@@ -4300,11 +4215,9 @@ const styles = StyleSheet.create({
     },
     billHeaderText: {
         flex: 1,
-        fontSize: 12,
+        fontSize: 13.5,
         fontWeight: '700',
-        color: '#3A78B5',
-        textTransform: 'uppercase',
-        letterSpacing: 0.4,
+        color: '#0F172A',
     },
     billViewAllBtn: {
         flexDirection: 'row',
@@ -4312,9 +4225,9 @@ const styles = StyleSheet.create({
         gap: 2,
     },
     billViewAllText: {
-        fontSize: 12,
+        fontSize: 13.5,
         fontWeight: '600',
-        color: '#3A78B5',
+        color: Colors.primary,
     },
     billThumbRow: {
         flexDirection: 'row',
@@ -4322,20 +4235,20 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     billThumb: {
-        width: 56,
-        height: 56,
-        borderRadius: 8,
+        width: 60,
+        height: 60,
+        borderRadius: 10,
         borderWidth: 1,
-        borderColor: '#DBEAFE',
-        backgroundColor: '#EFF6FF',
+        borderColor: Colors.border,
+        backgroundColor: Colors.fill,
     },
     materialActivityFooter: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingTop: 12,
-        borderTopWidth: 1,
-        borderTopColor: '#F1F5F9',
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: Colors.border,
     },
     userInfo: {
         flexDirection: 'row',
@@ -4343,20 +4256,21 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     userAvatar: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: '#3A78B5',
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: Colors.primaryLight,
         justifyContent: 'center',
         alignItems: 'center',
     },
     userAvatarText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#FFFFFF',
+        fontSize: 13,
+        fontWeight: '700',
+        color: Colors.primaryDark,
     },
     userName: {
-        fontSize: 13,
+        flexShrink: 1,
+        fontSize: 13.5,
         fontWeight: '600',
         color: '#334155',
     },
@@ -4431,27 +4345,30 @@ const styles = StyleSheet.create({
     },
     errorText: {
         marginTop: 16,
-        fontSize: 16,
-        color: '#EF4444',
-        fontWeight: '600',
+        fontSize: 17,
+        color: '#0F172A',
+        fontWeight: '700',
         textAlign: 'center',
     },
     retryButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
         marginTop: 20,
-        backgroundColor: '#3A78B5',
+        backgroundColor: Colors.primary,
         paddingHorizontal: 24,
-        paddingVertical: 12,
-        borderRadius: 8,
+        minHeight: 46,
+        borderRadius: 23,
     },
     retryButtonText: {
         color: '#FFFFFF',
-        fontSize: 14,
-        fontWeight: '600',
+        fontSize: 15,
+        fontWeight: '700',
     },
     errorHint: {
-        marginTop: 12,
+        marginTop: 8,
         fontSize: 14,
-        color: '#6B7280',
+        color: Colors.textSecondary,
         textAlign: 'center',
         lineHeight: 20,
     },
@@ -4522,57 +4439,40 @@ const styles = StyleSheet.create({
     dateHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 14,
-        paddingHorizontal: 18,
-        marginBottom: 12,
-        backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
-        borderWidth: 1,
-        borderColor: '#F1F5F9',
-    },
-    dateHeaderLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    dateHeaderRight: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
+        alignItems: 'baseline',
+        paddingHorizontal: 4,
+        marginBottom: 10,
     },
     activityCountText: {
         fontSize: 13,
         fontWeight: '500',
-        color: '#64748B',
+        color: Colors.textSecondary,
     },
     dateHeaderText: {
-        fontSize: 13,
-        fontWeight: '500',
-        color: '#64748B',
+        fontSize: 17,
+        fontWeight: '700',
+        color: '#0F172A',
+        letterSpacing: -0.3,
     },
     // New simplified activity card styles
     activityItemNew: {
         flexDirection: 'row',
-        backgroundColor: '#FFFFFF',
-        borderRadius: 16,
+        backgroundColor: Colors.surface,
+        borderRadius: 20,
         padding: 16,
-        marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        elevation: 3,
+        marginBottom: 14,
+        borderWidth: 1,
+        borderColor: '#E8EDF4',
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
+        elevation: 2,
     },
     iconContainerNew: {
-        width: 48,
-        height: 48,
-        borderRadius: 14,
+        width: 44,
+        height: 44,
+        borderRadius: 13,
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
@@ -4590,27 +4490,26 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 15,
         fontWeight: '600',
-        color: '#1F2937',
+        color: '#0F172A',
         lineHeight: 20,
         marginRight: 8,
     },
     categoryBadgeNew: {
-        backgroundColor: '#F3F4F6',
+        backgroundColor: Colors.fill,
         paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 6,
+        paddingVertical: 3,
+        borderRadius: 8,
     },
     categoryBadgeTextNew: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: '#6B7280',
-        letterSpacing: 0.5,
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#475569',
     },
     activityMessageNew: {
-        fontSize: 13,
-        color: '#6B7280',
+        fontSize: 13.5,
+        color: '#475569',
         marginBottom: 12,
-        lineHeight: 18,
+        lineHeight: 19,
     },
     activityFooterNew: {
         flexDirection: 'row',
@@ -4635,13 +4534,14 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
     },
     userNameNew: {
-        fontSize: 13,
-        fontWeight: '500',
-        color: '#374151',
+        fontSize: 13.5,
+        fontWeight: '600',
+        color: '#334155',
     },
     activityTimeNew: {
-        fontSize: 12,
-        color: '#9CA3AF',
+        fontSize: 12.5,
+        color: Colors.textSecondary,
+        fontWeight: '500',
     },
     // Load More Button Styles
     loadMoreContainer: {
@@ -4652,18 +4552,13 @@ const styles = StyleSheet.create({
     loadMoreButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#3A78B5',
-        paddingHorizontal: 24,
-        paddingVertical: 14,
-        borderRadius: 12,
-        gap: 8,
-        shadowColor: '#3A78B5',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
-        minWidth: 200,
         justifyContent: 'center',
+        gap: 8,
+        backgroundColor: Colors.primary,
+        paddingHorizontal: 24,
+        minHeight: 48,
+        borderRadius: 24,
+        minWidth: 220,
     },
     loadMoreButtonSecondary: {
         backgroundColor: '#FFFFFF',
@@ -4673,14 +4568,12 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
     },
     loadMoreButtonDisabled: {
-        backgroundColor: '#9CA3AF',
-        shadowColor: '#9CA3AF',
-        borderColor: '#9CA3AF',
+        backgroundColor: '#94A3B8',
     },
     loadMoreText: {
         color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '600',
+        fontSize: 15,
+        fontWeight: '700',
     },
     loadMoreTextSecondary: {
         color: '#3A78B5',
@@ -4877,36 +4770,29 @@ const styles = StyleSheet.create({
     },
     // Compact Date Navigation Styles
     compactDateNavigation: {
-        backgroundColor: '#FFFFFF',
-        width: '98%', // Increased from 96% to 98% for maximum space utilization
-        alignSelf: 'center', // Center the container
+        backgroundColor: Colors.surface,
+        alignSelf: 'stretch',
         marginVertical: 12,
-        borderRadius: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 3,
+        borderRadius: 18,
         borderWidth: 1,
-        borderColor: '#F1F5F9',
+        borderColor: '#E8EDF4',
+        overflow: 'hidden',
     },
     dateNavigationBar: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 8, // Further reduced padding to maximize space
-        paddingVertical: 12,
+        paddingHorizontal: 10,
+        paddingVertical: 10,
         justifyContent: 'space-between',
     },
     compactNavButton: {
         alignItems: 'center',
         justifyContent: 'center',
-        width: 44, // Fixed square size for icon-only buttons
-        height: 44, // Fixed square size for icon-only buttons
-        borderRadius: 12, // Slightly larger border radius for better appearance
-        backgroundColor: '#F0FDF4',
-        borderWidth: 1,
-        borderColor: '#BBF7D0',
-        flex: 0, // Don't let buttons grow
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: Colors.primaryLight,
+        flexShrink: 0,
     },
     prevButton: {
         // Specific styles for previous button if needed
@@ -4915,9 +4801,8 @@ const styles = StyleSheet.create({
         // Specific styles for next button if needed
     },
     navButtonDisabled: {
-        backgroundColor: '#F9FAFB',
-        borderColor: '#E5E7EB',
-        opacity: 0.6,
+        backgroundColor: Colors.fill,
+        opacity: 0.7,
     },
     compactNavButtonText: {
         fontSize: 11, // Further reduced from 12 to make buttons more compact
@@ -4929,37 +4814,34 @@ const styles = StyleSheet.create({
     },
     compactDateDisplay: {
         alignItems: 'center',
-        flex: 3, // Increased from 2 to 3 since buttons are now much smaller
-        paddingHorizontal: 16, // Increased padding for better spacing
-        minWidth: 0, // Allow shrinking if needed
+        flex: 1,
+        paddingHorizontal: 10,
+        minWidth: 0,
     },
     compactDateBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center', // Center the content horizontally within the badge
-        backgroundColor: '#ECFDF5',
-        paddingHorizontal: 16, // Increased padding since we have more space
-        paddingVertical: 10, // Increased vertical padding
-        borderRadius: 12, // Larger border radius for better appearance
-        borderWidth: 1,
-        borderColor: '#BBF7D0',
-        gap: 10, // Increased gap between icon and text
-        marginBottom: 2,
-        maxWidth: '100%', // Ensure it doesn't overflow
-        minWidth: 140, // Increased minimum width for better appearance
+        justifyContent: 'center',
+        gap: 8,
+        minHeight: 40,
+        paddingHorizontal: 14,
+        borderRadius: 20,
+        backgroundColor: Colors.primaryLight,
+        maxWidth: '100%',
     },
     compactDateText: {
-        fontSize: 15, // Increased font size since we have more space
-        fontWeight: '600',
-        color: '#059669',
-        flexShrink: 1, // Allow text to shrink if needed
-        textAlign: 'center', // Center align the date text
+        fontSize: 15,
+        fontWeight: '700',
+        color: Colors.primaryDark,
+        flexShrink: 1,
+        textAlign: 'center',
     },
     compactActivityCount: {
-        fontSize: 10, // Slightly smaller
-        color: '#6B7280',
+        fontSize: 12,
+        color: Colors.textSecondary,
         fontWeight: '500',
         textAlign: 'center',
+        marginTop: 4,
     },
     compactLoadingIndicator: {
         flexDirection: 'row',
@@ -4973,21 +4855,19 @@ const styles = StyleSheet.create({
         gap: 6,
     },
     compactLoadingText: {
-        fontSize: 12,
-        color: '#6B7280',
-        fontStyle: 'italic',
+        fontSize: 12.5,
+        color: Colors.textSecondary,
     },
     compactNavigationInfo: {
         alignItems: 'center',
-        paddingVertical: 6,
+        paddingVertical: 8,
         paddingHorizontal: 16,
-        backgroundColor: '#F8FAFC',
-        borderTopWidth: 1,
-        borderTopColor: '#F1F5F9',
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: Colors.border,
     },
     compactInfoText: {
-        fontSize: 11,
-        color: '#9CA3AF',
+        fontSize: 12.5,
+        color: Colors.textSecondary,
         fontWeight: '500',
     },
     todayButton: {
@@ -4995,15 +4875,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 6,
-        paddingVertical: 9,
-        backgroundColor: '#EAF0FE',
-        borderTopWidth: 1,
-        borderTopColor: '#F1F5F9',
+        minHeight: 46,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: Colors.border,
     },
     todayButtonText: {
-        fontSize: 12.5,
+        fontSize: 14,
         fontWeight: '700',
-        color: '#3A78B5',
+        color: Colors.primaryDark,
     },
     // iOS date picker sheet (Android uses the OS dialog instead)
     datePickerBackdrop: {
@@ -5066,26 +4945,22 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     simpleEmptyTitle: {
-        fontSize: 18,
+        fontSize: 17,
         fontWeight: '600',
-        color: '#6B7280',
-        marginTop: 16,
+        color: '#334155',
+        marginTop: 14,
         textAlign: 'center',
+        lineHeight: 23,
     },
     removeFilterButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#EF4444',
-        paddingVertical: 12,
-        paddingHorizontal: 20,
-        borderRadius: 12,
+        backgroundColor: Colors.primary,
+        minHeight: 46,
+        paddingHorizontal: 22,
+        borderRadius: 23,
         marginTop: 20,
-        shadowColor: '#EF4444',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 3,
     },
     removeFilterButtonText: {
         color: '#FFFFFF',
@@ -5105,12 +4980,10 @@ const styles = StyleSheet.create({
     },
     // Transfer details styles
     transferDetailsContainer: {
-        backgroundColor: '#F8FAFC',
-        borderRadius: 12,
+        backgroundColor: Colors.background,
+        borderRadius: 14,
         padding: 12,
         marginBottom: 12,
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
     },
     transferRoute: {
         flexDirection: 'row',
@@ -5132,12 +5005,11 @@ const styles = StyleSheet.create({
     },
     // ✅ NEW: Contractor info styles
     contractorInfoContainer: {
-        backgroundColor: '#F5F3FF',
-        borderRadius: 10,
-        padding: 10,
+        backgroundColor: Colors.background,
+        borderRadius: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
         marginBottom: 12,
-        borderWidth: 1,
-        borderColor: '#DDD6FE',
     },
     contractorInfoItem: {
         flexDirection: 'row',
@@ -5145,14 +5017,14 @@ const styles = StyleSheet.create({
         gap: 6,
     },
     contractorLabel: {
-        fontSize: 12,
+        fontSize: 12.5,
         fontWeight: '500',
-        color: '#6B7280',
+        color: Colors.textSecondary,
     },
     contractorName: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#3A78B5',
+        fontSize: 13.5,
+        fontWeight: '700',
+        color: Colors.primaryDark,
         flex: 1,
     },
     // ⚠️ Warning Tab Styles
@@ -5166,23 +5038,26 @@ const styles = StyleSheet.create({
         // Active indicator handled by tabIndicatorWarning
     },
     tabTextActiveWarning: {
-        color: '#3A78B5',
-        fontWeight: '600',
+        color: Colors.primaryDark,
+        fontWeight: '700',
     },
     warningTabHeaderRow: {
         flexDirection: 'row',
         alignItems: 'center',
     },
     warningBadgeCount: {
-        backgroundColor: '#3A78B5',
+        backgroundColor: Colors.errorText,
         borderRadius: 10,
+        minWidth: 20,
+        height: 20,
         paddingHorizontal: 6,
-        paddingVertical: 1,
-        marginLeft: 5,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: 6,
     },
     warningBadgeCountText: {
         color: '#FFFFFF',
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: '700',
     },
     tabIndicatorWarning: {
@@ -5196,34 +5071,36 @@ const styles = StyleSheet.create({
         borderTopRightRadius: 3,
     },
     warningSubTabActive: {
-        backgroundColor: '#EAF0FE',
-        borderColor: '#3A78B5',
+        backgroundColor: Colors.primaryLight,
+        borderColor: Colors.primaryLight,
     },
     warningSubTabTextActive: {
-        color: '#3A78B5',
-        fontWeight: '600',
+        color: Colors.primaryDark,
+        fontWeight: '700',
     },
     warningsContentContainer: {
         padding: 16,
     },
     warningSummaryCard: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: Colors.surface,
         borderRadius: 20,
-        padding: 18,
+        padding: 16,
         marginBottom: 18,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.1,
-        shadowRadius: 16,
-        elevation: 6,
+        borderWidth: 1,
+        borderColor: '#E8EDF4',
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
+        elevation: 2,
     },
     warningSummaryHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingBottom: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
+        paddingBottom: 14,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: Colors.border,
     },
     warningSummaryTitleRow: {
         flexDirection: 'row',
@@ -5232,23 +5109,21 @@ const styles = StyleSheet.create({
         marginRight: 8,
     },
     warningIconBg: {
-        width: 38,
-        height: 38,
-        borderRadius: 10,
-        backgroundColor: '#EAF0FE',
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: Colors.primaryLight,
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#BFDBFE',
     },
     warningSummaryTitle: {
-        fontSize: 15,
+        fontSize: 16,
         fontWeight: '700',
         color: '#0F172A',
     },
     warningSummarySubtitle: {
-        fontSize: 12,
-        color: '#64748B',
+        fontSize: 13,
+        color: Colors.textSecondary,
         marginTop: 2,
     },
     warningTotalBadge: {
@@ -5257,48 +5132,52 @@ const styles = StyleSheet.create({
         maxWidth: '45%',
     },
     warningTotalLabel: {
-        fontSize: 11,
-        color: '#64748B',
+        fontSize: 12.5,
+        color: Colors.textSecondary,
         fontWeight: '500',
     },
     warningTotalAmount: {
-        fontSize: 18,
+        fontSize: 21,
         fontWeight: '800',
         color: '#0F172A',
+        letterSpacing: -0.4,
+        fontVariant: ['tabular-nums'],
     },
     warningGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        marginTop: 12,
+        marginTop: 14,
         gap: 8,
     },
     warningGridItem: {
         flex: 1,
         minWidth: '45%',
-        backgroundColor: '#F8FAFC',
-        borderRadius: 10,
-        padding: 10,
+        backgroundColor: Colors.background,
+        borderRadius: 14,
+        paddingVertical: 12,
+        paddingHorizontal: 12,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderColor: Colors.background,
     },
     warningGridItemActive: {
-        backgroundColor: '#EAF0FE',
-        borderColor: '#BFDBFE',
+        backgroundColor: Colors.primaryLight,
+        borderColor: Colors.primary,
     },
     warningGridLabel: {
-        fontSize: 12,
-        color: '#64748B',
+        fontSize: 13,
+        color: Colors.textSecondary,
         fontWeight: '500',
     },
     warningGridValue: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '700',
         color: '#0F172A',
-        marginTop: 2,
+        marginTop: 3,
+        fontVariant: ['tabular-nums'],
     },
     warningGridCount: {
-        fontSize: 11,
-        color: '#3A78B5',
+        fontSize: 12.5,
+        color: Colors.primaryDark,
         marginTop: 2,
         fontWeight: '600',
     },
@@ -5309,17 +5188,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: '#FFFFFF',
-        borderRadius: 14,
+        backgroundColor: Colors.surface,
+        borderRadius: 16,
         paddingHorizontal: 14,
-        paddingVertical: 12,
+        minHeight: 56,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.03,
-        shadowRadius: 4,
-        elevation: 1,
+        borderColor: '#E8EDF4',
     },
     warningCategoryHeaderTitleRow: {
         flexDirection: 'row',
@@ -5329,57 +5203,58 @@ const styles = StyleSheet.create({
         marginRight: 8,
     },
     warningCategoryIconBg: {
-        width: 32,
-        height: 32,
+        width: 34,
+        height: 34,
         borderRadius: 10,
-        backgroundColor: '#EAF0FE',
+        backgroundColor: Colors.primaryLight,
         justifyContent: 'center',
         alignItems: 'center',
     },
     warningCategoryTitleText: {
-        fontSize: 14,
+        fontSize: 15,
         fontWeight: '700',
         color: '#0F172A',
     },
     warningCategoryBadge: {
-        backgroundColor: '#F1F5F9',
+        backgroundColor: Colors.fill,
         borderRadius: 12,
         paddingHorizontal: 8,
         paddingVertical: 2,
     },
     warningCategoryBadgeText: {
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: '600',
         color: '#475569',
     },
     warningCategoryAmountText: {
-        fontSize: 14,
+        fontSize: 15,
         fontWeight: '700',
         color: '#0F172A',
         flexShrink: 0,
+        fontVariant: ['tabular-nums'],
     },
     warningCardsGroup: {
         marginTop: 12,
     },
     // Pending payment cards reuse the Material tab's card styles; these are the extras.
     pendingCardPaid: {
-        opacity: 0.75,
+        opacity: 0.85,
     },
     pendingCategoryTag: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 5,
-        backgroundColor: '#EAF0FE',
+        backgroundColor: Colors.fill,
         paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 10,
+        paddingVertical: 5,
+        borderRadius: 20,
         flexShrink: 1,
         marginLeft: 8,
     },
     pendingCategoryTagText: {
-        fontSize: 12,
+        fontSize: 12.5,
         fontWeight: '600',
-        color: '#3A78B5',
+        color: '#475569',
     },
     pendingDueChip: {
         backgroundColor: '#FFFBEB',
@@ -5392,12 +5267,11 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: '#FFFBEB',
-        padding: 12,
-        borderRadius: 10,
+        backgroundColor: Colors.warningLight,
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        borderRadius: 14,
         marginBottom: 12,
-        borderWidth: 1,
-        borderColor: '#FDE68A',
     },
     pendingAmountLabel: {
         fontSize: 14,
@@ -5405,19 +5279,22 @@ const styles = StyleSheet.create({
         color: '#92400E',
     },
     pendingAmountValue: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#B45309',
+        fontSize: 19,
+        fontWeight: '800',
+        color: Colors.warningText,
+        letterSpacing: -0.3,
         flexShrink: 1,
         marginLeft: 12,
+        fontVariant: ['tabular-nums'],
     },
     pendingNote: {
         flexDirection: 'row',
         alignItems: 'flex-start',
         gap: 8,
-        backgroundColor: '#F8FAFC',
-        padding: 10,
-        borderRadius: 10,
+        backgroundColor: Colors.background,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 12,
         marginBottom: 12,
     },
     warningCard: {
@@ -5558,44 +5435,43 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 6,
-        paddingVertical: 11,
-        borderRadius: 12,
+        minHeight: 44,
+        borderRadius: 22,
     },
     warningActionPrimaryBtn: {
-        backgroundColor: '#3A78B5',
+        backgroundColor: Colors.primary,
     },
     warningActionPaidBtn: {
-        backgroundColor: '#F1F5F9',
-        borderWidth: 1,
-        borderColor: '#CBD5E1',
+        backgroundColor: Colors.fill,
     },
     warningActionBtnText: {
         color: '#FFFFFF',
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: '700',
     },
     warningActionSecondaryBtn: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 5,
-        paddingVertical: 11,
-        paddingHorizontal: 16,
-        borderRadius: 12,
-        backgroundColor: '#EAF0FE',
+        minHeight: 44,
+        paddingHorizontal: 18,
+        borderRadius: 22,
+        backgroundColor: Colors.primaryLight,
     },
     warningActionSecondaryBtnText: {
-        color: '#3A78B5',
-        fontSize: 13,
+        color: Colors.primaryDark,
+        fontSize: 14,
         fontWeight: '700',
     },
     emptyWarningContainer: {
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 40,
-        backgroundColor: '#FFFFFF',
-        borderRadius: 16,
+        paddingVertical: 36,
+        paddingHorizontal: 24,
+        backgroundColor: Colors.surface,
+        borderRadius: 20,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderColor: '#E8EDF4',
     },
     emptyWarningTitle: {
         fontSize: 17,
@@ -5604,10 +5480,11 @@ const styles = StyleSheet.create({
         marginTop: 12,
     },
     emptyWarningSubtitle: {
-        fontSize: 13,
-        color: '#64748B',
+        fontSize: 14,
+        color: Colors.textSecondary,
         textAlign: 'center',
-        marginTop: 4,
+        marginTop: 6,
+        lineHeight: 20,
     },
     warningModalContent: {
         backgroundColor: '#FFFFFF',

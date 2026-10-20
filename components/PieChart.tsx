@@ -301,14 +301,14 @@ const PieChart: React.FC<PieChartProps> = ({
                     alignItems: 'center',
                     justifyContent: 'center'
                 }}>
-                    <Text style={{ fontSize: 10, color: '#666', fontWeight: '600' }}>
+                    <Text style={{ fontSize: 11.5, color: '#64748B', fontWeight: '600', textAlign: 'center' }} numberOfLines={2}>
                         {centerContent.label}
                     </Text>
-                    <Text style={{ fontSize: 16, color: '#2C3E50', fontWeight: 'bold', marginVertical: 2 }}>
+                    <Text style={{ fontSize: 18, color: '#0F172A', fontWeight: '800', marginVertical: 2, fontVariant: ['tabular-nums'] }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                         {centerContent.value}
                     </Text>
                     {centerContent.subtitle && (
-                        <Text style={{ fontSize: 10, color: '#666' }}>
+                        <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '500' }}>
                             {centerContent.subtitle}
                         </Text>
                     )}
