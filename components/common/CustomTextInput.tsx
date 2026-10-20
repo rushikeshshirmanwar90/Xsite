@@ -1,17 +1,26 @@
-import React, { useState } from 'react';
-import { 
-    TextInput, 
-    TextInputProps, 
-    StyleSheet, 
-    View, 
-    ViewStyle, 
-    TextStyle, 
+import React, { useId, useState } from 'react';
+import {
     Platform,
-    TouchableOpacity 
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    TextInputProps,
+    TextStyle,
+    View,
+    ViewStyle,
 } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { Colors, Radius } from '@/constants/theme';
+
+// One step stronger than Colors.border so empty fields stay visible outdoors in bright light
+const FIELD_BORDER = '#CBD5E1';
 
 interface CustomTextInputProps extends TextInputProps {
+    ref?: React.Ref<TextInput>;
+    label?: string;
+    hint?: string;
+    error?: string;
     icon?: keyof typeof MaterialIcons.glyphMap;
     iconColor?: string;
     containerStyle?: ViewStyle;
@@ -21,9 +30,13 @@ interface CustomTextInputProps extends TextInputProps {
     isPassword?: boolean;
 }
 
-const CustomTextInput: React.FC<CustomTextInputProps> = ({
+const CustomTextInput = ({
+    ref,
+    label,
+    hint,
+    error,
     icon,
-    iconColor = '#666',
+    iconColor = Colors.textSecondary,
     containerStyle,
     inputStyle,
     rightElement,
@@ -32,19 +45,29 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
     showPasswordToggle = false,
     isPassword = false,
     secureTextEntry,
+    onFocus,
+    onBlur,
     ...props
-}) => {
+}: CustomTextInputProps) => {
     const [isPasswordVisible, setIsPasswordVisible] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
+    const labelId = useId();
 
     // Determine if this is a password field
-    const isPasswordField = isPassword || showPasswordToggle || secureTextEntry;
-    const shouldShowPassword = isPasswordField && isPasswordVisible;
+    const isPasswordField = isPassword || showPasswordToggle || !!secureTextEntry;
+    const isEditable = props.editable !== false;
+    const message = error || hint;
+
+    // Screen readers name the field after its visible label. Android links the two
+    // natively; iOS also reads the hint or error after the label.
+    const accessibilityProps = Platform.OS === 'android'
+        ? (label ? { accessibilityLabelledBy: labelId } : {})
+        : { accessibilityLabel: label, accessibilityHint: message };
 
     // Enhanced placeholder color logic for better visibility
     const getPlaceholderColor = () => {
         if (placeholderTextColor) return placeholderTextColor;
-        
+
         // Platform-specific defaults with better contrast
         if (Platform.OS === 'ios') {
             return '#8E8E93'; // iOS system placeholder color
@@ -54,122 +77,128 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
     };
 
     return (
-        <View style={[
-            styles.container, 
-            isFocused && styles.containerFocused,
-            containerStyle
-        ]}>
-            {icon && (
-                <MaterialIcons 
-                    name={icon} 
-                    size={20} 
-                    color={isFocused ? '#3A78B5' : iconColor} 
-                    style={styles.icon} 
-                />
+        <View>
+            {label && (
+                <Text nativeID={labelId} style={styles.label}>{label}</Text>
             )}
-            <TextInput
-                style={[styles.input, inputStyle]}
-                placeholder={placeholder}
-                placeholderTextColor={getPlaceholderColor()}
-                secureTextEntry={isPasswordField ? !isPasswordVisible : secureTextEntry}
-                onFocus={(e) => {
-                    setIsFocused(true);
-                    props.onFocus?.(e);
-                }}
-                onBlur={(e) => {
-                    setIsFocused(false);
-                    props.onBlur?.(e);
-                }}
-                // Enhanced keyboard handling for production builds
-                returnKeyType={props.returnKeyType || 'next'}
-                blurOnSubmit={props.blurOnSubmit !== undefined ? props.blurOnSubmit : false}
-                editable={props.editable !== undefined ? props.editable : true}
-                // Platform-specific optimizations
-                {...(Platform.OS === 'android' && {
-                    underlineColorAndroid: 'transparent',
-                    importantForAutofill: 'yes',
-                    // Ensure keyboard stays responsive in production
-                    keyboardType: props.keyboardType || 'default',
-                })}
-                {...(Platform.OS === 'ios' && {
-                    clearButtonMode: 'while-editing',
-                    // iOS-specific keyboard handling
-                    enablesReturnKeyAutomatically: true,
-                })}
-                {...props}
-            />
-            
-            {/* Password visibility toggle */}
-            {isPasswordField && (showPasswordToggle || isPassword) && (
-                <TouchableOpacity
-                    onPress={() => setIsPasswordVisible(!isPasswordVisible)}
-                    style={styles.passwordToggle}
-                    activeOpacity={0.7}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                    <Ionicons
-                        name={isPasswordVisible ? "eye-off" : "eye"}
-                        size={24}
-                        color="#3A78B5"
+            <View style={[
+                styles.container,
+                !isEditable && styles.containerReadOnly,
+                isFocused && styles.containerFocused,
+                !!error && styles.containerError,
+                containerStyle
+            ]}>
+                {icon && (
+                    <MaterialIcons
+                        name={icon}
+                        size={20}
+                        color={isFocused ? Colors.primary : iconColor}
+                        style={styles.icon}
                     />
-                </TouchableOpacity>
-            )}
-            
-            {/* Custom right element */}
-            {rightElement && !isPasswordField}
+                )}
+                <TextInput
+                    ref={ref}
+                    style={[styles.input, inputStyle]}
+                    placeholder={placeholder}
+                    placeholderTextColor={getPlaceholderColor()}
+                    secureTextEntry={isPasswordField ? !isPasswordVisible : secureTextEntry}
+                    {...accessibilityProps}
+                    // Compose with the caller's handlers so the focus ring always tracks focus
+                    onFocus={(e) => {
+                        setIsFocused(true);
+                        onFocus?.(e);
+                    }}
+                    onBlur={(e) => {
+                        setIsFocused(false);
+                        onBlur?.(e);
+                    }}
+                    // Enhanced keyboard handling for production builds
+                    returnKeyType={props.returnKeyType || 'next'}
+                    submitBehavior={props.submitBehavior ?? 'submit'}
+                    editable={isEditable}
+                    // Platform-specific optimizations
+                    {...(Platform.OS === 'android' && {
+                        underlineColorAndroid: 'transparent',
+                        importantForAutofill: 'yes',
+                        // Ensure keyboard stays responsive in production
+                        keyboardType: props.keyboardType || 'default',
+                    })}
+                    {...(Platform.OS === 'ios' && {
+                        // A clear button would sit next to the show/hide toggle
+                        clearButtonMode: isPasswordField ? 'never' : 'while-editing',
+                        // iOS-specific keyboard handling
+                        enablesReturnKeyAutomatically: true,
+                    })}
+                    {...props}
+                />
+
+                {/* Password visibility toggle */}
+                {isPasswordField && (showPasswordToggle || isPassword) && (
+                    <Pressable
+                        onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+                        style={({ pressed }) => [styles.passwordToggle, pressed && styles.pressed]}
+                        accessibilityRole="button"
+                        accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
+                    >
+                        <Ionicons
+                            name={isPasswordVisible ? 'eye-off-outline' : 'eye-outline'}
+                            size={22}
+                            color={Colors.textSecondary}
+                        />
+                    </Pressable>
+                )}
+
+                {/* Custom right element */}
+                {!isPasswordField && rightElement}
+            </View>
+
+            {/* Errors replace the hint and sit right under the field they're about */}
+            {error ? (
+                <View style={styles.messageRow}>
+                    <Ionicons name="alert-circle" size={16} color={Colors.errorText} style={styles.messageIcon} />
+                    <Text style={[styles.message, styles.errorMessage]}>{error}</Text>
+                </View>
+            ) : hint ? (
+                <Text style={[styles.message, styles.hintMessage]}>{hint}</Text>
+            ) : null}
         </View>
     );
 };
 
 const styles = StyleSheet.create({
+    label: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: Colors.textPrimary,
+        marginBottom: 8,
+    },
     container: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F9FAFB',
-        borderWidth: 1.5, // Slightly thicker border for better definition
-        borderColor: '#E5E7EB',
-        borderRadius: 12,
-        marginBottom: 16,
-        paddingHorizontal: 4,
-        minHeight: 56,
-        // Enhanced shadow for better visual separation
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.05,
-                shadowRadius: 2,
-            },
-            android: {
-                elevation: 1,
-            },
-        }),
+        minHeight: 52,
+        backgroundColor: Colors.surface,
+        borderWidth: 1.5,
+        borderColor: FIELD_BORDER,
+        borderRadius: Radius.md,
+        paddingHorizontal: 14,
+    },
+    containerReadOnly: {
+        backgroundColor: Colors.background,
     },
     containerFocused: {
-        borderColor: '#3A78B5',
-        backgroundColor: '#F0F9FF', // Slightly blue tint when focused
-        ...Platform.select({
-            ios: {
-                shadowColor: '#3A78B5',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.1,
-                shadowRadius: 4,
-            },
-            android: {
-                elevation: 2,
-            },
-        }),
+        borderColor: Colors.primary,
+    },
+    containerError: {
+        borderColor: Colors.error,
     },
     icon: {
-        paddingHorizontal: 12,
-        paddingVertical: 10,
+        marginRight: 10,
     },
     input: {
         flex: 1,
-        paddingVertical: 16,
-        paddingRight: 12,
-        fontSize: 16,
-        color: '#1F2937',
+        paddingVertical: 14,
+        fontSize: 17,
+        color: Colors.textPrimary,
         fontWeight: '400',
         // Platform-specific text rendering fixes
         ...Platform.select({
@@ -186,10 +215,35 @@ const styles = StyleSheet.create({
         }),
     },
     passwordToggle: {
-        paddingHorizontal: 12,
-        paddingVertical: 10,
+        width: 44,
+        height: 44,
+        marginRight: -10,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    pressed: {
+        opacity: 0.5,
+    },
+    messageRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 6,
+        marginTop: 8,
+    },
+    messageIcon: {
+        marginTop: 1,
+    },
+    message: {
+        flexShrink: 1,
+        fontSize: 14,
+        lineHeight: 19,
+    },
+    errorMessage: {
+        color: Colors.errorText,
+    },
+    hintMessage: {
+        color: Colors.textSecondary,
+        marginTop: 8,
     },
 });
 

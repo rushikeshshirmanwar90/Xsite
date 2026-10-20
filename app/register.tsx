@@ -1,25 +1,40 @@
+import {
+    AUTH_FORM_MAX_WIDTH,
+    AUTH_GUTTER,
+    AuthButton,
+    AuthHeading,
+    BlueprintBackdrop,
+    IOS_PASSWORD_RULES,
+    isPasswordValid,
+    PasswordChecklist,
+    signalError,
+    signalSuccess,
+} from '@/components/auth/AuthUI';
 import CustomTextInput from '@/components/common/CustomTextInput';
+import { Colors, Radius } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { domain } from '@/lib/domain';
 import { generateOTP } from '@/lib/functions';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from '@/utils/axiosConfig';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import {
     ActivityIndicator,
     KeyboardAvoidingView,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
     Platform,
+    Pressable,
     ScrollView,
     StyleSheet,
     Text,
-    TouchableOpacity,
-    View,
-    Animated
+    TextInput,
+    View
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 type Role = 'site-engineer' | 'supervisor' | 'manager';
@@ -50,9 +65,15 @@ interface OTPResponse {
     [key: string]: any;
 }
 
+// Top-to-bottom order of the form, used to focus the first field that needs attention
+const FIELD_ORDER = ['firstName', 'lastName', 'email', 'phoneNumber', 'password', 'confirmPassword'] as const;
+type Field = typeof FIELD_ORDER[number];
+type FieldErrors = Partial<Record<Field, string>>;
+
 export default function RegisterScreen() {
     const router = useRouter();
     const { checkAuthStatus } = useAuth();
+    const insets = useSafeAreaInsets();
 
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
@@ -60,11 +81,9 @@ export default function RegisterScreen() {
     const [phoneNumber, setPhoneNumber] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [isNavigating, setIsNavigating] = useState(false);
-    
+
     // Email verification states
     const [emailVerified, setEmailVerified] = useState(false);
     const [otp, setOtp] = useState('');
@@ -72,35 +91,89 @@ export default function RegisterScreen() {
     const [showOtpInput, setShowOtpInput] = useState(false);
     const [sendingOtp, setSendingOtp] = useState(false);
 
-    // Animation for header icon
-    const scaleAnim = new Animated.Value(1);
+    // Inline feedback, shown under the field it's about
+    const [errors, setErrors] = useState<FieldErrors>({});
+    const [codeError, setCodeError] = useState('');
+    const [codeNotice, setCodeNotice] = useState('');
+    const [showPasswordRules, setShowPasswordRules] = useState(false);
+
+    // Top bar gets a separator once content scrolls under it, and a title once the large one is gone
+    const [isScrolled, setIsScrolled] = useState(false);
+    const [showBarTitle, setShowBarTitle] = useState(false);
+
+    const firstNameRef = useRef<TextInput>(null);
+    const lastNameRef = useRef<TextInput>(null);
+    const emailRef = useRef<TextInput>(null);
+    const phoneNumberRef = useRef<TextInput>(null);
+    const passwordRef = useRef<TextInput>(null);
+    const confirmPasswordRef = useRef<TextInput>(null);
+    const fieldRefs: Record<Field, React.RefObject<TextInput | null>> = {
+        firstName: firstNameRef,
+        lastName: lastNameRef,
+        email: emailRef,
+        phoneNumber: phoneNumberRef,
+        password: passwordRef,
+        confirmPassword: confirmPasswordRef,
+    };
 
     // Default role for all new staff
     const role: Role = 'site-engineer';
 
-    // Animate icon on mount
-    useEffect(() => {
-        const pulse = () => {
-            Animated.sequence([
-                Animated.timing(scaleAnim, {
-                    toValue: 1.1,
-                    duration: 1000,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(scaleAnim, {
-                    toValue: 1,
-                    duration: 1000,
-                    useNativeDriver: true,
-                }),
-            ]).start(() => pulse());
-        };
-        pulse();
-    }, []);
+    const clearError = (field: Field) => {
+        setErrors(prev => (prev[field] ? { ...prev, [field]: undefined } : prev));
+    };
+
+    // Shown live once the confirmation is as long as the password
+    const confirmMismatch = confirmPassword.length > 0
+        && confirmPassword.length >= password.length
+        && confirmPassword !== password;
+
+    const goBack = () => {
+        if (router.canGoBack()) {
+            router.back();
+        } else {
+            router.replace('/login');
+        }
+    };
+
+    const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const y = event.nativeEvent.contentOffset.y;
+        setIsScrolled(y > 4);
+        setShowBarTitle(y > 48);
+    };
+
+    const resetVerification = () => {
+        setEmailVerified(false);
+        setShowOtpInput(false);
+        setOtp('');
+        setGeneratedOTP(0);
+        setCodeError('');
+        setCodeNotice('');
+    };
+
+    const handleEmailChange = (text: string) => {
+        // Email addresses never contain spaces; drop any that autofill adds
+        setEmail(text.replace(/\s/g, ''));
+        clearError('email');
+        // Any edit invalidates a verified address or a code that's already out,
+        // so a code sent to one address can't verify another
+        if (emailVerified || showOtpInput) {
+            resetVerification();
+        }
+    };
+
+    // Unlocks a verified address for editing; it has to be verified again
+    const handleChangeEmail = () => {
+        resetVerification();
+        setTimeout(() => emailRef.current?.focus(), 50);
+    };
 
     const handleSendOtp = async () => {
         // Validate email first
         if (!email.trim() || !email.includes('@')) {
-            toast.error('Please enter a valid email address');
+            const message = 'Enter a valid email address, like name@company.com.';
+            setErrors(prev => ({ ...prev, email: message }));
+            signalError(message);
             return;
         }
 
@@ -108,11 +181,10 @@ export default function RegisterScreen() {
 
         try {
             console.log('📧 Sending OTP to:', email);
-            
+
             // Generate OTP
             const OTP = generateOTP();
-            setGeneratedOTP(OTP);
-            
+
             // Send OTP via API
             const response = await apiClient.post<OTPResponse>(`/api/otp`, {
                 email: email.trim().toLowerCase(),
@@ -120,17 +192,23 @@ export default function RegisterScreen() {
             });
 
             if (response.status === 200) {
-                toast.success('OTP sent to your email');
+                // Only replace the code once the new email is out, so a failed resend
+                // leaves the earlier code working
+                setGeneratedOTP(OTP);
+                setOtp('');
+                setCodeError('');
+                setCodeNotice(showOtpInput ? 'New code sent. Earlier codes no longer work.' : '');
                 setShowOtpInput(true);
+                signalSuccess(showOtpInput ? 'New code sent' : 'Code sent');
             } else {
-                toast.error('Failed to send OTP');
+                toast.error("Couldn't send the code. Try again.");
             }
         } catch (error: any) {
             console.error('❌ Error sending OTP:', error);
             if (error?.response || error?.request) {
-                toast.error('Failed to send OTP. Please try again.');
+                toast.error("Couldn't send the code. Check your connection and try again.");
             } else {
-                toast.error('An unexpected error occurred');
+                toast.error('Something went wrong. Try again.');
             }
         } finally {
             setSendingOtp(false);
@@ -139,64 +217,73 @@ export default function RegisterScreen() {
 
     const handleVerifyOtp = async () => {
         if (!otp.trim() || otp.length !== 6) {
-            toast.error('Please enter a valid 6-digit OTP');
+            setCodeError('Enter the 6-digit code from the email.');
+            signalError('Enter the 6-digit code from the email.');
             return;
         }
 
-        if (Number(otp) === generatedOTP) {
-            toast.success('Email verified successfully!');
+        if (generatedOTP !== 0 && Number(otp) === generatedOTP) {
+            signalSuccess('Email verified');
             setEmailVerified(true);
             setShowOtpInput(false);
+            setCodeNotice('');
+            clearError('email');
         } else {
-            toast.error('Invalid OTP. Please try again.');
+            setCodeError("That code doesn't match. Check the latest email or resend the code.");
+            signalError("That code doesn't match. Check the latest email or resend the code.");
         }
     };
 
     const handleRegister = async () => {
-        // Validation
+        // Validation: collect every problem at once so the form can be fixed in one pass
+        const nextErrors: FieldErrors = {};
+
         if (!firstName.trim()) {
-            toast.error('First name is required');
-            return;
+            nextErrors.firstName = 'Enter your first name.';
         }
 
         if (!lastName.trim()) {
-            toast.error('Last name is required');
-            return;
+            nextErrors.lastName = 'Enter your last name.';
         }
 
         if (!email.trim() || !email.includes('@')) {
-            toast.error('Please enter a valid email address');
-            return;
-        }
-
-        // Check if email is verified
-        if (!emailVerified) {
-            toast.error('Please verify your email first');
-            return;
+            nextErrors.email = 'Enter a valid email address, like name@company.com.';
+        } else if (!emailVerified) {
+            // Check if email is verified
+            nextErrors.email = 'Verify your email to continue.';
         }
 
         if (!phoneNumber.trim() || phoneNumber.length < 10) {
-            toast.error('Please enter a valid phone number');
-            return;
+            nextErrors.phoneNumber = 'Enter a phone number with at least 10 digits.';
         }
 
-        // Password validation
+        // Password validation, matching the API's rules
         if (!password.trim()) {
-            toast.error('Password is required');
-            return;
+            nextErrors.password = 'Choose a password.';
+        } else if (!isPasswordValid(password)) {
+            nextErrors.password = 'Choose a password that meets every requirement below.';
         }
 
         // Confirm password validation
         if (!confirmPassword.trim()) {
-            toast.error('Please confirm your password');
+            nextErrors.confirmPassword = 'Enter your password again.';
+        } else if (password !== confirmPassword) {
+            nextErrors.confirmPassword = "Passwords don't match.";
+        }
+
+        const firstInvalid = FIELD_ORDER.find(field => nextErrors[field]);
+        if (firstInvalid) {
+            setErrors(nextErrors);
+            if (nextErrors.password) setShowPasswordRules(true);
+            signalError(nextErrors[firstInvalid] as string);
+            // A verified email is locked, so there's nothing to focus there
+            if (!(firstInvalid === 'email' && emailVerified)) {
+                fieldRefs[firstInvalid].current?.focus();
+            }
             return;
         }
 
-        if (password !== confirmPassword) {
-            toast.error('Passwords do not match');
-            return;
-        }
-
+        setErrors({});
         setLoading(true);
 
         try {
@@ -222,15 +309,15 @@ export default function RegisterScreen() {
             console.log('✅ Registration response:', response.data);
 
             if (response.status === 201) {
-                toast.success('Staff member registered successfully!');
-                
+                toast.success('Account created');
+
                 // Auto-login the user after successful registration
                 console.log('🔐 Auto-logging in user after registration...');
                 console.log('📦 Registration response:', response.data);
-                
+
                 // Extract staff data from response
                 const staffData = response.data.data || response.data;
-                
+
                 // Prepare user data for storage
                 const userData = {
                     _id: staffData?._id || '',
@@ -254,14 +341,13 @@ export default function RegisterScreen() {
                     console.warn('⚠️ Error clearing storage (non-critical):', clearError);
                     // Continue anyway - this is not critical
                 }
-                
+
                 // Store new user data
                 await AsyncStorage.setItem('user', JSON.stringify(userData));
                 await AsyncStorage.setItem('userType', 'staff');
 
                 // Show navigating state
                 setIsNavigating(true);
-                toast.success('Welcome! Redirecting to your dashboard...');
 
                 // Update auth context
                 await checkAuthStatus();
@@ -276,7 +362,7 @@ export default function RegisterScreen() {
                 setEmailVerified(false);
                 setOtp('');
                 setShowOtpInput(false);
-                
+
                 // Let AuthContext handle navigation automatically
                 // The layout will detect the auth change and redirect to main app
                 setLoading(false);
@@ -284,15 +370,15 @@ export default function RegisterScreen() {
             }
         } catch (error: any) {
             console.error('❌ Registration error:', error);
-            
+
             if (error?.response) {
-                const errorMessage = error.response.data?.error || error.response.data?.message || 'Registration failed';
+                const errorMessage = error.response.data?.error || error.response.data?.message || "Couldn't create your account. Try again.";
                 toast.error(errorMessage);
                 console.error('Error response:', error.response.data);
             } else if (error?.request) {
-                toast.error('Network error. Please check your connection.');
+                toast.error("Couldn't create your account. Check your connection and try again.");
             } else {
-                toast.error('An unexpected error occurred');
+                toast.error('Something went wrong. Try again.');
             }
         } finally {
             setLoading(false);
@@ -300,658 +386,396 @@ export default function RegisterScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <View style={styles.screen}>
             <StatusBar style="dark" />
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.keyboardAvoidingView}
-            >
-                <ScrollView
-                    contentContainerStyle={styles.scrollContent}
-                    keyboardShouldPersistTaps="handled"
-                    showsVerticalScrollIndicator={false}
-                >
-                    {/* Header */}
-                    <View style={styles.header}>
-                        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                            <Ionicons name="arrow-back" size={24} color="#1F2937" />
-                        </TouchableOpacity>
-                        <Text style={styles.headerTitle}>Staff Registration</Text>
-                        <View style={{ width: 24 }} />
+            <BlueprintBackdrop />
+            <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
+                {/* Top bar: stays put while the form scrolls, and reaches under the status bar
+                    so its background covers the grid there too once content scrolls beneath it */}
+                <View style={[styles.topBar, { paddingTop: insets.top }, isScrolled && styles.topBarScrolled]}>
+                    <View style={styles.topBarRow}>
+                        <Pressable
+                            onPress={goBack}
+                            style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
+                            accessibilityRole="button"
+                            accessibilityLabel="Back to Log In"
+                        >
+                            <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
+                        </Pressable>
+                        {showBarTitle && (
+                            <View style={styles.topBarTitleWrap} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                                <Text style={styles.topBarTitle} numberOfLines={1}>Create Staff Account</Text>
+                            </View>
+                        )}
                     </View>
+                </View>
 
-                    <View style={styles.content}>
-                        <View style={styles.formContainer}>
-                            <View style={styles.headerSection}>
-                                <Animated.View style={[styles.iconContainer, { transform: [{ scale: scaleAnim }] }]}>
-                                    <Ionicons name="person-add" size={32} color="#3A78B5" />
-                                </Animated.View>
-                                <Text style={styles.welcomeText}>Create Staff Account</Text>
-                                <Text style={styles.stepDescription}>
-                                    Join our team and start managing projects efficiently
-                                </Text>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.keyboardAvoidingView}
+                >
+                    <ScrollView
+                        contentContainerStyle={styles.scrollContent}
+                        keyboardShouldPersistTaps="handled"
+                        showsVerticalScrollIndicator={false}
+                        onScroll={handleScroll}
+                        scrollEventThrottle={16}
+                    >
+                        <View style={styles.content}>
+                            <AuthHeading title="Create Staff Account">
+                                Sign up, then show your staff QR code to your administrator so they can add you to their team.
+                            </AuthHeading>
+
+                            {/* Name */}
+                            <View style={styles.group}>
+                                <CustomTextInput
+                                    ref={firstNameRef}
+                                    label="First Name"
+                                    value={firstName}
+                                    onChangeText={(text) => {
+                                        setFirstName(text);
+                                        clearError('firstName');
+                                    }}
+                                    error={errors.firstName}
+                                    autoCapitalize="words"
+                                    autoComplete="given-name"
+                                    textContentType="givenName"
+                                    returnKeyType="next"
+                                    onSubmitEditing={() => lastNameRef.current?.focus()}
+                                />
+                                <CustomTextInput
+                                    ref={lastNameRef}
+                                    label="Last Name"
+                                    value={lastName}
+                                    onChangeText={(text) => {
+                                        setLastName(text);
+                                        clearError('lastName');
+                                    }}
+                                    error={errors.lastName}
+                                    autoCapitalize="words"
+                                    autoComplete="family-name"
+                                    textContentType="familyName"
+                                    returnKeyType="next"
+                                    onSubmitEditing={() => (emailVerified ? phoneNumberRef : emailRef).current?.focus()}
+                                />
                             </View>
 
-                            <View style={styles.inputSection}>
-                                {/* First Name */}
-                                <CustomTextInput
-                                    icon="person"
-                                    placeholder="First Name"
-                                    value={firstName}
-                                    onChangeText={setFirstName}
-                                    autoCapitalize="words"
-                                />
+                            {/* Contact: the email is verified with a code before the account is created */}
+                            <View style={styles.group}>
+                                <View style={styles.fieldStack}>
+                                    <CustomTextInput
+                                        ref={emailRef}
+                                        label="Email"
+                                        placeholder="name@company.com"
+                                        value={email}
+                                        onChangeText={handleEmailChange}
+                                        error={errors.email}
+                                        hint={!emailVerified && !showOtpInput ? "You'll get a 6-digit code to verify this address." : undefined}
+                                        keyboardType="email-address"
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                        autoComplete="email"
+                                        textContentType="emailAddress"
+                                        editable={!emailVerified}
+                                        returnKeyType="next"
+                                        onSubmitEditing={showOtpInput || sendingOtp ? undefined : handleSendOtp}
+                                    />
 
-                                {/* Last Name */}
-                                <CustomTextInput
-                                    icon="person-outline"
-                                    placeholder="Last Name"
-                                    value={lastName}
-                                    onChangeText={setLastName}
-                                    autoCapitalize="words"
-                                />
-
-                                {/* Email */}
-                                <CustomTextInput
-                                    icon="email"
-                                    iconColor={emailVerified ? "#10B981" : "#666"}
-                                    placeholder="Email Address"
-                                    value={email}
-                                    onChangeText={(text) => {
-                                        setEmail(text);
-                                        // Reset verification if email changes
-                                        if (emailVerified) {
-                                            setEmailVerified(false);
-                                            setShowOtpInput(false);
-                                            setOtp('');
-                                        }
-                                    }}
-                                    keyboardType="email-address"
-                                    autoCapitalize="none"
-                                    autoComplete="email"
-                                    editable={!emailVerified}
-                                    containerStyle={emailVerified ? styles.inputContainerVerified : undefined}
-                                    inputStyle={emailVerified ? styles.inputDisabled : undefined}
-                                    rightElement={emailVerified ? (
-                                        <Ionicons name="checkmark-circle" size={24} color="#10B981" style={{ marginRight: 8 }} />
-                                    ) : undefined}
-                                />
-
-                                {/* Verified Email Display */}
-                                {emailVerified && (
-                                    <View style={styles.verifiedEmailContainer}>
-                                        <View style={styles.verifiedEmailContent}>
-                                            <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                                            <Text style={styles.verifiedEmailText}>
-                                                Email verified: {email}
-                                            </Text>
+                                    {emailVerified ? (
+                                        <View style={styles.verifiedRow}>
+                                            <Ionicons name="checkmark-circle" size={20} color={Colors.successText} />
+                                            <Text style={styles.verifiedText}>Email verified</Text>
+                                            <AuthButton
+                                                variant="plain"
+                                                title="Change"
+                                                accessibilityLabel="Change email"
+                                                onPress={handleChangeEmail}
+                                                style={styles.verifiedChange}
+                                            />
                                         </View>
-                                    </View>
-                                )}
-
-                                {/* Change Email Button - Always visible after verification */}
-                                {emailVerified && (
-                                    <TouchableOpacity
-                                        style={styles.changeEmailButtonVerified}
-                                        onPress={() => {
-                                            setEmailVerified(false);
-                                            setShowOtpInput(false);
-                                            setOtp('');
-                                            setGeneratedOTP(0);
-                                            setEmail('');
-                                            toast.info('Email verification reset. You can now enter a different email address');
-                                        }}
-                                    >
-                                        <Ionicons name="mail" size={16} color="#3A78B5" />
-                                        <Text style={styles.changeEmailButtonVerifiedText}>Change Email</Text>
-                                    </TouchableOpacity>
-                                )}
-
-                                {/* Email Verification Button */}
-                                {!emailVerified && !showOtpInput && (
-                                    <TouchableOpacity
-                                        style={styles.verifyButton}
-                                        onPress={handleSendOtp}
-                                        disabled={sendingOtp || !email.trim()}
-                                    >
-                                        {sendingOtp ? (
-                                            <ActivityIndicator size="small" color="#3A78B5" />
-                                        ) : (
-                                            <>
-                                                <Ionicons name="mail-outline" size={18} color="#3A78B5" />
-                                                <Text style={styles.verifyButtonText}>Verify Email</Text>
-                                            </>
-                                        )}
-                                    </TouchableOpacity>
-                                )}
-     
-                                {/* OTP Input */}
-                                {showOtpInput && !emailVerified && (
-                                    <View style={styles.otpContainer}>
-                                        {/* Email Display */}
-                                        <View style={styles.emailDisplayContainer}>
-                                            <MaterialIcons name="email" size={16} color="#3A78B5" />
-                                            <Text style={styles.emailDisplayText}>
-                                                Verifying: {email}
-                                            </Text>
-                                        </View>
-                                        
-                                        <CustomTextInput
-                                            icon="lock"
-                                            placeholder="Enter 6-digit OTP"
-                                            value={otp}
-                                            onChangeText={setOtp}
-                                            keyboardType="number-pad"
-                                            maxLength={6}
+                                    ) : showOtpInput ? (
+                                        <Animated.View entering={FadeIn.duration(200)} style={styles.codePanel}>
+                                            <CustomTextInput
+                                                label="Verification Code"
+                                                value={otp}
+                                                onChangeText={(text) => {
+                                                    setOtp(text.replace(/\D/g, ''));
+                                                    setCodeError('');
+                                                }}
+                                                error={codeError}
+                                                hint={codeNotice || `Sent to ${email}.`}
+                                                keyboardType="number-pad"
+                                                maxLength={6}
+                                                autoComplete={Platform.OS === 'android' ? 'email-otp' : 'one-time-code'}
+                                                textContentType="oneTimeCode"
+                                                autoFocus
+                                                returnKeyType="done"
+                                                onSubmitEditing={handleVerifyOtp}
+                                                inputStyle={styles.codeInput}
+                                            />
+                                            <View style={styles.codeActions}>
+                                                <AuthButton
+                                                    variant="tinted"
+                                                    title="Verify Email"
+                                                    onPress={handleVerifyOtp}
+                                                    style={styles.codeVerify}
+                                                />
+                                                <AuthButton
+                                                    variant="plain"
+                                                    title="Resend Code"
+                                                    loadingTitle="Sending…"
+                                                    loading={sendingOtp}
+                                                    onPress={handleSendOtp}
+                                                />
+                                            </View>
+                                        </Animated.View>
+                                    ) : (
+                                        <AuthButton
+                                            variant="tinted"
+                                            title="Send Code"
+                                            loadingTitle="Sending code…"
+                                            loading={sendingOtp}
+                                            disabled={!email.trim()}
+                                            onPress={handleSendOtp}
                                         />
-                                        <View style={styles.otpActions}>
-                                            <TouchableOpacity
-                                                style={styles.verifyOtpButton}
-                                                onPress={handleVerifyOtp}
-                                            >
-                                                <Text style={styles.verifyOtpButtonText}>Verify OTP</Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity
-                                                style={styles.resendButton}
-                                                onPress={handleSendOtp}
-                                                disabled={sendingOtp}
-                                            >
-                                                <Text style={styles.resendButtonText}>Resend OTP</Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                        
-                                        {/* Change Email Button */}
-                                        <TouchableOpacity
-                                            style={styles.changeEmailButton}
-                                            onPress={() => {
-                                                setShowOtpInput(false);
-                                                setOtp('');
-                                                setGeneratedOTP(0);
-                                                setEmail('');
-                                                toast.info('You can now enter a different email address');
-                                            }}
-                                        >
-                                            <Ionicons name="mail" size={16} color="#6B7280" />
-                                            <Text style={styles.changeEmailText}>Change Email</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                )}
+                                    )}
+                                </View>
 
-                                {/* Phone Number */}
                                 <CustomTextInput
-                                    icon="phone"
-                                    placeholder="Phone Number"
+                                    ref={phoneNumberRef}
+                                    label="Phone Number"
                                     value={phoneNumber}
-                                    onChangeText={setPhoneNumber}
+                                    onChangeText={(text) => {
+                                        setPhoneNumber(text);
+                                        clearError('phoneNumber');
+                                    }}
+                                    error={errors.phoneNumber}
                                     keyboardType="phone-pad"
                                     maxLength={15}
+                                    autoComplete="tel"
+                                    textContentType="telephoneNumber"
+                                    returnKeyType="next"
+                                    onSubmitEditing={() => passwordRef.current?.focus()}
                                 />
+                            </View>
 
-                                {/* Password */}
-                                <CustomTextInput
-                                    icon="lock"
-                                    placeholder="Password"
-                                    value={password}
-                                    onChangeText={setPassword}
-                                    isPassword={true}
-                                    showPasswordToggle={true}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                />
+                            {/* Password */}
+                            <View style={styles.group}>
+                                <View style={styles.fieldStack}>
+                                    <CustomTextInput
+                                        ref={passwordRef}
+                                        label="Password"
+                                        value={password}
+                                        onChangeText={(text) => {
+                                            setPassword(text);
+                                            clearError('password');
+                                        }}
+                                        error={errors.password}
+                                        isPassword={true}
+                                        showPasswordToggle={true}
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                        autoComplete="new-password"
+                                        textContentType="newPassword"
+                                        passwordRules={IOS_PASSWORD_RULES}
+                                        returnKeyType="next"
+                                        onSubmitEditing={() => confirmPasswordRef.current?.focus()}
+                                    />
+                                    <PasswordChecklist password={password} showErrors={showPasswordRules} />
+                                </View>
 
-                                {/* Confirm Password */}
                                 <CustomTextInput
-                                    icon="lock-outline"
-                                    placeholder="Confirm Password"
+                                    ref={confirmPasswordRef}
+                                    label="Confirm Password"
                                     value={confirmPassword}
-                                    onChangeText={setConfirmPassword}
+                                    onChangeText={(text) => {
+                                        setConfirmPassword(text);
+                                        clearError('confirmPassword');
+                                    }}
+                                    error={errors.confirmPassword ?? (confirmMismatch ? "Passwords don't match." : undefined)}
                                     isPassword={true}
                                     showPasswordToggle={true}
                                     autoCapitalize="none"
                                     autoCorrect={false}
+                                    autoComplete="new-password"
+                                    textContentType="newPassword"
+                                    passwordRules={IOS_PASSWORD_RULES}
+                                    returnKeyType="done"
+                                    onSubmitEditing={loading ? undefined : handleRegister}
                                 />
                             </View>
 
-
-
-                            <View style={styles.buttonSection}>
-                                {/* Register Button */}
-                                <TouchableOpacity
-                                    style={[styles.button, loading && { opacity: 0.7 }]}
-                                    onPress={handleRegister}
-                                    disabled={loading}
-                                >
-                                    <View style={styles.buttonInner}>
-                                        {loading ? (
-                                            <ActivityIndicator color="white" />
-                                        ) : (
-                                            <>
-                                                <Ionicons name="person-add" size={20} color="white" style={{ marginRight: 8 }} />
-                                                <Text style={styles.buttonText}>Create Account</Text>
-                                            </>
-                                        )}
-                                    </View>
-                                </TouchableOpacity>
-
-                                {/* Back to Login */}
-                                <TouchableOpacity
-                                    style={styles.secondaryButton}
-                                    onPress={() => router.back()}
-                                >
-                                    <Ionicons name="arrow-back" size={18} color="#3A78B5" style={{ marginRight: 8 }} />
-                                    <Text style={styles.secondaryButtonText}>Back to Login</Text>
-                                </TouchableOpacity>
-                            </View>
+                            <AuthButton
+                                title="Create Account"
+                                loadingTitle="Creating account…"
+                                loading={loading}
+                                onPress={handleRegister}
+                            />
                         </View>
-                    </View>
-                </ScrollView>
-            </KeyboardAvoidingView>
+
+                        {/* Back to Login */}
+                        <View style={styles.footer}>
+                            <Text style={styles.footerText}>Already have an account?</Text>
+                            <AuthButton variant="plain" title="Log In" onPress={goBack} style={styles.footerLink} />
+                        </View>
+                    </ScrollView>
+                </KeyboardAvoidingView>
+            </SafeAreaView>
 
             {/* Navigating Overlay */}
             {isNavigating && (
-                <View style={styles.navigatingOverlay}>
-                    <View style={styles.navigatingContainer}>
-                        <ActivityIndicator size="large" color="#3A78B5" />
-                        <Text style={styles.navigatingText}>Setting up your account...</Text>
-                    </View>
+                <View
+                    style={styles.navigatingOverlay}
+                    accessible
+                    accessibilityViewIsModal
+                    accessibilityRole="progressbar"
+                    accessibilityLabel="Setting up your account"
+                >
+                    <ActivityIndicator size="large" color={Colors.primary} />
+                    <Text style={styles.navigatingText}>Setting up your account…</Text>
                 </View>
             )}
-        </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
+    screen: {
         flex: 1,
-        backgroundColor: '#F8FAFC',
+        backgroundColor: Colors.background,
+    },
+    safeArea: {
+        flex: 1,
+    },
+    topBar: {
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: 'transparent',
+    },
+    topBarScrolled: {
+        backgroundColor: Colors.background,
+        borderBottomColor: Colors.border,
+    },
+    topBarRow: {
+        height: 56,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: AUTH_GUTTER,
+    },
+    backButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: Colors.surface,
+        borderWidth: 1,
+        borderColor: Colors.border,
+    },
+    backButtonPressed: {
+        backgroundColor: Colors.fill,
+    },
+    topBarTitleWrap: {
+        ...StyleSheet.absoluteFill,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 72,
+        pointerEvents: 'none',
+    },
+    topBarTitle: {
+        fontSize: 17,
+        fontWeight: '600',
+        color: Colors.textPrimary,
     },
     keyboardAvoidingView: {
         flex: 1,
     },
     scrollContent: {
         flexGrow: 1,
-        paddingBottom: 20,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 16,
-        backgroundColor: '#ffffff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#E2E8F0',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    backButton: {
-        padding: 8,
-        borderRadius: 8,
-        backgroundColor: '#F1F5F9',
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1F2937',
+        paddingHorizontal: AUTH_GUTTER,
+        paddingTop: 8,
+        paddingBottom: 12,
     },
     content: {
-        padding: 20,
-        justifyContent: 'center',
+        width: '100%',
+        maxWidth: AUTH_FORM_MAX_WIDTH,
+        alignSelf: 'center',
+        gap: 28,
     },
-    formContainer: {
-        backgroundColor: '#ffffff',
-        borderRadius: 24,
-        padding: 28,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.1,
-        shadowRadius: 20,
-        elevation: 8,
-        marginVertical: 10,
-    },
-    headerSection: {
-        alignItems: 'center',
-        marginBottom: 32,
-    },
-    iconContainer: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: '#EAF0FE',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 16,
-        shadowColor: '#3A78B5',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    welcomeText: {
-        fontSize: 28,
-        fontWeight: '800',
-        color: '#1E293B',
-        marginBottom: 8,
-        textAlign: 'center',
-    },
-    stepDescription: {
-        fontSize: 16,
-        color: '#64748B',
-        marginBottom: 8,
-        textAlign: 'center',
-        lineHeight: 22,
-    },
-    inputSection: {
-        marginBottom: 24,
-    },
-    buttonSection: {
+    group: {
         gap: 16,
     },
-    inputContainer: {
+    fieldStack: {
+        gap: 12,
+    },
+    verifiedRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F8FAFC',
-        borderWidth: 2,
-        borderColor: '#E2E8F0',
-        borderRadius: 16,
-        marginBottom: 16,
-        padding: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    inputContainerVerified: {
-        backgroundColor: '#F0FDF4',
-        borderColor: '#BBF7D0',
-    },
-    inputIcon: {
-        padding: 12,
-    },
-    visibilityIcon: {
-        padding: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    input: {
-        flex: 1,
-        paddingVertical: 16,
-        paddingRight: 12,
-        fontSize: 16,
-        color: '#1E293B',
-        fontWeight: '500',
-    },
-    inputDisabled: {
-        color: '#9CA3AF',
-        backgroundColor: 'transparent',
-    },
-    dropdownButton: {
-        flex: 1,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 16,
-        paddingRight: 12,
-    },
-    dropdownText: {
-        fontSize: 16,
-        color: '#1E293B',
-        fontWeight: '500',
-    },
-    dropdownList: {
-        backgroundColor: '#ffffff',
-        borderWidth: 2,
-        borderColor: '#E2E8F0',
-        borderRadius: 16,
-        marginBottom: 16,
-        marginTop: -8,
-        overflow: 'hidden',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    dropdownItem: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 16,
-        paddingHorizontal: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
-    },
-    dropdownItemText: {
-        fontSize: 16,
-        color: '#1E293B',
-        fontWeight: '500',
-    },
-    dropdownItemTextActive: {
-        color: '#3A78B5',
-        fontWeight: '700',
-    },
-    helperText: {
-        fontSize: 12,
-        color: '#6B7280',
-        marginBottom: 16,
-        fontStyle: 'italic',
-    },
-    button: {
-        borderRadius: 16,
-        overflow: 'hidden',
-        shadowColor: '#3A78B5',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.25,
-        shadowRadius: 12,
-        elevation: 6,
-    },
-    buttonGradient: {
-        paddingVertical: 18,
-        alignItems: 'center',
-        flexDirection: 'row',
-        justifyContent: 'center',
-    },
-    buttonInner: {
-        backgroundColor: '#3A78B5',
-        paddingVertical: 18,
-        alignItems: 'center',
-        flexDirection: 'row',
-        justifyContent: 'center',
-        borderRadius: 16,
-    },
-    buttonText: {
-        color: 'white',
-        fontSize: 18,
-        fontWeight: '700',
-    },
-    secondaryButton: {
-        backgroundColor: 'transparent',
-        borderWidth: 2,
-        borderColor: '#3A78B5',
-        borderRadius: 16,
-        paddingVertical: 16,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    secondaryButtonText: {
-        color: '#3A78B5',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    verifyButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#EAF0FE',
-        borderWidth: 2,
-        borderColor: '#3A78B5',
-        borderRadius: 16,
-        paddingVertical: 14,
-        marginBottom: 16,
         gap: 8,
-        shadowColor: '#3A78B5',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
     },
-    verifyButtonText: {
-        color: '#3A78B5',
-        fontSize: 15,
-        fontWeight: '600',
-    },
-    otpContainer: {
-        marginBottom: 16,
-    },
-    emailDisplayContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#EAF0FE',
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 16,
-        borderWidth: 2,
-        borderColor: '#C4D8FC',
-    },
-    emailDisplayText: {
-        marginLeft: 8,
-        fontSize: 15,
-        color: '#1E40AF',
-        fontWeight: '600',
+    verifiedText: {
         flex: 1,
+        fontSize: 15,
+        fontWeight: '600',
+        color: Colors.successText,
     },
-    otpActions: {
-        flexDirection: 'row',
+    verifiedChange: {
+        marginRight: -12,
+    },
+    codePanel: {
         gap: 12,
-        marginTop: 8,
-    },
-    verifyOtpButton: {
-        flex: 1,
-        backgroundColor: '#10B981',
-        borderRadius: 16,
-        paddingVertical: 14,
-        alignItems: 'center',
-        shadowColor: '#10B981',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    verifyOtpButtonText: {
-        color: '#ffffff',
-        fontSize: 15,
-        fontWeight: '700',
-    },
-    resendButton: {
-        flex: 1,
-        backgroundColor: 'transparent',
-        borderWidth: 2,
-        borderColor: '#3A78B5',
-        borderRadius: 16,
-        paddingVertical: 14,
-        alignItems: 'center',
-    },
-    resendButtonText: {
-        color: '#3A78B5',
-        fontSize: 15,
-        fontWeight: '600',
-    },
-    changeEmailButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'transparent',
-        borderWidth: 2,
-        borderColor: '#D1D5DB',
-        borderRadius: 16,
-        paddingVertical: 12,
-        marginTop: 16,
-        gap: 6,
-    },
-    changeEmailText: {
-        color: '#6B7280',
-        fontSize: 14,
-        fontWeight: '500',
-    },
-    changeEmailButtonVerified: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#EAF0FE',
-        borderWidth: 2,
-        borderColor: '#3A78B5',
-        borderRadius: 16,
-        paddingVertical: 12,
-        marginBottom: 16,
-        gap: 6,
-        shadowColor: '#3A78B5',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    changeEmailButtonVerifiedText: {
-        color: '#3A78B5',
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    verifiedEmailContainer: {
-        backgroundColor: '#F0FDF4',
-        borderWidth: 2,
-        borderColor: '#BBF7D0',
-        borderRadius: 16,
         padding: 16,
-        marginBottom: 16,
-        shadowColor: '#10B981',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
+        borderRadius: Radius.lg,
+        backgroundColor: Colors.surface,
+        borderWidth: 1,
+        borderColor: Colors.border,
     },
-    verifiedEmailContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
-    verifiedEmailText: {
-        flex: 1,
-        fontSize: 15,
-        color: '#166534',
+    codeInput: {
+        fontSize: 24,
         fontWeight: '600',
+        letterSpacing: 6,
+        fontVariant: ['tabular-nums'],
+    },
+    codeActions: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        gap: 8,
+    },
+    codeVerify: {
+        flexGrow: 1,
+    },
+    footer: {
+        width: '100%',
+        maxWidth: AUTH_FORM_MAX_WIDTH,
+        alignSelf: 'center',
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 32,
+        paddingTop: 8,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: Colors.border,
+    },
+    footerText: {
+        fontSize: 15,
+        color: Colors.textSecondary,
+    },
+    footerLink: {
+        paddingHorizontal: 8,
     },
     navigatingOverlay: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        ...StyleSheet.absoluteFill,
+        backgroundColor: `${Colors.background}F0`,
         justifyContent: 'center',
         alignItems: 'center',
+        gap: 16,
         zIndex: 1000,
     },
-    navigatingContainer: {
-        backgroundColor: '#ffffff',
-        borderRadius: 24,
-        padding: 40,
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.15,
-        shadowRadius: 20,
-        elevation: 12,
-        minWidth: 200,
-    },
     navigatingText: {
-        marginTop: 20,
         fontSize: 17,
         fontWeight: '600',
-        color: '#3A78B5',
-        textAlign: 'center',
+        color: Colors.textPrimary,
     },
 });

@@ -1,23 +1,39 @@
 import Loading from '@/components/Loading';
+import {
+    AUTH_FORM_MAX_WIDTH,
+    AUTH_GUTTER,
+    AuthButton,
+    AuthEmphasis,
+    AuthHeading,
+    BlueprintBackdrop,
+    BrandMark,
+    IOS_PASSWORD_RULES,
+    isPasswordValid,
+    PasswordChecklist,
+    signalError,
+    signalSuccess,
+} from '@/components/auth/AuthUI';
 import CustomTextInput from '@/components/common/CustomTextInput';
+import { Colors } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { addPassword, confirmMail, findUserType, forgetPassword, getUser, login, sendOtp } from '@/functions/login';
 import { generateOTP } from '@/lib/functions';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
+    BackHandler,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
     StyleSheet,
     Text,
-    TouchableOpacity,
     View
 } from 'react-native';
+import Animated, { FadeIn, FadeInRight } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -35,10 +51,32 @@ export default function LoginScreen() {
     const [generatedOTP, setGeneratedOTP] = useState(1);
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
-    const [showPassword, setShowPassword] = useState(false);
     const [isVerified, setIsVerified] = useState(false);
     const [userType, setUserType] = useState('');
     const [isNavigating, setIsNavigating] = useState(false);
+
+    // Inline feedback, shown under the field it's about
+    const [emailError, setEmailError] = useState('');
+    const [otpError, setOtpError] = useState('');
+    const [otpNotice, setOtpNotice] = useState('');
+    const [passwordError, setPasswordError] = useState('');
+    const [showPasswordRules, setShowPasswordRules] = useState(false);
+    const [resending, setResending] = useState(false);
+    const [sendingReset, setSendingReset] = useState(false);
+    // Set after Forgot Password, so the code and password steps say "reset"
+    const [isPasswordReset, setIsPasswordReset] = useState(false);
+
+    const goToEmailStep = () => {
+        setPassword('');
+        setOtp('');
+        setOtpError('');
+        setOtpNotice('');
+        setPasswordError('');
+        setShowPasswordRules(false);
+        setIsVerified(false);
+        setIsPasswordReset(false);
+        setCurrentStep('email');
+    };
 
     useEffect(() => {
         // Just check if we should show loading, don't navigate
@@ -60,13 +98,35 @@ export default function LoginScreen() {
         checkLogin();
     }, [])
 
+    // Android's back button steps back through the flow instead of leaving it
+    useEffect(() => {
+        if (currentStep === 'email') return;
+        const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+            goToEmailStep();
+            return true;
+        });
+        return () => subscription.remove();
+    }, [currentStep]);
+
     if (mountLoading) {
         return <Loading />
     }
 
+    const flagError = (setError: (message: string) => void, message: string) => {
+        setError(message);
+        signalError(message);
+    };
+
+    // Keeps the field and its button above the keyboard
+    const scrollToForm = () => {
+        setTimeout(() => {
+            scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+    };
+
     const handleGenerateOTP = async () => {
         if (!email.trim() || !email.includes('@')) {
-            toast.error('Please enter a valid email address');
+            flagError(setEmailError, 'Enter a valid email address, like name@company.com.');
             return;
         }
 
@@ -76,13 +136,13 @@ export default function LoginScreen() {
 
             console.log(check);
             console.log(check.userType)
-            
+
             // ✅ FIX: Check if user exists in database first
             if (!check.isUser) {
-                toast.error('User not found with this email address');
+                flagError(setEmailError, 'No account found with this email. Check it for typos.');
                 return;
             }
-            
+
             setUserType(check.userType)
             if (!check.verified) {
                 // User exists but not verified - send OTP for password setup
@@ -90,10 +150,9 @@ export default function LoginScreen() {
                 setGeneratedOTP(OTP);
                 const sendMail = await sendOtp(email, OTP);
                 if (sendMail) {
-                    toast.success('OTP sent to your email');
                     setCurrentStep('otp');
                 } else {
-                    toast.error("Something went wrong, can't send the OTP")
+                    toast.error("Couldn't send the code. Try again.")
                 }
             } else {
                 // User exists and is verified - go to password login
@@ -101,32 +160,54 @@ export default function LoginScreen() {
                 setCurrentStep('password')
             }
         } catch (error) {
-            toast.error('User not found');
+            toast.error("Couldn't check this email. Try again.");
             console.log(error)
         } finally {
             setLoading(false);
         }
     };
 
+    const handleResendOTP = async () => {
+        setResending(true);
+        try {
+            const OTP = generateOTP();
+            const sendMail = await sendOtp(email, OTP);
+            if (sendMail) {
+                // Only replace the code once the new email is out, so a failed resend
+                // leaves the earlier code working
+                setGeneratedOTP(OTP);
+                setOtp('');
+                setOtpError('');
+                setOtpNotice('New code sent. Earlier codes no longer work.');
+                signalSuccess('New code sent');
+            } else {
+                toast.error("Couldn't send the code. Try again.");
+            }
+        } finally {
+            setResending(false);
+        }
+    };
+
     const handleVerifyOTP = async () => {
         if (!otp.trim() || otp.length !== 6) {
-            toast.error('Please enter a valid 6-digit OTP');
+            flagError(setOtpError, 'Enter the 6-digit code from the email.');
             return;
         }
 
         setLoading(true);
         try {
             if (Number(otp) === generatedOTP) {
-                toast.success('OTP verified successfully');
+                signalSuccess();
+                setOtpNotice('');
                 // ✅ Only proceed to password step if OTP is correct
                 setCurrentStep('password');
             } else {
-                toast.error("Invalid OTP");
+                flagError(setOtpError, "That code doesn't match. Check the latest email or resend the code.");
                 // ✅ Stay on OTP step if OTP is wrong
                 // Don't change the step, let user try again
             }
         } catch (error) {
-            toast.error('Invalid OTP');
+            flagError(setOtpError, "That code doesn't match. Check the latest email or resend the code.");
             // ✅ Stay on OTP step if there's an error
         } finally {
             setLoading(false);
@@ -136,36 +217,14 @@ export default function LoginScreen() {
     const handleSetPassword = async () => {
         // ✅ Enhanced password validation to match backend requirements
         if (!password.trim()) {
-            toast.error('Password is required');
+            flagError(setPasswordError, 'Enter a password.');
             return;
         }
 
-        if (password.length < 8) {
-            toast.error('Password must be at least 8 characters long');
-            return;
-        }
-
-        // Check for uppercase letter
-        if (!/[A-Z]/.test(password)) {
-            toast.error('Password must contain at least one uppercase letter');
-            return;
-        }
-
-        // Check for lowercase letter
-        if (!/[a-z]/.test(password)) {
-            toast.error('Password must contain at least one lowercase letter');
-            return;
-        }
-
-        // Check for number
-        if (!/\d/.test(password)) {
-            toast.error('Password must contain at least one number');
-            return;
-        }
-
-        // Check for special character
-        if (!/[@$!%*?&]/.test(password)) {
-            toast.error('Password must contain at least one special character (@$!%*?&)');
+        // Length, upper and lowercase, number, symbol, and no characters the API rejects
+        if (!isPasswordValid(password)) {
+            setShowPasswordRules(true);
+            flagError(setPasswordError, 'Choose a password that meets every requirement below.');
             return;
         }
 
@@ -176,7 +235,7 @@ export default function LoginScreen() {
 
             const res = await addPassword(email, password, userType);
             console.log('addPassword result:', res);
-            
+
             if (res.success) {
                 const user = await getUser(email, userType);
                 console.log('User data retrieved:', user);
@@ -187,17 +246,17 @@ export default function LoginScreen() {
                     if (typeof user._id === 'object') {
                         user._id = user._id.toString();
                     }
-                    
-                    // ✅ FIX: Don't override clientId with _id! 
+
+                    // ✅ FIX: Don't override clientId with _id!
                     // The API already returns the correct clientId
                     // user.clientId should be the client/company ID, not the user's own ID
                     if (user.clientId && typeof user.clientId === 'object') {
                         user.clientId = user.clientId.toString();
                     }
-                    
+
                     // ✅ ADD userType to user object for tab navigation
                     user.userType = userType;
-                    
+
                     console.log('✅ User ID (_id):', user._id);
                     console.log('✅ Client ID (clientId):', user.clientId);
                     console.log('✅ User Type:', user.userType);
@@ -223,10 +282,10 @@ export default function LoginScreen() {
                     console.warn('⚠️ Error clearing storage (non-critical):', clearError);
                     // Continue anyway - this is not critical
                 }
-                
+
                 // PRODUCTION FIX: Add login timestamp for validation
                 await AsyncStorage.setItem('loginTimestamp', Date.now().toString());
-                
+
                 // Store fresh user data in AsyncStorage
                 const jsonUser = JSON.stringify(user);
                 console.log('💾 Storing fresh user data:', jsonUser);
@@ -234,13 +293,13 @@ export default function LoginScreen() {
 
                 // Also store userType separately for reference
                 await AsyncStorage.setItem('userType', userType);
-                
+
                 // Re-store the JWT token after clearing (important!)
                 if (res.token) {
                     console.log('🔐 Re-storing JWT token after clear...');
                     await AsyncStorage.setItem('auth_token', res.token);
                     console.log('✅ JWT token re-stored successfully');
-                    
+
                     // DEBUG: Verify token was actually stored
                     const verifyToken = await AsyncStorage.getItem('auth_token');
                     if (verifyToken) {
@@ -253,10 +312,10 @@ export default function LoginScreen() {
                 } else {
                     console.error('❌ CRITICAL: No JWT token to re-store!');
                 }
-                
+
                 console.log('✅ Fresh login data stored successfully');
 
-                toast.success('Password set successfully');
+                toast.success('Password saved');
 
                 // Show navigating state
                 setIsNavigating(true);
@@ -272,24 +331,24 @@ export default function LoginScreen() {
                 setIsNavigating(false);
             } else {
                 console.error('❌ Password setup failed:', res.error);
-                toast.error(res.error || "Failed to set password. Please try again.");
+                toast.error(res.error || "Couldn't save your password. Try again.");
                 setLoading(false);
             }
         } catch (error) {
             console.error('Password setup error:', error);
-            toast.error('Failed to set password');
+            toast.error("Couldn't save your password. Try again.");
             setLoading(false);
         }
     };
 
     const handleLogin = async () => {
         if (!password.trim()) {
-            toast.error("Password is required");
+            flagError(setPasswordError, 'Enter your password.');
             return;
         }
 
         if (password.length < 8) {
-            toast.error("Password must be at least 8 characters long");
+            flagError(setPasswordError, 'That password is too short. Passwords have at least 8 characters.');
             return;
         }
 
@@ -326,17 +385,17 @@ export default function LoginScreen() {
                     if (typeof user._id === 'object') {
                         user._id = user._id.toString();
                     }
-                    
-                    // ✅ FIX: Don't override clientId with _id! 
+
+                    // ✅ FIX: Don't override clientId with _id!
                     // The API already returns the correct clientId
                     // user.clientId should be the client/company ID, not the user's own ID
                     if (user.clientId && typeof user.clientId === 'object') {
                         user.clientId = user.clientId.toString();
                     }
-                    
+
                     // ✅ ADD userType to user object for tab navigation
                     user.userType = userType;
-                    
+
                     console.log('✅ User ID (_id):', user._id);
                     console.log('✅ Client ID (clientId):', user.clientId);
                     console.log('✅ User Type:', user.userType);
@@ -353,10 +412,10 @@ export default function LoginScreen() {
                     console.warn('⚠️ Error clearing storage (non-critical):', clearError);
                     // Continue anyway - this is not critical
                 }
-                
+
                 // PRODUCTION FIX: Add login timestamp for validation
                 await AsyncStorage.setItem('loginTimestamp', Date.now().toString());
-                
+
                 // Store fresh user data in AsyncStorage
                 const jsonUser = JSON.stringify(user);
                 console.log('💾 Storing fresh user data:', jsonUser);
@@ -364,13 +423,13 @@ export default function LoginScreen() {
 
                 // Also store userType separately for reference
                 await AsyncStorage.setItem('userType', userType);
-                
+
                 // Re-store the JWT token after clearing (important!)
                 if (result.token) {
                     console.log('🔐 Re-storing JWT token after clear...');
                     await AsyncStorage.setItem('auth_token', result.token);
                     console.log('✅ JWT token re-stored successfully');
-                    
+
                     // DEBUG: Verify token was actually stored
                     const verifyToken = await AsyncStorage.getItem('auth_token');
                     if (verifyToken) {
@@ -383,10 +442,8 @@ export default function LoginScreen() {
                 } else {
                     console.error('❌ CRITICAL: No JWT token to re-store!');
                 }
-                
-                console.log('✅ Fresh login data stored successfully');
 
-                toast.success("User logged in successfully");
+                console.log('✅ Fresh login data stored successfully');
 
                 // Show navigating state
                 setIsNavigating(true);
@@ -401,18 +458,24 @@ export default function LoginScreen() {
                 setLoading(false);
                 setIsNavigating(false);
             } else {
-                toast.error(result.error || "Invalid email or password");
+                // A wrong password belongs next to the field; account problems stay in a toast
+                const message = result.error || '';
+                if (!message || /invalid credentials|invalid email or password/i.test(message)) {
+                    flagError(setPasswordError, 'Incorrect password. Try again or reset it.');
+                } else {
+                    toast.error(message);
+                }
                 setLoading(false);
             }
         } catch (error) {
             console.error('Login error:', error);
-            toast.error("Failed to login due to an unexpected error");
+            toast.error("Couldn't log in. Check your connection and try again.");
             setLoading(false);
         }
     };
 
     const handleForgetPassword = async () => {
-        setLoading(true);
+        setSendingReset(true);
         try {
             console.log('\n🔐 FORGET PASSWORD FLOW STARTED');
             console.log('Email:', email);
@@ -425,13 +488,13 @@ export default function LoginScreen() {
 
             if (!userTypeResult.success || !userTypeResult.userType) {
                 console.log('❌ User not found');
-                toast.error("User not found with this email");
+                toast.error("No account found with this email.");
                 return;
             }
 
             console.log('✅ User found with type:', userTypeResult.userType);
             setUserType(userTypeResult.userType);
-            
+
             console.log('Step 2: Sending forget password request...');
 
             // Then send forget password request
@@ -441,34 +504,50 @@ export default function LoginScreen() {
 
             if (result.success) {
                 console.log('✅ Password reset successful');
-                toast.success("Password reset successful. Please verify with OTP to set new password.");
-                
+
                 // Generate and send OTP for verification
                 const OTP = generateOTP();
                 setGeneratedOTP(OTP);
                 const sendMail = await sendOtp(email, OTP);
-                
-                if (sendMail) {
-                    toast.success('OTP sent to your email');
-                    // Set isVerified to false so user goes through password setup flow
-                    setIsVerified(false);
-                    // Go to OTP step
-                    setCurrentStep('otp');
-                    setPassword('');
-                    setOtp('');
-                } else {
-                    toast.error("Failed to send OTP. Please try again.");
-                }
+
+                // The old password no longer works, so move on to the code step either
+                // way; if the email failed, Resend Code can try again from there
+                // Set isVerified to false so user goes through password setup flow
+                setIsVerified(false);
+                setIsPasswordReset(true);
+                // Go to OTP step
+                setCurrentStep('otp');
+                setPassword('');
+                setOtp('');
+                setPasswordError('');
+                setOtpNotice('');
+                setOtpError(sendMail ? '' : "Couldn't send the code. Tap Resend Code to try again.");
             } else {
                 console.log('❌ Failed to reset password');
-                toast.error(result.error || "Failed to reset password");
+                toast.error(result.error || "Couldn't reset your password. Try again.");
             }
         } catch (error) {
             console.error('❌ Forget password error:', error);
-            toast.error("Failed to process forget password request");
+            toast.error("Couldn't reset your password. Try again.");
         } finally {
-            setLoading(false);
+            setSendingReset(false);
         }
+    };
+
+    // Resetting clears the current password on the server right away, so confirm first
+    const confirmForgetPassword = () => {
+        if (Platform.OS === 'web') {
+            handleForgetPassword();
+            return;
+        }
+        Alert.alert(
+            'Reset Password?',
+            `Your current password will stop working. A 6-digit code will be sent to ${email} so you can create a new one.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Reset Password', style: 'destructive', onPress: handleForgetPassword },
+            ]
+        );
     };
 
     const renderStep = () => {
@@ -476,441 +555,286 @@ export default function LoginScreen() {
             case 'email':
                 return (
                     <>
-                        <Text style={styles.welcomeText}>Welcome To Exponentor</Text>
-                        <Text style={styles.stepTitle}>Enter your email</Text>
-                        <Text style={styles.stepDescription}>
-                            thank you for giving us a chance to solve your problem
-                        </Text>
+                        <AuthHeading title="Log In">
+                            Track materials, labor, and payments across every site.
+                        </AuthHeading>
                         <CustomTextInput
-                            icon="email"
-                            placeholder="Email address"
+                            label="Email"
+                            placeholder="name@company.com"
                             value={email}
-                            onChangeText={setEmail}
+                            onChangeText={(text) => {
+                                // Email addresses never contain spaces; drop any that autofill adds
+                                setEmail(text.replace(/\s/g, ''));
+                                setEmailError('');
+                            }}
+                            error={emailError}
                             keyboardType="email-address"
                             autoCapitalize="none"
+                            autoCorrect={false}
                             autoComplete="email"
-                            onFocus={() => {
-                                setTimeout(() => {
-                                    scrollViewRef.current?.scrollToEnd({ animated: true });
-                                }, 100);
-                            }}
+                            textContentType="username"
+                            returnKeyType="next"
+                            onSubmitEditing={loading ? undefined : handleGenerateOTP}
+                            onFocus={scrollToForm}
                         />
-                        <TouchableOpacity
-                            style={[styles.button, loading && { opacity: 0.7 }]}
+                        <AuthButton
+                            title="Continue"
+                            loadingTitle="Checking…"
+                            loading={loading}
                             onPress={handleGenerateOTP}
-                            disabled={loading}
-                        >
-                            <View style={styles.buttonInner}>
-                                {loading ? (
-                                    <ActivityIndicator color="white" />
-                                ) : (
-                                    <Text style={styles.buttonText}>Next</Text>
-                                )}
-                            </View>
-                        </TouchableOpacity>
+                        />
                     </>
                 );
 
             case 'otp':
                 return (
                     <>
-                        <Text style={styles.welcomeText}>Verification</Text>
-                        <Text style={styles.stepTitle}>Enter OTP</Text>
-                        <Text style={styles.stepDescription}>
-                            Please enter the 6-digit code sent to {email}
-                        </Text>
+                        <AuthHeading title="Check Your Email">
+                            {isPasswordReset
+                                ? 'To reset your password, enter the 6-digit code sent to '
+                                : 'Enter the 6-digit code sent to '}
+                            <AuthEmphasis>{email}</AuthEmphasis>.
+                        </AuthHeading>
                         <CustomTextInput
-                            icon="lock"
-                            placeholder="6-digit OTP"
+                            label="Verification Code"
                             value={otp}
-                            onChangeText={setOtp}
+                            onChangeText={(text) => {
+                                setOtp(text.replace(/\D/g, ''));
+                                setOtpError('');
+                            }}
+                            error={otpError}
+                            hint={otpNotice}
                             keyboardType="number-pad"
                             maxLength={6}
-                            onFocus={() => {
-                                setTimeout(() => {
-                                    scrollViewRef.current?.scrollToEnd({ animated: true });
-                                }, 100);
-                            }}
+                            autoComplete={Platform.OS === 'android' ? 'email-otp' : 'one-time-code'}
+                            textContentType="oneTimeCode"
+                            autoFocus
+                            returnKeyType="done"
+                            onSubmitEditing={loading ? undefined : handleVerifyOTP}
+                            inputStyle={styles.codeInput}
+                            onFocus={scrollToForm}
                         />
-                        <TouchableOpacity
-                            style={[styles.button, loading && { opacity: 0.7 }]}
+                        <AuthButton
+                            title="Verify"
+                            loadingTitle="Verifying…"
+                            loading={loading}
                             onPress={handleVerifyOTP}
-                            disabled={loading}
-                        >
-                            <View style={styles.buttonInner}>
-                                {loading ? (
-                                    <ActivityIndicator color="white" />
-                                ) : (
-                                    <Text style={styles.buttonText}>Verify OTP</Text>
-                                )}
-                            </View>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.secondaryButton}
-                            onPress={() => {
-                                setOtp('');
-                                setCurrentStep('email');
-                            }}
-                        >
-                            <Text style={styles.secondaryButtonText}>Change Email</Text>
-                        </TouchableOpacity>
+                        />
+                        <View style={styles.secondaryActions}>
+                            <AuthButton
+                                variant="plain"
+                                title="Resend Code"
+                                loadingTitle="Sending…"
+                                loading={resending}
+                                onPress={handleResendOTP}
+                            />
+                            <AuthButton variant="plain" title="Change Email" onPress={goToEmailStep} />
+                        </View>
                     </>
                 );
 
             case 'password':
                 return (
                     <>
-                        <Text style={styles.welcomeText}>Almost Done</Text>
-                        <Text style={styles.stepTitle}>{isVerified ? 'Enter' : 'Set'} Password</Text>
-
-                        {/* Show email */}
-                        <View style={styles.emailDisplayContainer}>
-                            <MaterialIcons name="email" size={16} color="#666" />
-                            <Text style={styles.emailDisplayText}>{email}</Text>
-                            <TouchableOpacity
-                                onPress={() => {
-                                    setPassword('');
-                                    setOtp('');
-                                    setCurrentStep('email');
-                                }}
-                                style={styles.changeEmailButton}
-                            >
-                                <Text style={styles.changeEmailText}>Change</Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        <Text style={styles.stepDescription}>
-                            {isVerified 
-                                ? 'Enter your password to continue' 
-                                : 'Create a strong password: 8+ characters with uppercase, lowercase, number, and special character (@$!%*?&)'
-                            }
-                        </Text>
+                        <AuthHeading
+                            title={isVerified ? 'Enter Password' : isPasswordReset ? 'Create New Password' : 'Create Password'}
+                        >
+                            {isVerified
+                                ? 'Logging in as '
+                                : isPasswordReset
+                                    ? 'Choose a new password for '
+                                    : 'Set a password for '}
+                            <AuthEmphasis>{email}</AuthEmphasis>
+                            {isVerified || isPasswordReset ? '.' : ' to finish setting up your account.'}
+                        </AuthHeading>
 
                         <CustomTextInput
-                            icon="lock"
-                            placeholder="Password (8+ chars, A-z, 0-9, @$!%*?&)"
+                            label="Password"
                             value={password}
-                            onChangeText={setPassword}
+                            onChangeText={(text) => {
+                                setPassword(text);
+                                setPasswordError('');
+                            }}
+                            error={passwordError}
                             isPassword={true}
                             showPasswordToggle={true}
                             autoCapitalize="none"
                             autoCorrect={false}
-                            textContentType="password"
-                            onFocus={() => {
-                                setTimeout(() => {
-                                    scrollViewRef.current?.scrollToEnd({ animated: true });
-                                }, 100);
-                            }}
+                            autoComplete={isVerified ? 'current-password' : 'new-password'}
+                            textContentType={isVerified ? 'password' : 'newPassword'}
+                            passwordRules={isVerified ? undefined : IOS_PASSWORD_RULES}
+                            autoFocus
+                            returnKeyType="go"
+                            onSubmitEditing={loading ? undefined : (isVerified ? handleLogin : handleSetPassword)}
+                            onFocus={scrollToForm}
                         />
 
-                        {/* Forget Password - Only show when user is verified (login mode) */}
-                        {isVerified && (
-                            <TouchableOpacity
-                                onPress={handleForgetPassword}
-                                style={styles.forgetPasswordButton}
+                        {/* Existing accounts can reset; new passwords get live requirements */}
+                        {isVerified ? (
+                            <AuthButton
+                                variant="plain"
+                                title="Forgot Password?"
+                                loadingTitle="Sending code…"
+                                loading={sendingReset}
                                 disabled={loading}
-                            >
-                                <Text style={styles.forgetPasswordText}>Forgot Password?</Text>
-                            </TouchableOpacity>
+                                onPress={confirmForgetPassword}
+                                style={styles.forgotPassword}
+                            />
+                        ) : (
+                            <PasswordChecklist password={password} showErrors={showPasswordRules} />
                         )}
 
-                        <TouchableOpacity
-                            style={[styles.button, loading && { opacity: 0.7 }]}
+                        <AuthButton
+                            title={isVerified ? 'Log In' : 'Set Password'}
+                            loadingTitle={isVerified ? 'Logging in…' : 'Saving…'}
+                            loading={loading}
+                            disabled={sendingReset}
                             onPress={!isVerified ? handleSetPassword : handleLogin}
-                            disabled={loading}
-                        >
-                            <View style={styles.buttonInner}>
-                                {loading ? (
-                                    <ActivityIndicator color="white" />
-                                ) : (
-                                    <Text style={styles.buttonText}>{isVerified ? 'Login' : 'Set Password'}</Text>
-                                )}
-                            </View>
-                        </TouchableOpacity>
+                        />
+                        <AuthButton variant="plain" title="Change Email" onPress={goToEmailStep} />
                     </>
                 );
         }
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <View style={styles.screen}>
             <StatusBar style="dark" />
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.keyboardAvoidingView}
-            >
-                <ScrollView
-                    ref={scrollViewRef}
-                    contentContainerStyle={styles.scrollContent}
-                    keyboardShouldPersistTaps="handled"
-                    showsVerticalScrollIndicator={false}
+            <BlueprintBackdrop />
+            <SafeAreaView style={styles.safeArea}>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.keyboardAvoidingView}
                 >
-                    <View style={styles.content}>
-                        <View style={styles.formContainer}>
-                            {renderStep()}
-                        </View>
-                        
-                        {/* Registration Link */}
-                        <View style={styles.registerContainer}>
-                            <Text style={styles.registerText}>New staff member? </Text>
-                            <TouchableOpacity 
-                                onPress={() => {
-                                    console.log('Register button pressed');
-                                    router.push('/register');
-                                }}
-                                activeOpacity={0.7}
-                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    <ScrollView
+                        ref={scrollViewRef}
+                        contentContainerStyle={styles.scrollContent}
+                        keyboardShouldPersistTaps="handled"
+                        showsVerticalScrollIndicator={false}
+                    >
+                        <View style={styles.content}>
+                            <BrandMark />
+                            {/* Each step fades in; forward steps also slide from the trailing side */}
+                            <Animated.View
+                                key={currentStep}
+                                entering={currentStep === 'email' ? FadeIn.duration(200) : FadeInRight.duration(240)}
+                                style={styles.form}
                             >
-                                <Text style={styles.registerLink}>Register here</Text>
-                            </TouchableOpacity>
+                                {renderStep()}
+                            </Animated.View>
                         </View>
-                    </View>
-                </ScrollView>
-            </KeyboardAvoidingView>
+
+                        {/* Registration Link */}
+                        {currentStep === 'email' && (
+                            <View style={styles.footer}>
+                                <Text style={styles.footerText}>New staff member?</Text>
+                                <AuthButton
+                                    variant="plain"
+                                    title="Create Account"
+                                    onPress={() => {
+                                        console.log('Register button pressed');
+                                        router.push('/register');
+                                    }}
+                                    style={styles.footerLink}
+                                />
+                            </View>
+                        )}
+                    </ScrollView>
+                </KeyboardAvoidingView>
+            </SafeAreaView>
 
             {/* Navigating Overlay */}
             {isNavigating && (
-                <View style={styles.navigatingOverlay}>
-                    <View style={styles.navigatingContainer}>
-                        <ActivityIndicator size="large" color="#3A78B5" />
-                        <Text style={styles.navigatingText}>Redirecting...</Text>
-                    </View>
+                <View
+                    style={styles.navigatingOverlay}
+                    accessible
+                    accessibilityViewIsModal
+                    accessibilityRole="progressbar"
+                    accessibilityLabel="Logging in"
+                >
+                    <ActivityIndicator size="large" color={Colors.primary} />
+                    <Text style={styles.navigatingText}>Logging in…</Text>
                 </View>
             )}
-        </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
+    screen: {
         flex: 1,
-        backgroundColor: '#F8FAFC',
+        backgroundColor: Colors.background,
+    },
+    safeArea: {
+        flex: 1,
     },
     keyboardAvoidingView: {
         flex: 1,
     },
     scrollContent: {
         flexGrow: 1,
-        justifyContent: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: AUTH_GUTTER,
+        paddingTop: 16,
+        paddingBottom: 12,
     },
     content: {
-        padding: 24,
-        justifyContent: 'center',
+        width: '100%',
+        maxWidth: AUTH_FORM_MAX_WIDTH,
+        alignSelf: 'center',
     },
-    header: {
-        alignItems: 'center',
-        marginBottom: 32,
+    form: {
+        gap: 20,
+        marginTop: 40,
     },
-    logoContainer: {
-        marginBottom: 24,
-    },
-    logoBackground: {
-        width: 72,
-        height: 72,
-        borderRadius: 16,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    illustration: {
-        width: 220,
-        height: 180,
-    },
-    illustrationImage: {
-        width: 220,
-        height: 180,
-    },
-    headerTitle: {
+    codeInput: {
         fontSize: 24,
-        fontWeight: 'bold',
-        color: '#666',
-        marginTop: 8,
-        textTransform: 'uppercase',
-    },
-    formContainer: {
-        backgroundColor: '#ffffff',
-        borderRadius: 20,
-        padding: 24,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-        elevation: 5,
-    },
-    welcomeText: {
-        fontSize: 26,
-        fontWeight: 'bold',
-        color: '#295E94',
-        marginBottom: 16,
-        textAlign: 'center',
-    },
-    stepTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 8,
-    },
-    stepDescription: {
-        fontSize: 14,
-        color: '#666',
-        marginBottom: 24,
-    },
-    inputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#f7f9fc',
-        borderWidth: 1,
-        borderColor: '#e6e8eb',
-        borderRadius: 12,
-        marginBottom: 16,
-        padding: 4,
-    },
-    inputIcon: {
-        padding: 10,
-    },
-    visibilityIcon: {
-        padding: 10,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    input: {
-        flex: 1,
-        paddingVertical: 12,
-        paddingRight: 12,
-        fontSize: 16,
-        color: '#333',
-    },
-    button: {
-        borderRadius: 12,
-        overflow: 'hidden',
-        marginTop: 8,
-        shadowColor: '#295E94',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    buttonInner: {
-        backgroundColor: '#3A78B5',
-        paddingVertical: 16,
-        alignItems: 'center',
-        borderRadius: 12,
-    },
-    buttonText: {
-        color: 'white',
-        fontSize: 16,
-        fontWeight: '700',
-        letterSpacing: 0.2,
-    },
-    secondaryButton: {
-        backgroundColor: 'transparent',
-        borderWidth: 1,
-        borderColor: '#3A78B5',
-        borderRadius: 12,
-        paddingVertical: 15,
-        marginTop: 16,
-    },
-    secondaryButtonText: {
-        color: '#3A78B5',
-        textAlign: 'center',
-        fontWeight: 'bold',
-    },
-    signupContainer: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        marginTop: 24,
-    },
-    signupText: {
-        color: '#666',
-    },
-    signupLink: {
-        color: '#295E94',
-        fontWeight: 'bold',
-    },
-    emailDisplayContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#f0f9ff',
-        borderRadius: 8,
-        padding: 12,
-        marginBottom: 12,
-        borderWidth: 1,
-        borderColor: '#C4D8FC',
-    },
-    emailDisplayText: {
-        flex: 1,
-        marginLeft: 8,
-        fontSize: 14,
-        color: '#1e40af',
-        fontWeight: '500',
-    },
-    changeEmailButton: {
-        paddingHorizontal: 12,
-        paddingVertical: 4,
-        backgroundColor: '#3A78B5',
-        borderRadius: 6,
-    },
-    changeEmailText: {
-        color: '#ffffff',
-        fontSize: 12,
         fontWeight: '600',
+        letterSpacing: 6,
+        fontVariant: ['tabular-nums'],
     },
-    forgetPasswordButton: {
-        alignSelf: 'flex-end',
+    secondaryActions: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
         marginTop: -8,
-        marginBottom: 8,
     },
-    forgetPasswordText: {
-        color: '#3A78B5',
-        fontSize: 14,
-        fontWeight: '600',
+    forgotPassword: {
+        alignSelf: 'flex-end',
+        marginTop: -12,
+        marginRight: -12,
+    },
+    footer: {
+        width: '100%',
+        maxWidth: AUTH_FORM_MAX_WIDTH,
+        alignSelf: 'center',
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 32,
+        paddingTop: 8,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: Colors.border,
+    },
+    footerText: {
+        fontSize: 15,
+        color: Colors.textSecondary,
+    },
+    footerLink: {
+        paddingHorizontal: 8,
     },
     navigatingOverlay: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        ...StyleSheet.absoluteFill,
+        backgroundColor: `${Colors.background}F0`,
         justifyContent: 'center',
         alignItems: 'center',
+        gap: 16,
         zIndex: 1000,
     },
-    navigatingContainer: {
-        backgroundColor: '#ffffff',
-        borderRadius: 16,
-        padding: 32,
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-        elevation: 8,
-    },
     navigatingText: {
-        marginTop: 16,
-        fontSize: 16,
+        fontSize: 17,
         fontWeight: '600',
-        color: '#3A78B5',
-    },
-    registerContainer: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: 24,
-        marginBottom: 20,
-        paddingTop: 20,
-        paddingBottom: 10,
-        borderTopWidth: 1,
-        borderTopColor: '#f1f5f9',
-    },
-    registerText: {
-        fontSize: 14,
-        color: '#6B7280',
-    },
-    registerLink: {
-        fontSize: 14,
-        color: '#295E94',
-        fontWeight: '700',
-        textDecorationLine: 'underline',
+        color: Colors.textPrimary,
     },
 });
