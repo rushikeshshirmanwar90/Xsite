@@ -26,6 +26,9 @@ import { ContractorFormModal } from '@/components/details/ContractorFormModal';
 import CommitmentDateModal from '@/components/common/CommitmentDateModal';
 import ContractorReportGenerator from './_components/contractor/ContractorReportGenerator';
 import Header from '@/components/details/Header';
+import PaidByPicker from '@/components/partnership/PaidByPicker';
+import { PaidBy, reportLedgerResult } from '@/functions/partnership';
+import { invalidateProjectPartnership, useProjectPartnership } from '@/hooks/useProjectPartnership';
 
 interface LaborEntry {
   _id: string;
@@ -67,6 +70,12 @@ export default function ContractorScreen() {
   const [recordingPayment, setRecordingPayment] = useState(false);
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
   const [currentContractorForPayment, setCurrentContractorForPayment] = useState<any | null>(null);
+  // Who paid — asked when the project has a partnership. The state holds an
+  // explicit choice; until one is made, the recorder is assumed.
+  const partnershipInfo = useProjectPartnership(projectId);
+  const [paidByChoice, setPaidBy] = useState<PaidBy | null>(null);
+  const [paidByError, setPaidByError] = useState('');
+  const paidBy = paidByChoice ?? partnershipInfo.defaultPaidBy;
   
 
   // Report generator state
@@ -161,7 +170,10 @@ export default function ContractorScreen() {
         [
           {
             text: 'Record Final Payout & Complete',
-            onPress: () => handleFinalPaymentAndComplete(contractor, remaining),
+            // With partners, the payout needs a payer, so it goes through the payment form
+            onPress: () => partnershipInfo.activePartnership
+              ? handleOpenFinalPayment(contractor, remaining)
+              : handleFinalPaymentAndComplete(contractor, remaining),
             style: 'default',
           },
           {
@@ -191,6 +203,20 @@ export default function ContractorScreen() {
         ]
       );
     }
+  };
+
+  // A final payment marks the contract completed on the server
+  const handleOpenFinalPayment = (contractor: any, amount: number) => {
+    setCurrentContractorForPayment(contractor);
+    setPaymentAmount(String(amount));
+    setPaymentType('final');
+    setPaymentNotes(`Final payment — ${formatCurrency(amount)}`);
+    setPaidBy(null);
+    setPaidByError('');
+    setSelectedContractorForManage(null);
+    setTimeout(() => {
+      setShowRecordPaymentModal(true);
+    }, 100);
   };
 
   const handleFinalPaymentAndComplete = async (contractor: any, amount: number) => {
@@ -443,7 +469,9 @@ export default function ContractorScreen() {
     // Set default payment type and notes
     setPaymentType('weekly');
     setPaymentNotes(`Payment for work done - Outstanding Work Value: ${formatCurrency(outstandingWorkValue)}`);
-    
+    setPaidBy(null);
+    setPaidByError('');
+
     // Close current management modal first
     setSelectedContractorForManage(null);
     
@@ -461,6 +489,12 @@ export default function ContractorScreen() {
     
     if (!currentContractorForPayment) {
       Alert.alert('Error', 'Unable to identify contractor. Please try again.');
+      return;
+    }
+
+    if (partnershipInfo.activePartnership && !paidBy) {
+      setPaidByError('Choose who paid this.');
+      Alert.alert('Who Paid?', 'Choose who paid this so it counts toward the right partner.');
       return;
     }
 
@@ -550,10 +584,13 @@ export default function ContractorScreen() {
         paymentType: paymentType,
         notes: paymentNotes,
         ...(commitmentDate ? { commitmentDate } : {}),
+        ...(partnershipInfo.activePartnership && paidBy ? { paidBy } : {}),
       });
-      
+
       if ((res.data as any).success) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        reportLedgerResult((res.data as any).data?.partnershipLedger);
+        if (partnershipInfo.activePartnership) invalidateProjectPartnership(projectId);
         
         // Show detailed success message
         const paidAmount = Number(paymentAmount);
@@ -1106,6 +1143,20 @@ export default function ContractorScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
+
+              {/* Who paid — partnership projects only */}
+              <PaidByPicker
+                partnership={partnershipInfo.activePartnership}
+                value={paidBy}
+                onChange={(value) => {
+                  setPaidBy(value);
+                  setPaidByError('');
+                }}
+                myPartnerId={partnershipInfo.myPartnerId}
+                poolBalance={partnershipInfo.summary?.pool.balance}
+                error={paidByError}
+                style={{ marginTop: 20 }}
+              />
 
               {/* Notes */}
               <Text style={pStyles.fieldLabel}>Note  <Text style={{ color: '#CBD5E1', fontWeight: '400' }}>(optional)</Text></Text>

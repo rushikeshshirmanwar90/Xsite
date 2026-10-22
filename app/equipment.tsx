@@ -16,6 +16,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import apiClient from '@/utils/axiosConfig';
 import { domain } from '@/lib/domain';
 import { getClientId } from '@/functions/clientId';
+import { PaidBy, reportLedgerResult } from '@/functions/partnership';
+import { invalidateProjectPartnership } from '@/hooks/useProjectPartnership';
 import { toast } from 'sonner-native';
 import Header from '@/components/details/Header';
 import EquipmentFormModal from '@/components/details/EquipmentFormModal';
@@ -364,7 +366,7 @@ const EquipmentManagement = () => {
     };
 
     // Function to handle adding equipment entries (simplified like labor)
-    const handleAddEquipmentEntries = async (equipmentEntries: any[], message: string) => {
+    const handleAddEquipmentEntries = async (equipmentEntries: any[], message: string, paidBy?: PaidBy | null) => {
         try {
             console.log('Adding equipment entries:', equipmentEntries);
 
@@ -381,6 +383,8 @@ const EquipmentManagement = () => {
             // Prepare data for the bulk equipment API
             const requestData = {
                 operation: 'create',
+                // Who paid, on projects with a partnership
+                ...(paidBy ? { paidBy } : {}),
                 data: equipmentEntries.map(entry => {
                     // Create clean equipment entry with only the required fields
                     const mappedEntry = {
@@ -441,6 +445,8 @@ const EquipmentManagement = () => {
             console.log('Equipment API response:', result);
 
             if (result.success) {
+                reportLedgerResult(result.partnershipLedger);
+                if (paidBy) invalidateProjectPartnership(projectId);
                 // Log activity for equipment addition (without loading toast)
                 try {
                     console.log('🚀 Starting equipment activity logging...');

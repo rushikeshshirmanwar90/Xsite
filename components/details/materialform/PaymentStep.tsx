@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { BillImage } from '@/utils/billUpload';
 import CommitmentDateModal from '@/components/common/CommitmentDateModal';
+import PaidByPicker from '@/components/partnership/PaidByPicker';
+import { PaidBy, Partnership } from '@/functions/partnership';
 import BillingDateModal from './BillingDateModal';
 import BillUploadCard from './BillUploadCard';
 
@@ -37,6 +39,13 @@ interface PaymentStepProps {
   onBeforeBillCapture?: () => void | Promise<void>;
   onBack: () => void;
   onClose: (skip?: boolean) => void;
+  // Who paid — shown only when the project has an active partnership
+  partnership?: Partnership | null;
+  myPartnerId?: string | null;
+  poolBalance?: number | null;
+  paidBy?: PaidBy | null;
+  paidByError?: string;
+  onPaidByChange?: (value: PaidBy) => void;
 }
 
 // "2026-07-06" → "06/07/2026" for display
@@ -95,6 +104,12 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
   onBeforeBillCapture,
   onBack,
   onClose,
+  partnership,
+  myPartnerId,
+  poolBalance,
+  paidBy,
+  paidByError,
+  onPaidByChange,
 }) => {
   const paidNum = parseFloat(amountPaid) || 0;
   const overLimit = paymentStatus === 'partial' && paidNum > totalCost;
@@ -210,6 +225,18 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
               </Text>
             )}
           </View>
+        )}
+
+        {/* Who paid — partnership projects only, once some money has been paid */}
+        {(paymentStatus === 'full' || paymentStatus === 'partial') && onPaidByChange && (
+          <PaidByPicker
+            partnership={partnership ?? null}
+            value={paidBy ?? null}
+            onChange={onPaidByChange}
+            myPartnerId={myPartnerId}
+            poolBalance={poolBalance}
+            error={paidByError}
+          />
         )}
 
         {/* Commitment date — required whenever the vendor is left partial/unpaid */}

@@ -17,11 +17,15 @@ import {
 import * as Haptics from 'expo-haptics';
 import { domain } from '@/lib/domain';
 import apiClient from '@/utils/axiosConfig';
+import PaidByPicker from '@/components/partnership/PaidByPicker';
+import { PaidBy } from '@/functions/partnership';
+import { useProjectPartnership } from '@/hooks/useProjectPartnership';
 
 interface EquipmentFormModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (equipmentEntries: any[], message: string) => void;
+  // paidBy is set on projects with a partnership
+  onSubmit: (equipmentEntries: any[], message: string, paidBy?: PaidBy | null) => void;
   sectionId?: string;
   projectId?: string;
   projectName?: string;
@@ -41,10 +45,18 @@ interface EquipmentType {
 const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
   visible,
   onClose,
-  onSubmit
+  onSubmit,
+  projectId,
 }) => {
   // Get screen dimensions and calculate safe bottom padding
   const safeBottomPadding = Platform.OS === 'ios' ? 34 : 20;
+
+  // Who paid for this equipment, on projects with a partnership. The state holds
+  // an explicit choice; until one is made, the recorder is assumed.
+  const partnershipInfo = useProjectPartnership(projectId);
+  const [paidByChoice, setPaidBy] = useState<PaidBy | null>(null);
+  const [paidByError, setPaidByError] = useState('');
+  const paidBy = paidByChoice ?? partnershipInfo.defaultPaidBy;
   
   // Helper function to convert rental period to plural noun form
   const getPeriodNoun = (period: string): string => {
@@ -195,6 +207,8 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
     equipmentEntriesRef.current = [];
     setShowAddForm(false);
     setEditingEntry(null);
+    setPaidBy(null);
+    setPaidByError('');
     setIsSwipeComplete(false);
     setSwipeProgress(0);
     setProgressText('Swipe to Submit All');
@@ -327,8 +341,18 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
       return;
     }
 
+    if (partnershipInfo.activePartnership && !paidBy) {
+      setPaidByError('Choose who paid for this equipment.');
+      Alert.alert('Who Paid?', 'Choose who paid for this equipment so it counts toward the right partner.');
+      // The swipe already snapped to the end; put it back so it can be tried again
+      swipeAnimation.setValue(0);
+      setIsSwipeComplete(false);
+      setProgressText('Swipe to Submit All');
+      return;
+    }
+
     const message = `Added ${currentEntries.length} equipment ${currentEntries.length === 1 ? 'entry' : 'entries'}`;
-    onSubmit(currentEntries, message);
+    onSubmit(currentEntries, message, partnershipInfo.activePartnership ? paidBy : undefined);
 
     resetForm();
     onClose();
@@ -494,6 +518,22 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                   </View>
                 </TouchableOpacity>
               </View>
+            )}
+
+            {/* Who paid — partnership projects only, once entries are ready to submit */}
+            {equipmentEntries.length > 0 && !showAddForm && (
+              <PaidByPicker
+                partnership={partnershipInfo.activePartnership}
+                value={paidBy}
+                onChange={(value) => {
+                  setPaidBy(value);
+                  setPaidByError('');
+                }}
+                myPartnerId={partnershipInfo.myPartnerId}
+                poolBalance={partnershipInfo.summary?.pool.balance}
+                error={paidByError}
+                style={{ marginHorizontal: 4, marginBottom: 20 }}
+              />
             )}
 
             {/* Equipment Adding Form */}

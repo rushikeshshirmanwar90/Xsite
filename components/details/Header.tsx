@@ -41,6 +41,8 @@ interface HeaderProps {
     isGeneratingStockReport?: boolean;
     // Material analysis (cost breakdown pie chart) for the selected mini-section
     onMaterialAnalysisPress?: () => void;
+    // The project's partnership — partners, money pool and who paid what
+    onPartnershipPress?: () => void;
     subtitle?: string;
 }
 
@@ -74,6 +76,7 @@ const Header: React.FC<HeaderProps> = ({
     onStockReportPress,
     isGeneratingStockReport = false,
     onMaterialAnalysisPress,
+    onPartnershipPress,
     subtitle,
 }) => {
     // State to store fetched sections
@@ -82,7 +85,7 @@ const Header: React.FC<HeaderProps> = ({
     const [showMenu, setShowMenu] = useState(false);
     const insets = useSafeAreaInsets();
 
-    const hasMenuItems = !!(onContractorPress || onLaborPress || onEquipmentPress || onOtherCostPress || onToggleSectionCompletion || onStockReportPress || onMaterialAnalysisPress);
+    const hasMenuItems = !!(onContractorPress || onLaborPress || onEquipmentPress || onOtherCostPress || onToggleSectionCompletion || onStockReportPress || onMaterialAnalysisPress || onPartnershipPress);
 
     useEffect(() => {
         const getSectionData = async () => {
@@ -123,6 +126,7 @@ const Header: React.FC<HeaderProps> = ({
             onPress: onStockReportPress, disabled: isGeneratingStockReport,
         },
         { key: 'analysis', icon: 'pie-chart-outline' as const, label: 'Material Analysis', onPress: onMaterialAnalysisPress },
+        { key: 'partnership', icon: 'wallet-outline' as const, label: 'Partnership', onPress: onPartnershipPress },
     ].filter(item => !!item.onPress);
 
     // Title hierarchy: an explicit subtitle (e.g. "Labor") is the screen's title and the

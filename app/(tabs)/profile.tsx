@@ -1,7 +1,9 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { InlineSkeleton } from '@/components/common/InlineSkeleton';
 import { getClientId } from '@/functions/clientId';
+import { fetchMyPartnerships } from '@/functions/partnership';
 import { getProjectData } from '@/functions/project';
+import { getMyPartnerId } from '@/hooks/useProjectPartnership';
 import { useUser, isStaff } from '@/hooks/useUser';
 import { domain } from '@/lib/domain';
 import { Ionicons } from '@expo/vector-icons';
@@ -79,6 +81,26 @@ const CompanyProfile: React.FC = () => {
 
     // Check if current user is staff
     const isCurrentUserStaff = isStaff(user);
+
+    // Admins always get Partnerships; staff only once they're a partner somewhere
+    const [isPartnerSomewhere, setIsPartnerSomewhere] = useState(false);
+    useEffect(() => {
+        if (!isCurrentUserStaff) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const partnerId = await getMyPartnerId();
+                const mine = partnerId ? await fetchMyPartnerships(partnerId) : [];
+                if (!cancelled) setIsPartnerSomewhere(mine.length > 0);
+            } catch {
+                // No row is the safe fallback
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [isCurrentUserStaff]);
+    const showPartnerships = !isCurrentUserStaff || isPartnerSomewhere;
 
     // Force refresh data every time the screen is focused (after login/logout)
     useFocusEffect(
@@ -1434,6 +1456,36 @@ const CompanyProfile: React.FC = () => {
                         <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
                     </TouchableOpacity>
                 </View>
+
+                {/* Partnerships — partners and money pools per project */}
+                {showPartnerships && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Partnerships</Text>
+                        <TouchableOpacity
+                            style={styles.activityButton}
+                            onPress={() => router.push('/partnerships')}
+                            activeOpacity={0.7}
+                            accessibilityRole="button"
+                        >
+                            <View style={styles.activityButtonLeft}>
+                                <View style={styles.activityButtonIcon}>
+                                    <Ionicons name="wallet-outline" size={22} color="#3A78B5" />
+                                </View>
+                                <View style={styles.activityButtonContent}>
+                                    <Text style={styles.activityButtonTitle}>
+                                        {isCurrentUserStaff ? 'My Partnerships' : 'Project Partnerships'}
+                                    </Text>
+                                    <Text style={styles.activityButtonSubtitle}>
+                                        {isCurrentUserStaff
+                                            ? 'See what you and your partners have put in'
+                                            : 'Partners, money pools and who paid what'}
+                                    </Text>
+                                </View>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
+                        </TouchableOpacity>
+                    </View>
+                )}
 
                 {/* Reports Section - Only for non-staff users */}
                 {!isCurrentUserStaff && (

@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BillImage } from '@/utils/billUpload';
+import type { PaidBy } from '@/functions/partnership';
 import type { PaymentStatus } from './PaymentStep';
 import { CustomSpec, InternalMaterial, MaterialFormData } from './types';
 
@@ -35,6 +36,8 @@ export interface MaterialDraft {
   billingDate: string;
   commitmentDate: string;
   billImages: BillImage[];
+  // Who paid, on projects with a partnership
+  paidBy?: PaidBy | null;
 }
 
 export const saveMaterialDraft = async (

@@ -3,6 +3,8 @@ import LaborCardEnhanced from '@/components/details/LaborCardEnhanced';
 import LaborFormModal from '@/components/details/LaborFormModal';
 import { getClientId } from '@/functions/clientId';
 import { getSection } from '@/functions/details';
+import { PaidBy, reportLedgerResult } from '@/functions/partnership';
+import { invalidateProjectPartnership } from '@/hooks/useProjectPartnership';
 import apiClient from '@/utils/axiosConfig';
 
 import { styles } from '@/style/details';
@@ -562,7 +564,12 @@ const LaborPage = () => {
         loadingAnimation.setValue(0);
     };
     // Function to handle adding labor entries (real API implementation)
-    const handleAddLaborEntries = async (laborEntries: LaborEntry[], message: string) => {
+    const handleAddLaborEntries = async (
+        laborEntries: LaborEntry[],
+        message: string,
+        _miniSectionId?: string,
+        paidBy?: PaidBy | null
+    ) => {
         try {
             console.log('Adding labor entries:', laborEntries);
 
@@ -594,7 +601,9 @@ const LaborPage = () => {
                 entityType: 'project',
                 entityId: projectId,
                 sectionId: sectionId,
-                addedBy: user?._id || clientId
+                addedBy: user?._id || clientId,
+                // Who paid, on projects with a partnership
+                ...(paidBy ? { paidBy } : {}),
             };
 
             console.log('Sending labor data to API:', requestData);
@@ -606,6 +615,8 @@ const LaborPage = () => {
             console.log('Labor API response:', result);
 
             if (result.success) {
+                reportLedgerResult(result.data?.partnershipLedger);
+                if (paidBy) invalidateProjectPartnership(projectId);
                 // Log activity for labor addition
                 try {
                     console.log('🚀 Starting labor activity logging...');

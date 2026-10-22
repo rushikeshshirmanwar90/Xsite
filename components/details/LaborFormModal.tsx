@@ -1,6 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import PaidByPicker from '@/components/partnership/PaidByPicker';
+import { PaidBy } from '@/functions/partnership';
+import { useProjectPartnership } from '@/hooks/useProjectPartnership';
 import {
   Alert,
   Animated,
@@ -21,7 +24,8 @@ import * as Haptics from 'expo-haptics';
 interface LaborFormModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (laborEntries: any[], message: string, miniSectionId?: string) => void;
+  // paidBy is set on projects with a partnership (never for contractor-logged labor)
+  onSubmit: (laborEntries: any[], message: string, miniSectionId?: string, paidBy?: PaidBy | null) => void;
   sectionId?: string;
   miniSectionId?: string;
   projectId?: string;
@@ -256,7 +260,8 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
   miniSections = [],
   contractorId,
   contractorType,
-  contractorContracts
+  contractorContracts,
+  projectId,
 }) => {
   const allowedCategories = React.useMemo(() => {
     if (contractorContracts && contractorContracts.length > 0) {
@@ -292,6 +297,14 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
 
   const { user } = useAuth();
   const isStaffLogin = !!user?.role;
+
+  // Who paid this labor, on projects with a partnership. A contractor's labor is
+  // paid through their contract, so it's never asked for them.
+  // The state holds an explicit choice; until one is made, the recorder is assumed.
+  const partnershipInfo = useProjectPartnership(contractorId ? undefined : projectId);
+  const [paidByChoice, setPaidBy] = useState<PaidBy | null>(null);
+  const [paidByError, setPaidByError] = useState('');
+  const paidBy = paidByChoice ?? partnershipInfo.defaultPaidBy;
 
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   // Labor is entered as two tiers per work area: skilled (main worker) + unskilled (helper).
@@ -514,6 +527,8 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
     laborEntriesRef.current = []; // Reset ref too
     setShowAddForm(false);
     setEditingEntry(null);
+    setPaidBy(null);
+    setPaidByError('');
     setIsSwipeComplete(false);
     setSwipeProgress(0);
     setProgressText('Swipe to Submit All');
@@ -730,9 +745,18 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
       return;
     }
 
+    if (partnershipInfo.activePartnership && !paidBy) {
+      setPaidByError('Choose who paid for this labour.');
+      Alert.alert('Who Paid?', 'Choose who paid for this labour so it counts toward the right partner.');
+      // The swipe already snapped to the end; put it back so it can be tried again
+      swipeAnimation.setValue(0);
+      setIsSwipeComplete(false);
+      return;
+    }
+
     // Submit all entries as one group
     const message = `Labor added successfully`;
-    onSubmit(currentEntries, message);
+    onSubmit(currentEntries, message, undefined, partnershipInfo.activePartnership ? paidBy : undefined);
 
     resetForm();
     onClose();
@@ -930,6 +954,22 @@ const LaborFormModal: React.FC<LaborFormModalProps> = ({
                   </View>
                 </TouchableOpacity>
               </View>
+            )}
+
+            {/* Who paid — partnership projects only, once entries are ready to submit */}
+            {laborEntries.length > 0 && !showAddForm && (
+              <PaidByPicker
+                partnership={partnershipInfo.activePartnership}
+                value={paidBy}
+                onChange={(value) => {
+                  setPaidBy(value);
+                  setPaidByError('');
+                }}
+                myPartnerId={partnershipInfo.myPartnerId}
+                poolBalance={partnershipInfo.summary?.pool.balance}
+                error={paidByError}
+                style={{ marginHorizontal: 4, marginBottom: 20 }}
+              />
             )}
 
             {/* Labor Adding Form - Show by default when no entries, or when showAddForm is true */}

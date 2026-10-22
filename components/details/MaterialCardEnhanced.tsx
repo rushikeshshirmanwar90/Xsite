@@ -5,6 +5,9 @@ import { Animated, Image, Modal, ScrollView, StyleSheet, Text, TextInput, Toucha
 import BillViewerModal from '@/components/common/BillViewerModal';
 import apiClient from '@/utils/axiosConfig';
 import PaymentStep, { PaymentStatus } from '@/components/details/materialform/PaymentStep';
+import PaidByPicker from '@/components/partnership/PaidByPicker';
+import { PaidBy, reportLedgerResult } from '@/functions/partnership';
+import { invalidateProjectPartnership, useProjectPartnership } from '@/hooks/useProjectPartnership';
 import { BillImage, toBillPayload } from '@/utils/billUpload';
 
 /** A vendor bill photo attached to a purchase batch (see utils/billUpload). */
@@ -188,6 +191,16 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [paymentInput, setPaymentInput] = useState('');
     const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+
+    // Who paid — asked on both payment flows when the project has a partnership.
+    // The state holds an explicit choice; until one is made, the recorder is assumed.
+    const partnershipInfo = useProjectPartnership(currentProjectId);
+    const [paymentPaidByChoice, setPaymentPaidBy] = useState<PaidBy | null>(null);
+    const [paymentPaidByError, setPaymentPaidByError] = useState('');
+    const [addStockPaidByChoice, setAddStockPaidBy] = useState<PaidBy | null>(null);
+    const [addStockPaidByError, setAddStockPaidByError] = useState('');
+    const paymentPaidBy = paymentPaidByChoice ?? partnershipInfo.defaultPaidBy;
+    const addStockPaidBy = addStockPaidByChoice ?? partnershipInfo.defaultPaidBy;
 
     // Edit Stock functionality states (admin-only, unused materials)
     const [showEditModal, setShowEditModal] = useState(false);
@@ -568,6 +581,8 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
     const handleOpenPaymentModal = () => {
         // Default the input to the full outstanding amount for a quick "pay in full".
         setPaymentInput(amountRemaining > 0 ? String(Math.round(amountRemaining)) : '');
+        setPaymentPaidBy(null);
+        setPaymentPaidByError('');
         setShowPaymentModal(true);
     };
 
@@ -582,6 +597,11 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                 'Amount Too High',
                 `Payment cannot exceed the outstanding amount of ₹${amountRemaining.toLocaleString('en-IN')}.`
             );
+            return;
+        }
+        if (partnershipInfo.activePartnership && !paymentPaidBy) {
+            setPaymentPaidByError('Choose who paid this.');
+            Alert.alert('Who Paid?', 'Choose who paid this so it counts toward the right partner.');
             return;
         }
         if (isSubmittingPayment) return;
@@ -604,9 +624,12 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                 clientId,
                 materialIds,
                 amountPaid: amount,
+                paidBy: partnershipInfo.activePartnership ? paymentPaidBy : undefined,
             });
 
             if (res.data?.success) {
+                reportLedgerResult(res.data?.data?.partnershipLedger);
+                if (partnershipInfo.activePartnership) invalidateProjectPartnership(currentProjectId);
                 setShowPaymentModal(false);
                 setPaymentInput('');
                 Alert.alert('Payment Recorded', res.data?.message || 'Payment recorded successfully.');
@@ -627,6 +650,8 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
     const resetAddStockPaymentState = () => {
         setAddStockStep('details');
         setAddStockPaymentStatus(undefined);
+        setAddStockPaidBy(null);
+        setAddStockPaidByError('');
         setAddStockAmountPaid('');
         setAddStockBillingDate('');
         setAddStockCommitmentDate('');
@@ -721,6 +746,16 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
             return;
         }
 
+        // On a partnership project, money paid now has to say whose money it was
+        const addStockSomethingPaid = addStockPaymentStatus === 'full'
+            || (addStockPaymentStatus === 'partial' && parseFloat(addStockAmountPaid) > 0);
+        const attributeAddStock = addStockSomethingPaid && !!partnershipInfo.activePartnership;
+        if (attributeAddStock && !addStockPaidBy) {
+            setAddStockPaidByError('Choose who paid this bill.');
+            Alert.alert('Who Paid?', 'Choose who paid this bill so it counts toward the right partner.');
+            return;
+        }
+
         let confirmMsg = `Add ${quantity} ${material.unit} of ${material.name}`;
         if (perUnitCost > 0) confirmMsg += ` at ₹${perUnitCost}/${material.unit}`;
         if (vendorName) confirmMsg += `\nVendor: ${vendorName}`;
@@ -778,11 +813,14 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                         ? addStockCommitmentDate || undefined
                                         : undefined,
                                 billImages: addStockBillImages.length > 0 ? toBillPayload(addStockBillImages) : undefined,
+                                paidBy: attributeAddStock ? addStockPaidBy : undefined,
                             });
 
                             console.log('📥 API Response:', response.data);
 
                             if (response.data.success) {
+                                reportLedgerResult(response.data.data?.partnershipLedger);
+                                if (attributeAddStock) invalidateProjectPartnership(currentProjectId);
                                 const isNewEntry = response.data.action === 'created';
                                 const reasons: string[] = [];
                                 if (isNewEntry && response.data.data?.newEntryReason === 'vendor') {
@@ -822,10 +860,12 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
 
     // Low stock check — only meaningful on the imported/available tab, where the
     // remaining quantity is what's actually left in stock.
+    // Remaining = Total Purchase − Total Used, from the same two figures shown beside it,
+    // so the card always adds up. On the used tab currentlyAvailable is project-wide stock
+    // while Total Used is this section's, so it could read 0 when the math said otherwise.
     const totalPurchased = material.totalImported || material.totalQuantity || 0;
-    const remainingQty = material.currentlyAvailable !== undefined && material.currentlyAvailable !== null
-        ? material.currentlyAvailable
-        : material.totalQuantity;
+    const totalUsedQty = material.totalUsed || 0;
+    const remainingQty = Math.max(0, Math.round((totalPurchased - totalUsedQty) * 100) / 100);
     const stockPercentage = totalPurchased > 0 ? (remainingQty / totalPurchased) * 100 : 100;
     const isLowStock = !isIgnored && activeTab === 'imported' && totalPurchased > 0 && stockPercentage <= lowStockThreshold;
 
@@ -996,9 +1036,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                         <Ionicons name="warning" size={13} color={Colors.errorText} style={styles.statAlertIcon} accessibilityLabel="Low stock" />
                                     )}
                                     <Text style={[styles.statsListValue, isLowStock && styles.statValueAlert]}>
-                                        {material.currentlyAvailable !== undefined && material.currentlyAvailable !== null
-                                            ? material.currentlyAvailable
-                                            : material.totalQuantity} {material.unit}
+                                        {remainingQty} {material.unit}
                                     </Text>
                                 </View>
                             </View>
@@ -1149,9 +1187,7 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 <View style={detailStyles.statItem}>
                                     <Text style={detailStyles.statLabel}>Remaining</Text>
                                     <Text style={[detailStyles.statValue, isLowStock && styles.statValueAlert]}>
-                                        {material.currentlyAvailable !== undefined && material.currentlyAvailable !== null
-                                            ? material.currentlyAvailable
-                                            : material.totalQuantity} {material.unit}
+                                        {remainingQty} {material.unit}
                                     </Text>
                                 </View>
                             </View>
@@ -1759,6 +1795,20 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                             </TouchableOpacity>
                         )}
 
+                        {/* Who paid — partnership projects only */}
+                        <PaidByPicker
+                            partnership={partnershipInfo.activePartnership}
+                            value={paymentPaidBy}
+                            onChange={(value) => {
+                                setPaymentPaidBy(value);
+                                setPaymentPaidByError('');
+                            }}
+                            myPartnerId={partnershipInfo.myPartnerId}
+                            poolBalance={partnershipInfo.summary?.pool.balance}
+                            error={paymentPaidByError}
+                            style={{ marginTop: 20 }}
+                        />
+
                         {/* Confirm button */}
                         <TouchableOpacity
                             style={[
@@ -1811,6 +1861,15 @@ const MaterialCardEnhanced: React.FC<MaterialCardEnhancedProps> = ({
                                 onBillUploadingChange={setAddStockUploadingBill}
                                 onBack={() => setAddStockStep('details')}
                                 onClose={() => closeAddStockModal()}
+                                partnership={partnershipInfo.activePartnership}
+                                myPartnerId={partnershipInfo.myPartnerId}
+                                poolBalance={partnershipInfo.summary?.pool.balance}
+                                paidBy={addStockPaidBy}
+                                paidByError={addStockPaidByError}
+                                onPaidByChange={(value) => {
+                                    setAddStockPaidBy(value);
+                                    setAddStockPaidByError('');
+                                }}
                             />
                             <View style={styles.addStockFloatingBar}>
                                 <TouchableOpacity

@@ -28,6 +28,8 @@ import ProgressIndicator from './ProgressIndicator';
 import ReviewPurposeStep from './ReviewPurposeStep';
 import { CustomSpec, InternalMaterial, MaterialFormData } from './types';
 import { getClientId } from '@/functions/clientId';
+import { PaidBy } from '@/functions/partnership';
+import { useProjectPartnership } from '@/hooks/useProjectPartnership';
 import apiClient from '@/utils/axiosConfig';
 import { BillImage, toBillPayload } from '@/utils/billUpload';
 
@@ -37,12 +39,15 @@ interface MaterialFormModalProps {
   visible: boolean;
   onClose: () => void;
   onSubmit: (materials: any[], message: string) => Promise<void>;
+  // Lets the payment step ask who paid when the project has a partnership
+  projectId?: string;
 }
 
 const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   visible,
   onClose,
   onSubmit,
+  projectId,
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedTemplateKey, setSelectedTemplateKey] = useState<string | null>(null);
@@ -94,6 +99,12 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   // True while a bill photo is still uploading — submit is blocked so the
   // material isn't saved without the bill the user is clearly waiting on.
   const [isUploadingBill, setIsUploadingBill] = useState(false);
+  // Who paid this purchase — only asked when the project has a partnership.
+  // paidBy holds an explicit choice; until one is made, the recorder is assumed.
+  const partnershipInfo = useProjectPartnership(projectId);
+  const [paidBy, setPaidBy] = useState<PaidBy | null>(null);
+  const [paidByError, setPaidByError] = useState('');
+  const effectivePaidBy = paidBy ?? partnershipInfo.defaultPaidBy;
 
   // Loading animation states
   const [isAddingMaterials, setIsAddingMaterials] = useState(false);
@@ -165,6 +176,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       billingDate,
       commitmentDate,
       billImages,
+      paidBy,
     });
   };
 
@@ -180,6 +192,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     setAmountPaid(draft.amountPaid || '');
     setBillingDate(draft.billingDate || '');
     setCommitmentDate(draft.commitmentDate || '');
+    if (draft.paidBy) setPaidBy(draft.paidBy);
     // Drop localUri — the cached file may not have survived the restart, and the
     // hosted URL renders the same thumbnail.
     setBillImages((draft.billImages || []).map(({ localUri, ...bill }) => bill));
@@ -613,6 +626,15 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       return;
     }
 
+    // On a partnership project, money paid now has to say whose money it was
+    const somethingPaid = paymentStatus === 'full' || (paymentStatus === 'partial' && parseFloat(amountPaid) > 0);
+    const attributePayment = somethingPaid && !!partnershipInfo.activePartnership;
+    if (attributePayment && !effectivePaidBy) {
+      setPaidByError('Choose who paid this bill.');
+      Alert.alert('Who Paid?', 'Choose who paid this bill so it counts toward the right partner.');
+      return;
+    }
+
     if (isSubmitting) return;
 
     const totalBatchCost = currentAddedMaterials.reduce(
@@ -651,6 +673,7 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
             ? commitmentDate || undefined
             : undefined,
         billImages: billPayload,
+        paidBy: attributePayment ? effectivePaidBy : undefined,
       };
     });
 
@@ -830,6 +853,8 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       setCommitmentDate('');
       setBillImages([]);
       setIsUploadingBill(false);
+      setPaidBy(null);
+      setPaidByError('');
       // The form is being emptied on purpose — no snapshot left to offer back.
       clearMaterialDraft();
       resetForm();
@@ -869,6 +894,8 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               setCommitmentDate('');
               setBillImages([]);
               setIsUploadingBill(false);
+              setPaidBy(null);
+              setPaidByError('');
               // The form is being emptied on purpose — no snapshot left to offer back.
               clearMaterialDraft();
               resetForm();
@@ -898,6 +925,8 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       setCommitmentDate('');
       setBillImages([]);
       setIsUploadingBill(false);
+      setPaidBy(null);
+      setPaidByError('');
       // The form is being emptied on purpose — no snapshot left to offer back.
       clearMaterialDraft();
       resetForm();
@@ -1038,6 +1067,15 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                 onBeforeBillCapture={saveDraft}
                 onBack={handlePreviousStep}
                 onClose={handleClose}
+                partnership={partnershipInfo.activePartnership}
+                myPartnerId={partnershipInfo.myPartnerId}
+                poolBalance={partnershipInfo.summary?.pool.balance}
+                paidBy={effectivePaidBy}
+                paidByError={paidByError}
+                onPaidByChange={(value) => {
+                  setPaidBy(value);
+                  setPaidByError('');
+                }}
               />
             </Animated.View>
           </View>

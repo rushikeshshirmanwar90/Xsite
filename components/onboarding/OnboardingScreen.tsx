@@ -1,265 +1,241 @@
-import React, { useState, useRef, useCallback } from 'react';
-import {
-    View,
-    Text,
-    TouchableOpacity,
-    Dimensions,
-    StatusBar,
-    Animated,
-    ScrollView,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { AUTH_FORM_MAX_WIDTH, AUTH_GUTTER, AuthButton, BlueprintBackdrop } from '@/components/auth/AuthUI';
+import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+    AccessibilityInfo,
+    Animated,
+    FlatList,
+    Image,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
+    Pressable,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    useWindowDimensions,
+    View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { width, height } = Dimensions.get('window');
+// Three short pages, then straight to Log In. The logo stays put over the same
+// drafting grid as the login screen while only the words slide, so the whole
+// first run reads as one place. One colour: brand blue, on the main button and
+// the current page dot.
 
-interface OnboardingSlide {
-    id: number;
+interface Page {
     title: string;
-    subtitle: string;
-    description: string;
-    icon: keyof typeof Ionicons.glyphMap;
-    backgroundColor: string;
-    iconColor: string;
-    accentColor: string;
-    features: string[];
+    body: string;
+    points: { icon: keyof typeof Ionicons.glyphMap; label: string }[];
 }
 
-const onboardingData: OnboardingSlide[] = [
+const PAGES: Page[] = [
     {
-        id: 1,
-        title: "Welcome to Xsite",
-        subtitle: "Construction Management Made Simple",
-        description: "Your all-in-one solution for managing construction projects, tracking materials, and monitoring budgets in real-time.",
-        icon: "construct-outline",
-        backgroundColor: '#F0F4FF',
-        iconColor: '#295E94',
-        accentColor: '#3A78B5',
-        features: [
-            "Manage multiple construction projects",
-            "Real-time budget tracking",
-            "Material and labor management",
-            "Team collaboration tools"
-        ]
+        title: 'Every Site in One Place',
+        body: 'Track projects, materials and daily work as it happens.',
+        points: [
+            { icon: 'business-outline', label: 'Projects and sections' },
+            { icon: 'cube-outline', label: 'Material stock and usage' },
+            { icon: 'hammer-outline', label: 'Labour and equipment' },
+        ],
     },
     {
-        id: 2,
-        title: "Smart Project Tracking",
-        subtitle: "Stay on Top of Every Detail",
-        description: "Organize projects into sections and slabs. Track materials from import to usage with comprehensive analytics.",
-        icon: "analytics-outline",
-        backgroundColor: '#FDF2F8',
-        iconColor: '#EC4899',
-        accentColor: '#F472B6',
-        features: [
-            "Hierarchical project structure",
-            "Material import & usage tracking",
-            "Visual budget analytics",
-            "Progress monitoring"
-        ]
+        title: 'Know Where the Money Goes',
+        body: 'See every bill, payment and partner’s share.',
+        points: [
+            { icon: 'receipt-outline', label: 'Vendor and contractor payments' },
+            { icon: 'alarm-outline', label: 'Payment reminders' },
+            { icon: 'wallet-outline', label: 'Partner accounts' },
+        ],
     },
     {
-        id: 3,
-        title: "Team Management",
-        subtitle: "Collaborate Seamlessly",
-        description: "Assign staff to projects with QR code technology. Different access levels for admins and staff members.",
-        icon: "people-outline",
-        backgroundColor: '#F0FDFA',
-        iconColor: '#14B8A6',
-        accentColor: '#2DD4BF',
-        features: [
-            "QR code staff assignment",
-            "Role-based access control",
-            "Staff directory management",
-            "Project team coordination"
-        ]
+        title: 'Bring Your Team On Site',
+        body: 'Add staff with a QR code and choose what each person can do.',
+        points: [
+            { icon: 'qr-code-outline', label: 'QR code invites' },
+            { icon: 'shield-checkmark-outline', label: 'Roles and permissions' },
+            { icon: 'notifications-outline', label: 'Live activity alerts' },
+        ],
     },
-    {
-        id: 4,
-        title: "Financial Control",
-        subtitle: "Budget Like a Pro",
-        description: "Monitor expenses with interactive dashboards. Track labor costs, material expenses, and project profitability.",
-        icon: "cash-outline",
-        backgroundColor: '#F0FDF4',
-        iconColor: '#22C55E',
-        accentColor: '#4ADE80',
-        features: [
-            "Real-time expense tracking",
-            "Interactive pie charts",
-            "Budget vs actual analysis",
-            "Cost optimization insights"
-        ]
-    },
-    {
-        id: 5,
-        title: "Ready to Build?",
-        subtitle: "Let's Get Started",
-        description: "Join thousands of construction professionals who trust Xsite to manage their projects efficiently and profitably.",
-        icon: "rocket-outline",
-        backgroundColor: '#FFFBEB',
-        iconColor: '#F59E0B',
-        accentColor: '#FBBF24',
-        features: [
-            "Complete audit trail",
-            "Mobile-first design",
-            "Offline capabilities",
-            "24/7 project access"
-        ]
-    }
 ];
+
+const LOGO = require('@/assets/images/xsite-logo.png');
+const LOGO_MAX = 220;
+const LOGO_MIN = 88;
+// Wordmark below the logo plus breathing room
+const WORDMARK_SPACE = 56;
+const DOT = 8;
+const DOT_ACTIVE = 22;
 
 interface OnboardingScreenProps {
     onComplete: () => void;
 }
 
 const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const scrollX = useRef(new Animated.Value(0)).current;
-    const slidesRef = useRef<any>(null);
+    const { width } = useWindowDimensions();
+    const insets = useSafeAreaInsets();
+    const pagerRef = useRef<FlatList<Page>>(null);
+    const [scrollX] = useState(() => new Animated.Value(0));
+    const [index, setIndex] = useState(0);
+    const [reduceMotion, setReduceMotion] = useState(false);
+    // Only very large accessibility text can outgrow the screen; scroll only then
+    const [viewportHeight, setViewportHeight] = useState(0);
+    const [contentHeight, setContentHeight] = useState(0);
 
-    const viewableItemsChanged = useRef(({ viewableItems }: any) => {
-        setCurrentIndex(viewableItems[0]?.index || 0);
-    }).current;
+    useEffect(() => {
+        AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
+        const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+        return () => sub.remove();
+    }, []);
 
-    const viewConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
+    // The logo gets whatever height the words and button leave over, so the
+    // screen never has to scroll: up to 220pt on most phones, smaller only on
+    // the smallest ones
+    const [heroHeight, setHeroHeight] = useState(0);
+    const logoSize = Math.round(Math.max(LOGO_MIN, Math.min(LOGO_MAX, heroHeight - WORDMARK_SPACE, width * 0.6)));
 
-    const scrollTo = () => {
-        if (currentIndex < onboardingData.length - 1) {
-            slidesRef.current?.scrollToIndex({ index: currentIndex + 1 });
-        } else {
-            onComplete();
+    const isLast = index === PAGES.length - 1;
+
+    const goTo = (next: number) => {
+        pagerRef.current?.scrollToOffset({ offset: next * width, animated: !reduceMotion });
+        setIndex(next);
+    };
+
+    const handleContinue = () => {
+        if (isLast) onComplete();
+        else goTo(index + 1);
+    };
+
+    const handleScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const next = Math.round(event.nativeEvent.contentOffset.x / width);
+        if (next !== index && next >= 0 && next < PAGES.length) {
+            setIndex(next);
+            AccessibilityInfo.announceForAccessibility(`Page ${next + 1} of ${PAGES.length}: ${PAGES[next].title}`);
         }
     };
 
-    const skipToEnd = () => {
-        onComplete();
-    };
-
-    // Interpolate background color based on scroll position
-    const animatedBackgroundColor = scrollX.interpolate({
-        inputRange: onboardingData.map((_, i) => i * width),
-        outputRange: onboardingData.map((item) => item.backgroundColor),
-        extrapolate: 'clamp',
-    });
-
-    // Interpolate button color based on scroll position
-    const animatedButtonColor = scrollX.interpolate({
-        inputRange: onboardingData.map((_, i) => i * width),
-        outputRange: onboardingData.map((item) => item.iconColor),
-        extrapolate: 'clamp',
-    });
-
-    // Interpolate accent color for skip button
-    const animatedAccentColor = scrollX.interpolate({
-        inputRange: onboardingData.map((_, i) => i * width),
-        outputRange: onboardingData.map((item) => item.accentColor),
-        extrapolate: 'clamp',
-    });
-
-    // Content-only slide rendered inside the FlatList
-    const ContentSlide = useCallback(({ item }: { item: OnboardingSlide }) => (
-        <View style={styles.contentSlide}>
-            <ScrollView
-                style={styles.scrollView}
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
-            >
-                {/* Icon Container */}
-                <View style={styles.iconContainer}>
-                    <View style={[styles.iconBackground, { backgroundColor: '#FFFFFF', borderColor: item.iconColor }]}>
-                        <Ionicons name={item.icon} size={80} color={item.iconColor} />
-                    </View>
-                </View>
-
-                {/* Text Content */}
-                <View style={styles.textContainer}>
-                    <Text style={[styles.title, { color: item.iconColor }]}>{item.title}</Text>
-                    <Text style={[styles.subtitle, { color: item.accentColor }]}>{item.subtitle}</Text>
-                    <Text style={styles.description}>{item.description}</Text>
-
-                    {/* Features List */}
-                    <View style={styles.featuresContainer}>
-                        {item.features.map((feature, index) => (
-                            <View key={index} style={styles.featureItem}>
-                                <View style={[styles.featureDot, { backgroundColor: item.iconColor }]} />
-                                <Text style={styles.featureText}>{feature}</Text>
-                            </View>
-                        ))}
-                    </View>
-                </View>
-            </ScrollView>
-        </View>
-    ), []);
-
     return (
-        <Animated.View style={[styles.container, { backgroundColor: animatedBackgroundColor }]}>
-            <SafeAreaView style={styles.safeArea}>
-                <StatusBar barStyle="dark-content" translucent />
+        <View style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+            <BlueprintBackdrop />
 
-                {/* Skip Button — fixed, not inside the FlatList */}
-                {currentIndex < onboardingData.length - 1 && (
-                    <Animated.View style={[styles.skipButtonWrapper, { backgroundColor: animatedAccentColor }]}>
-                        <TouchableOpacity onPress={skipToEnd}>
+            <ScrollView
+                contentContainerStyle={[
+                    styles.body,
+                    { paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 20) },
+                ]}
+                scrollEnabled={contentHeight > viewportHeight + 1}
+                bounces={false}
+                showsVerticalScrollIndicator={false}
+                onLayout={(e) => setViewportHeight(e.nativeEvent.layout.height)}
+                onContentSizeChange={(_, h) => setContentHeight(h)}
+            >
+                {/* Skip — keeps its space on the last page so nothing shifts */}
+                <View style={styles.topBar}>
+                    {!isLast && (
+                        <Pressable
+                            onPress={onComplete}
+                            hitSlop={8}
+                            style={({ pressed }) => [styles.skip, pressed && styles.skipPressed]}
+                            accessibilityRole="button"
+                            accessibilityLabel="Skip introduction"
+                        >
                             <Text style={styles.skipText}>Skip</Text>
-                        </TouchableOpacity>
-                    </Animated.View>
-                )}
+                        </Pressable>
+                    )}
+                </View>
 
-                {/* Sliding content area */}
+                {/* The one signature element: the logo, large and still */}
+                <View style={styles.hero} onLayout={(e) => setHeroHeight(e.nativeEvent.layout.height)}>
+                    {heroHeight > 0 && (
+                        <>
+                            <Image
+                                source={LOGO}
+                                style={{ width: logoSize, height: logoSize }}
+                                resizeMode="contain"
+                                accessibilityIgnoresInvertColors
+                                accessible
+                                accessibilityLabel="Xsite"
+                                accessibilityRole="image"
+                            />
+                            <Text style={styles.wordmark} accessibilityElementsHidden importantForAccessibility="no">
+                                Xsite
+                            </Text>
+                        </>
+                    )}
+                </View>
+
+                {/* Only the words slide */}
                 <Animated.FlatList
-                    ref={slidesRef}
-                    data={onboardingData}
-                    renderItem={({ item }) => <ContentSlide item={item} />}
+                    ref={pagerRef}
+                    data={PAGES}
+                    keyExtractor={(item) => item.title}
                     horizontal
-                    showsHorizontalScrollIndicator={false}
                     pagingEnabled
                     bounces={false}
-                    keyExtractor={(item) => item.id.toString()}
-                    onScroll={Animated.event(
-                        [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                        { useNativeDriver: false }
+                    showsHorizontalScrollIndicator={false}
+                    getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
+                    onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
+                        useNativeDriver: false,
+                    })}
+                    scrollEventThrottle={16}
+                    onMomentumScrollEnd={handleScrollEnd}
+                    style={styles.pager}
+                    renderItem={({ item, index: i }) => (
+                        <View
+                            style={[styles.page, { width }]}
+                            accessibilityElementsHidden={i !== index}
+                            importantForAccessibility={i === index ? 'auto' : 'no-hide-descendants'}
+                        >
+                            <View style={styles.pageInner}>
+                                <Text style={styles.title} accessibilityRole="header">{item.title}</Text>
+                                <Text style={styles.description}>{item.body}</Text>
+                                <View style={styles.points}>
+                                    {item.points.map((point) => (
+                                        <View key={point.label} style={styles.point}>
+                                            <Ionicons
+                                                name={point.icon}
+                                                size={20}
+                                                color={Colors.primaryDark}
+                                                accessibilityElementsHidden
+                                                importantForAccessibility="no"
+                                            />
+                                            <Text style={styles.pointText}>{point.label}</Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            </View>
+                        </View>
                     )}
-                    onViewableItemsChanged={viewableItemsChanged}
-                    viewabilityConfig={viewConfig}
-                    scrollEventThrottle={32}
-                    style={styles.flatList}
                 />
 
-                {/* Bottom Section — fixed, not inside the FlatList */}
-                <View style={styles.bottomSection}>
-                    {/* Pagination Dots */}
-                    <View style={styles.pagination}>
-                        {onboardingData.map((_, index) => {
-                            const dotWidth = scrollX.interpolate({
-                                inputRange: [
-                                    (index - 1) * width,
-                                    index * width,
-                                    (index + 1) * width,
-                                ],
-                                outputRange: [10, 30, 10],
-                                extrapolate: 'clamp',
-                            });
-
-                            const dotOpacity = scrollX.interpolate({
-                                inputRange: [
-                                    (index - 1) * width,
-                                    index * width,
-                                    (index + 1) * width,
-                                ],
-                                outputRange: [0.3, 1, 0.3],
-                                extrapolate: 'clamp',
-                            });
-
+                <View style={styles.footer}>
+                    {/* Page control: size, not just colour, marks the current page */}
+                    <View
+                        style={styles.dots}
+                        accessible
+                        accessibilityRole="text"
+                        accessibilityLabel={`Page ${index + 1} of ${PAGES.length}`}
+                    >
+                        {PAGES.map((page, i) => {
+                            const range = [(i - 1) * width, i * width, (i + 1) * width];
                             return (
                                 <Animated.View
-                                    key={index}
+                                    key={page.title}
                                     style={[
                                         styles.dot,
                                         {
-                                            width: dotWidth,
-                                            opacity: dotOpacity,
-                                            backgroundColor: animatedButtonColor,
+                                            width: scrollX.interpolate({
+                                                inputRange: range,
+                                                outputRange: [DOT, DOT_ACTIVE, DOT],
+                                                extrapolate: 'clamp',
+                                            }),
+                                            backgroundColor: scrollX.interpolate({
+                                                inputRange: range,
+                                                outputRange: [Colors.border, Colors.primary, Colors.border],
+                                                extrapolate: 'clamp',
+                                            }),
                                         },
                                     ]}
                                 />
@@ -267,180 +243,122 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
                         })}
                     </View>
 
-                    {/* Next/Get Started Button */}
-                    <TouchableOpacity
-                        style={styles.nextButton}
-                        onPress={scrollTo}
-                        activeOpacity={0.8}
-                    >
-                        <Animated.View style={[styles.nextButtonInner, { backgroundColor: animatedButtonColor }]}>
-                            <Text style={styles.nextButtonText}>
-                                {currentIndex === onboardingData.length - 1 ? 'Get Started' : 'Next'}
-                            </Text>
-                            <Ionicons
-                                name={currentIndex === onboardingData.length - 1 ? 'checkmark' : 'arrow-forward'}
-                                size={24}
-                                color="#FFFFFF"
-                            />
-                        </Animated.View>
-                    </TouchableOpacity>
+                    <AuthButton
+                        title={isLast ? 'Get Started' : 'Continue'}
+                        onPress={handleContinue}
+                        style={styles.button}
+                    />
                 </View>
-            </SafeAreaView>
-        </Animated.View>
+            </ScrollView>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: Colors.background,
     },
-    safeArea: {
-        flex: 1,
+    body: {
+        flexGrow: 1,
     },
-    skipButtonWrapper: {
-        position: 'absolute',
-        top: 60,
-        right: 20,
-        zIndex: 10,
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+    topBar: {
+        height: 52,
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        paddingHorizontal: AUTH_GUTTER - 12,
+    },
+    skip: {
+        minHeight: 44,
+        minWidth: 64,
+        paddingHorizontal: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 22,
+    },
+    skipPressed: {
+        opacity: 0.5,
     },
     skipText: {
-        color: '#FFFFFF',
-        fontSize: 16,
+        fontSize: 17,
         fontWeight: '600',
+        color: Colors.primaryDark,
     },
-    flatList: {
-        flex: 1,
-    },
-    contentSlide: {
-        width,
-        flex: 1,
-    },
-    scrollView: {
-        flex: 1,
-    },
-    scrollContent: {
+    // Sized by the space left over, never by the logo, so the logo can follow it
+    hero: {
         flexGrow: 1,
-        paddingHorizontal: 30,
-        paddingTop: 70,
-        paddingBottom: 20,
-    },
-    iconContainer: {
+        flexBasis: 0,
+        minHeight: LOGO_MIN + WORDMARK_SPACE,
         alignItems: 'center',
-        marginBottom: 20,
-    },
-    iconBackground: {
-        width: 160,
-        height: 160,
-        borderRadius: 80,
         justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 3,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.15,
-        shadowRadius: 16,
-        elevation: 8,
+        overflow: 'hidden',
     },
-    textContainer: {
+    wordmark: {
+        marginTop: 4,
+        fontSize: 22,
+        fontWeight: '800',
+        color: Colors.textPrimary,
+        letterSpacing: -0.4,
+    },
+    pager: {
+        flexGrow: 0,
+    },
+    page: {
         alignItems: 'center',
-        marginBottom: 20,
+        paddingHorizontal: AUTH_GUTTER,
+    },
+    pageInner: {
+        width: '100%',
+        maxWidth: AUTH_FORM_MAX_WIDTH,
     },
     title: {
-        fontSize: 32,
+        fontSize: 28,
+        lineHeight: 34,
         fontWeight: '800',
-        textAlign: 'center',
-        marginBottom: 8,
-        letterSpacing: -0.5,
-    },
-    subtitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        textAlign: 'center',
-        marginBottom: 10,
+        color: Colors.textPrimary,
+        letterSpacing: -0.6,
     },
     description: {
-        fontSize: 16,
-        color: '#6B7280',
-        textAlign: 'center',
+        marginTop: 8,
+        fontSize: 17,
         lineHeight: 24,
-        marginBottom: 20,
-        paddingHorizontal: 10,
+        color: Colors.textSecondary,
     },
-    featuresContainer: {
-        alignSelf: 'stretch',
+    points: {
         marginTop: 20,
+        gap: 12,
     },
-    featureItem: {
+    point: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 16,
-        paddingHorizontal: 20,
-        backgroundColor: '#FFFFFF',
-        paddingVertical: 12,
-        borderRadius: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        gap: 12,
     },
-    featureDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        marginRight: 12,
-    },
-    featureText: {
-        fontSize: 14,
-        color: '#374151',
-        fontWeight: '500',
+    pointText: {
         flex: 1,
+        fontSize: 16,
+        lineHeight: 22,
+        fontWeight: '500',
+        color: Colors.textPrimary,
     },
-    bottomSection: {
+    footer: {
         alignItems: 'center',
-        paddingHorizontal: 30,
-        paddingBottom: 40,
-        paddingTop: 20,
+        paddingHorizontal: AUTH_GUTTER,
+        paddingTop: 28,
+        gap: 20,
     },
-    pagination: {
+    dots: {
         flexDirection: 'row',
-        marginBottom: 20,
+        alignItems: 'center',
+        gap: 8,
     },
     dot: {
-        height: 10,
-        borderRadius: 5,
-        marginHorizontal: 6,
+        height: DOT,
+        borderRadius: DOT / 2,
     },
-    nextButton: {
+    button: {
         width: '100%',
-        maxWidth: 280,
-    },
-    nextButtonInner: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 16,
-        paddingHorizontal: 32,
-        borderRadius: 30,
-        gap: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 6,
-    },
-    nextButtonText: {
-        color: '#FFFFFF',
-        fontSize: 18,
-        fontWeight: '700',
+        maxWidth: AUTH_FORM_MAX_WIDTH,
     },
 });
 

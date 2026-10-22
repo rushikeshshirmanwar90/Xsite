@@ -17,18 +17,23 @@ import {
   View,
 } from 'react-native';
 import { OtherCostEntry } from '@/types/otherCost';
+import PaidByPicker from '@/components/partnership/PaidByPicker';
+import { PaidBy } from '@/functions/partnership';
+import { useProjectPartnership } from '@/hooks/useProjectPartnership';
 
 interface Props {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (entries: OtherCostEntry[], message: string) => void;
+  // paidBy is set on projects with a partnership
+  onSubmit: (entries: OtherCostEntry[], message: string, paidBy?: PaidBy | null) => void;
+  projectId?: string;
 }
 
 const SAFE_BOTTOM = Platform.OS === 'ios' ? 34 : 20;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MAX_SWIPE = SCREEN_WIDTH - 40 - 54 - 10;
 
-const OtherCostFormModal: React.FC<Props> = ({ visible, onClose, onSubmit }) => {
+const OtherCostFormModal: React.FC<Props> = ({ visible, onClose, onSubmit, projectId }) => {
   // ── Form fields ────────────────────────────────────────────────────────────
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
@@ -38,6 +43,13 @@ const OtherCostFormModal: React.FC<Props> = ({ visible, onClose, onSubmit }) => 
   const [entries, setEntries] = useState<OtherCostEntry[]>([]);
   const entriesRef = useRef<OtherCostEntry[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
+
+  // ── Who paid (partnership projects only) ───────────────────────────────────
+  // The state holds an explicit choice; until one is made, the recorder is assumed.
+  const partnershipInfo = useProjectPartnership(projectId);
+  const [paidByChoice, setPaidBy] = useState<PaidBy | null>(null);
+  const [paidByError, setPaidByError] = useState('');
+  const paidBy = paidByChoice ?? partnershipInfo.defaultPaidBy;
 
   // ── Swipe ──────────────────────────────────────────────────────────────────
   const swipeAnim = useRef(new Animated.Value(0)).current;
@@ -110,6 +122,8 @@ const OtherCostFormModal: React.FC<Props> = ({ visible, onClose, onSubmit }) => 
     setEntries([]);
     entriesRef.current = [];
     setShowAddForm(false);
+    setPaidBy(null);
+    setPaidByError('');
     setSwipeDone(false);
     swipeAnim.setValue(0);
   };
@@ -170,7 +184,15 @@ const OtherCostFormModal: React.FC<Props> = ({ visible, onClose, onSubmit }) => 
       Alert.alert('Error', 'Please add at least one cost entry');
       return;
     }
-    onSubmit(current, 'Other costs added successfully');
+    if (partnershipInfo.activePartnership && !paidBy) {
+      setPaidByError('Choose who paid these costs.');
+      Alert.alert('Who Paid?', 'Choose who paid these costs so they count toward the right partner.');
+      // The swipe already snapped to the end; put it back so it can be tried again
+      swipeAnim.setValue(0);
+      setSwipeDone(false);
+      return;
+    }
+    onSubmit(current, 'Other costs added successfully', partnershipInfo.activePartnership ? paidBy : undefined);
     resetAll();
     onClose();
   };
@@ -246,6 +268,22 @@ const OtherCostFormModal: React.FC<Props> = ({ visible, onClose, onSubmit }) => 
                 <Ionicons name="add-circle" size={20} color="#10B981" />
                 <Text style={styles.addAnotherText}>Add Another Cost</Text>
               </TouchableOpacity>
+            )}
+
+            {/* ── Who paid — partnership projects only ── */}
+            {entries.length > 0 && !showAddForm && (
+              <PaidByPicker
+                partnership={partnershipInfo.activePartnership}
+                value={paidBy}
+                onChange={(value) => {
+                  setPaidBy(value);
+                  setPaidByError('');
+                }}
+                myPartnerId={partnershipInfo.myPartnerId}
+                poolBalance={partnershipInfo.summary?.pool.balance}
+                error={paidByError}
+                style={{ marginTop: 4, marginBottom: 16 }}
+              />
             )}
 
             {/* ── Form ── */}

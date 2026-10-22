@@ -24,6 +24,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { toast } from 'sonner-native';
 import { useSimpleNotifications } from '@/hooks/useSimpleNotifications';
+import { useProjectPartnership } from '@/hooks/useProjectPartnership';
+import { reportLedgerResult } from '@/functions/partnership';
 import { useAuth } from '@/contexts/AuthContext';
 import apiClient from '@/utils/axiosConfig';
 import { safeJsonParse, safeDivide, safeFirst } from '@/utils/helpers';
@@ -478,6 +480,9 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
     const projectName = params.projectName as string;
     const sectionId = params.sectionId as string;
     const sectionName = params.sectionName as string;
+    // Admins manage the project's partnership; partners can open it to see their account
+    const projectPartnership = useProjectPartnership(projectId);
+    const canOpenPartnership = !user?.role || !!projectPartnership.myPartner;
 
     // 🔍 DEBUG: Log params on component mount
     console.log('\n🚀 ========== DETAILS.TSX COMPONENT MOUNTED ==========');
@@ -1971,6 +1976,16 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 miniSectionName: miniSec?.name || '',
                 materialUsed: JSON.stringify(rawMaterialUsed),
             },
+        });
+    };
+
+    const handlePartnershipPress = () => {
+        router.push({
+            pathname: '/partnership',
+            params: {
+                projectId: projectId || '',
+                projectName: projectName || '',
+            }
         });
     };
 
@@ -4363,6 +4378,8 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             billImages: Array.isArray(material.billImages) && material.billImages.length > 0
                 ? material.billImages
                 : undefined,
+            // Who paid, on projects with a partnership
+            paidBy: material.paidBy || undefined,
         }));
 
 
@@ -4387,6 +4404,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
             });
 
             const responseData = res.data as any;
+            reportLedgerResult(responseData?.partnershipLedger);
 
             // Check response
             if (responseData.success && responseData.results && Array.isArray(responseData.results)) {
@@ -4570,6 +4588,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
                 onStockReportPress={handleGenerateStockReport}
                 isGeneratingStockReport={generatingStockReport}
                 onMaterialAnalysisPress={selectedMiniSection ? handleMaterialAnalysisPress : undefined}
+                onPartnershipPress={canOpenPartnership ? handlePartnershipPress : undefined}
             />
 
             {/* Section Completed Info Banner — material operations are disabled when completed */}
@@ -4586,6 +4605,7 @@ const Details = ({ lockedTab }: { lockedTab?: 'imported' | 'used' } = {}) => {
 
             <MaterialFormModal
                 visible={showMaterialForm}
+                projectId={projectId}
                 onClose={() => setShowMaterialForm(false)}
                 onSubmit={async (materials, message) => {
                     try {

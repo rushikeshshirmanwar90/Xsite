@@ -4,6 +4,8 @@ import OtherCostCard from '@/components/details/OtherCostCard';
 import OtherCostFormModal from '@/components/details/OtherCostFormModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { getClientId } from '@/functions/clientId';
+import { PaidBy, reportLedgerResult } from '@/functions/partnership';
+import { invalidateProjectPartnership } from '@/hooks/useProjectPartnership';
 import { OtherCost, OtherCostEntry } from '@/types/otherCost';
 import apiClient from '@/utils/axiosConfig';
 import { Ionicons } from '@expo/vector-icons';
@@ -137,7 +139,7 @@ const OtherCostPage = () => {
   }, [projectId]);
 
   // ── Submit ─────────────────────────────────────────────────────────────────
-  const handleAddOtherCosts = async (entries: OtherCostEntry[], _message: string) => {
+  const handleAddOtherCosts = async (entries: OtherCostEntry[], _message: string, paidBy?: PaidBy | null) => {
     try {
       startLoadingAnim();
       toast.loading('Adding costs...');
@@ -174,6 +176,8 @@ const OtherCostPage = () => {
                   : 'Unknown User',
             }
           : undefined,
+        // Who paid, on projects with a partnership
+        ...(paidBy ? { paidBy } : {}),
       };
 
       const response = await apiClient.post('/api/otherCost', requestData);
@@ -182,6 +186,8 @@ const OtherCostPage = () => {
       if (!result?.success) {
         throw new Error(result?.message || 'Failed to add other costs');
       }
+      reportLedgerResult(result.data?.partnershipLedger);
+      if (paidBy) invalidateProjectPartnership(projectId);
 
       // Log to activity feed
       try {
@@ -233,6 +239,7 @@ const OtherCostPage = () => {
         visible={showForm}
         onClose={() => setShowForm(false)}
         onSubmit={handleAddOtherCosts}
+        projectId={projectId}
       />
 
       {/* Page heading row — fixed above the scroll area so it never scrolls away */}

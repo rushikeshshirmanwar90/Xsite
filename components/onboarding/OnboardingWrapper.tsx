@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator, Text } from 'react-native';
+import { View, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Colors } from '@/constants/theme';
 import OnboardingScreen from './OnboardingScreen';
 
 interface OnboardingWrapperProps {
@@ -65,24 +66,16 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ children }) => {
         }
     };
 
-    // Show loading spinner while checking onboarding status
+    // Brief check before first paint — same background as onboarding and login, so nothing flashes
     if (loading) {
         return (
-            <View style={{ 
-                flex: 1, 
-                justifyContent: 'center', 
-                alignItems: 'center', 
-                backgroundColor: '#F0F4FF' // Light blue background
+            <View style={{
+                flex: 1,
+                justifyContent: 'center',
+                alignItems: 'center',
+                backgroundColor: Colors.background,
             }}>
-                <ActivityIndicator size="large" color="#295E94" />
-                <Text style={{
-                    marginTop: 16,
-                    fontSize: 16,
-                    color: '#6B7280',
-                    fontWeight: '500'
-                }}>
-                    Loading...
-                </Text>
+                <ActivityIndicator size="large" color={Colors.primary} accessibilityLabel="Loading" />
             </View>
         );
     }
