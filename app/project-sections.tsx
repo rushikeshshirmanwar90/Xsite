@@ -504,10 +504,6 @@ const ProjectSections = () => {
     router.push({ pathname: '../other-cost', params: { projectId: id as string, projectName: name as string } });
   };
 
-  const goToCostSummary = () => {
-    router.push({ pathname: '../cost-summary', params: { projectId: id as string, projectName: name as string } });
-  };
-
   const handleReportOption = async (key: string, section: ProjectSection) => {
     setOptionPopup(null);
 
@@ -1179,26 +1175,9 @@ const ProjectSections = () => {
           </View>
         )}
 
-        <View style={{ height: 100 }} />
+        {/* Keeps the last section clear of the home indicator */}
+        <View style={{ height: insets.bottom + 24 }} />
       </ScrollView>
-
-      {/* ── Cost Summary — pinned at the bottom of the screen — admins only ───── */}
-      {userIsAdmin && !isRowHouseMode && (
-        <SafeAreaView edges={['bottom']} style={summaryBtnStyles.bottomBar}>
-          <TouchableOpacity style={summaryBtnStyles.card} activeOpacity={0.8} onPress={goToCostSummary}>
-            <View style={summaryBtnStyles.iconWrap}>
-              <Ionicons name="pie-chart" size={22} color="#3A78B5" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={summaryBtnStyles.title}>Cost Summary</Text>
-              <Text style={summaryBtnStyles.desc}>Materials, contractors, equipment & other costs</Text>
-            </View>
-            <View style={summaryBtnStyles.chevronCircle}>
-              <Ionicons name="chevron-forward" size={16} color="#3A78B5" />
-            </View>
-          </TouchableOpacity>
-        </SafeAreaView>
-      )}
 
       {/* Animated report generation overlay */}
       <ReportGeneratingOverlay visible={reportGenerating} label={reportGeneratingLabel} />
@@ -1799,64 +1778,6 @@ const popupStyles = StyleSheet.create({
   },
   itemLabel: { fontSize: 15, fontWeight: '600', color: '#0F172A' },
   itemDesc: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
-});
-
-// ─── Cost Summary entry card styles ───────────────────────────────────────────
-const summaryBtnStyles = StyleSheet.create({
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    backgroundColor: Colors.background,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.border,
-  },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: Colors.surface,
-    borderRadius: 18,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E8EDF4',
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: '#EAF0FE',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  desc: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  chevronCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 11,
-    backgroundColor: '#EAF0FE',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 });
 
 const stockStyles = StyleSheet.create({

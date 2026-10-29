@@ -563,8 +563,9 @@ export default function LoginScreen() {
                             placeholder="name@company.com"
                             value={email}
                             onChangeText={(text) => {
-                                // Email addresses never contain spaces; drop any that autofill adds
-                                setEmail(text.replace(/\s/g, ''));
+                                // Emails are stored lowercase and looked up exactly, so drop spaces and
+                                // capitals that autofill or the keyboard add ("Name@..." would 404)
+                                setEmail(text.replace(/\s/g, '').toLowerCase());
                                 setEmailError('');
                             }}
                             error={emailError}

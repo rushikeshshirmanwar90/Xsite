@@ -2,97 +2,83 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Skeleton } from 'moti/skeleton';
 import { SKELETON_COLORS } from '@/components/common/skeletonTheme';
+import { Colors } from '@/constants/theme';
 
-const THEME_COLOR = '#3A78B5';
-
-// Placeholder mirroring the Cost Summary screen: the solid-color grand-total
-// card (static translucent blocks — a shimmer looks wrong on a brand-color
-// background) followed by category cards (icon + label/count + amount, action
-// row) that do shimmer.
+// Placeholder mirroring the Cost Summary screen block for block, so nothing
+// jumps when the figures arrive: the "Total Spent" card (label, amount, budget
+// line, spending bar, status row), the Breakdown heading, then four category
+// rows (icon tile, label and count, amount).
 const CostSummarySkeleton: React.FC = () => {
   return (
-    <View>
-      <View style={styles.totalCard}>
-        <View style={styles.totalIconWrap} />
-        <View style={styles.totalLabelBar} />
-        <View style={styles.totalAmountBar} />
-      </View>
-
-      {[0, 1, 2, 3].map((i) => (
-        <View key={i} style={styles.card}>
-          <View style={styles.headerRow}>
-            <Skeleton.Group show>
-              <Skeleton colors={SKELETON_COLORS} radius={12} width={44} height={44} />
-              <View style={styles.info}>
-                <Skeleton colors={SKELETON_COLORS} width="50%" height={15} />
-                <View style={{ height: 6 }} />
-                <Skeleton colors={SKELETON_COLORS} width="30%" height={11} />
-              </View>
-              <Skeleton colors={SKELETON_COLORS} width={70} height={16} />
-            </Skeleton.Group>
-          </View>
-          <View style={styles.actionsRow}>
-            <View style={{ flex: 1 }}>
-              <Skeleton colors={SKELETON_COLORS} width="100%" height={32} radius={10} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Skeleton colors={SKELETON_COLORS} width="100%" height={32} radius={10} />
-            </View>
+    <View accessible accessibilityLabel="Loading cost summary">
+      <Skeleton.Group show>
+        <View style={styles.heroCard}>
+          <Skeleton colors={SKELETON_COLORS} width={90} height={14} />
+          <View style={{ height: 10 }} />
+          <Skeleton colors={SKELETON_COLORS} width={190} height={34} radius={8} />
+          <View style={{ height: 8 }} />
+          <Skeleton colors={SKELETON_COLORS} width={150} height={15} />
+          <View style={{ height: 18 }} />
+          <Skeleton colors={SKELETON_COLORS} width="100%" height={12} radius={6} />
+          <View style={styles.statusRow}>
+            <Skeleton colors={SKELETON_COLORS} width={80} height={13} />
+            <Skeleton colors={SKELETON_COLORS} width={100} height={13} />
           </View>
         </View>
-      ))}
+
+        <View style={styles.heading}>
+          <Skeleton colors={SKELETON_COLORS} width={110} height={20} />
+        </View>
+
+        {[0, 1, 2, 3].map((i) => (
+          <View key={i} style={styles.card}>
+            <Skeleton colors={SKELETON_COLORS} radius={12} width={42} height={42} />
+            <View style={styles.info}>
+              <Skeleton colors={SKELETON_COLORS} width="55%" height={17} />
+              <View style={{ height: 6 }} />
+              <Skeleton colors={SKELETON_COLORS} width="40%" height={13} />
+            </View>
+            <Skeleton colors={SKELETON_COLORS} width={76} height={17} />
+          </View>
+        ))}
+      </Skeleton.Group>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  totalCard: {
-    backgroundColor: THEME_COLOR,
-    borderRadius: 16,
+  heroCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
     padding: 20,
-    alignItems: 'center',
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
-  totalIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    marginBottom: 10,
+  statusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
   },
-  totalLabelBar: {
-    width: 120,
-    height: 11,
-    borderRadius: 5,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    marginBottom: 10,
-  },
-  totalAmountBar: {
-    width: 160,
-    height: 26,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+  heading: {
+    marginTop: 8,
+    marginBottom: 12,
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    minHeight: 72,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 12,
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   info: {
     flex: 1,
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 14,
   },
 });
 

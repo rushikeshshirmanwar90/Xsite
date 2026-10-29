@@ -1,6 +1,7 @@
 import ProjectCard from '@/components/ProjectCard';
 import { ProjectListSkeleton } from '@/components/ProjectCardSkeleton';
 import FloatingStatsButton from '@/components/FloatingStatsButton';
+import CostSummaryProjectPicker from '@/components/CostSummaryProjectPicker';
 import { getClientId } from '@/functions/clientId';
 import { getProjectData } from '@/functions/project';
 import { isAdmin, useUser } from '@/hooks/useUser';
@@ -52,6 +53,7 @@ const Index: React.FC = () => {
     const [urgentPayments, setUrgentPayments] = useState<{ count: number; totalAmount: number }>({ count: 0, totalAmount: 0 });
     const [isScrolled, setIsScrolled] = useState(false); // Shows the header hairline once content slides under it
     const [bannerCollapsed, setBannerCollapsed] = useState(false); // Urgent banner collapsed state
+    const [showCostPicker, setShowCostPicker] = useState(false); // Project picker behind the Cost Summary button
 
     const handleScroll = (event: any) => {
         const scrolled = event.nativeEvent.contentOffset.y > 4;
@@ -744,6 +746,21 @@ const Index: React.FC = () => {
 
     const openWarnings = () => router.push({ pathname: '/notification', params: { tab: 'warnings' } } as any);
 
+    // Cost Summary: pick a project first, then open the same screen Project Sections uses
+    const openCostSummaryPicker = () => {
+        if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+        setShowCostPicker(true);
+    };
+
+    const openCostSummary = (project: Project) => {
+        if (!project._id) return;
+        setShowCostPicker(false);
+        router.push({
+            pathname: '/cost-summary',
+            params: { projectId: project._id, projectName: project.name },
+        } as any);
+    };
+
     return (
         <SafeAreaView style={homeStyles.container} edges={['top', 'left', 'right']}>
             <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
@@ -780,9 +797,28 @@ const Index: React.FC = () => {
                 </View>
 
                 <View style={homeStyles.sectionHeader}>
-                    <Text style={homeStyles.sectionTitle} accessibilityRole="header">Projects</Text>
-                    {!showStatusTabs && !loading && (
-                        <Text style={homeStyles.sectionCount}>{ongoingCount} ongoing</Text>
+                    <View style={homeStyles.sectionTitleGroup}>
+                        <Text style={homeStyles.sectionTitle} accessibilityRole="header">Projects</Text>
+                        {!showStatusTabs && !loading && (
+                            <Text style={homeStyles.sectionCount}>{ongoingCount} ongoing</Text>
+                        )}
+                    </View>
+
+                    {/* Cost Summary works on the projects below, so it sits in their header:
+                        always visible, and it never pushes the first project down. Admin only,
+                        like the cost screen itself. */}
+                    {userIsAdmin && !loading && !error && projects.length > 0 && (
+                        <Pressable
+                            style={({ pressed }) => [homeStyles.costButton, pressed && homeStyles.costButtonPressed]}
+                            onPress={openCostSummaryPicker}
+                            hitSlop={4}
+                            accessibilityRole="button"
+                            accessibilityLabel="Cost Summary"
+                            accessibilityHint="Choose a project to see what has been spent on it"
+                        >
+                            <Ionicons name="pie-chart-outline" size={16} color={Colors.primaryDark} />
+                            <Text style={homeStyles.costButtonText}>Cost Summary</Text>
+                        </Pressable>
                     )}
                 </View>
 
@@ -1044,6 +1080,15 @@ const Index: React.FC = () => {
                     ]}
                 />
             )}
+
+            {userIsAdmin && (
+                <CostSummaryProjectPicker
+                    visible={showCostPicker}
+                    projects={projects}
+                    onClose={() => setShowCostPicker(false)}
+                    onSelect={openCostSummary}
+                />
+            )}
         </SafeAreaView>
     );
 };
@@ -1149,10 +1194,21 @@ const homeStyles = StyleSheet.create({
     // Section title + filter
     sectionHeader: {
         flexDirection: 'row',
-        alignItems: 'baseline',
+        alignItems: 'center',
         justifyContent: 'space-between',
+        // At large text sizes the Cost Summary button wraps under the title instead of squeezing it
+        flexWrap: 'wrap',
+        rowGap: 8,
+        columnGap: 12,
+        minHeight: 36, // same as the button, so the row doesn't grow when it appears after loading
         marginTop: 24,
         marginBottom: 12,
+    },
+    sectionTitleGroup: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+        flexShrink: 1,
+        gap: 10,
     },
     sectionTitle: {
         fontSize: 28,
@@ -1164,6 +1220,25 @@ const homeStyles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         color: Colors.textSecondary,
+    },
+    // Tinted, not filled: the filled accent is kept for the Add Project tab.
+    // #295E94 on #DCEEFF is 5.7:1.
+    costButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        minHeight: 36, // + 4pt hitSlop each side = 44pt target
+        paddingHorizontal: 14,
+        borderRadius: 18,
+        backgroundColor: Colors.primaryLight,
+    },
+    costButtonPressed: {
+        backgroundColor: '#C7E1FB', // text stays 5.0:1
+    },
+    costButtonText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: Colors.primaryDark,
     },
     segmented: {
         flexDirection: 'row',
@@ -1304,6 +1379,7 @@ const homeStyles = StyleSheet.create({
         fontWeight: '700',
         color: '#FFFFFF',
     },
+
 
     // Empty / error states
     stateContainer: {
