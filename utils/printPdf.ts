@@ -1,6 +1,23 @@
 import * as Print from 'expo-print';
 import { File, Paths } from 'expo-file-system';
 
+// expo-print renders through an off-screen WebView on Android. If that render
+// never reports back, the promise never settles and the report button spins
+// forever, so give up after a minute with an error the user can act on.
+const PRINT_TIMEOUT_MS = 60_000;
+
+export const printToFileWithTimeout = (options: Print.FilePrintOptions): Promise<Print.FilePrintResult> =>
+  new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error('Creating the PDF took too long. Please try again.')),
+      PRINT_TIMEOUT_MS,
+    );
+    Print.printToFileAsync(options).then(
+      (result) => { clearTimeout(timer); resolve(result); },
+      (error) => { clearTimeout(timer); reject(error); },
+    );
+  });
+
 /**
  * Renders HTML to a PDF and saves it in the app's document directory.
  *
@@ -14,12 +31,14 @@ export const printPdfToFile = async (
   filename: string,
   options: Omit<Print.FilePrintOptions, 'html' | 'base64'> = {},
 ): Promise<string> => {
-  const { base64 } = await Print.printToFileAsync({ ...options, html, base64: true });
+  const { base64 } = await printToFileWithTimeout({ ...options, html, base64: true });
   if (!base64) throw new Error('PDF data missing');
 
   const file = new File(Paths.document, filename);
   if (file.exists) file.delete();
   file.create();
-  file.write(base64, { encoding: 'base64' });
+  // writeSync, not write(): since SDK 58 write() is async, and on Android it
+  // could leave the report stuck. writeSync finishes before we hand out the URI.
+  file.writeSync(base64, { encoding: 'base64' });
   return file.uri;
 };

@@ -1,9 +1,65 @@
-import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
 import { Paths, File } from 'expo-file-system';
+import { printToFileWithTimeout } from './printPdf';
 import { Alert, Platform } from 'react-native';
+
+// Print styles for the Complete Report: the same tokens as the server-built
+// Cost Summary reports (ink #0F172A, body #334155, muted #64748B at 4.8:1,
+// hairlines #E2E8F0, category shades from the app). The detail tables still
+// carry inline styles; the last rules lift their faint grays to readable ones.
+const COMPLETE_REPORT_CSS = `
+    @page { size: A4; margin: 14mm 14mm 16mm; }
+    * { box-sizing: border-box; }
+    html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { margin: 0; font-family: 'Noto Sans', -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+           font-size: 9.5pt; line-height: 1.45; color: #334155; background: #fff; }
+    .page-break { break-before: page; }
+    .xr-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .xr-accent { width: 34mm; height: 4pt; border-radius: 2pt; background: #3A78B5; margin-bottom: 10pt; }
+    .xr-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16pt;
+               padding-bottom: 12pt; border-bottom: 1pt solid #E2E8F0; }
+    .xr-eyebrow { font-size: 8pt; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #64748B; }
+    .xr-title { font-size: 22pt; font-weight: 700; color: #0F172A; letter-spacing: -.02em; line-height: 1.15; margin-top: 3pt; }
+    .xr-issuer { text-align: right; font-size: 8.5pt; color: #64748B; line-height: 1.5; }
+    .xr-issuer strong { display: block; font-size: 10.5pt; color: #0F172A; font-weight: 600; }
+    .xr-figures { display: flex; margin: 14pt 0 18pt; border: 1pt solid #E2E8F0; border-radius: 8pt; }
+    .xr-figure { flex: 1; padding: 10pt 14pt; }
+    .xr-figure + .xr-figure { border-left: 1pt solid #E2E8F0; }
+    .xr-label { font-size: 8pt; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: .06em; }
+    .xr-value { font-size: 17pt; font-weight: 700; color: #0F172A; margin-top: 2pt; }
+    .xr-lead .xr-value { font-size: 20pt; }
+    .xr-note { font-size: 8.5pt; color: #64748B; margin-top: 1pt; }
+    .xr-section { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 8pt; }
+    .xr-section h2 { margin: 0; font-size: 11pt; font-weight: 700; color: #0F172A; }
+    .xr-section span { font-size: 8.5pt; color: #64748B; }
+    .xr-split { display: flex; gap: 2pt; height: 8pt; border-radius: 4pt; overflow: hidden; background: #EEF2F7; margin-bottom: 8pt; }
+    .xr-split i { display: block; height: 100%; }
+    .xr-table { width: 100%; border-collapse: collapse; }
+    .xr-table td { padding: 7pt 0; border-bottom: .75pt solid #E2E8F0; vertical-align: top; }
+    .xr-table td + td { padding-left: 10pt; }
+    .xr-total td { border-bottom: none; border-top: 1.5pt solid #0F172A; font-weight: 700; color: #0F172A; padding-top: 8pt; }
+    .xr-r { text-align: right; }
+    .xr-dot { display: inline-block; width: 7pt; height: 7pt; border-radius: 2pt; margin-right: 6pt; vertical-align: 0; }
+    .xr-name { font-weight: 600; color: #0F172A; }
+    .xr-sub { font-size: 8.5pt; color: #64748B; }
+    .xr-breakdown .xr-sub { margin-left: 13pt; }
+    .xr-amount { font-weight: 600; color: #0F172A; }
+    .xr-day { margin-bottom: 18pt; }
+    .xr-day-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12pt;
+                   padding-bottom: 6pt; border-bottom: 1.5pt solid #0F172A; margin-bottom: 10pt; break-after: avoid; }
+    .xr-day-head h2 { margin: 0; font-size: 12pt; font-weight: 700; color: #0F172A; }
+    .xr-cat { margin: 4pt 0 8pt; font-size: 10pt; font-weight: 700; color: #0F172A; break-after: avoid; }
+    .xr-day-body > div { margin-bottom: 14pt; }
+    .xr-day-total { display: flex; justify-content: space-between; align-items: center; gap: 12pt;
+                    padding: 9pt 12pt; background: #F8FAFC; border: 1pt solid #E2E8F0; border-radius: 6pt; break-inside: avoid; }
+    h1, h2, h3, h4 { color: #0F172A; }
+    table { font-variant-numeric: tabular-nums; }
+    tr { break-inside: avoid; }
+    /* Lift faint inline grays (2.5–3.1:1) to the muted token (4.8:1) */
+    [style*="#9ca3af"], [style*="#94a3b8"], [style*="#9CA3AF"], [style*="#94A3B8"] { color: #64748B !important; }
+`;
 
 interface MaterialActivity {
     _id: string;
@@ -173,11 +229,11 @@ export class PDFReportGenerator {
             
             return `
                 <div style="margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-                    <div style="background-color: #fef3c7; padding: 12px; border-bottom: 1px solid #e2e8f0;">
+                    <div style="background-color: #F8FAFC; padding: 12px; border-bottom: 1px solid #e2e8f0;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <div>
-                                <span style="background-color: #EE730C; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
-                                    👷 LABOR ENTRY
+                                <span style="background-color: #F1F5F9; color: #334155; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
+                                    LABOR ENTRY
                                 </span>
                                 <span style="margin-left: 10px; font-weight: 600; color: #374151;">
                                     ${adminName}
@@ -204,7 +260,7 @@ export class PDFReportGenerator {
                             <tr>
                                 <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">
                                     <div style="display: flex; align-items: center;">
-                                        <div style="width: 8px; height: 8px; background-color: #EE730C; border-radius: 50%; margin-right: 8px;"></div>
+                                        <div style="width: 8px; height: 8px; background-color: #2B5F95; border-radius: 50%; margin-right: 8px;"></div>
                                         <strong>${labor.type || 'Unknown Type'}</strong>
                                     </div>
                                 </td>
@@ -220,18 +276,18 @@ export class PDFReportGenerator {
                             </tr>
                         </tbody>
                         <tfoot>
-                            <tr style="background-color: #fef3c7; font-weight: bold;">
+                            <tr style="background-color: #F8FAFC; font-weight: bold;">
                                 <td style="padding: 10px; border-top: 2px solid #e2e8f0;" colspan="3">
                                     Entry Total
                                 </td>
-                                <td style="padding: 10px; text-align: right; border-top: 2px solid #e2e8f0; color: #EE730C;">
+                                <td style="padding: 10px; text-align: right; border-top: 2px solid #e2e8f0; color: #B45309;">
                                     ${this.formatCurrency(Number(labor.totalCost) || 0)}
                                 </td>
                             </tr>
                         </tfoot>
                     </table>
                     ${labor.description ? `
-                    <div style="padding: 10px 12px; background-color: #fdfaf2; border-top: 1px solid #e2e8f0; font-size: 12px; color: #4b5563;">
+                    <div style="padding: 10px 12px; background-color: #F8FAFC; border-top: 1px solid #e2e8f0; font-size: 12px; color: #4b5563;">
                         <strong>Work done:</strong> ${labor.description}
                     </div>
                     ` : ''}
@@ -240,7 +296,7 @@ export class PDFReportGenerator {
         }).join('');
     }
 
-    // ✅ NEW: Generate equipment entry HTML
+    // NEW: Generate equipment entry HTML
     private generateEquipmentHTML(equipmentEntries: any[]): string {
         if (!equipmentEntries || equipmentEntries.length === 0) return '';
 
@@ -274,11 +330,11 @@ export class PDFReportGenerator {
             
             return `
                 <div style="margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-                    <div style="background-color: #EAF0FE; padding: 12px; border-bottom: 1px solid #e2e8f0;">
+                    <div style="background-color: #F8FAFC; padding: 12px; border-bottom: 1px solid #e2e8f0;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <div>
-                                <span style="background-color: #2E72F0; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
-                                    🚜 EQUIPMENT ENTRY
+                                <span style="background-color: #F1F5F9; color: #334155; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
+                                    EQUIPMENT ENTRY
                                 </span>
                                 <span style="margin-left: 10px; font-weight: 600; color: #374151;">
                                     ${adminName}
@@ -329,11 +385,11 @@ export class PDFReportGenerator {
                             </tr>
                         </tbody>
                         <tfoot>
-                            <tr style="background-color: #EAF0FE; font-weight: bold;">
+                            <tr style="background-color: #F8FAFC; font-weight: bold;">
                                 <td style="padding: 10px; border-top: 2px solid #e2e8f0;" colspan="4">
                                     Entry Total
                                 </td>
-                                <td style="padding: 10px; text-align: right; border-top: 2px solid #e2e8f0; color: #2E72F0;">
+                                <td style="padding: 10px; text-align: right; border-top: 2px solid #e2e8f0; color: #3A78B5;">
                                     ${this.formatCurrency(Number(equipment.totalCost) || 0)}
                                 </td>
                             </tr>
@@ -356,25 +412,25 @@ export class PDFReportGenerator {
 
             return `
                 <div style="margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-                    <div style="background-color: #faf5ff; padding: 12px; border-bottom: 1px solid #e2e8f0;">
+                    <div style="background-color: #F8FAFC; padding: 12px; border-bottom: 1px solid #e2e8f0;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <div>
-                                <span style="background-color: #8b5cf6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
-                                    💸 OTHER COST
+                                <span style="background-color: #F1F5F9; color: #334155; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
+                                    OTHER COST
                                 </span>
                                 <span style="margin-left: 10px; font-weight: 600; color: #374151;">
                                     ${name}
                                 </span>
                             </div>
                             <div style="text-align: right;">
-                                <div style="font-size: 16px; font-weight: bold; color: #8b5cf6;">
+                                <div style="font-size: 16px; font-weight: bold; color: #2B5F95;">
                                     ${this.formatCurrency(amount)}
                                 </div>
                             </div>
                         </div>
                     </div>
                     ${description || sectionName ? `
-                    <div style="padding: 10px 12px; background-color: #fffbeb; font-size: 12px; color: #4b5563;">
+                    <div style="padding: 10px 12px; background-color: #F8FAFC; font-size: 12px; color: #4b5563;">
                         ${sectionName ? `<strong>Section:</strong> ${sectionName}<br/>` : ''}
                         ${description ? `<strong>Description:</strong> ${description}` : ''}
                     </div>
@@ -402,17 +458,17 @@ export class PDFReportGenerator {
 
     // Generate material activity row HTML
     private generateMaterialActivityHTML(activity: MaterialActivity): string {
-        // ✅ FIXED: Calculate activity total correctly based on activity type
+        // FIXED: Calculate activity total correctly based on activity type
         // For imported materials: include in cost calculation
         // For used materials: show cost for reference but don't include in totals
         const activityTotal = activity.materials.reduce((sum, material) => {
-            // ✅ UPDATED: Use totalCost if available, otherwise calculate from perUnitCost
+            // UPDATED: Use totalCost if available, otherwise calculate from perUnitCost
             if (material.totalCost !== undefined) {
                 return sum + Number(material.totalCost);
             } else if (material.perUnitCost !== undefined) {
                 return sum + (Number(material.perUnitCost) * Number(material.qnt));
             } else if (material.cost !== undefined) {
-                // ✅ LEGACY: Fallback to old cost field for backward compatibility
+                // LEGACY: Fallback to old cost field for backward compatibility
                 const costValue = Number(material.cost) || 0;
                 const quantity = Number(material.qnt) || 0;
                 
@@ -431,7 +487,7 @@ export class PDFReportGenerator {
         const isUsed = activity.activity === 'used';
         const isTransferred = activity.activity === 'transferred';
         
-        // ✅ ENHANCED: Create location path for better visibility
+        // ENHANCED: Create location path for better visibility
         const createLocationPath = () => {
             const parts = [];
             if (activity.projectName) parts.push(activity.projectName);
@@ -443,7 +499,7 @@ export class PDFReportGenerator {
         const locationPath = createLocationPath();
         const hasLocationDetails = activity.sectionName || activity.miniSectionName;
         
-        // ✅ SIMPLIFIED: Trust the API data first, minimal fallback logic
+        // SIMPLIFIED: Trust the API data first, minimal fallback logic
         const getLocationDisplayName = () => {
             // Priority 1: Use mini-section name from API (already validated and fetched from DB)
             if (activity.miniSectionName && 
@@ -477,7 +533,7 @@ export class PDFReportGenerator {
             let perUnitCost = 0;
             let materialTotalCost = 0;
             
-            // ✅ UPDATED: Use new cost structure with fallback to legacy
+            // UPDATED: Use new cost structure with fallback to legacy
             if (material.perUnitCost !== undefined && material.totalCost !== undefined) {
                 // New structure: use perUnitCost and totalCost directly
                 perUnitCost = Number(material.perUnitCost);
@@ -492,7 +548,7 @@ export class PDFReportGenerator {
                 const quantity = Number(material.qnt) || 1;
                 perUnitCost = materialTotalCost / quantity;
             } else if (material.cost !== undefined) {
-                // ✅ LEGACY: Fallback to old cost field logic
+                // LEGACY: Fallback to old cost field logic
                 const costValue = Number(material.cost) || 0;
                 const quantity = Number(material.qnt) || 1;
                 
@@ -511,7 +567,7 @@ export class PDFReportGenerator {
             <tr>
                 <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">
                     <div style="display: flex; align-items: center;">
-                        <div style="width: 8px; height: 8px; background-color: ${isImported ? '#10B981' : '#EF4444'}; border-radius: 50%; margin-right: 8px;"></div>
+                        <div style="width: 8px; height: 8px; background-color: ${isImported ? '#047857' : '#B91C1C'}; border-radius: 50%; margin-right: 8px;"></div>
                         <strong>${material.name}</strong>
                     </div>
                 </td>
@@ -533,7 +589,7 @@ export class PDFReportGenerator {
                     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                         <div style="flex: 1;">
                             <div style="margin-bottom: 8px;">
-                                <span style="background-color: ${isImported ? '#10B981' : isUsed ? '#EF4444' : '#2E72F0'}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
+                                <span style="background-color: ${isImported ? '#047857' : isUsed ? '#B91C1C' : '#3A78B5'}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
                                     ${isImported ? 'IMPORTED' : isUsed ? 'USED' : 'TRANSFERRED'}
                                 </span>
                                 <span style="margin-left: 10px; font-weight: 600; color: #374151;">
@@ -544,15 +600,15 @@ export class PDFReportGenerator {
                                     const vendorName = activity.contractor_name || 
                                         activity.materials.find(m => m.contractor_name)?.contractor_name || '';
                                     return vendorName ? `
-                                        <span style="margin-left: 10px; font-size: 12px; color: #059669; font-weight: 600; background-color: #d1fae5; padding: 3px 8px; border-radius: 4px; border: 1px solid #34d399; display: inline-flex; align-items: center; vertical-align: middle;">
-                                            🏢 Vendor: ${vendorName}
+                                        <span style="margin-left: 10px; font-size: 12px; color: #047857; font-weight: 600; background-color: #F8FAFC; padding: 3px 8px; border-radius: 4px; border: 1px solid #34d399; display: inline-flex; align-items: center; vertical-align: middle;">
+                                            Vendor: ${vendorName}
                                         </span>
                                     ` : '';
                                 })()}
                             </div>
                             
                             ${isUsed && hasLocationDetails ? `
-                                <div style="background-color: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 6px; padding: 8px; margin-top: 8px;">
+                                <div style="background-color: #F8FAFC; border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 6px; padding: 8px; margin-top: 8px;">
                                     <div style="display: flex; align-items: center; margin-bottom: 4px;">
                                         <div style="width: 16px; height: 16px; background-color: #EF4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 6px;">
                                             <div style="width: 6px; height: 6px; background-color: white; border-radius: 50%;"></div>
@@ -560,7 +616,7 @@ export class PDFReportGenerator {
                                         <span style="font-size: 12px; font-weight: 600; color: #DC2626;">MATERIAL USAGE LOCATION</span>
                                     </div>
                                     <div style="font-size: 13px; color: #374151; font-weight: 600; margin-left: 22px;">
-                                        📍 Used in: ${displayLocationName}
+                                        Used in: ${displayLocationName}
                                     </div>
                                 </div>
                             ` : ''}
@@ -579,7 +635,7 @@ export class PDFReportGenerator {
                     ${activity.message ? `<div style="margin-top: 8px; font-size: 13px; color: #6b7280; font-style: italic;">"${activity.message}"</div>` : ''}
                     
                     ${isTransferred && activity.transferDetails ? `
-                        <div style="margin-top: 8px; padding: 8px; background-color: rgba(59, 130, 246, 0.1); border-radius: 6px; border-left: 3px solid #2E72F0;">
+                        <div style="margin-top: 8px; padding: 8px; background-color: #F8FAFC; border-radius: 6px; border-left: 3px solid #E2E8F0;">
                             <div style="font-size: 12px; color: #374151; font-weight: 600;">Transfer Details:</div>
                             <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">
                                 From: <strong>${activity.transferDetails.fromProject.name}</strong> → To: <strong>${activity.transferDetails.toProject.name}</strong>
@@ -617,7 +673,7 @@ export class PDFReportGenerator {
         `;
     }
 
-    // ✅ NEW: Generate comprehensive summary page with aggregated costs
+    // NEW: Generate comprehensive summary page with aggregated costs
     private generateSummaryPage(activities: MaterialActivity[], laborData: any[], equipmentData: any[], otherCostData?: any[]): string {
         console.log('📊 ========================================');
         console.log('📊 GENERATING COMPREHENSIVE SUMMARY PAGE');
@@ -797,49 +853,18 @@ export class PDFReportGenerator {
         
         return `
             <div style="margin-top: 20px;">
-                <div style="background: linear-gradient(135deg, #1e293b, #334155); color: white; padding: 24px; border-radius: 12px; margin-bottom: 32px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-                    <h1 style="margin: 0 0 8px 0; font-size: 28px; font-weight: 800;">📊 Project Cost Summary</h1>
-                    <p style="margin: 0; opacity: 0.9; font-size: 14px;">Comprehensive breakdown of all project expenses</p>
-                </div>
-                
-                <!-- Grand Total Card -->
-                <div style="background: linear-gradient(135deg, #059669, #10B981); color: white; padding: 24px; border-radius: 12px; margin-bottom: 32px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-                    <div style="font-size: 16px; opacity: 0.9; margin-bottom: 8px;">Total Project Cost</div>
-                    <div style="font-size: 42px; font-weight: 800; margin-bottom: 16px;">${this.formatCurrency(grandTotal)}</div>
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.2);">
-                        <div>
-                            <div style="font-size: 12px; opacity: 0.8;">Materials</div>
-                            <div style="font-size: 18px; font-weight: 700;">${this.formatCurrency(totalMaterialCost)}</div>
-                            <div style="font-size: 11px; opacity: 0.7;">${grandTotal > 0 ? ((totalMaterialCost / grandTotal) * 100).toFixed(1) : 0}% of total</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 12px; opacity: 0.8;">Labor</div>
-                            <div style="font-size: 18px; font-weight: 700;">${this.formatCurrency(totalLaborCost)}</div>
-                            <div style="font-size: 11px; opacity: 0.7;">${grandTotal > 0 ? ((totalLaborCost / grandTotal) * 100).toFixed(1) : 0}% of total</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 12px; opacity: 0.8;">Equipment</div>
-                            <div style="font-size: 18px; font-weight: 700;">${this.formatCurrency(totalEquipmentCost)}</div>
-                            <div style="font-size: 11px; opacity: 0.7;">${grandTotal > 0 ? ((totalEquipmentCost / grandTotal) * 100).toFixed(1) : 0}% of total</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 12px; opacity: 0.8;">Other Cost</div>
-                            <div style="font-size: 18px; font-weight: 700;">${this.formatCurrency(totalOtherCost)}</div>
-                            <div style="font-size: 11px; opacity: 0.7;">${grandTotal > 0 ? ((totalOtherCost / grandTotal) * 100).toFixed(1) : 0}% of total</div>
-                        </div>
-                    </div>
-                </div>
-                
+                <div class="xr-section"><h2>Totals by item</h2><span>Everything in the period, grouped</span></div>
+
                 <!-- Material Costs Summary -->
                 ${sortedMaterials.length > 0 ? `
                     <div style="margin-bottom: 32px;">
-                        <div style="background-color: #f0fdf4; padding: 16px; border-radius: 8px 8px 0 0; border: 1px solid #10B981; border-bottom: none;">
-                            <h2 style="margin: 0; color: #059669; font-size: 20px; display: flex; align-items: center;">
-                                <span style="margin-right: 8px;">📦</span> Material Costs Summary
+                        <div style="background-color: #F8FAFC; padding: 16px; border-radius: 8px 8px 0 0; border: 1px solid #E2E8F0; border-bottom: none;">
+                            <h2 style="margin: 0; color: #047857; font-size: 13pt; display: flex; align-items: center;">
+                                Material Costs Summary
                             </h2>
                             <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">Total: ${this.formatCurrency(totalMaterialCost)} across ${sortedMaterials.length} material types</p>
                         </div>
-                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #10B981; border-top: none;">
+                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #E2E8F0; border-top: none;">
                             <thead>
                                 <tr style="background-color: #f8fafc;">
                                     <th style="padding: 12px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0; width: 50px;">#</th>
@@ -863,7 +888,7 @@ export class PDFReportGenerator {
                                         <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: center; color: #6b7280;">
                                             ${data.quantity.toLocaleString('en-IN')} ${data.unit}
                                         </td>
-                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 700; color: #059669;">
+                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 700; color: #047857;">
                                             ${this.formatCurrency(data.totalCost)}
                                         </td>
                                         <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; color: #6b7280; font-size: 11px;">
@@ -876,17 +901,17 @@ export class PDFReportGenerator {
                                 `).join('')}
                             </tbody>
                             <tfoot>
-                                <tr style="background-color: #f0fdf4; font-weight: bold;">
-                                    <td colspan="3" style="padding: 12px; border-top: 2px solid #10B981; color: #059669;">
+                                <tr style="background-color: #F8FAFC; font-weight: bold;">
+                                    <td colspan="3" style="padding: 12px; border-top: 2px solid #E2E8F0; color: #047857;">
                                         Total Material Cost
                                     </td>
-                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #10B981; color: #059669; font-size: 16px;">
+                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #E2E8F0; color: #047857; font-size: 16px;">
                                         ${this.formatCurrency(totalMaterialCost)}
                                     </td>
-                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #10B981; color: #059669;">
+                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #E2E8F0; color: #047857;">
 
                                     </td>
-                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #10B981; color: #059669;">
+                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #E2E8F0; color: #047857;">
 
                                     </td>
                                 </tr>
@@ -898,13 +923,13 @@ export class PDFReportGenerator {
                 <!-- Labor Costs Summary -->
                 ${sortedLabor.length > 0 ? `
                     <div style="margin-bottom: 32px;">
-                        <div style="background-color: #fef3c7; padding: 16px; border-radius: 8px 8px 0 0; border: 1px solid #EE730C; border-bottom: none;">
-                            <h2 style="margin: 0; color: #D97706; font-size: 20px; display: flex; align-items: center;">
-                                <span style="margin-right: 8px;">👷</span> Labor Costs Summary
+                        <div style="background-color: #F8FAFC; padding: 16px; border-radius: 8px 8px 0 0; border: 1px solid #E2E8F0; border-bottom: none;">
+                            <h2 style="margin: 0; color: #D97706; font-size: 13pt; display: flex; align-items: center;">
+                                Labor Costs Summary
                             </h2>
                             <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">Total: ${this.formatCurrency(totalLaborCost)} across ${sortedLabor.length} labor categories</p>
                         </div>
-                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #EE730C; border-top: none;">
+                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #E2E8F0; border-top: none;">
                             <thead>
                                 <tr style="background-color: #f8fafc;">
                                     <th style="padding: 12px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0; width: 50px;">#</th>
@@ -920,7 +945,7 @@ export class PDFReportGenerator {
                                         <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-weight: 600; color: #6b7280;">${index + 1}</td>
                                         <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">
                                             <div style="display: flex; align-items: center;">
-                                                <div style="width: 8px; height: 8px; background-color: #EE730C; border-radius: 50%; margin-right: 8px;"></div>
+                                                <div style="width: 8px; height: 8px; background-color: #2B5F95; border-radius: 50%; margin-right: 8px;"></div>
                                                 <strong style="color: #374151;">${name}</strong>
                                             </div>
                                         </td>
@@ -937,14 +962,14 @@ export class PDFReportGenerator {
                                 `).join('')}
                             </tbody>
                             <tfoot>
-                                <tr style="background-color: #fef3c7; font-weight: bold;">
-                                    <td colspan="3" style="padding: 12px; border-top: 2px solid #EE730C; color: #D97706;">
+                                <tr style="background-color: #F8FAFC; font-weight: bold;">
+                                    <td colspan="3" style="padding: 12px; border-top: 2px solid #E2E8F0; color: #D97706;">
                                         Total Labor Cost
                                     </td>
-                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #EE730C; color: #D97706; font-size: 16px;">
+                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #E2E8F0; color: #D97706; font-size: 16px;">
                                         ${this.formatCurrency(totalLaborCost)}
                                     </td>
-                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #EE730C; color: #D97706;">
+                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #E2E8F0; color: #D97706;">
                                         100%
                                     </td>
                                 </tr>
@@ -956,13 +981,13 @@ export class PDFReportGenerator {
                 <!-- Equipment Costs Summary -->
                 ${sortedEquipment.length > 0 ? `
                     <div style="margin-bottom: 32px;">
-                        <div style="background-color: #EAF0FE; padding: 16px; border-radius: 8px 8px 0 0; border: 1px solid #2E72F0; border-bottom: none;">
-                            <h2 style="margin: 0; color: #1E40AF; font-size: 20px; display: flex; align-items: center;">
-                                <span style="margin-right: 8px;">🚜</span> Equipment Costs Summary
+                        <div style="background-color: #F8FAFC; padding: 16px; border-radius: 8px 8px 0 0; border: 1px solid #E2E8F0; border-bottom: none;">
+                            <h2 style="margin: 0; color: #1E40AF; font-size: 13pt; display: flex; align-items: center;">
+                                Equipment Costs Summary
                             </h2>
                             <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">Total: ${this.formatCurrency(totalEquipmentCost)} across ${sortedEquipment.length} equipment types</p>
                         </div>
-                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #2E72F0; border-top: none;">
+                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #E2E8F0; border-top: none;">
                             <thead>
                                 <tr style="background-color: #f8fafc;">
                                     <th style="padding: 12px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0; width: 50px;">#</th>
@@ -998,14 +1023,14 @@ export class PDFReportGenerator {
                                 `).join('')}
                             </tbody>
                             <tfoot>
-                                <tr style="background-color: #EAF0FE; font-weight: bold;">
-                                    <td colspan="3" style="padding: 12px; border-top: 2px solid #2E72F0; color: #1E40AF;">
+                                <tr style="background-color: #F8FAFC; font-weight: bold;">
+                                    <td colspan="3" style="padding: 12px; border-top: 2px solid #E2E8F0; color: #1E40AF;">
                                         Total Equipment Cost
                                     </td>
-                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #2E72F0; color: #1E40AF; font-size: 16px;">
+                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #E2E8F0; color: #1E40AF; font-size: 16px;">
                                         ${this.formatCurrency(totalEquipmentCost)}
                                     </td>
-                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #2E72F0; color: #1E40AF;">
+                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #E2E8F0; color: #1E40AF;">
                                         100%
                                     </td>
                                 </tr>
@@ -1017,13 +1042,13 @@ export class PDFReportGenerator {
                 <!-- Other Costs Summary -->
                 ${sortedOtherCosts.length > 0 ? `
                     <div style="margin-bottom: 32px;">
-                        <div style="background-color: #faf5ff; padding: 16px; border-radius: 8px 8px 0 0; border: 1px solid #8b5cf6; border-bottom: none;">
-                            <h2 style="margin: 0; color: #8b5cf6; font-size: 20px; display: flex; align-items: center;">
-                                <span style="margin-right: 8px;">💸</span> Other Costs Summary
+                        <div style="background-color: #F8FAFC; padding: 16px; border-radius: 8px 8px 0 0; border: 1px solid #E2E8F0; border-bottom: none;">
+                            <h2 style="margin: 0; color: #2B5F95; font-size: 13pt; display: flex; align-items: center;">
+                                Other Costs Summary
                             </h2>
                             <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">Total: ${this.formatCurrency(totalOtherCost)} across ${sortedOtherCosts.length} types</p>
                         </div>
-                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #8b5cf6; border-top: none;">
+                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #E2E8F0; border-top: none;">
                             <thead>
                                 <tr style="background-color: #f8fafc;">
                                     <th style="padding: 12px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e2e8f0; width: 50px;">#</th>
@@ -1038,11 +1063,11 @@ export class PDFReportGenerator {
                                         <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-weight: 600; color: #6b7280;">${index + 1}</td>
                                         <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">
                                             <div style="display: flex; align-items: center;">
-                                                <div style="width: 8px; height: 8px; background-color: #8b5cf6; border-radius: 50%; margin-right: 8px;"></div>
+                                                <div style="width: 8px; height: 8px; background-color: #4F8BC7; border-radius: 50%; margin-right: 8px;"></div>
                                                 <strong style="color: #374151;">${name}</strong>
                                             </div>
                                         </td>
-                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 700; color: #8b5cf6;">
+                                        <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 700; color: #2B5F95;">
                                             ${this.formatCurrency(data.totalCost)}
                                         </td>
                                         <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; color: #6b7280;">
@@ -1052,14 +1077,14 @@ export class PDFReportGenerator {
                                 `).join('')}
                             </tbody>
                             <tfoot>
-                                <tr style="background-color: #faf5ff; font-weight: bold;">
-                                    <td colspan="2" style="padding: 12px; border-top: 2px solid #8b5cf6; color: #8b5cf6;">
+                                <tr style="background-color: #F8FAFC; font-weight: bold;">
+                                    <td colspan="2" style="padding: 12px; border-top: 2px solid #E2E8F0; color: #2B5F95;">
                                         Total Other Cost
                                     </td>
-                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #8b5cf6; color: #8b5cf6; font-size: 16px;">
+                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #E2E8F0; color: #2B5F95; font-size: 16px;">
                                         ${this.formatCurrency(totalOtherCost)}
                                     </td>
-                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #8b5cf6; color: #8b5cf6;">
+                                    <td style="padding: 12px; text-align: right; border-top: 2px solid #E2E8F0; color: #2B5F95;">
                                         100%
                                     </td>
                                 </tr>
@@ -1160,76 +1185,47 @@ export class PDFReportGenerator {
             periodEnd = this.getLocalDateString(endDate);
         }
 
-        const dateRangeHTML = periodStart && periodEnd ? `
-            <div style="background-color: #f0f9ff; padding: 12px; border-radius: 6px; margin-bottom: 20px;">
-                <strong>Report Period:</strong> ${this.formatDate(periodStart)} to ${this.formatDate(periodEnd)}
-            </div>
-        ` : '';
+        // Key figures and "where the money went", in the same category shades
+        // as the app's Cost Summary spending bar.
+        const entryCount = totalActivities + (laborData || []).length + (equipmentData || []).length + (otherCostData || []).length;
+        const shortDay = (value: string) => new Date(value).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        const periodLabel = periodStart && periodEnd ? `${shortDay(periodStart)} – ${shortDay(periodEnd)}` : '';
+        const periodDays = periodStart && periodEnd
+            ? Math.max(1, Math.round((new Date(periodEnd).getTime() - new Date(periodStart).getTime()) / 86400000) + 1)
+            : 0;
+        const categories = [
+            { label: 'Materials', note: `${importedCount} imported · ${usedCount} used${transferredCount ? ` · ${transferredCount} moved` : ''}`, amount: totalMaterialCost, shade: '#173F69', show: includeMaterial },
+            { label: 'Labor', note: `${(laborData || []).length} entries`, amount: totalLaborCost, shade: '#2B5F95', show: includeContractor },
+            { label: 'Equipment', note: `${(equipmentData || []).length} entries`, amount: totalEquipmentCost, shade: '#3A78B5', show: includeEquipment },
+            { label: 'Other costs', note: `${(otherCostData || []).length} entries`, amount: totalOtherCost, shade: '#4F8BC7', show: includeOther },
+        ].filter((c) => c.show);
+        const share = (amount: number) => (totalCost > 0 ? (amount / totalCost) * 100 : 0);
 
+        const dateRangeHTML = '';
         const summaryHTML = `
-            <div style="background-color: #f8fafc; padding: 16px; border-radius: 8px; margin-bottom: 24px; border: 1px solid #e2e8f0;">
-                <h3 style="margin: 0 0 12px 0; color: #374151;">Summary</h3>
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
-                    <div>
-                        <div style="font-size: 24px; font-weight: bold; color: #2E72F0;">${totalActivities + (laborData || []).length + (equipmentData || []).length + (otherCostData || []).length}</div>
-                        <div style="font-size: 12px; color: #6b7280;">Total Entries</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 24px; font-weight: bold; color: #059669;">${this.formatCurrency(totalCost)}</div>
-                        <div style="font-size: 12px; color: #6b7280;">Total Project Cost</div>
-                    </div>
-                </div>
-                
-                <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
-                    <div>
-                        <div style="font-size: 16px; font-weight: bold; color: #10b981;">${this.formatCurrency(totalMaterialCost)}</div>
-                        <div style="font-size: 12px; color: #6b7280;">Materials Cost</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 16px; font-weight: bold; color: #EE730C;">${this.formatCurrency(totalLaborCost)}</div>
-                        <div style="font-size: 12px; color: #6b7280;">Labor Cost</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 16px; font-weight: bold; color: #2E72F0;">${this.formatCurrency(totalEquipmentCost)}</div>
-                        <div style="font-size: 12px; color: #6b7280;">Equipment Cost</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 16px; font-weight: bold; color: #8b5cf6;">${this.formatCurrency(totalOtherCost)}</div>
-                        <div style="font-size: 12px; color: #6b7280;">Other Cost</div>
-                    </div>
-                </div>
-
-                <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
-                        <div>
-                            <div style="font-size: 16px; font-weight: bold; color: #10b981;">${importedCount}</div>
-                            <div style="font-size: 12px; color: #6b7280;">Materials Imported</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 16px; font-weight: bold; color: #ef4444;">${usedCount}</div>
-                            <div style="font-size: 12px; color: #6b7280;">Materials Used</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 16px; font-weight: bold; color: #2E72F0;">${transferredCount}</div>
-                            <div style="font-size: 12px; color: #6b7280;">Materials Transferred</div>
-                        </div>
-                    </div>
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 12px;">
-                        <div>
-                            <div style="font-size: 16px; font-weight: bold; color: #8b5cf6;">${(laborData || []).length}</div>
-                            <div style="font-size: 12px; color: #6b7280;">Labor Entries</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 16px; font-weight: bold; color: #EE730C;">${(equipmentData || []).length}</div>
-                            <div style="font-size: 12px; color: #6b7280;">Equipment Entries</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 16px; font-weight: bold; color: #8b5cf6;">${(otherCostData || []).length}</div>
-                            <div style="font-size: 12px; color: #6b7280;">Other Cost Entries</div>
-                        </div>
-                    </div>
-                </div>
+            <div class="xr-figures">
+                <div class="xr-figure xr-lead"><div class="xr-label">Total cost</div><div class="xr-value xr-num">${this.formatCurrency(totalCost)}</div>
+                    ${periodLabel ? `<div class="xr-note">${periodLabel}</div>` : ''}</div>
+                <div class="xr-figure"><div class="xr-label">Entries</div><div class="xr-value xr-num">${entryCount}</div>
+                    <div class="xr-note">materials, labor, equipment, other</div></div>
+                <div class="xr-figure"><div class="xr-label">Period</div><div class="xr-value xr-num">${periodDays ? `${periodDays} day${periodDays === 1 ? '' : 's'}` : '—'}</div>
+                    <div class="xr-note">${sortedDates.length} with activity</div></div>
             </div>
+
+            <div class="xr-section"><h2>Where the money went</h2></div>
+            <div class="xr-split">${categories.map((c) => share(c.amount) > 0
+                ? `<i style="width:${share(c.amount).toFixed(2)}%;background:${c.shade}"></i>` : '').join('')}</div>
+            <table class="xr-table xr-breakdown">
+                <tbody>${categories.map((c) => `
+                    <tr>
+                        <td><span class="xr-dot" style="background:${c.shade}"></span><span class="xr-name">${c.label}</span>
+                            <div class="xr-sub">${c.note}</div></td>
+                        <td class="xr-r xr-num xr-sub" style="width:60pt">${share(c.amount).toFixed(1)}%</td>
+                        <td class="xr-r xr-num xr-amount" style="width:100pt">${this.formatCurrency(c.amount)}</td>
+                    </tr>`).join('')}
+                    <tr class="xr-total"><td>Total</td><td></td><td class="xr-r xr-num">${this.formatCurrency(totalCost)}</td></tr>
+                </tbody>
+            </table>
         `;
 
         // Generate daily sections with materials, labor, equipment, and other costs integrated
@@ -1276,23 +1272,18 @@ export class PDFReportGenerator {
             const entrySummary = entryParts.length > 0 ? `(${entryParts.join(', ')})` : '';
 
             return `
-                <div style="page-break-inside: avoid; margin-bottom: 32px;">
-                    <div style="background-color: #1e293b; color: white; padding: 16px; border-radius: 8px 8px 0 0; margin-bottom: 0;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <h2 style="margin: 0; font-size: 18px;">${this.formatDate(date)}</h2>
-                            <div style="text-align: right;">
-                                <div style="font-size: 14px; opacity: 0.9;">
-                                    ${totalEntries} ${totalEntries === 1 ? 'entry' : 'entries'} ${entrySummary}
-                                </div>
-                                ${dayTotal > 0 ? `<div style="font-size: 16px; font-weight: bold;">${this.formatCurrency(dayTotal)}</div>` : ''}
-                            </div>
+                <div class="xr-day">
+                    <div class="xr-day-head">
+                        <h2>${this.formatDate(date)}</h2>
+                        <div class="xr-r">
+                            <span class="xr-sub">${totalEntries} ${totalEntries === 1 ? 'entry' : 'entries'} ${entrySummary}</span>
+                            ${dayTotal > 0 ? `<span class="xr-amount xr-num" style="margin-left:10pt">${this.formatCurrency(dayTotal)}</span>` : ''}
                         </div>
                     </div>
-                    <div style="border: 1px solid #e2e8f0; border-top: none; padding: 16px; border-radius: 0 0 8px 8px;">
+                    <div class="xr-day-body">
                         ${dayActivities.length > 0 ? `
                             <div style="margin-bottom: ${dayLabor.length > 0 || dayEquipment.length > 0 || dayOtherCosts.length > 0 ? '24px' : '0'};">
-                                <h3 style="color: #374151; font-size: 14px; margin: 0 0 12px 0; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
-                                    📦 Material Activities (${dayActivities.length})
+                                <h3 class="xr-cat"><span class="xr-dot" style="background:#173F69"></span>Material activities (${dayActivities.length})
                                 </h3>
                                 ${dayActivities.map(activity => this.generateMaterialActivityHTML(activity)).join('')}
                             </div>
@@ -1300,8 +1291,7 @@ export class PDFReportGenerator {
                         
                         ${dayLabor.length > 0 ? `
                             <div style="margin-bottom: ${dayEquipment.length > 0 || dayOtherCosts.length > 0 ? '24px' : '0'};">
-                                <h3 style="color: #374151; font-size: 14px; margin: 0 0 12px 0; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
-                                    👷 Labor Costs (${dayLabor.length})
+                                <h3 class="xr-cat"><span class="xr-dot" style="background:#2B5F95"></span>Labor (${dayLabor.length})
                                 </h3>
                                 ${this.generateLaborHTML(dayLabor)}
                             </div>
@@ -1309,8 +1299,7 @@ export class PDFReportGenerator {
                         
                         ${dayEquipment.length > 0 ? `
                             <div style="margin-bottom: ${dayOtherCosts.length > 0 ? '24px' : '0'};">
-                                <h3 style="color: #374151; font-size: 14px; margin: 0 0 12px 0; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
-                                    🚜 Equipment Costs (${dayEquipment.length})
+                                <h3 class="xr-cat"><span class="xr-dot" style="background:#3A78B5"></span>Equipment (${dayEquipment.length})
                                 </h3>
                                 ${this.generateEquipmentHTML(dayEquipment)}
                             </div>
@@ -1318,26 +1307,24 @@ export class PDFReportGenerator {
                         
                         ${dayOtherCosts.length > 0 ? `
                             <div>
-                                <h3 style="color: #374151; font-size: 14px; margin: 0 0 12px 0; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
-                                    💸 Other Costs (${dayOtherCosts.length})
+                                <h3 class="xr-cat"><span class="xr-dot" style="background:#4F8BC7"></span>Other costs (${dayOtherCosts.length})
                                 </h3>
                                 ${this.generateOtherCostsHTML(dayOtherCosts)}
                             </div>
                         ` : ''}
                         
                         ${dayTotal > 0 ? `
-                            <div style="margin-top: 16px; padding: 12px; background-color: #f0f9ff; border-radius: 6px; border-left: 4px solid #2E72F0;">
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <div>
-                                        <div style="font-size: 14px; font-weight: 600; color: #374151;">Day Total</div>
-                                        <div style="font-size: 11px; color: #6b7280; margin-top: 2px;">
-                                            ${dayMaterialTotal > 0 ? `Materials: ${this.formatCurrency(dayMaterialTotal)}` : ''}${dayMaterialTotal > 0 && (dayLaborTotal > 0 || dayEquipmentTotal > 0 || dayOtherCostTotal > 0) ? ' • ' : ''}${dayLaborTotal > 0 ? `Labor: ${this.formatCurrency(dayLaborTotal)}` : ''}${(dayLaborTotal > 0 && (dayEquipmentTotal > 0 || dayOtherCostTotal > 0)) ? ' • ' : ''}${dayEquipmentTotal > 0 ? `Equipment: ${this.formatCurrency(dayEquipmentTotal)}` : ''}${dayEquipmentTotal > 0 && dayOtherCostTotal > 0 ? ' • ' : ''}${dayOtherCostTotal > 0 ? `Other Cost: ${this.formatCurrency(dayOtherCostTotal)}` : ''}
-                                        </div>
-                                    </div>
-                                    <div style="font-size: 20px; font-weight: bold; color: #2E72F0;">
-                                        ${this.formatCurrency(dayTotal)}
-                                    </div>
+                            <div class="xr-day-total">
+                                <div>
+                                    <div class="xr-name">Day total</div>
+                                    <div class="xr-sub">${[
+                                        dayMaterialTotal > 0 ? `Materials ${this.formatCurrency(dayMaterialTotal)}` : '',
+                                        dayLaborTotal > 0 ? `Labor ${this.formatCurrency(dayLaborTotal)}` : '',
+                                        dayEquipmentTotal > 0 ? `Equipment ${this.formatCurrency(dayEquipmentTotal)}` : '',
+                                        dayOtherCostTotal > 0 ? `Other ${this.formatCurrency(dayOtherCostTotal)}` : '',
+                                    ].filter(Boolean).join(' · ')}</div>
                                 </div>
+                                <div class="xr-amount xr-num" style="font-size:12pt">${this.formatCurrency(dayTotal)}</div>
                             </div>
                         ` : ''}
                     </div>
@@ -1351,97 +1338,30 @@ export class PDFReportGenerator {
             <head>
                 <meta charset="utf-8">
                 <title>${projectName ? `${projectName} - Complete Cost Report` : 'Complete Project Cost Report'}</title>
-                <style>
-                    body {
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                        line-height: 1.4;
-                        color: #374151;
-                        margin: 0;
-                        padding: 20px;
-                        background-color: #ffffff;
-                    }
-                    .header {
-                        margin-bottom: 32px;
-                        padding-bottom: 20px;
-                        border-bottom: 2px solid #e2e8f0;
-                    }
-                    .company-info {
-                        background-color: #f8fafc;
-                        padding: 16px;
-                        border-radius: 8px;
-                        margin-bottom: 24px;
-                        border: 1px solid #e2e8f0;
-                    }
-                    @media print {
-                        body { margin: 0; }
-                        .page-break { page-break-before: always; }
-                    }
-                </style>
+                <style>${COMPLETE_REPORT_CSS}</style>
             </head>
             <body>
-                <div class="header">
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
-                        <div style="flex: 0 0 auto;">
-                            <!-- Client Logo -->
-                            <!-- TODO: Replace with actual client logo image when available -->
-                            <!-- <img src="data:image/png;base64,..." style="width: 80px; height: 80px; border-radius: 12px; object-fit: cover;" alt="Company Logo" /> -->
-                            <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #2E72F0, #1E40AF); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 18px; text-align: center; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-                                ${this.clientData.companyName ? this.clientData.companyName.substring(0, 2).toUpperCase() : 'CM'}
-                            </div>
-                        </div>
-                        <div style="flex: 1; text-align: center; margin: 0 20px;">
-                            <h1 style="margin: 0 0 8px 0; color: #1e293b; font-size: 32px; font-weight: 800;">${projectName || 'Project Cost Report'}</h1>
-                            <div style="background: linear-gradient(90deg, #2E72F0, #1E40AF); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 16px; font-weight: 600; margin-bottom: 8px;">
-                                ${(() => {
-                                    const parts = [];
-                                    if (includeMaterial) parts.push('Material');
-                                    if (includeContractor) parts.push('Contractor');
-                                    if (includeEquipment) parts.push('Equipment');
-                                    if (includeOther) parts.push('Other');
-                                    const typeLabel = parts.length === 4 ? 'Material, Labor & Equipment'
-                                        : parts.length > 0 ? parts.join(', ')
-                                        : 'Cost';
-                                    return `${reportMode === 'summary' ? 'Summary' : 'Detailed'} ${typeLabel} Report`;
-                                })()}
-                            </div>
-                            <p style="margin: 0; color: #6b7280; font-size: 13px;">Generated on ${new Date().toLocaleDateString('en-US', { 
-                                weekday: 'long', 
-                                year: 'numeric', 
-                                month: 'long', 
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                            })}</p>
-                        </div>
-                        <div style="flex: 0 0 auto; width: 80px; text-align: right;">
-                            <!-- Company Info Badge -->
-                            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; font-size: 10px; color: #6b7280; text-align: center;">
-                                <div style="font-weight: 600; color: #374151;">REPORT</div>
-                                <div>ID: ${Date.now().toString().slice(-6)}</div>
-                            </div>
-                        </div>
+                <div class="xr-accent"></div>
+                <div class="xr-head">
+                    <div>
+                        <div class="xr-eyebrow">${(() => {
+                            const parts = [];
+                            if (includeMaterial) parts.push('Materials');
+                            if (includeContractor) parts.push('Labor');
+                            if (includeEquipment) parts.push('Equipment');
+                            if (includeOther) parts.push('Other costs');
+                            const scope = parts.length === 4 ? 'Complete cost report' : `${parts.join(', ')} report`;
+                            return `${scope} · ${reportMode === 'summary' ? 'Summary' : 'Detailed'}`;
+                        })()}</div>
+                        <div class="xr-title">${projectName || 'Project'}</div>
+                    </div>
+                    <div class="xr-issuer">
+                        <strong>${this.clientData?.companyName || this.clientData?.name || this.userData?.company || 'Company'}</strong>
+                        Generated ${new Date().toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}<br>
+                        by ${this.userData?.name || 'Admin'}
                     </div>
                 </div>
 
-                <div class="company-info">
-                    <h3 style="margin: 0 0 12px 0; color: #374151;">Company Information</h3>
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
-                        <div>
-                            <strong>Company:</strong> ${this.clientData.companyName || this.userData.company || 'N/A'}
-                        </div>
-                        <div>
-                            <strong>Contact:</strong> ${this.clientData.email || this.userData.email || 'N/A'}
-                        </div>
-                        <div>
-                            <strong>Phone:</strong> ${this.clientData.phone || this.userData.phone || 'N/A'}
-                        </div>
-                        <div>
-                            <strong>Generated by:</strong> ${this.userData.name || 'N/A'}
-                        </div>
-                    </div>
-                </div>
-
-                ${dateRangeHTML}
                 ${summaryHTML}
 
                 <!-- Comprehensive Project Cost Summary - Start on new page only if there's content -->
@@ -1451,9 +1371,8 @@ export class PDFReportGenerator {
                 ` : ''}
 
                 ${reportMode === 'detailed' && sortedDates.length > 0 ? `
-                    <h2 style="color: #1e293b; margin-top: 32px; margin-bottom: 20px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
-                        Daily Activity Details
-                    </h2>
+                    <div class="page-break"></div>
+                    <div class="xr-section"><h2>Day by day</h2><span>Every entry, newest day first</span></div>
                     ${activitiesHTML}
                 ` : reportMode === 'summary' ? `` : `
                     <div style="text-align: center; padding: 40px; background-color: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
@@ -1462,13 +1381,22 @@ export class PDFReportGenerator {
                     </div>
                 `}
 
-                <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #9ca3af; font-size: 12px;">
-                    <p>This complete cost report was automatically generated by Xsite Application</p>
-                    <p>Project: ${projectName || 'N/A'} | Report ID: ${Date.now()}</p>
-                </div>
             </body>
             </html>
         `;
+    }
+
+    /**
+     * The Complete Report's HTML and file name, for the server to print
+     * (createHtmlReport). Same layout and name generatePDF prints on the phone.
+     */
+    buildCompleteReport(activities: MaterialActivity[], projectName?: string, laborData?: any[], equipmentData?: any[], otherCostData?: any[], startDate?: Date, endDate?: Date, options?: ReportOptions): { html: string; fileName: string } {
+        const html = this.generateHTML(activities, projectName, laborData, equipmentData, otherCostData, startDate, endDate, options);
+        const companyName = this.clientData?.companyName || this.clientData?.name || this.userData?.company || 'Company';
+        const currentDate = this.getLocalDateString(new Date());
+        const clean = (value: string) => value.replace(/[^a-zA-Z0-9\s]/g, '').trim();
+        const fileName = `${clean(companyName)} - ${clean(projectName || 'Project')} - Complete Report - ${currentDate}.pdf`;
+        return { html, fileName };
     }
 
     // Generate and download PDF
@@ -1502,7 +1430,7 @@ export class PDFReportGenerator {
             
             // Generate PDF
             console.log('📄 Calling Print.printToFileAsync...');
-            const { uri, base64: pdfBase64 } = await Print.printToFileAsync({
+            const { uri, base64: pdfBase64 } = await printToFileWithTimeout({
                 html: htmlContent,
                 base64: true,
                 margins: {
@@ -1538,7 +1466,7 @@ export class PDFReportGenerator {
                     // expo-sharing (e.g. in Expo Go), so write the PDF bytes into the document dir.
                     if (!pdfBase64) throw new Error('PDF data missing');
                     customFile.create();
-                    customFile.write(pdfBase64, { encoding: 'base64' });
+                    customFile.writeSync(pdfBase64, { encoding: 'base64' });
                     
                     // Verify the file was copied successfully
                     if (customFile.exists) {
@@ -1967,7 +1895,7 @@ export class PDFReportGenerator {
             `;
 
             // Generate PDF
-            const { uri, base64: pdfBase64 } = await Print.printToFileAsync({
+            const { uri, base64: pdfBase64 } = await printToFileWithTimeout({
                 html: fullHTML,
                 base64: true,
                 margins: { left: 16, top: 16, right: 16, bottom: 16 },
@@ -1989,12 +1917,12 @@ export class PDFReportGenerator {
                     // expo-sharing (e.g. in Expo Go), so write the PDF bytes into the document dir.
                     if (!pdfBase64) throw new Error('PDF data missing');
                     customFile.create();
-                    customFile.write(pdfBase64, { encoding: 'base64' });
+                    customFile.writeSync(pdfBase64, { encoding: 'base64' });
                     if (customFile.exists) {
                         finalUri = customFile.uri;
                     }
                 }
-            } catch (_) { /* use original uri */ }
+            } catch (saveError) { console.warn('⚠️ Could not save the PDF under its report name, using the temporary file:', saveError); }
 
             // Show view/share dialog
             setTimeout(() => {
@@ -2250,7 +2178,7 @@ export class PDFReportGenerator {
             `;
 
             // Generate PDF
-            const { uri, base64: pdfBase64 } = await Print.printToFileAsync({
+            const { uri, base64: pdfBase64 } = await printToFileWithTimeout({
                 html: fullHTML,
                 base64: true,
                 margins: { left: 16, top: 16, right: 16, bottom: 16 },
@@ -2272,12 +2200,12 @@ export class PDFReportGenerator {
                     // expo-sharing (e.g. in Expo Go), so write the PDF bytes into the document dir.
                     if (!pdfBase64) throw new Error('PDF data missing');
                     customFile.create();
-                    customFile.write(pdfBase64, { encoding: 'base64' });
+                    customFile.writeSync(pdfBase64, { encoding: 'base64' });
                     if (customFile.exists) {
                         finalUri = customFile.uri;
                     }
                 }
-            } catch (_) { /* use original uri */ }
+            } catch (saveError) { console.warn('⚠️ Could not save the PDF under its report name, using the temporary file:', saveError); }
 
             // Show view/share dialog
             setTimeout(() => {
@@ -2544,7 +2472,7 @@ export class PDFReportGenerator {
             `;
 
             // Generate PDF
-            const { uri, base64: pdfBase64 } = await Print.printToFileAsync({
+            const { uri, base64: pdfBase64 } = await printToFileWithTimeout({
                 html: fullHTML,
                 base64: true,
                 margins: { left: 16, top: 16, right: 16, bottom: 16 },
@@ -2566,12 +2494,12 @@ export class PDFReportGenerator {
                     // expo-sharing (e.g. in Expo Go), so write the PDF bytes into the document dir.
                     if (!pdfBase64) throw new Error('PDF data missing');
                     customFile.create();
-                    customFile.write(pdfBase64, { encoding: 'base64' });
+                    customFile.writeSync(pdfBase64, { encoding: 'base64' });
                     if (customFile.exists) {
                         finalUri = customFile.uri;
                     }
                 }
-            } catch (_) { /* use original uri */ }
+            } catch (saveError) { console.warn('⚠️ Could not save the PDF under its report name, using the temporary file:', saveError); }
 
             // Show view/share dialog
             setTimeout(() => {
@@ -2793,7 +2721,7 @@ export class PDFReportGenerator {
             `;
 
             // Generate PDF
-            const { uri, base64: pdfBase64 } = await Print.printToFileAsync({
+            const { uri, base64: pdfBase64 } = await printToFileWithTimeout({
                 html: fullHTML,
                 base64: true,
                 margins: { left: 16, top: 16, right: 16, bottom: 16 },
@@ -2815,12 +2743,12 @@ export class PDFReportGenerator {
                     // expo-sharing (e.g. in Expo Go), so write the PDF bytes into the document dir.
                     if (!pdfBase64) throw new Error('PDF data missing');
                     customFile.create();
-                    customFile.write(pdfBase64, { encoding: 'base64' });
+                    customFile.writeSync(pdfBase64, { encoding: 'base64' });
                     if (customFile.exists) {
                         finalUri = customFile.uri;
                     }
                 }
-            } catch (_) { /* use original uri */ }
+            } catch (saveError) { console.warn('⚠️ Could not save the PDF under its report name, using the temporary file:', saveError); }
 
             // Show view/share dialog
             setTimeout(() => {

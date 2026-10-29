@@ -1,11 +1,19 @@
-import ContractorReportGenerator from '@/app/_components/contractor/ContractorReportGenerator';
 import CostSummarySkeleton from '@/components/CostSummarySkeleton';
 import { Colors } from '@/constants/theme';
 import { getClientId } from '@/functions/clientId';
 import { isAdmin, useUser } from '@/hooks/useUser';
 import apiClient from '@/utils/axiosConfig';
+import ReportSheet from '@/components/ReportSheet';
+import {
+  createCostReport,
+  openReport,
+  ReportCancelledError,
+  ReportRequestError,
+  ReportStage,
+  SavedReport,
+  shareReport,
+} from '@/services/costReportPdf';
 import { fetchMaterialStockRows, MaterialStockRow } from '@/utils/materialStockReport';
-import { PDFReportGenerator } from '@/utils/pdfReportGenerator';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -33,6 +41,15 @@ if (Platform.OS === 'android' && !(globalThis as any).nativeFabricUIManager && U
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 type CategoryKey = 'material' | 'contractor' | 'equipment' | 'other';
+
+// The report sheet's state: being made, saved, or failed
+type ReportJob =
+  | { phase: 'working'; key: CategoryKey; count: number; stage: ReportStage }
+  | { phase: 'ready'; key: CategoryKey; count: number; report: SavedReport }
+  | { phase: 'error'; key: CategoryKey; count: number; message: string };
+
+// Shortest time the progress state shows, so a fast report doesn't flash past
+const MIN_WORKING_MS = 900;
 type IoniconName = keyof typeof Ionicons.glyphMap;
 
 interface BreakdownRow {
@@ -320,10 +337,15 @@ const CostSummary = () => {
   const [expandedKey, setExpandedKey] = useState<CategoryKey | null>(null);
   const [budget, setBudget] = useState<number>(0);
   const [budgetFailed, setBudgetFailed] = useState(false);
-  const [generatingKey, setGeneratingKey] = useState<CategoryKey | null>(null);
-  const [showContractorReport, setShowContractorReport] = useState(false);
+  const [reportJob, setReportJob] = useState<ReportJob | null>(null);
+  const [reportActionError, setReportActionError] = useState<string | null>(null);
+  const reportAbortRef = useRef<AbortController | null>(null);
+  const generatingKey = reportJob?.phase === 'working' ? reportJob.key : null;
 
-  // Raw records kept alongside the display summaries. The PDF generators need
+  // Leaving the screen cancels a report still being made
+  useEffect(() => () => reportAbortRef.current?.abort(), []);
+
+  // Raw records kept alongside the display summaries. The PDF reports need
   // the original shapes, not the flattened breakdown rows shown on screen.
   const [materialStockRows, setMaterialStockRows] = useState<MaterialStockRow[]>([]);
   const [equipmentList, setEquipmentList] = useState<any[]>([]);
@@ -518,38 +540,59 @@ const CostSummary = () => {
   };
 
   // ── Report generation ────────────────────────────────────────────────────────
+  // The server builds the PDF from the records on screen; the phone saves it.
   const handleGenerateReport = async (key: CategoryKey) => {
-    if (generatingKey) return;
+    if (reportJob?.phase === 'working') return;
 
-    if (key === 'contractor') {
-      if (contractorList.length === 0) {
-        toast.error('No contractors recorded for this project.');
-        return;
-      }
-      setShowContractorReport(true);
+    const rows =
+      key === 'material' ? materialStockRows
+        : key === 'contractor' ? contractorList
+          : key === 'equipment' ? equipmentList
+            : otherCostEntries;
+    if (rows.length === 0) {
+      toast.error(`No ${CATEGORY_META[key].label.toLowerCase()} recorded for this project yet.`);
       return;
     }
 
-    setGeneratingKey(key);
+    const controller = new AbortController();
+    reportAbortRef.current = controller;
+    const count = rows.length;
+    setReportActionError(null);
+    setReportJob({ phase: 'working', key, count, stage: 'building' });
+    // Keep the progress state up long enough to read, so a fast report doesn't flash
+    const minShown = new Promise((resolve) => setTimeout(resolve, MIN_WORKING_MS));
     try {
-      const userName = await getUserName();
-      const pdfGen = new PDFReportGenerator({}, { name: userName });
-
-      if (key === 'material') {
-        if (materialStockRows.length === 0) { toast.error('No materials found to generate a report.'); return; }
-        await pdfGen.generateMaterialStockReport(materialStockRows, projectName);
-      } else if (key === 'equipment') {
-        if (equipmentList.length === 0) { toast.error('No equipment costs recorded for this project.'); return; }
-        await pdfGen.generateEquipmentCostReport(equipmentList, projectName);
-      } else if (key === 'other') {
-        if (otherCostEntries.length === 0) { toast.error('No other costs recorded for this project.'); return; }
-        await pdfGen.generateOtherCostReport(otherCostEntries, projectName);
-      }
-    } catch (error: any) {
-      toast.error(error?.message || "Couldn't generate the report. Try again.");
+      const [generatedBy, clientId] = await Promise.all([getUserName(), getClientId().catch(() => null)]);
+      const report = await createCostReport({
+        type: key, projectName, generatedBy, clientId, rows,
+        signal: controller.signal,
+        onStage: (stage) => setReportJob((job) => (job?.phase === 'working' && job.key === key ? { ...job, stage } : job)),
+      });
+      await minShown;
+      if (controller.signal.aborted) return;
+      setReportJob({ phase: 'ready', key, count, report });
+    } catch (error) {
+      if (error instanceof ReportCancelledError || controller.signal.aborted) return;
+      setReportJob({
+        phase: 'error', key, count,
+        message: error instanceof ReportRequestError ? error.message : "Couldn't make the report. Try again.",
+      });
     } finally {
-      setGeneratingKey(null);
+      if (reportAbortRef.current === controller) reportAbortRef.current = null;
     }
+  };
+
+  const cancelReport = () => {
+    reportAbortRef.current?.abort();
+    setReportJob(null);
+  };
+
+  const runReportAction = (action: (report: SavedReport) => Promise<void>) => {
+    if (reportJob?.phase !== 'ready') return;
+    setReportActionError(null);
+    action(reportJob.report).catch((error) =>
+      setReportActionError(error instanceof Error ? error.message : "Couldn't open the report."),
+    );
   };
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -686,15 +729,22 @@ const CostSummary = () => {
 
       {renderContent()}
 
-      {/* Contractor report — reuses the same picker/generator used on the Contractor page */}
-      {showContractorReport && (
-        <ContractorReportGenerator
-          visible={showContractorReport}
-          onClose={() => setShowContractorReport(false)}
-          contractorData={null}
-          allContractors={contractorList}
-          projectId={projectId}
+      {reportJob && (
+        <ReportSheet
+          visible
+          phase={reportJob.phase}
+          stage={reportJob.phase === 'working' ? reportJob.stage : 'saving'}
+          categoryLabel={CATEGORY_META[reportJob.key].label}
           projectName={projectName}
+          itemSummary={`${reportJob.count} ${CATEGORY_META[reportJob.key].noun[reportJob.count === 1 ? 0 : 1]}`}
+          report={reportJob.phase === 'ready' ? reportJob.report : null}
+          errorMessage={reportJob.phase === 'error' ? reportJob.message : null}
+          actionError={reportActionError}
+          onCancel={cancelReport}
+          onClose={() => setReportJob(null)}
+          onView={() => runReportAction(openReport)}
+          onShare={() => runReportAction(shareReport)}
+          onRetry={() => handleGenerateReport(reportJob.key)}
         />
       )}
     </SafeAreaView>

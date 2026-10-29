@@ -12,7 +12,7 @@
 
 // PRODUCTION OPTIONS:
 // export const domain = "https://real-estate-optimize-apis.vercel.app/";
-export const domain = "https://xsite.tech"; // Use production API with Bearer token
+export const domain = "http://10.185.182.254:8080"; // Use production API with Bearer token
 
 // Ensure domain has trailing slash for API calls
 export const API_BASE_URL = domain.endsWith('/') ? domain : domain + '/'

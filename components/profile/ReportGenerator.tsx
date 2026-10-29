@@ -2,7 +2,7 @@ import { domain } from '@/lib/domain';
 import { getClientId } from '@/functions/clientId';
 import { Ionicons } from '@expo/vector-icons';
 import apiClient from '@/utils/axiosConfig';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     Alert,
     Modal,
@@ -16,6 +16,25 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { PDFReportGenerator } from '@/utils/pdfReportGenerator';
+import ReportSheet from '@/components/ReportSheet';
+import {
+    createHtmlReport,
+    openReport,
+    ReportCancelledError,
+    ReportRequestError,
+    ReportStage,
+    SavedReport,
+    shareReport,
+} from '@/services/costReportPdf';
+
+// The progress / result sheet's state while a Complete Report is made
+type ReportJob =
+    | { phase: 'working'; stage: ReportStage }
+    | { phase: 'ready'; report: SavedReport }
+    | { phase: 'error'; message: string };
+
+// Shortest time the progress state shows, so a fast report doesn't flash past
+const MIN_WORKING_MS = 900;
 
 interface ReportGeneratorProps {
     visible: boolean;
@@ -90,7 +109,13 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
     const [loadingProjects, setLoadingProjects] = useState(false);
     const [showStartDatePicker, setShowStartDatePicker] = useState(false);
     const [showEndDatePicker, setShowEndDatePicker] = useState(false);
-    const [generating, setGenerating] = useState(false);
+    const [reportJob, setReportJob] = useState<ReportJob | null>(null);
+    const [reportActionError, setReportActionError] = useState<string | null>(null);
+    const reportAbortRef = useRef<AbortController | null>(null);
+    const generating = reportJob?.phase === 'working';
+
+    // Closing the page cancels a report still being made
+    useEffect(() => () => reportAbortRef.current?.abort(), []);
     
     // Section selection state
     const [selectedSections, setSelectedSections] = useState<string[]>([]);
@@ -221,6 +246,8 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
     };
 
     const generateReport = async () => {
+        if (reportAbortRef.current) return;
+        const controller = new AbortController();
         try {
             // Validate that a project is selected
             if (!selectedProjectId) {
@@ -244,7 +271,11 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                 return;
             }
 
-            setGenerating(true);
+            // The server prints the PDF; the sheet shows each step until it's saved
+            reportAbortRef.current = controller;
+            setReportActionError(null);
+            setReportJob({ phase: 'working', stage: 'collecting' });
+            const minShown = new Promise((resolve) => setTimeout(resolve, MIN_WORKING_MS));
             
             console.log('\n========================================');
             console.log('📊 GENERATING MATERIAL ACTIVITY REPORT');
@@ -261,7 +292,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
             // Get client ID
             const clientId = await getClientId();
             if (!clientId) {
-                Alert.alert('Error', 'Client ID not found. Please login again.');
+                setReportJob({ phase: 'error', message: 'Your account details are missing. Log out and log in again.' });
                 return;
             }
 
@@ -491,22 +522,10 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
             if (!activities || activities.length === 0) {
                 // Check if we have labor data, equipment data, or other cost data even if no material activities
                 if (laborData.length === 0 && equipmentData.length === 0 && otherCostData.length === 0) {
-                    Alert.alert(
-                        'No Data Found',
-                        `No material activities, labor entries, equipment entries, or other costs found for the selected period${selectedSections.length > 0 ? ' and sections' : ''} (${formatDate(startDate)} to ${formatDate(endDate)}).`,
-                        [
-                            { text: 'OK' },
-                            {
-                                text: 'Extend Range',
-                                onPress: () => {
-                                    // Extend date range to last 90 days
-                                    const newStartDate = new Date();
-                                    newStartDate.setDate(newStartDate.getDate() - 90);
-                                    setStartDate(newStartDate);
-                                }
-                            }
-                        ]
-                    );
+                    setReportJob({
+                        phase: 'error',
+                        message: `Nothing was recorded for this project${selectedSections.length > 0 ? ' and these sections' : ''} between ${formatDate(startDate)} and ${formatDate(endDate)}. Close this and pick a longer date range.`,
+                    });
                     return;
                 }
             }
@@ -548,18 +567,24 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
 
             // Generate PDF report
             console.log('📄 Creating PDF generator...');
+            if (controller.signal.aborted) return;
             const pdfGenerator = new PDFReportGenerator(clientData, userData);
-            
-            console.log('📄 Calling generatePDF...');
-            console.log('📄 Report options:', { mode: reportMode, included: includedReports });
-            await pdfGenerator.generatePDF(activities || [], reportTitle, laborData, equipmentData, otherCostData, startDate, endDate, {
+            const { html, fileName } = pdfGenerator.buildCompleteReport(activities || [], reportTitle, laborData, equipmentData, otherCostData, startDate, endDate, {
                 mode: reportMode,
                 includeMaterial: includedReports.material,
                 includeContractor: includedReports.contractor,
                 includeEquipment: includedReports.equipment,
                 includeOther: includedReports.other,
             });
-            console.log('📄 generatePDF completed successfully');
+            const report = await createHtmlReport({
+                html,
+                fileName,
+                signal: controller.signal,
+                onStage: (stage) => setReportJob((job) => (job?.phase === 'working' ? { ...job, stage } : job)),
+            });
+            await minShown;
+            if (controller.signal.aborted) return;
+            setReportJob({ phase: 'ready', report });
 
             console.log('✅ PDF generation completed successfully');
             console.log('========================================\n');
@@ -572,14 +597,24 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
             console.error('❌ Error response:', error.response?.data);
             console.error('========================================\n');
             
-            Alert.alert(
-                'Error',
-                error.response?.data?.error || error.message || 'Failed to generate report. Please try again.',
-                [{ text: 'OK' }]
-            );
+            if (error instanceof ReportCancelledError || controller.signal.aborted) return;
+            setReportJob({
+                phase: 'error',
+                message: error instanceof ReportRequestError
+                    ? error.message
+                    : error.response?.data?.error || error.message || "Couldn't make the report. Try again.",
+            });
         } finally {
-            setGenerating(false);
+            if (reportAbortRef.current === controller) reportAbortRef.current = null;
         }
+    };
+
+    const runReportAction = (action: (report: SavedReport) => Promise<void>) => {
+        if (reportJob?.phase !== 'ready') return;
+        setReportActionError(null);
+        action(reportJob.report).catch((error) =>
+            setReportActionError(error instanceof Error ? error.message : "Couldn't open the report."),
+        );
     };
 
     const getActivityFilterIcon = (filter: ActivityFilter) => {
@@ -1181,6 +1216,29 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                         onChange={handleEndDateChange}
                         minimumDate={startDate}
                         maximumDate={new Date()}
+                    />
+                )}
+
+                {reportJob && (
+                    <ReportSheet
+                        visible
+                        phase={reportJob.phase}
+                        stage={reportJob.phase === 'working' ? reportJob.stage : 'saving'}
+                        categoryLabel="Complete Report"
+                        projectName={projects.find(p => p._id === selectedProjectId)?.name || 'Project'}
+                        itemSummary={`${formatDate(startDate)} – ${formatDate(endDate)}`}
+                        report={reportJob.phase === 'ready' ? reportJob.report : null}
+                        errorMessage={reportJob.phase === 'error' ? reportJob.message : null}
+                        actionError={reportActionError}
+                        onCancel={() => {
+                            reportAbortRef.current?.abort();
+                            reportAbortRef.current = null;
+                            setReportJob(null);
+                        }}
+                        onClose={() => setReportJob(null)}
+                        onView={() => runReportAction(openReport)}
+                        onShare={() => runReportAction(shareReport)}
+                        onRetry={generateReport}
                     />
                 )}
             </View>
